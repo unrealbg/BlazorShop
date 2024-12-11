@@ -24,7 +24,12 @@
 
         public async Task<int> DeleteAsync(Guid id)
         {
-            var entity = await this.GetByIdAsync(id) ?? throw new ItemNotFoundException(id);
+            var entity = await this.GetByIdAsync(id);
+
+            if (entity == null)
+            {
+                return 0;
+            }
 
             _ctx.Set<TEntity>().Remove(entity);
             return await _ctx.SaveChangesAsync();
