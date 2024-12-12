@@ -17,6 +17,9 @@ BlazorShop is ideal for:
 - **Backend**: ASP.NET Core Web API
 - **Frontend**: Blazor WebAssembly
 - **Database**: Microsoft SQL Server (MSSQL)
+- **Object-Relational Mapping**: EntityFramework Core
+- **Mapping**: AutoMapper
+- **API Documentation**: Swashbuckle (Swagger)
 
 ## Requirements
 Before getting started, ensure you have the following:
