@@ -1,26 +1,31 @@
-# BlazorShop
-
-BlazorShop is a modern e-commerce application built with Blazor, offering an intuitive interface for managing products, orders, and customers, with a focus on speed, flexibility, and easy customization.
-
-## Table of Contents
-- [Introduction](#introduction)
-- [Features](#features)
-- [Getting Started](#getting-started)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
-
 ## Introduction
-BlazorShop is designed to provide an efficient and user-friendly platform for managing e-commerce operations. Built with Blazor, it offers a seamless experience for both administrators and customers.
+BlazorShop is an open-source e-commerce platform designed to provide an efficient and user-friendly solution for managing online stores. Built with Blazor, it delivers a seamless experience for both administrators and customers.
+
+### Who Is It For?
+BlazorShop is ideal for:
+- Small to medium-sized businesses looking to manage their online store efficiently.
+- Developers wanting to explore Blazor WebAssembly and clean architecture in real-world projects.
 
 ## Features
-- **Product Management**: Easily add, edit, and remove products.
-- **Order Management**: Manage customer orders with ease.
-- **Customer Management**: Keep track of customer information and order history.
-- **Customization**: Flexible and easy to customize to suit your specific needs.
+- **Product Management**: Add, edit, and remove products effortlessly.
+- **Order Management**: Handle customer orders with an intuitive interface.
+- **Customer Management**: Track customer information and their order history.
+- **Customization**: Adaptable to your specific business needs.
+
+## Technologies Used
+- **Backend**: ASP.NET Core Web API
+- **Frontend**: Blazor WebAssembly
+- **Database**: Microsoft SQL Server (MSSQL)
+
+## Requirements
+Before getting started, ensure you have the following:
+- .NET 9 SDK or later
+- SQL Server instance (local or cloud)
+- A web browser that supports WebAssembly (e.g., Chrome, Edge, Firefox)
 
 ## Getting Started
-To get started with BlazorShop, follow these steps:
+Follow these steps to set up and run BlazorShop:
+
 1. **Clone the repository**:
     ```sh
     git clone https://github.com/unrealbg/BlazorShop.git
@@ -29,21 +34,39 @@ To get started with BlazorShop, follow these steps:
     ```sh
     cd BlazorShop
     ```
-3. **Build and run the project**:
+3. **Set up the database**:
+    - Update the `appsettings.json` file with your SQL Server connection string.
+    - Apply migrations (if applicable):
+      ```sh
+      dotnet ef database update
+      ```
+4. **Build and run the project**:
     ```sh
     dotnet run
     ```
 
 ## Contributing
-We welcome contributions to BlazorShop! To contribute:
+We welcome contributions to BlazorShop! Here’s how you can get involved:
 1. Fork the repository.
-2. Create a new branch (`git checkout -b feature-branch`).
-3. Make your changes and commit them (`git commit -m 'Add new feature'`).
-4. Push to the branch (`git push origin feature-branch`).
+2. Create a new branch:
+    ```sh
+    git checkout -b feature-branch
+    ```
+3. Make your changes and commit them:
+    ```sh
+    git commit -m 'Add new feature'
+    ```
+4. Push to your branch:
+    ```sh
+    git push origin feature-branch
+    ```
 5. Open a pull request.
+
+## Demo
+Check out a live demo of BlazorShop [shop.unrealbg.com](https://shop.unrealbg.com).
 
 ## License
 BlazorShop is licensed under the MIT License. See the [LICENSE](./LICENSE) file for more details.
 
 ## Acknowledgements
-- [unrealbg](https://github.com/unrealbg): The creator and main contributor of BlazorShop.
+- **[unrealbg](https://github.com/unrealbg)**: The creator and main contributor of BlazorShop.
