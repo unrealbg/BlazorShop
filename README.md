@@ -8,6 +8,7 @@ BlazorShop is ideal for:
 
 ## Features
 - **Product Management**: Add, edit, and remove products effortlessly.
+- **Category Management**: Organize products into categories for better navigation and management.
 - **Order Management**: Handle customer orders with an intuitive interface.
 - **Customer Management**: Track customer information and their order history.
 - **Customization**: Adaptable to your specific business needs.
