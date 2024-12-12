@@ -19,11 +19,13 @@
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<CreateProduct>> GetAllAsync()
+        public async Task<IEnumerable<GetProduct>> GetAllAsync()
         {
             var result = await _productRepository.GetAllAsync();
 
-            return result.Any() ? _mapper.Map<IEnumerable<CreateProduct>>(result) : [];
+            var mappedData = _mapper.Map<IEnumerable<GetProduct>>(result);
+
+            return result.Any() ? mappedData : [];
         }
 
         public async Task<GetProduct> GetByIdAsync(Guid id)

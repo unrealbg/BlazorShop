@@ -5,7 +5,7 @@
 
     public interface IProductService
     {
-        Task<IEnumerable<CreateProduct>> GetAllAsync();
+        Task<IEnumerable<GetProduct>> GetAllAsync();
 
         Task<GetProduct> GetByIdAsync(Guid id);
 
