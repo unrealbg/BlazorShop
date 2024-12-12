@@ -30,9 +30,9 @@ namespace BlazorShop.API
             builder.Services.AddInfrastructure(builder.Configuration);
             builder.Services.AddApplication();
             builder.Services.AddCors(
-                builder =>
+                co =>
                     {
-                        builder.AddDefaultPolicy(
+                        co.AddDefaultPolicy(
                             opt =>
                                 {
                                     opt.AllowAnyHeader()
