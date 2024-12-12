@@ -1,0 +1,28 @@
+@BlazorShop.API_HostAddress = http://localhost:5282
+
+GET {{BlazorShop.API_HostAddress}}/api/category/
+Accept: application/json
+###
+GET {{BlazorShop.API_HostAddress}}/api/product/
+Accept: application/json
+
+### Add category
+POST {{BlazorShop.API_HostAddress}}/api/category/add
+Content-Type: application/json
+{
+  "name": "Category 1",
+  "description": "Description 1"
+}
+
+### Add product
+POST {{BlazorShop.API_HostAddress}}/api/product/add
+Content-Type: application/json
+{
+  "name": "Product 1",
+  "description": "Description 1",
+  "price": 100,
+  "categoryId": 1
+}
+
+### Get single category
+GET {{BlazorShop.API_HostAddress}}/api/category/single/{{id}}
