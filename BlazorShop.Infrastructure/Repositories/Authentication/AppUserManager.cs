@@ -33,13 +33,7 @@
 
             var result = await _userManager.CreateAsync(user!, user!.PasswordHash!);
 
-            if (result.Succeeded)
-            {
-                await _userManager.AddToRoleAsync(user, "User");
-                return true;
-            }
-
-            return false;
+            return result.Succeeded;
         }
 
         public async Task<bool> LoginUserAsync(AppUser user)
@@ -75,7 +69,7 @@
 
         public async Task<IEnumerable<AppUser?>> GetAllUsersAsync()
         {
-            //return await this._context.Users.ToListAsync();
+            return await this._context.Users.ToListAsync();
         }
 
         public async Task<int> RemoveUserByEmail(string email)
