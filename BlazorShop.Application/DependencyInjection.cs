@@ -2,7 +2,14 @@
 {
     using BlazorShop.Application.Mapping;
     using BlazorShop.Application.Services;
+    using BlazorShop.Application.Services.Authentication;
     using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Application.Services.Contracts.Authentication;
+    using BlazorShop.Application.Validations;
+    using BlazorShop.Application.Validations.Authentication;
+
+    using FluentValidation;
+    using FluentValidation.AspNetCore;
 
     using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +20,11 @@
             services.AddAutoMapper(typeof(MappingConfig));
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
+
+            services.AddFluentValidationAutoValidation();
+            services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
+            services.AddScoped<IValidationService, ValidationService>();
+            services.AddScoped<IAuthenticationService, AuthenticationService>();
 
             return services;
         }
