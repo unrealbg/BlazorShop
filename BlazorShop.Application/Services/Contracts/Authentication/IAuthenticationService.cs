@@ -5,7 +5,7 @@
 
     public interface IAuthenticationService
     {
-        Task<ServiceResponse> CreateUser(CreateUser request);
+        Task<ServiceResponse> CreateUser(CreateUser user);
 
         Task<LoginResponse> LoginUser(LoginUser user);
 
