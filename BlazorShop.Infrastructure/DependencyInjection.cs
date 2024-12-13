@@ -1,12 +1,24 @@
 ﻿namespace BlazorShop.Infrastructure
 {
+    using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Domain.Contracts;
+    using BlazorShop.Domain.Contracts.Authentication;
+    using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Data;
+    using BlazorShop.Infrastructure.ExceptionsMiddleware;
     using BlazorShop.Infrastructure.Repositories;
+    using BlazorShop.Infrastructure.Repositories.Authentication;
+    using BlazorShop.Infrastructure.Services;
 
+    using EntityFramework.Exceptions.SqlServer;
+
+    using Microsoft.AspNetCore.Authentication.JwtBearer;
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.IdentityModel.Tokens;
 
     public static class DependencyInjection
     {
@@ -19,11 +31,60 @@
                         {
                             sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
                             sqlOptions.EnableRetryOnFailure();
-                        }));
+                        }).UseExceptionProcessor());
 
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            services.AddScoped(typeof(IAppLogger<>), typeof(LoggerAdapter<>));
+
+            services.AddDefaultIdentity<AppUser>(
+                opt =>
+                    {
+                        opt.SignIn.RequireConfirmedEmail = true;
+                        opt.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
+                        opt.Password.RequireDigit = true;
+                        opt.Password.RequireNonAlphanumeric = true;
+                        opt.Password.RequiredLength = 8;
+                        opt.Password.RequireLowercase = true;
+                        opt.Password.RequireUppercase = true;
+                        opt.Password.RequiredUniqueChars = 1;
+                    })
+                .AddRoles<IdentityRole>()
+                .AddEntityFrameworkStores<AppDbContext>();
+
+            services.AddAuthentication(opt =>
+                {
+                    opt.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    opt.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                    opt.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                }).AddJwtBearer(opt =>
+                {
+                    opt.SaveToken = true;
+                    opt.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        RequireExpirationTime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidAudience = config["JWT:Audience"],
+                        ValidIssuer = config["JWT:Issuer"],
+                        ClockSkew = TimeSpan.Zero,
+                        IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(config["JWT:Key"]!)),
+                    };
+                });
+
+            services.AddScoped<IAppUserManager, AppUserManager>();
+            services.AddScoped<IAppTokenManager, AppTokenManager>();
+            services.AddScoped<IAppRoleManager, AppRoleManager>();
 
             return services;
+        }
+
+        public static IApplicationBuilder UseInfrastructure(this IApplicationBuilder app)
+        {
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+            return app;
         }
     }
 }
