@@ -1,6 +1,7 @@
 ﻿namespace BlazorShop.API.Controllers
 {
     using BlazorShop.Application.DTOs.Category;
+    using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
 
     using Microsoft.AspNetCore.Mvc;
@@ -74,6 +75,18 @@
         {
             var result = await _categoryService.DeleteAsync(id);
             return result.Success ? this.Ok(result) : this.BadRequest(result.Message);
+        }
+
+        /// <summary>
+        /// Get all products by category.
+        /// </summary>
+        /// <param name="categoryId">The ID of the category. </param>
+        /// <returns>List of products by category.</returns>
+        [HttpGet("products-by-category/{categoryId}")]
+        public async Task<ActionResult<IEnumerable<GetProduct>>> GetProductsByCategory(Guid categoryId)
+        {
+            var results = await _categoryService.GetProductsByCategoryAsync(categoryId);
+            return results.Any() ? this.Ok(results) : this.NotFound();
         }
     }
 }

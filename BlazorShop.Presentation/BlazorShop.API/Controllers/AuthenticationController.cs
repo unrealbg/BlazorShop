@@ -16,6 +16,11 @@
             _authenticationService = authenticationService;
         }
 
+        /// <summary>
+        /// Create a new user
+        /// </summary>
+        /// <param name="user">The user object </param>
+        /// <returns>The result of the creation </returns>
         [HttpPost("create")]
         public async Task<IActionResult> CreateUser(CreateUser user)
         {
@@ -23,6 +28,11 @@
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 
+        /// <summary>
+        /// Login a user
+        /// </summary>
+        /// <param name="user">The user object </param>
+        /// <returns>The result of the login </returns>
         [HttpPost("login")]
         public async Task<IActionResult> LoginUser(LoginUser user)
         {
@@ -30,12 +40,16 @@
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 
+        /// <summary>
+        /// Refresh the token
+        /// </summary>
+        /// <param name="refreshToken">The refresh token </param>
+        /// <returns>The result of the refresh </returns>
         [HttpGet("refreshToken/{refreshToken}")]
         public async Task<IActionResult> RefreshToken(string refreshToken)
         {
             var result = await _authenticationService.ReviveToken(refreshToken);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
-
     }
 }
