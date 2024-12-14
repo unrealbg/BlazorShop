@@ -1,13 +1,18 @@
 ﻿namespace BlazorShop.Infrastructure
 {
     using BlazorShop.Application.Services.Contracts.Logging;
+    using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Authentication;
+    using BlazorShop.Domain.Contracts.CategoryPersistence;
+    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Data;
     using BlazorShop.Infrastructure.ExceptionsMiddleware;
     using BlazorShop.Infrastructure.Repositories;
     using BlazorShop.Infrastructure.Repositories.Authentication;
+    using BlazorShop.Infrastructure.Repositories.CategoryPersistence;
+    using BlazorShop.Infrastructure.Repositories.Payment;
     using BlazorShop.Infrastructure.Services;
 
     using EntityFramework.Exceptions.SqlServer;
@@ -76,6 +81,13 @@
             services.AddScoped<IAppUserManager, AppUserManager>();
             services.AddScoped<IAppTokenManager, AppTokenManager>();
             services.AddScoped<IAppRoleManager, AppRoleManager>();
+
+            services.AddScoped<IPaymentMethod, PaymentMethodRepository>();
+            services.AddScoped<IPaymentService, StripePaymentService>();
+
+            services.AddScoped<ICategoryRepository, CategoryRepository>();
+
+            Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
 
             return services;
         }
