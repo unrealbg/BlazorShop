@@ -3,10 +3,12 @@
     using AutoMapper;
 
     using BlazorShop.Application.DTOs.Category;
+    using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.DTOs.UserIdentity;
     using BlazorShop.Domain.Entities;
     using BlazorShop.Domain.Entities.Identity;
+    using BlazorShop.Domain.Entities.Payment;
 
     public class MappingConfig : Profile
     {
@@ -21,6 +23,9 @@
 
             this.CreateMap<CreateUser, AppUser>();
             this.CreateMap<LoginUser, AppUser>();
+
+            this.CreateMap<PaymentMethod, GetPaymentMethod>();
+            this.CreateMap<CreateAchieve, Achieve>();
         }
     }
 }
