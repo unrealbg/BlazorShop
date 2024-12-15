@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorShop.Web", "BlazorSho
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorShop.Web.Shared", "BlazorShop.Presentation\BlazorShop.Web.Shared\BlazorShop.Web.Shared.csproj", "{AFE32812-DCE4-592A-1B72-5F8A9F560F2E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorShop.Tests", "BlazorShop.Tests\BlazorShop.Tests.csproj", "{FECE84AC-01C9-4F82-9EDA-DD56713E574A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,10 @@ Global
 		{AFE32812-DCE4-592A-1B72-5F8A9F560F2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AFE32812-DCE4-592A-1B72-5F8A9F560F2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AFE32812-DCE4-592A-1B72-5F8A9F560F2E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FECE84AC-01C9-4F82-9EDA-DD56713E574A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FECE84AC-01C9-4F82-9EDA-DD56713E574A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FECE84AC-01C9-4F82-9EDA-DD56713E574A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FECE84AC-01C9-4F82-9EDA-DD56713E574A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
