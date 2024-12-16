@@ -38,7 +38,7 @@ namespace BlazorShop.API
                                     opt.AllowAnyHeader()
                                         .AllowAnyMethod()
                                         .AllowCredentials()
-                                    .WithOrigins("https://localhost:7094");
+                                    .WithOrigins("https://localhost:7258");
                                 });
                     });
 
