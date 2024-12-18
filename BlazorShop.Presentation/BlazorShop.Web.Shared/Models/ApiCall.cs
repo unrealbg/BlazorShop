@@ -12,6 +12,6 @@
 
         public string? Id { get; set; }
 
-        public void ToString(Guid id) => id.ToString();
+        public void ToString(Guid id) => this.Id = id.ToString();
     }
 }
