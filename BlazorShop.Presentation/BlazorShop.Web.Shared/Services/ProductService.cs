@@ -4,6 +4,7 @@
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Services.Contracts;
+    using System.Net;
 
     public class ProductService : IProductService
     {
@@ -29,9 +30,10 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? []
-                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetProduct>>(result);
+
+            return result.IsSuccessStatusCode
+                       ? await _apiCallHelper.GetServiceResponse<IEnumerable<GetProduct>>(result)
+                       : [];
         }
 
         public async Task<GetProduct> GetByIdAsync(Guid id)
@@ -47,9 +49,10 @@
 
             currentApiCall.ToString(id);
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? null!
-                       : await this._apiCallHelper.GetServiceResponse<GetProduct>(result);
+
+            return result.IsSuccessStatusCode
+                       ? await _apiCallHelper.GetServiceResponse<GetProduct>(result)
+                       : null!;
         }
 
         public async Task<ServiceResponse> AddAsync(CreateProduct product)
@@ -66,8 +69,8 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateProduct>(currentApiCall);
             return result == null
-                       ? this._apiCallHelper.ConnectionError()
-                       : await this._apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<ServiceResponse> UpdateAsync(UpdateProduct product)
@@ -84,8 +87,8 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<UpdateProduct>(currentApiCall);
             return result == null
-                       ? this._apiCallHelper.ConnectionError()
-                       : await this._apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<ServiceResponse> DeleteAsync(Guid id)
@@ -101,8 +104,8 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
             return result == null
-                       ? this._apiCallHelper.ConnectionError()
-                       : await this._apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
     }
 }

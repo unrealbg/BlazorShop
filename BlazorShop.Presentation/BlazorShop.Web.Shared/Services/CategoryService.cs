@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.Web.Shared.Services
 {
+    using System.Net;
+
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
@@ -21,36 +23,38 @@
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = Constant.Category.GetAll,
-                                         Type = Constant.ApiCallType.Get,
-                                         Client = client,
-                                         Model = null!,
-                                         Id = null!
-                                     };
+            {
+                Route = Constant.Category.GetAll,
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+                Model = null!,
+                Id = null!
+            };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? []
-                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetCategory>>(result);
+
+            return result.IsSuccessStatusCode
+                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetCategory>>(result)
+                       : [];
         }
 
         public async Task<GetCategory> GetByIdAsync(Guid id)
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = Constant.Category.Get,
-                                         Type = Constant.ApiCallType.Get,
-                                         Client = client,
-                                         Model = null!,
-                                     };
+            {
+                Route = Constant.Category.Get,
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+                Model = null!,
+            };
 
             currentApiCall.ToString(id);
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? null!
-                       : await this._apiCallHelper.GetServiceResponse<GetCategory>(result);
+
+            return result.IsSuccessStatusCode
+                       ? await this._apiCallHelper.GetServiceResponse<GetCategory>(result)
+                       : null!;
         }
 
         public async Task<ServiceResponse> AddAsync(CreateCategory category)
@@ -75,13 +79,13 @@
         {
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = Constant.Category.Update,
-                                         Type = Constant.ApiCallType.Update,
-                                         Client = client,
-                                         Id = null!,
-                                         Model = category,
-                                     };
+            {
+                Route = Constant.Category.Update,
+                Type = Constant.ApiCallType.Update,
+                Client = client,
+                Id = null!,
+                Model = category,
+            };
 
             var result = await _apiCallHelper.ApiCallTypeCall<UpdateCategory>(currentApiCall);
             return result == null
@@ -93,12 +97,12 @@
         {
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = Constant.Category.Delete,
-                                         Type = Constant.ApiCallType.Delete,
-                                         Client = client,
-                                         Model = null!,
-                                     };
+            {
+                Route = Constant.Category.Delete,
+                Type = Constant.ApiCallType.Delete,
+                Client = client,
+                Model = null!,
+            };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
             return result == null
@@ -110,18 +114,19 @@
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = Constant.Category.Get,
-                                         Type = Constant.ApiCallType.Get,
-                                         Client = client,
-                                         Model = null!,
-                                     };
+            {
+                Route = Constant.Category.Get,
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+                Model = null!,
+            };
 
             currentApiCall.ToString(id);
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? []
-                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetProduct>>(result);
+
+            return result.IsSuccessStatusCode
+                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetProduct>>(result)
+                       : [];
         }
     }
 }
