@@ -38,7 +38,7 @@
 
                 var opt = new SessionCreateOptions
                 {
-                    PaymentMethodTypes = ["eur"],
+                    PaymentMethodTypes = ["card"],
                     LineItems = lineItems,
                     Mode = "payment",
                     SuccessUrl = "https://localhost:7094/payment-success",
