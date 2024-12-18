@@ -5,6 +5,8 @@
     using BlazorShop.Application.Services.Authentication;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Services.Contracts.Authentication;
+    using BlazorShop.Application.Services.Contracts.Payment;
+    using BlazorShop.Application.Services.Payment;
     using BlazorShop.Application.Validations;
     using BlazorShop.Application.Validations.Authentication;
 
@@ -25,6 +27,9 @@
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
             services.AddScoped<IValidationService, ValidationService>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+            services.AddScoped<ICartService, CartService>();
+            services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 
             return services;
         }
