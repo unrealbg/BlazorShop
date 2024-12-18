@@ -14,6 +14,7 @@
         public static class Category
         {
             public const string GetAll = "category/all";
+            public const string GetProductByCategory = "category/products-by-category";
             public const string Get = "category/single";
             public const string Add = "category/add";
             public const string Update = "category/update";

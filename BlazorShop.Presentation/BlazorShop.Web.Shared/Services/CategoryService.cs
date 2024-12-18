@@ -115,7 +115,7 @@
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
             {
-                Route = Constant.Category.Get,
+                Route = Constant.Category.GetProductByCategory,
                 Type = Constant.ApiCallType.Get,
                 Client = client,
                 Model = null!,
