@@ -14,7 +14,7 @@
 
         public BrowserCookieStorageService(IJSRuntime jsRuntime)
         {
-            _jsModuleHandler = new JsModuleHandler(jsRuntime, "./js/cookiestorage.js");
+            _jsModuleHandler = new JsModuleHandler(jsRuntime, "./js/cookieStorage.js");
         }
 
         public async Task SetAsync(string name, string value, int days, string path = "/")
