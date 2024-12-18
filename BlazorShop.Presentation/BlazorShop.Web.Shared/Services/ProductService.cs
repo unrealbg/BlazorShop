@@ -21,7 +21,7 @@
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
             {
-                Route = Constant.Product.Get,
+                Route = Constant.Product.GetAll,
                 Type = Constant.ApiCallType.Get,
                 Client = client,
                 Model = null!,

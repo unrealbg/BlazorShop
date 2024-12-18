@@ -22,7 +22,7 @@
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
                                      {
-                                         Route = Constant.Category.Get,
+                                         Route = Constant.Category.GetAll,
                                          Type = Constant.ApiCallType.Get,
                                          Client = client,
                                          Model = null!,
