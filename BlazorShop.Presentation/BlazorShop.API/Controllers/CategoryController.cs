@@ -22,7 +22,7 @@
         /// Get all categories.
         /// </summary>
         /// <returns>List of categories.</returns>
-        [HttpGet]
+        [HttpGet("all")]
         public async Task<ActionResult<IEnumerable<GetCategory>>> GetAll()
         {
             var categories = await _categoryService.GetAllAsync();
