@@ -31,10 +31,8 @@
                 return client;
             }
 
-            var newClient = new HttpClient();
-            newClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-            return newClient;
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return client;
         }
     }
 }
