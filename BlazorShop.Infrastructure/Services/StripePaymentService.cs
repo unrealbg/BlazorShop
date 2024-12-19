@@ -42,7 +42,7 @@
                     LineItems = lineItems,
                     Mode = "payment",
                     SuccessUrl = "https://localhost:7094/payment-success",
-                    CancelUrl = "https://localhost:7094/payment-failed",
+                    CancelUrl = "https://localhost:7094/payment-cancel",
                 };
 
                 var service = new SessionService();
