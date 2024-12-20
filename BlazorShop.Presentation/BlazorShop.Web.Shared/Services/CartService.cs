@@ -34,7 +34,7 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
-        public async Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateAchieve> achieves)
+        public async Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();
             var apiCallModel = new ApiCall
@@ -43,10 +43,10 @@
                                        Type = Constant.ApiCallType.Post,
                                        Client = privateClient,
                                        Id = null!,
-                                       Model = achieves
+                                       Model = orderItems
             };
 
-            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CreateAchieve>>(apiCallModel);
+            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CreateOrderItem>>(apiCallModel);
             return result == null
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);

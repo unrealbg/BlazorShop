@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlazorShop.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20241219155552_Init")]
+    [Migration("20241220105933_Init")]
     partial class Init
     {
         /// <inheritdoc />
@@ -127,7 +127,7 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.Achieve", b =>
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -147,7 +147,7 @@ namespace BlazorShop.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("CheckoutAchieves");
+                    b.ToTable("CheckoutOrderItems");
                 });
 
             modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.PaymentMethod", b =>

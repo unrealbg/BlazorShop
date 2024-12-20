@@ -13,9 +13,9 @@
             this._context = context;
         }
 
-        public async Task<int> SaveCheckoutHistory(IEnumerable<Achieve> checkouts)
+        public async Task<int> SaveCheckoutHistory(IEnumerable<OrderItem> checkouts)
         {
-            this._context.CheckoutAchieves.AddRange(checkouts);
+            this._context.CheckoutOrderItems.AddRange(checkouts);
             return await this._context.SaveChangesAsync();
         }
     }

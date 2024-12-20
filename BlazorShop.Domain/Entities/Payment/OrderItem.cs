@@ -2,7 +2,7 @@
 {
     using System.ComponentModel.DataAnnotations;
 
-    public class Achieve
+    public class OrderItem
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();

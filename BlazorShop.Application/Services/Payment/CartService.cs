@@ -31,9 +31,9 @@
             this._paymentService = paymentService;
         }
 
-        public async Task<ServiceResponse> SaveCheckoutHistoryAsync(IEnumerable<CreateAchieve> achieves)
+        public async Task<ServiceResponse> SaveCheckoutHistoryAsync(IEnumerable<CreateOrderItem> orderItems)
         {
-            var mappedData = this._mapper.Map<IEnumerable<Achieve>>(achieves);
+            var mappedData = this._mapper.Map<IEnumerable<OrderItem>>(orderItems);
             var result = await this._cart.SaveCheckoutHistory(mappedData);
 
             return result > 0 ? new ServiceResponse(true, "Checkout history saved successfully") : new ServiceResponse(false, "Failed to save checkout history");

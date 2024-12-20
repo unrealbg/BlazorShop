@@ -31,12 +31,12 @@
         /// <summary>
         /// Save the checkout history
         /// </summary>
-        /// <param name="achieves">The list of products to save </param>
+        /// <param name="orderItems">The list of products to save </param>
         /// <returns>The result of the save </returns>
         [HttpPost("save-checkout")]
-        public async Task<IActionResult> SaveCheckout(IEnumerable<CreateAchieve> achieves)
+        public async Task<IActionResult> SaveCheckout(IEnumerable<CreateOrderItem> orderItems)
         {
-            var result = await _cartService.SaveCheckoutHistoryAsync(achieves);
+            var result = await _cartService.SaveCheckoutHistoryAsync(orderItems);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
     }

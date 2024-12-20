@@ -66,7 +66,7 @@ namespace BlazorShop.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CheckoutAchieves",
+                name: "CheckoutOrderItems",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -77,7 +77,7 @@ namespace BlazorShop.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CheckoutAchieves", x => x.Id);
+                    table.PrimaryKey("PK_CheckoutOrderItems", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -313,7 +313,7 @@ namespace BlazorShop.Infrastructure.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "CheckoutAchieves");
+                name: "CheckoutOrderItems");
 
             migrationBuilder.DropTable(
                 name: "PaymentMethods");

@@ -2,7 +2,7 @@
 {
     using System.ComponentModel.DataAnnotations;
 
-    public class CreateAchieve
+    public class CreateOrderItem
     {
         [Required]
         public Guid ProductId { get; set; }

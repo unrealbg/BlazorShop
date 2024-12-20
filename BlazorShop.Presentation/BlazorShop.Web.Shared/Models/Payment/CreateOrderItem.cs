@@ -2,7 +2,7 @@
 {
     using System.ComponentModel.DataAnnotations;
 
-    public class CreateAchieve : ProcessCart
+    public class CreateOrderItem : ProcessCart
     {
         [Required]
         public string UserId { get; set; } = string.Empty;
