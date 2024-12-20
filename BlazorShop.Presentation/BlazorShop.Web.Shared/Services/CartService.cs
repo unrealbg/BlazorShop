@@ -46,7 +46,7 @@
                                        Model = achieves
             };
 
-            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<Checkout>>(apiCallModel);
+            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CreateAchieve>>(apiCallModel);
             return result == null
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
