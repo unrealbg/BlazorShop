@@ -8,5 +8,7 @@
         Task<ServiceResponse> SaveCheckoutHistoryAsync(IEnumerable<CreateOrderItem> orderItems);
 
         Task<ServiceResponse> CheckoutAsync(Checkout checkout);
+
+        Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync();
     }
 }
