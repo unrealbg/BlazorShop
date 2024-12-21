@@ -59,12 +59,13 @@ namespace BlazorShop.API
                     app.UseSwaggerUI();
                 }
 
+                app.UseStaticFiles();
+
                 app.UseInfrastructure();
 
                 app.UseHttpsRedirection();
 
                 app.UseAuthorization();
-
 
                 app.MapControllers();
 
