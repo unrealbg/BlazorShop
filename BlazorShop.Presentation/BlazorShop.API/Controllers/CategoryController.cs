@@ -4,6 +4,7 @@
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
 
+    using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
 
@@ -47,6 +48,7 @@
         /// <param name="category">The category object to add.</param>
         /// <returns>The result of the operation.</returns>
         [HttpPost("add")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Add(CreateCategory category)
         {
             var result = await _categoryService.AddAsync(category);
@@ -59,6 +61,7 @@
         /// <param name="category">The category object with updated information.</param>
         /// <returns>The result of the operation.</returns>
         [HttpPut("update")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(UpdateCategory category)
         {
             var result = await _categoryService.UpdateAsync(category);
@@ -71,6 +74,7 @@
         /// <param name="id">The ID of the category to delete.</param>
         /// <returns>The result of the operation.</returns>
         [HttpDelete("delete/{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var result = await _categoryService.DeleteAsync(id);

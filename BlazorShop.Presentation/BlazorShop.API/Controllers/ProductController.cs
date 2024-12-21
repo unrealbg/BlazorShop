@@ -3,6 +3,7 @@
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
 
+    using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
 
     [Route("api/[controller]")]
@@ -45,6 +46,7 @@
         /// <param name="product">The product object to add.</param>
         /// <returns>The result of the operation.</returns>
         [HttpPost("add")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Add(CreateProduct product)
         {
             var result = await _productService.AddAsync(product);
@@ -57,6 +59,7 @@
         /// <param name="product">The product object with updated information.</param>
         /// <returns>The result of the operation.</returns>
         [HttpPut("update")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(UpdateProduct product)
         {
             var result = await _productService.UpdateAsync(product);
@@ -69,6 +72,7 @@
         /// <param name="id">The ID of the product to delete.</param>
         /// <returns>The result of the operation.</returns>
         [HttpDelete("delete/{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var result = await _productService.DeleteAsync(id);
