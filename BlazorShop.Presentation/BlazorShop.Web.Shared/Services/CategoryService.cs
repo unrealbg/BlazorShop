@@ -98,7 +98,7 @@
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
             {
-                Route = Constant.Category.Delete,
+                Route = $"{Constant.Category.Delete}/{id}",
                 Type = Constant.ApiCallType.Delete,
                 Client = client,
                 Model = null!,
