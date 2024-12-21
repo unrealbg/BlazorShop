@@ -59,6 +59,12 @@
             public const string Checkout = "cart/checkout";
             public const string SaveCart = "cart/save-checkout";
             public const string Name = "my-cart";
+            public const string GetOrderItems = "cart/order-items";
+        }
+
+        public static class Administration
+        {
+            public const string AdminRole = "Admin";
         }
     }
 }
