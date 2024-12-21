@@ -51,5 +51,24 @@
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
+
+        public async Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync()
+        {
+            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var currentApiCall = new ApiCall
+                                     {
+                                         Route = Constant.Cart.GetOrderItems,
+                                         Type = Constant.ApiCallType.Get,
+                                         Client = client,
+                                         Model = null!,
+                                         Id = null!
+                                     };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+
+            return result.IsSuccessStatusCode
+                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result)
+                       : [];
+        }
     }
 }
