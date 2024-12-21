@@ -24,7 +24,7 @@
         public static class Authentication
         {
             public const string Type = "Bearer";
-            public const string Register = "authentication/register";
+            public const string Register = "authentication/create";
             public const string Login = "authentication/login";
             public const string ReviveToke = "authentication/refreshToken";
         }
