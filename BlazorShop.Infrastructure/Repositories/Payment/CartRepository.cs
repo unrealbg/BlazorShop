@@ -4,6 +4,8 @@
     using BlazorShop.Domain.Entities.Payment;
     using BlazorShop.Infrastructure.Data;
 
+    using Microsoft.EntityFrameworkCore;
+
     public class CartRepository : ICart
     {
         private readonly AppDbContext _context;
@@ -16,7 +18,12 @@
         public async Task<int> SaveCheckoutHistory(IEnumerable<OrderItem> checkouts)
         {
             this._context.CheckoutOrderItems.AddRange(checkouts);
-            return await this._context.SaveChangesAsync();
+            return await _context.SaveChangesAsync();
+        }
+
+        public async Task<IEnumerable<OrderItem>> GetAllCheckoutHistory()
+        {
+            return await _context.CheckoutOrderItems.AsNoTracking().ToListAsync();
         }
     }
 }
