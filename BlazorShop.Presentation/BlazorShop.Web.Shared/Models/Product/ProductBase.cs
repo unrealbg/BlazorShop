@@ -11,7 +11,7 @@
         public string? Description { get; set; }
 
         [Required]
-        public string? ImageUrl { get; set; }
+        public string? Image { get; set; }
 
         [Required]
         [DataType(DataType.Currency)]
