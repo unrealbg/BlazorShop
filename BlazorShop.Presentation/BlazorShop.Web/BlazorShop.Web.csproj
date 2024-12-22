@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Blazored.Typeahead" Version="4.7.0" />
+    <PackageReference Include="Humanizer.Core" Version="2.14.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.0" PrivateAssets="all" />
@@ -16,6 +17,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorShop.Web.Shared\BlazorShop.Web.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 
 </Project>
