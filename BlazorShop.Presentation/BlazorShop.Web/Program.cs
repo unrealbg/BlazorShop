@@ -39,6 +39,10 @@ namespace BlazorShop.Web
                     }).AddHttpMessageHandler<RefreshTokenHandler>();
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddAuthorizationCore();
+            builder.Services.AddScoped<ICartService, CartService>();
+            builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+            builder.Services.AddSingleton<IToastService, ToastService>();
+
 
             await builder.Build().RunAsync();
         }
