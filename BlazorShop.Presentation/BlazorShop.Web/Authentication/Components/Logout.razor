@@ -1,0 +1,10 @@
+﻿@page "/authentication/logout"
+
+@code {
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TokenService.RemoveCookie(Constant.Cookie.Name);
+        NavigationManager.NavigateTo("/", true);
+    }
+}

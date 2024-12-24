@@ -1,0 +1,87 @@
+﻿@page "/authentication/login"
+@page "/authentication/login/{route}"
+@using BlazorShop.Web.Shared.Toast
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 col-sm-10">
+            <div class="card shadow-lg border-0 rounded-3">
+                <div class="card-header bg-warning text-dark text-center">
+                    <h4 class="fw-bold m-0">Login</h4>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Validation Message -->
+                    @if (!string.IsNullOrEmpty(_message))
+                    {
+                        <div class="alert alert-@_alertType" role="alert">
+                            @_message
+                        </div>
+                    }
+
+                    <!-- Login Form -->
+                    <EditForm Model="User" OnValidSubmit="LoginUser">
+                        <DataAnnotationsValidator />
+                        <div class="form-floating mb-3">
+                            <FloatingTextInput class="form-control" @bind-Value="User.Email" Label="Email Address" Type="text" Placeholder="my@email.com" />
+                            <ValidationMessage For="@(() => User.Email)" />
+                        </div>
+
+                        <div class="form-floating mb-3">
+                            <FloatingTextInput class="form-control" @bind-Value="User.Password" Label="Password" Type="Password" Placeholder="Password" />
+                            <ValidationMessage For="@(() => User.Password)" />
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning fw-bold text-light shadow-sm">Login</button>
+                        </div>
+                    </EditForm>
+                </div>
+
+                <div class="card-footer bg-transparent text-center py-3">
+                    <small>Don't have an account? 
+                        <a href="/authentication/register" class="text-warning fw-bold">Register Here</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    string _alertType = string.Empty;
+    string _message = string.Empty;
+
+    [Parameter]
+    public string Route { get; set; } = null!;
+
+    public LoginUser User { get; set; } = new();
+
+    async Task LoginUser()
+    {
+        _message = string.Empty;
+        _alertType = string.Empty;
+
+        var result = await AuthenticationService.LoginUser(User);
+
+        if (!result.Success)
+        {
+            _message = result.Message;
+            _alertType = "danger";
+            ToastService.ShowToast(ToastLevel.Error, result.Message, "Error", ToastIcon.Error);
+            return;
+        }
+
+        string cookieValue = TokenService.FromToken(result.Token, result.RefreshToken);
+        await TokenService.SetCookie(Constant.Cookie.Name, cookieValue, Constant.Cookie.Days, Constant.Cookie.Path);
+
+        (AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
+
+        NavigationManager.NavigateTo(Route == null ? "/" : Route, true);
+    }
+}
+<style>
+    .card {
+        margin-bottom: 2rem;
+    }
+</style>
