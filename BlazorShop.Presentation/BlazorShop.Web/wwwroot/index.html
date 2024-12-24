@@ -4,28 +4,67 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BlazorShop.Web</title>
+    <title>BlazorShop</title>
     <base href="/" />
     <link rel="stylesheet" href="css/app.css" />
-    <!-- If you add any scoped CSS files, uncomment the following to load them
-    <link href="BlazorShop.Web.styles.css" rel="stylesheet" /> -->
+    <link rel="shortcut icon" type="image/x-icon" href="images/favicon.png">
+    <link href="BlazorShop.Web.styles.css" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" type="text/css" href="font-awesome/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="icon" href="images/fevicon.png" type="image/gif" />
+    <link rel="stylesheet" href="css/jquery.mCustomScrollbar.min.css">
+    <link href="https://fonts.googleapis.com/css?family=Great+Vibes|Poppins:400,700&display=swap&subset=latin-ext" rel="stylesheet">
+    <link rel="stylesheet" href="css/owl.carousel.min.css">
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/popper.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery-3.0.0.min.js"></script>
+    <script src="js/plugin.js"></script>
+    <!-- sidebar -->
+    <script src="js/jquery.mCustomScrollbar.concat.min.js"></script>
+    <script src="js/custom.js"></script>
+
+    <link href="_content/Blazored.Typeahead/blazored-typeahead.css" rel="stylesheet" />
+    <script src="_content/Blazored.Typeahead/blazored-typeahead.js"></script>
 </head>
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div class="loader_main">
+            <div class="loader">
+                <div class="circle"></div>
+            </div>
+            <div class="loading-progress-text"></div>
+        </div>
     </div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+    <div id="blazor-error-ui" class="error-popup">
+        <div class="error-content">
+            <div class="error-message">
+                <span class="error-icon">⚠️</span>
+                <span class="error-text">An unhandled error has occurred.</span>
+            </div>
+            <div class="error-actions">
+                <a href="#" class="reload reload-btn">Reload</a>
+                <a class="dismiss">🗙</a>
+            </div>
+        </div>
     </div>
+
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 
 </html>
+
+<script>
+    function openNav() {
+        document.getElementById("mySidenav").style.width = "250px";
+    }
+
+    function closeNav() {
+        document.getElementById("mySidenav").style.width = "0";
+    }
+</script>
