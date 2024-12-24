@@ -66,5 +66,10 @@
         {
             public const string AdminRole = "Admin";
         }
+
+        public static class File
+        {
+            public const string Upload = "upload/image";
+        }
     }
 }
