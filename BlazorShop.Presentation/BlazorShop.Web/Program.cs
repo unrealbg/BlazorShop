@@ -1,6 +1,6 @@
 namespace BlazorShop.Web
 {
-    using BlazorShop.Web.Authentication;
+    using BlazorShop.Web.Authentication.Providers;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.CookieStorage;
     using BlazorShop.Web.Shared.CookieStorage.Contracts;
@@ -41,8 +41,8 @@ namespace BlazorShop.Web
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<ICartService, CartService>();
             builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+            builder.Services.AddScoped<IFileUploadService, FileUploadService>();
             builder.Services.AddSingleton<IToastService, ToastService>();
-
 
             await builder.Build().RunAsync();
         }
