@@ -29,7 +29,8 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Checkout>(apiCallModel);
-            return result == null
+            
+            return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
@@ -47,7 +48,8 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CreateOrderItem>>(apiCallModel);
-            return result == null
+
+            return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
@@ -66,9 +68,9 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
 
-            return result.IsSuccessStatusCode
-                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result)
-                       : [];
+            return result is null || !result.IsSuccessStatusCode
+                       ? []
+                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result);
         }
     }
 }

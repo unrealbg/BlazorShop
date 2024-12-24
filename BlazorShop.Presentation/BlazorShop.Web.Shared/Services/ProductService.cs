@@ -68,7 +68,8 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateProduct>(currentApiCall);
-            return result == null
+
+            return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
@@ -86,7 +87,8 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<UpdateProduct>(currentApiCall);
-            return result == null
+
+            return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
@@ -103,7 +105,8 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
+
+            return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }

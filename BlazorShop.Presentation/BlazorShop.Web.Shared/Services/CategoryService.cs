@@ -70,9 +70,10 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateCategory>(currentApiCall);
-            return result == null
-                       ? this._apiCallHelper.ConnectionError()
-                       : await this._apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<ServiceResponse> UpdateAsync(UpdateCategory category)
@@ -88,9 +89,10 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<UpdateCategory>(currentApiCall);
-            return result == null
-                       ? this._apiCallHelper.ConnectionError()
-                       : await this._apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<ServiceResponse> DeleteAsync(Guid id)
@@ -105,9 +107,10 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? this._apiCallHelper.ConnectionError()
-                       : await this._apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<IEnumerable<GetProduct>> GetProductsByCategoryAsync(Guid id)

@@ -1,7 +1,9 @@
 ﻿namespace BlazorShop.Web.Shared.Services
 {
+    using System.Net.Http.Json;
     using System.Web;
 
+    using BlazorShop.Web.Shared.Helper;
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Authentication;
@@ -31,7 +33,8 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateUser>(currentApiCall);
-            return result == null
+
+            return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
@@ -49,9 +52,31 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<LoginUser>(currentApiCall);
-            return result == null
-                       ? new LoginResponse(Message: this._apiCallHelper.ConnectionError().Message)
-                       : await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
+
+            if (result is null || !result.IsSuccessStatusCode)
+            {
+                string errorMessage = "An error occurred.";
+
+                if (result?.Content != null)
+                {
+                    try
+                    {
+                        var errorResponse = await result.Content.ReadFromJsonAsync<LoginResponse>();
+                        if (errorResponse != null && !string.IsNullOrWhiteSpace(errorResponse.Message))
+                        {
+                            errorMessage = errorResponse.Message;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        errorMessage = await result.Content.ReadAsStringAsync();
+                    }
+                }
+
+                return new LoginResponse(Message: errorMessage);
+            }
+
+            return await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
         }
 
         public async Task<LoginResponse> ReviveToken(string refreshToken)
@@ -67,9 +92,11 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result == null
-                       ? null!
-                       : await this._apiCallHelper.GetServiceResponse<LoginResponse>(result);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? new LoginResponse(Message: this._apiCallHelper.ConnectionError().Message)
+                       : await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
+       
         }
     }
 }
