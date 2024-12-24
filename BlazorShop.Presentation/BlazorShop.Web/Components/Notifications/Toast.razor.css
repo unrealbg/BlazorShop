@@ -1,0 +1,111 @@
+﻿.custom-toast-container {
+    position: fixed;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+    /* Контейнерите за различните ъгли */
+    .custom-toast-container.top-right {
+        top: 1rem;
+        right: 1rem;
+        align-items: flex-end;
+    }
+
+    .custom-toast-container.top-left {
+        top: 1rem;
+        left: 1rem;
+        align-items: flex-start;
+    }
+
+    .custom-toast-container.bottom-right {
+        bottom: 1rem;
+        right: 1rem;
+        align-items: flex-end;
+    }
+
+    .custom-toast-container.bottom-left {
+        bottom: 1rem;
+        left: 1rem;
+        align-items: flex-start;
+    }
+
+/* Общ вид на тоста */
+.custom-toast {
+    min-width: 300px;
+    margin-bottom: 0.5rem;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.85);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 0.5rem;
+    opacity: 1;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+    /* Преход при показване/скриване */
+    .custom-toast.fade.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .custom-toast.fade {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+/* Хедър на тоста */
+.custom-toast-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    color: #fff;
+    background-color: inherit;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+}
+
+    .custom-toast-header small {
+        margin-left: auto;
+        margin-right: 0.1rem;
+    }
+
+    .custom-toast-header button {
+        margin-left: 0.1rem;
+    }
+
+/* Текстът */
+.custom-toast-body {
+    padding: 1rem;
+    font-size: 0.9rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-bottom-left-radius: 0.25rem;
+    border-bottom-right-radius: 0.25rem;
+}
+
+/* Бутона за затваряне */
+.close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* Цветове спрямо типа на тоста */
+.custom-toast.Info {
+    background-color: #17a2b8;
+}
+
+.custom-toast.Success {
+    background-color: #28a745;
+}
+
+.custom-toast.Warning {
+    background-color: #ea6813;
+}
+
+.custom-toast.Error {
+    background-color: #a50000;
+}
