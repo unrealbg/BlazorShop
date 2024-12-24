@@ -627,6 +627,7 @@ a:hover {
 }
 
 .seemore_bt {
+    cursor: pointer;
     width: 100%;
     float: right;
     text-align: right;
