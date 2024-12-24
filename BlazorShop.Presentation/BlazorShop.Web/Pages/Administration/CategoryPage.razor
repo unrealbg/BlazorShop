@@ -1,0 +1,162 @@
+﻿@page "/category"
+@using BlazorShop.Web.Shared.Models
+@using BlazorShop.Web.Shared.Toast
+@layout AdminLayout
+
+<div class="banner_section">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card p-5 m-2">
+                    <div class="card-header text-center fs-3">Manage Categories</div>
+                    <div class="card-title">
+                        <button class="btn btn-outline-success btn-lg mt-2 float-end" @onclick="AddCategory">
+                            Add Category
+                        </button>
+                    </div>
+                    <div class="card-body" style="height: 500px; overflow: auto">
+                        @if (_categories.Any())
+                        {
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr class="bg-light mb-5">
+                                        <th>Id</th>
+                                        <th>Name</th>
+                                        <th class="text-danger">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var category in _categories)
+                                    {
+                                        <tr>
+                                            <td>@category.Id</td>
+                                            <td>@category.Name</td>
+                                            <td>
+                                                <i class="fa fa-trash text-danger buy_bt" @onclick="() => ConfirmDelete(category.Id)">
+                                                </i>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info fw-bold text-center" role="alert">
+                                No categories found.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ModalDialog @bind-IsVisible="_showDialog">
+    <Header>
+        <h5 class="modal-title">Add New Category</h5>
+    </Header>
+    <Body>
+        <EditForm Model="_category" OnValidSubmit="SaveCategory">
+            <div class="form-group p-2">
+                <FloatingTextInput @bind-Value="_category.Name" Label="Category Name" class="form-control" />
+            </div>
+        </EditForm>
+    </Body>
+    <Footer>
+        <button class="btn btn-primary mt-3" @onclick="SaveCategory">Save</button>
+        <button class="btn btn-danger mt-3" @onclick="Cancel">Cancel</button>
+    </Footer>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
+    <Header>
+        <h5 class="modal-title">Confirm Delete</h5>
+    </Header>
+    <Body>
+        <p>Are you sure you want to delete this category?</p>
+    </Body>
+    <Footer>
+        <button class="btn btn-danger" @onclick="DeleteCategoryConfirmed">Yes, Delete</button>
+        <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+    </Footer>
+</ModalDialog>
+
+@code {
+    private bool _showDialog = false;
+    private bool _showConfirmDeleteDialog = false;
+    private Guid _categoryToDelete;
+    private IEnumerable<GetCategory> _categories = [];
+    private CreateCategory _category = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCategories();
+    }
+
+    private async Task GetCategories()
+    {
+        _categories = await CategoryService.GetAllAsync();
+    }
+
+    private void AddCategory()
+    {
+        _showDialog = true;
+    }
+
+    private void Cancel()
+    {
+        _showDialog = false;
+        _category = new CreateCategory();
+    }
+
+    private void ConfirmDelete(Guid id)
+    {
+        _categoryToDelete = id;
+        _showConfirmDeleteDialog = true;
+    }
+
+    private async Task DeleteCategoryConfirmed()
+    {
+        _showConfirmDeleteDialog = false;
+        var result = await CategoryService.DeleteAsync(_categoryToDelete);
+
+        if (result.Success)
+        {
+            await GetCategories();
+        }
+
+        ShowToast(result, "Delete-Category");
+    }
+
+    private void CancelDelete()
+    {
+        _showConfirmDeleteDialog = false;
+        _categoryToDelete = Guid.Empty;
+    }
+
+    private async Task SaveCategory()
+    {
+        var result = await CategoryService.AddAsync(_category);
+        if (result.Success)
+        {
+            _showDialog = false;
+            await GetCategories();
+        }
+
+        ShowToast(result, "Add-Category");
+    }
+
+    private void ShowToast(ServiceResponse result, string heading)
+    {
+        var level = result.Success ? ToastLevel.Success : ToastLevel.Error;
+        var icon = result.Success ? ToastIcon.Success : ToastIcon.Error;
+
+        ToastService.ShowToast(
+            level: level,
+            message: result.Message,
+            heading: heading,
+            iconClass: icon);
+    }
+}

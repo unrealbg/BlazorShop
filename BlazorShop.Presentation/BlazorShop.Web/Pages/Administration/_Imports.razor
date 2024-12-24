@@ -1,0 +1,33 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Text.Json
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.JSInterop
+@using BlazorShop.Web
+@using BlazorShop.Web.Components
+@using BlazorShop.Web.Components.FormControls
+@using BlazorShop.Web.Authentication.Providers
+@using BlazorShop.Web.Layout
+@using BlazorShop.Web.Shared
+@using BlazorShop.Web.Shared.Helper.Contracts
+@using BlazorShop.Web.Shared.Services.Contracts
+@using BlazorShop.Web.Shared.Models.Authentication
+@using BlazorShop.Web.Shared.Models.Category
+@using BlazorShop.Web.Shared.Models.Product
+@using BlazorShop.Web.Shared.Models.Payment
+@using BlazorShop.Web.Shared.Services
+@using Blazored.Typeahead
+@using BlazorShop.Web.Shared.CookieStorage.Contracts
+@inject ICategoryService CategoryService
+@inject IProductService ProductService
+@inject NavigationManager NavigationManager
+@inject ICartService CartService
+@inject IToastService ToastService
+@attribute [Authorize(Roles = Constant.Administration.AdminRole)]
