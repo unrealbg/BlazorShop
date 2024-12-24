@@ -1,0 +1,31 @@
+﻿@using BlazorShop.Web.Components.Header
+<a href="/" style="position: absolute; left: 30px;">
+    <img src="images/footer-logo.png" alt="Logo" style="height: 30px;">
+</a>
+<div class="header_section mt-5">
+    <div class="container">
+        <div class="containt_main">
+            <SideNavComponent />
+            <SearchBarComponent Products="@Products" />
+            <HeaderBoxComponent />
+        </div>
+    </div>
+</div>
+
+@code
+
+{
+    protected IEnumerable<GetProduct> Products = new List<GetProduct>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Products = await ProductService.GetAllAsync();
+        }
+        catch
+        {
+            // handle error
+        }
+    }
+}
