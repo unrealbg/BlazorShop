@@ -19,9 +19,11 @@
         /// </summary>
         /// <param name="file"></param>
         /// <returns>A message and the URL of the uploaded file.</returns>
-        [HttpPost]
+        [HttpPost("image")]
         public async Task<IActionResult> UploadFile(IFormFile file)
         {
+            Console.WriteLine($"Received file: {file?.FileName}, Content-Type: {file?.ContentType}");
+
             if (file == null || file.Length == 0)
             {
                 return BadRequest("No file uploaded.");
