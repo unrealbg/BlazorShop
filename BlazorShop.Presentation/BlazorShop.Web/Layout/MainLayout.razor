@@ -1,30 +1,14 @@
 ﻿@inherits LayoutComponentBase
 
 <div class="banner_bg_main page-container d-flex flex-column min-vh-100">
-    <!-- Toast and Navbar -->
     <div>
         <Toast />
         <NavBar />
     </div>
 
-    <!-- Header and Main Body -->
     <div class="content flex-grow-1">
         <Header />
         @Body
     </div>
-    <!-- Footer -->
     <Footer />
 </div>
-
-<style>
-    .page-container {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-    }
-
-    .content {
-        flex-grow: 1;
-    }
-
-</style>

@@ -8,20 +8,3 @@
         </a>
     }
 }
-
-@code
-{
-    IEnumerable<GetCategory> _categories = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            _categories = await CategoryService.GetAllAsync();
-        }
-        catch
-        {
-            ToastService.ShowErrorToast("An error occurred while loading categories.");
-        }
-    }
-}
