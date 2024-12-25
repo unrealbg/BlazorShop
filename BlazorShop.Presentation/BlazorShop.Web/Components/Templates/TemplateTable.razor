@@ -1,0 +1,20 @@
+﻿<table class="table @Styles.GetTableFormat(TableFormat) @CssClass">
+    <thead class="@Styles.GetBackgroundColor(HeaderBackground) @Styles.GetTextColor(HeaderTextColor)"
+           style="@Styles.GetFont(HeaderFont); font-size:@HeaderFontSize;">
+    @HeaderTemplate
+    </thead>
+    <tbody class="@Styles.GetBackgroundColor(ContentBackground) @Styles.GetTextColor(ContentTextColor)"
+           style="@Styles.GetFont(ContentFont); font-size:@ContentFontSize;">
+    @ContentTemplate
+    </tbody>
+    <tfoot>
+        @if (ButtonTemplate != null)
+        {
+            <tr>
+                <td colspan="100%" class="text-center">
+                    @ButtonTemplate
+                </td>
+            </tr>
+        }
+    </tfoot>
+</table>
