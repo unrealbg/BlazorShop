@@ -8,6 +8,9 @@
 
   <ItemGroup>
     <Folder Include="Application\Services\Authentication\" />
+    <Folder Include="Application\Services\Payment\" />
+    <Folder Include="Presentation\Services\Authentication\" />
+    <Folder Include="Presentation\Services\Payment\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorShop.Application\BlazorShop.Application.csproj" />
+    <ProjectReference Include="..\BlazorShop.Presentation\BlazorShop.Web.Shared\BlazorShop.Web.Shared.csproj" />
   </ItemGroup>
 
 </Project>
