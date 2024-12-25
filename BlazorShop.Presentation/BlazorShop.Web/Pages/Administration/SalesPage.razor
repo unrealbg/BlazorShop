@@ -65,12 +65,3 @@
         </div>
     </div>
 </div>
-
-@code {
-    private IEnumerable<GetOrderItem> _orderItems = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        _orderItems = await CartService.GetOrderItemsAsync();
-    }
-}
