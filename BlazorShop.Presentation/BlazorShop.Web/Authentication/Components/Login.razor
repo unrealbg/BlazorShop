@@ -1,6 +1,5 @@
 ﻿@page "/authentication/login"
 @page "/authentication/login/{route}"
-@using BlazorShop.Web.Shared.Toast
 
 <div class="container mt-5">
     <div class="row justify-content-center">
@@ -47,41 +46,3 @@
     </div>
 </div>
 
-@code {
-
-    string _alertType = string.Empty;
-    string _message = string.Empty;
-
-    [Parameter]
-    public string Route { get; set; } = null!;
-
-    public LoginUser User { get; set; } = new();
-
-    async Task LoginUser()
-    {
-        _message = string.Empty;
-        _alertType = string.Empty;
-
-        var result = await AuthenticationService.LoginUser(User);
-
-        if (!result.Success)
-        {
-            _message = result.Message;
-            _alertType = "danger";
-            ToastService.ShowToast(ToastLevel.Error, result.Message, "Error", ToastIcon.Error);
-            return;
-        }
-
-        string cookieValue = TokenService.FromToken(result.Token, result.RefreshToken);
-        await TokenService.SetCookie(Constant.Cookie.Name, cookieValue, Constant.Cookie.Days, Constant.Cookie.Path);
-
-        (AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
-
-        NavigationManager.NavigateTo(Route == null ? "/" : Route, true);
-    }
-}
-<style>
-    .card {
-        margin-bottom: 2rem;
-    }
-</style>

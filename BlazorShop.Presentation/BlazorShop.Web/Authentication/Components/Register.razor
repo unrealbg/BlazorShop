@@ -39,29 +39,3 @@
         </div>
     </div>
 </div>
-
-@code {
-    private CreateUser _user = new();
-
-    private async Task HandleRegister()
-    {
-        try
-        {
-            var response = await AuthenticationService.CreateUser(_user);
-
-            if (response.Success)
-            {
-                ToastService.ShowSuccessToast("Registration successful. You can now log in.");
-                NavigationManager.NavigateTo("/authentication/login");
-            }
-            else
-            {
-                ToastService.ShowErrorToast($"Registration failed: {response.Message}");
-            }
-        }
-        catch (Exception ex)
-        {
-            ToastService.ShowErrorToast($"An error occurred: {ex.Message}");
-        }
-    }
-}
