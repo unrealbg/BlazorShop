@@ -1,3 +1,5 @@
+![Build Status](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml/badge.svg)
+
 ## Introduction
 BlazorShop is an open-source e-commerce platform designed to provide an efficient and user-friendly solution for managing online stores. Built with Blazor, it delivers a seamless experience for both administrators and customers.
 
