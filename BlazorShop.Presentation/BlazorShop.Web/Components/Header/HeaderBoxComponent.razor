@@ -1,0 +1,62 @@
+﻿<div class="header_box">
+    <div class="login_menu">
+        <ul>
+            <li>
+                <a href="my-cart" class="cart-link">
+                    <i class="fa fa-shopping-cart" aria-hidden="true"></i>
+                    <span style="color: black">&nbsp;Cart</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="login_menu ml-3">
+        <a href="#" title="Account" class="nav-link" data-toggle="dropdown">
+            <i class="fa fa-user" aria-hidden="true"></i>
+            <span class="text-light">
+                <AuthorizeView>
+                    <Authorized>
+                        <span style="color: #000000"> &nbsp;@UserEmail</span>
+                    </Authorized>
+                    <NotAuthorized>
+                        <span style="color: #000000;">&nbsp;ACCOUNT</span>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </span>
+        </a>
+        <div class="dropdown-menu">
+            <AuthorizeView>
+                <Authorized>
+                    @if (IsAdmin)
+                    {
+                        <div class="dropdown-item">
+                            <div class="hstack gap-1">
+                                <i class="fa fa-cog"></i>
+                                <a href="admin">&nbsp;Admin Menu</a>
+                            </div>
+                        </div>
+                    }
+                    <div class="dropdown-item">
+                        <div class="hstack gap-1">
+                            <i class="fa fa-sign-out"></i>
+                            <a href="/authentication/logout">&nbsp;Logout</a>
+                        </div>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <div class="dropdown-item">
+                        <div class="hstack gap-1">
+                            <i class="fa fa-sign-in"></i>
+                            <a href="/authentication/login">&nbsp; Login</a>
+                        </div>
+                    </div>
+                    <div class="dropdown-item">
+                        <div class="hstack gap-1">
+                            <i class="fa fa-user-plus"></i>
+                            <a href="/authentication/register">&nbsp; Register</a>
+                        </div>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</div>
