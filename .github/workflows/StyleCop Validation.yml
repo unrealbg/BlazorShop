@@ -1,15 +1,34 @@
 name: Code Analysis
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
+    # Checkout the repository
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # Setup .NET
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
-    - name: Run StyleCop
-      run: dotnet tool run stylecop
+        dotnet-version: '9.0.x'
 
+    # Restore dependencies
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    # Build and analyze code with StyleCop
+    - name: Analyze Code with StyleCop
+      run: dotnet build --no-restore -warnaserror
+
+    # Run Unit Tests (optional, but recommended)
+    - name: Run Unit Tests
+      run: dotnet test --no-build --verbosity normal
