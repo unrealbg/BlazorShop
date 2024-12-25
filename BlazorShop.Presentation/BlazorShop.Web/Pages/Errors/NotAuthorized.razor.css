@@ -1,0 +1,19 @@
+﻿.card {
+    border-radius: 8px;
+    border: none;
+    margin-bottom: 40px;
+}
+
+.text-danger {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.lead {
+    font-size: 1.2rem;
+    margin-top: 10px;
+}
+
+.btn {
+    margin: 0 10px;
+}
