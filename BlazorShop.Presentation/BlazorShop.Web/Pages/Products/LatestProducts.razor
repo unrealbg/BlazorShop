@@ -1,0 +1,60 @@
+﻿@using BlazorShop.Web.Shared.Toast
+@implements IAsyncDisposable
+
+<div class="fashion_section container-fluid">
+    <div id="main_slider" class="carousel slide" data-ride="carousel">
+        <div class="carousel-inner">
+            @if (_productGroups.Any())
+            {
+                int sn = 1;
+                foreach (var group in _productGroups)
+                {
+                    <div class="carousel-item @(sn == 1 ? "active" : null)">
+                        <div class="container-fluid">
+                            <div class="container">
+                                <h1 class="fashion_taital fw-bold">Latest Products</h1>
+                                <div class="fashion_section_2">
+                                    <div class="d-flex flex-nowrap justify-content-center align-content-center">
+                                        @foreach (var product in group)
+                                        {
+                                            <div class="col-lg-4 col-sm-3">
+                                                <div class="box_main">
+                                                    <h4 class="shirt_text">@product.Name</h4>
+                                                    <p class="price_text">Price <span style="color: #262626;">€ @product.Price</span></p>
+                                                    <div class="tshirt_img"><img src="@product.Image"/></div>
+                                                    <div class="btn_main">
+                                                        <div class="buy_bt text-danger" @onclick="() => AddItemToCart(product.Id)">
+                                                            <i class="fa fa-cart-plus" aria-hidden="true"></i>Add To Cart
+                                                        </div>
+                                                        <div class="seemore_bt" @onclick="() => ShowDetails(product)">
+                                                            <i class="fa fa-eye"></i> See More
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    sn++;
+                }
+            }
+        </div>
+        @if (_products.Any())
+        {
+            <a class="carousel-control-prev" href="#main_slider" role="button" data-slide="prev">
+                <i class="fa fa-angle-left"></i>
+            </a>
+            <a class="carousel-control-next" href="#main_slider" role="button" data-slide="next">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        }
+    </div>
+</div>
+
+<ProductDetails Product="SelectedProduct"
+                IsVisible="_showModal"
+                OnClose="CloseDetails"
+                OnAddToCart="AddItemToCart" />
