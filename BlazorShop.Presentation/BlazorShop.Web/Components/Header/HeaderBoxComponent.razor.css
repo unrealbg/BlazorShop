@@ -1,0 +1,16 @@
+﻿.cart-link {
+    color: black;
+    text-decoration: none;
+}
+
+.cart-link i {
+    color: black
+}
+
+.cart-link:hover {
+    color: #f26745;
+}
+
+.cart-link:hover i {
+    color: #f26745;
+}

@@ -1,0 +1,14 @@
+﻿@using BlazorShop.Web.Components.Header
+<a href="/" class="logo-container">
+    <img src="images/header-logo.png" alt="Logo" class="logo-image">
+</a>
+
+<div class="header_section mt-5">
+    <div class="container">
+        <div class="containt_main">
+            <SideNavComponent />
+            <SearchBarComponent Products="@Products" />
+            <HeaderBoxComponent />
+        </div>
+    </div>
+</div>

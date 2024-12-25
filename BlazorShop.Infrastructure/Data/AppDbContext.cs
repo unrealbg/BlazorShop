@@ -23,7 +23,7 @@
 
         public DbSet<PaymentMethod> PaymentMethods { get; set; }
 
-        public DbSet<Achieve> CheckoutAchieves { get; set; }
+        public DbSet<OrderItem> CheckoutOrderItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

@@ -1,0 +1,53 @@
+﻿<a href="/" class="logo-container">
+    <img src="images/header-logo.png" alt="Logo" class="logo-image">
+</a>
+<button class="menu-toggle" @onclick="ToggleMenu">☰</button>
+<div class="mobile-side-menu @(IsMenuVisible ? "show" : "")">
+    <ul>
+        <li>
+            <a href="admin" @onclick="HideMenu">
+                <i class="fa fa-home"></i> Home
+            </a>
+        </li>
+        <li>
+            <a href="product" @onclick="HideMenu">
+                <i class="fa fa-box"></i> Products
+            </a>
+        </li>
+        <li>
+            <a href="category" @onclick="HideMenu">
+                <i class="fa fa-list"></i> Categories
+            </a>
+        </li>
+        <li>
+            <a href="authentication/logout" class="text-danger" @onclick="HideMenu">
+                <i class="fa fa-sign-out"></i> Logout
+            </a>
+        </li>
+    </ul>
+</div>
+
+<div class="container">
+    <div class="header_section_top">
+        <div class="row">
+            <div class="col-sm-12" style="position: relative;">
+                <div class="custom_menu">
+                    <ul>
+                        <li>
+                            <a href="admin">Home</a>
+                        </li>
+                        <li>
+                            <a href="product">Products</a>
+                        </li>
+                        <li>
+                            <a href="category">Categories</a>
+                        </li>
+                        <li>
+                            <a class="text-danger" href="authentication/logout">Logout</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

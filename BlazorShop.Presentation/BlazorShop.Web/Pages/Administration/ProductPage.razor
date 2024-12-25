@@ -1,0 +1,117 @@
+﻿@page "/product"
+@layout AdminLayout
+
+<div class="banner_section mt-5">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card p-5 m-2">
+                    <div class="card-header text-center fs-3">Manage Products</div>
+                    <div class="card-title">
+                        <button class="btn btn-outline-success btn-lg mt-2 float-end" @onclick="AddProduct">
+                            Add Product
+                        </button>
+                    </div>
+                    <div class="card-body" style="height: 500px; overflow: auto">
+                        @if (_products.Any())
+                        {
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr class="bg-light mb-5">
+                                        <th>Id</th>
+                                        <th>Image</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Price</th>
+                                        <th>Quantity</th>
+                                        <th>Created Date</th>
+                                        <th class="text-danger">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var product in _products)
+                                    {
+                                        <tr>
+                                            <td>@product.Id</td>
+                                            <td><img src="@product.Image" alt="@product.Name" width="50" height="50" /></td>
+                                            <td>@product.Name</td>
+                                            <td>@product.Description</td>
+                                            <td>@product.Price</td>
+                                            <td>@product.Quantity</td>
+                                            <td>@product.CreatedOn</td>
+                                            <td>
+                                                <i class="fa fa-trash text-danger buy_bt" @onclick="() => ConfirmDelete(product.Id)">
+                                                </i>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info fw-bold text-center" role="alert">
+                                No products found.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ModalDialog @bind-IsVisible="_showDialog">
+    <Header>
+        <h5 class="modal-title">Add New Product</h5>
+    </Header>
+    <Body>
+        <EditForm Model="_product" OnValidSubmit="SaveProduct">
+            <div class="form-group p-2">
+                <FloatingTextInput @bind-Value="_product.Name" Label="Product Name" class="form-control" />
+            </div>
+            <div class="form-group p-2">
+                <label class="form-label">Price</label>
+                <InputNumber @bind-Value="_product.Price" class="form-control" />
+            </div>
+            <div class="form-group p-2">
+                <FloatingNumberInput @bind-Value="_product.Quantity" Label="Quantity" class="form-control" />
+            </div>
+            <div class="form-group p-2">
+                <FloatingTextAreaInput @bind-Value="_product.Description" Label="Product Description" class="form-control" />
+            </div>
+            <div class="form-group p-2">
+                <label for="category" class="form-label">Category</label>
+                <InputSelect id="category" class="form-control" @bind-Value="_product.CategoryId">
+                    <option value="">-- Select a Category --</option>
+                    @foreach (var category in _categories)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="form-group p-2">
+                <label class="form-label">Image</label>
+                <InputFile OnChange="EventCallback.Factory.Create < InputFileChangeEventArgs > (this, OnFileSelected)" accept="image/*" />
+            </div>
+        </EditForm>
+    </Body>
+    <Footer>
+        <button class="btn btn-primary" @onclick="SaveProduct">Save</button>
+        <button class="btn btn-danger" @onclick="Cancel">Cancel</button>
+    </Footer>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
+    <Header>
+        <h5 class="modal-title">Confirm Delete</h5>
+    </Header>
+    <Body>
+        <p>Are you sure you want to delete this product?</p>
+    </Body>
+    <Footer>
+        <button class="btn btn-danger" @onclick="DeleteProductConfirmed">Yes, Delete</button>
+        <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+    </Footer>
+</ModalDialog>
+

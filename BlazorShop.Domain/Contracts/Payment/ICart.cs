@@ -4,6 +4,8 @@
 
     public interface ICart
     {
-        Task<int> SaveCheckoutHistory(IEnumerable<Achieve> checkouts);
+        Task<int> SaveCheckoutHistory(IEnumerable<OrderItem> checkouts);
+
+        Task<IEnumerable<OrderItem>> GetAllCheckoutHistory();
     }
 }

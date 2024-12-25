@@ -20,7 +20,7 @@
         /// Get all payment methods
         /// </summary>
         /// <returns>The payment methods </returns>
-        [HttpGet("payment-methods")]
+        [HttpGet("methods")]
         public async Task<ActionResult<IEnumerable<GetPaymentMethod>>> GetPaymentMethods()
         {
             var paymentMethods = await _paymentMethodService.GetPaymentMethodsAsync();

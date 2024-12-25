@@ -1,0 +1,25 @@
+﻿@page "/faq"
+
+<div class="container mb-3">
+    <div class="col-lg-12">
+        <div class="p-2 mt-3 w-100" style="background-color: rgba(255, 255, 255, 0.5);">
+            <div class="card m-2 text-center" style="background-color: rgba(255, 255, 255, 0.7);">
+                <div class="card-header">
+                    <h1>Frequently Asked Questions</h1>
+                </div>
+                <div class="card-body">
+                    <p>Here you can find answers to the most common questions from our customers.</p>
+                    <div class="faq-section">
+                        @foreach (var faq in FAQs)
+                        {
+                            <div class="faq-item">
+                                <h3 class="faq-question">@faq.Question</h3>
+                                <p class="faq-answer">@faq.Answer</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

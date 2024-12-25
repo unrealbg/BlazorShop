@@ -19,4 +19,8 @@
     <ProjectReference Include="..\..\BlazorShop.Infrastructure\BlazorShop.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\uploads\" />
+  </ItemGroup>
+
 </Project>

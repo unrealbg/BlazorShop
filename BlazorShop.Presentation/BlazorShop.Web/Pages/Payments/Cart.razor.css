@@ -1,0 +1,8 @@
+﻿.quantity-input {
+    width: 80px;
+    text-align: center;
+    font-size: 1rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #6c757d;
+    border-radius: 0.25rem;
+}

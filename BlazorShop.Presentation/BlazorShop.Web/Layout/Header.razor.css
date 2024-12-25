@@ -1,0 +1,32 @@
+﻿.logo-container {
+    position: absolute;
+    top: 10px;
+    left: 8%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.logo-image {
+    height: 50px;
+    max-width: 100%;
+}
+
+@@media (max-width: 1600px) and (min-width: 768px) {
+     .logo-container {
+         top: 50px; /* Регулира височината на логото за устройства между 768px и 1600px */
+         left: 50%;
+         transform: translateX(-50%);
+     }
+ }
+
+@@media (max-width: 768px) {
+     .logo-container {
+         top: 5px; /* Регулира височината на логото за устройства под 768px */
+         left: 50%;
+         transform: translateX(-50%);
+     }
+
+     .logo-image {
+         height: 40px; /* Намалява размера на логото */
+     }
+ }

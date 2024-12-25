@@ -1,0 +1,41 @@
+﻿@page "/authentication/register"
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 col-sm-12">
+            <div class="card shadow-lg border-0 rounded-3 mb-5">
+                <div class="card-header bg-warning text-light text-center">
+                    <h4 class="fw-bold m-0">Register</h4>
+                </div>
+                <div class="card-body p-4">
+                    <EditForm Model="_user" OnValidSubmit="HandleRegister">
+                        <DataAnnotationsValidator />
+                        <div class="form-floating mb-3">
+                            <FloatingTextInput type="text" id="username" class="form-control" @bind-Value="_user.FullName" Label="Full Name" placeholder="John Doe" />
+                            <ValidationMessage For="@(() => _user.FullName)" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <FloatingTextInput type="text" id="email" class="form-control" @bind-Value="_user.Email" Label="Email Address" Placeholder="john@email.com" />
+                            <ValidationMessage For="@(() => _user.Email)" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <FloatingTextInput id="password" class="form-control" @bind-Value="_user.Password" Label="Password" Type="Password" Placeholder="My Password" />
+                            <ValidationMessage For="@(() => _user.Password)" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <FloatingTextInput type="Password" id="confirmPassword" class="form-control" @bind-Value="_user.ConfirmPassword" Label="Confirm Password" placeholder="Confirm Password" />
+                            <ValidationMessage For="@(() => _user.ConfirmPassword)" />
+                        </div>
+                        <button class="btn btn-warning w-100 mt-3" type="submit">Register</button>
+                    </EditForm>
+                </div>
+                <div class="card-footer bg-transparent text-center py-3 mb-2">
+                    <small>
+                        Already have an account?
+                        <a href="/authentication/login" class="text-warning fw-bold">Login</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

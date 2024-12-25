@@ -1,0 +1,14 @@
+﻿<div class="main">
+    <div class="input-group bg-light text-dark">
+        <BlazoredTypeahead 
+            Placeholder="Search Products..." 
+            SearchMethod="SearchProducts"
+            @bind-Value="SelectedProduct">
+            <SelectedTemplate>@context.Name</SelectedTemplate>
+            <ResultTemplate>@context.Name</ResultTemplate>
+            <NotFoundTemplate>
+                <span>No Products Found</span>
+            </NotFoundTemplate>
+        </BlazoredTypeahead>
+    </div>
+</div>

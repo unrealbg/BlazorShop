@@ -1,0 +1,38 @@
+﻿.not-found-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80vh; /* Центрира вертикално */
+    background-color: transparent;
+}
+
+.not-found-content {
+    text-align: center;
+    padding: 2rem;
+    background-color: rgba(255, 255, 255, 0.9); /* Полупрозрачен фон */
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1); /* Леки сенки */
+}
+
+.not-found-content h1 {
+    font-size: 6rem;
+    font-weight: bold;
+    color: #dc3545; /* Червен текст */
+    margin-bottom: 0.5rem;
+}
+
+.not-found-content h2 {
+    font-size: 2rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+}
+
+.not-found-content p {
+    font-size: 1rem;
+    color: #6c757d;
+}
+
+.not-found-content .btn {
+    font-size: 1rem;
+    padding: 0.75rem 1.5rem;
+}

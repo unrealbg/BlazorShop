@@ -19,6 +19,8 @@
 
         public int Quantity { get; set; }
 
+        public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
+
         public Guid CategoryId { get; set; }
 
         public Category? Category { get; set; }

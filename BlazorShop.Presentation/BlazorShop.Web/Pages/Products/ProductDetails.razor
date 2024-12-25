@@ -1,0 +1,28 @@
+﻿<div class="modal fade @(IsVisible ? "show d-flex" : "d-none")" tabindex="-1" role="dialog" style="background-color: rgba(0, 0, 0, 0.5);">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@Product?.Name</h5>
+                <button type="button" class="close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="product-details-card text-center p-4">
+                    <div class="product-image">
+                        <img src="@Product?.Image" alt="@Product?.Name" class="img-fluid rounded mb-3 shadow fixed-size-image" />
+                    </div>
+                    <p class="product-description text-muted">@Product?.Description</p>
+                    <div class="product-meta mt-3">
+                        <p class="product-price text-success fw-bold"><i class="fa fa-euro"></i> @Product?.Price</p>
+                        <p class="product-quantity text-info"><strong>Quantity Available:</strong> @Product?.Quantity</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary me-2" @onclick="HandleAddToCart">
+                    <i class="fa fa-cart-plus"></i> Add to Cart
+                </button>
+                <button class="btn btn-danger" @onclick="CloseModal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

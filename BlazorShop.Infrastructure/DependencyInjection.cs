@@ -87,6 +87,8 @@
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 
+            services.AddScoped<ICart, CartRepository>();
+
             Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
 
             return services;

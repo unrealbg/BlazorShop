@@ -1,0 +1,30 @@
+﻿<div id="mySidenav" class="@(isOpen ? "sidenav open" : "sidenav")">
+    <a href="#" class="closebtn" @onclick="CloseNav" style="color: #cca120">&times;</a>
+
+    <div class="fw-bold text-center text-warning" style="font: Tahoma; font-size: 20px">
+        CATEGORIES
+    </div>
+    <hr style="height: 5px; background: linear-gradient(to bottom, #cca120, grey)" class="text-light" />
+
+    @if (_categories != null)
+    {
+        @foreach (var category in _categories)
+        {
+            <a href="@($"main/products/category/{category.Id}")" @onclick="CloseNav">
+                <i class="fa fa-archive fs-2" style="color:#cca120" aria-hidden="true"></i>
+                @category.Name
+            </a>
+        }
+    }
+
+    <div class="sidenav-footer">
+        <hr style="height: 5px; background: linear-gradient(to bottom, #cca120, grey)" class="text-light" />
+        <div class="fw-bold text-center text-warning" style="font: Tahoma; font-size: 16px;">
+            BlazorShop 1.0
+        </div>
+    </div>
+</div>
+
+<span class="toggle_icon" @onclick="OpenNav">
+    <img src="images/toggle-icon.png">
+</span>

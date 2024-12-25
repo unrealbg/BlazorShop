@@ -1,6 +1,8 @@
 
 namespace BlazorShop.API
 {
+    using System.Text.Json.Serialization;
+
     using BlazorShop.Application;
     using BlazorShop.Infrastructure;
 
@@ -23,7 +25,8 @@ namespace BlazorShop.API
             builder.Host.UseSerilog();
             Log.Logger.Information("Application Starting...");
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers().AddJsonOptions(opt =>
+                opt.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddSwaggerGen();
 
@@ -38,7 +41,7 @@ namespace BlazorShop.API
                                     opt.AllowAnyHeader()
                                         .AllowAnyMethod()
                                         .AllowCredentials()
-                                    .WithOrigins("https://localhost:7094");
+                                    .WithOrigins("https://localhost:7258");
                                 });
                     });
 
@@ -56,12 +59,13 @@ namespace BlazorShop.API
                     app.UseSwaggerUI();
                 }
 
+                app.UseStaticFiles();
+
                 app.UseInfrastructure();
 
                 app.UseHttpsRedirection();
 
                 app.UseAuthorization();
-
 
                 app.MapControllers();
 

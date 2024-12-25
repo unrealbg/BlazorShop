@@ -38,11 +38,11 @@
 
                 var opt = new SessionCreateOptions
                 {
-                    PaymentMethodTypes = ["eur"],
+                    PaymentMethodTypes = ["card"],
                     LineItems = lineItems,
                     Mode = "payment",
-                    SuccessUrl = "https://localhost:7094/payment-success",
-                    CancelUrl = "https://localhost:7094/payment-failed",
+                    SuccessUrl = "https://localhost:7258/payment-success",
+                    CancelUrl = "https://localhost:7258/payment-cancel",
                 };
 
                 var service = new SessionService();

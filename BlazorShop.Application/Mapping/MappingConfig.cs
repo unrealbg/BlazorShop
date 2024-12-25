@@ -25,7 +25,7 @@
             this.CreateMap<LoginUser, AppUser>();
 
             this.CreateMap<PaymentMethod, GetPaymentMethod>();
-            this.CreateMap<CreateAchieve, Achieve>();
+            this.CreateMap<CreateOrderItem, OrderItem>();
         }
     }
 }

@@ -1,0 +1,57 @@
+﻿.todays-deals-section {
+    background-color: #343a40;
+    padding: 40px 20px;
+    color: white;
+}
+
+.deal-card {
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.deal-card:hover {
+    transform: translateY(-5px);
+}
+
+.deal-card-header {
+    height: 180px;
+    overflow: hidden;
+}
+
+.deal-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.deal-card-body {
+    padding: 15px;
+    text-align: center;
+}
+
+.deal-card-title {
+    font-size: 1.25rem;
+    margin-bottom: 10px;
+}
+
+.deal-card-price {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 15px;
+}
+
+.deal-card-actions button,
+.deal-card-actions a {
+    margin: 5px 0;
+    font-size: 0.9rem;
+}
+
+.deal-card-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
