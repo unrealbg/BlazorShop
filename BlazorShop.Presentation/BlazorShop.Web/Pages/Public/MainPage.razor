@@ -1,0 +1,53 @@
+﻿@page "/main/products/category/{categoryId}"
+@implements IAsyncDisposable
+
+@if (SelectedCategory != null && _productsByCategory.Any())
+{
+    <div class="container-fluid mt-5 p-3">
+        <div class="container">
+            <h1 class="fashion_taital text-light fw-bold">@SelectedCategory!.Name Products</h1>
+            <div class="fashion_section_2">
+                <div class="row">
+                    @foreach (var product in _productsByCategory)
+                    {
+                        <div class="col-lg-4 col-sm-12">
+                            <div class="box_main">
+                                <h4 class="shirt_text">@product.Name</h4>
+                                @if (product.IsNew)
+                                {
+                                    <span id="newTag" class="badge badge-pill badge-success fs-2">New</span>
+                                }
+                                <p class="price_text"> Price <span style="color: #262626;">€ @product.Price</span></p>
+                                <div class="tshirt_img"> <img src="@product.Image" /></div>
+                                <div class="btn_main">
+                                    <div class="buy_bt text-danger" @onclick="() => AddItemToCart(product.Id)">
+                                        <i class="fa fa-cart-plus" aria-hidden="true"></i>Add To Cart
+                                    </div>
+                                    <div class="seemore_bt" @onclick="() => ShowDetails(product)">
+                                        <i class="fa fa-eye"></i> See More
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container mt-5 mb-5">
+        <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+            <div class="alert alert-info p-4 text-center rounded-3 shadow">
+                <h4>No products found in this category</h4>
+                <a href="/" class="btn btn-warning mt-3 fw-bold">Go Back to Home</a>
+            </div>
+        </div>
+    </div>
+}
+
+<ProductDetails Product="SelectedProduct"
+                IsVisible="_showModal"
+                OnClose="CloseDetails"
+                OnAddToCart="AddItemToCart" />
