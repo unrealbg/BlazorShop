@@ -1,0 +1,33 @@
+﻿@page "/search-result/{filter}"
+@if (_searchedProducts.Any())
+{
+    <div class="container-fluid mt-5 p-3">
+        <div class="container">
+            <h1 class="fashion_taital text-light fw-bold">Search Results</h1>
+            <div class="fashion_section_2">
+                <div class="row">
+                    @foreach (var product in _searchedProducts)
+                    {
+                        <div class="col-lg-4 col-sm-12">
+                            <div class="box_main">
+                                <h4 class="shirt_text">@product.Name</h4>
+                                @if (product.IsNew)
+                                {
+                                    <span id="newTag" class="badge badge-pill badge-success fs-2">New</span>
+                                }
+                                <p class="price_text"> Price <span style="color: #262626;">€ @product.Price</span></p>
+                                <div class="tshirt_img"> <img src="@product.Image" /></div>
+                                <div class="btn_main">
+                                    <div class="buy_bt text-danger" @onclick="() => AddItemToCart(product.Id)">
+                                        <i class="fa fa-cart-plus" aria-hidden="true"></i>Add To Cart
+                                    </div>
+                                    <div class="seemore_bt"><a href="#">See More</a></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
