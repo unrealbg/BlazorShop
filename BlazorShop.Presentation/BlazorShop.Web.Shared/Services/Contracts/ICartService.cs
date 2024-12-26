@@ -10,5 +10,7 @@
         Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems);
 
         Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync();
+
+        Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId();
     }
 }

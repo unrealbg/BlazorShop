@@ -120,5 +120,42 @@
 
             return (cartProducts!, totalAmount);
         }
+
+        public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId(string userId)
+        {
+            // Вземете историята на поръчките само за дадения потребител
+            var history = await _cart.GetCheckoutHistoryByUserId(userId);
+
+            if (history == null || !history.Any())
+            {
+                return new List<GetOrderItem>();
+            }
+
+            // Вземете всички продукти
+            var products = await _productRepository.GetAllAsync();
+
+            // Създайте списък с поръчки за потребителя
+            var orderItems = new List<GetOrderItem>();
+
+            // Вземете детайлите на потребителя
+            var customerDetails = await _userManager.GetUserByIdAsync(userId);
+
+            foreach (var item in history)
+            {
+                var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+
+                orderItems.Add(new GetOrderItem
+                                   {
+                                       CustomerName = customerDetails?.UserName,
+                                       CustomerEmail = customerDetails?.Email,
+                                       ProductName = product?.Name,
+                                       AmountPayed = item.Quantity * (product?.Price ?? 0),
+                                       QuantityOrdered = item.Quantity,
+                                       DatePurchased = item.CreatedOn
+                                   });
+            }
+
+            return orderItems;
+        }
     }
 }

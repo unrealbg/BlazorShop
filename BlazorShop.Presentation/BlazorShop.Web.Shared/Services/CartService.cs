@@ -72,5 +72,22 @@
                        ? []
                        : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result);
         }
+
+        public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId()
+        {
+            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var currentApiCall = new ApiCall
+            {
+                Route = Constant.Cart.GetUserOrderItems,
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+                Model = null!,
+                Id = null!
+            };
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+            return result is null || !result.IsSuccessStatusCode
+                       ? []
+                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result);
+        }
     }
 }
