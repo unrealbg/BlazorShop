@@ -1,0 +1,218 @@
+﻿@page "/profile"
+
+<div class="container mb-3">
+    <div class="col-lg-12">
+        <div class="p-2 mt-3 w-100" style="background-color: rgba(255, 255, 255, 0.5);">
+            <div class="card m-2" style="background-color: rgba(255, 255, 255, 0.7);">
+                <div class="card-header text-center">
+                    <h1>My Profile</h1>
+                </div>
+                <div class="row">
+                    <!-- Side Navigation Menu -->
+                    <div class="col-lg-3 col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-primary text-light text-center">
+                                <strong>Menu</strong>
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item @(ActiveTab == "profile" ? "active-tab" : "")">
+                                    <button class="btn btn-link text-dark p-0 fw-bold" @onclick='() => SwitchTab("profile")'>Profile Details</button>
+                                </li>
+                                <li class="list-group-item @(ActiveTab == "orders" ? "active-tab" : "")">
+                                    <button class="btn btn-link text-dark p-0 fw-bold" @onclick='() => SwitchTab("orders")'>My Orders</button>
+                                </li>
+                                <li class="list-group-item @(ActiveTab == "password" ? "active-tab" : "")">
+                                    <button class="btn btn-link text-dark p-0 fw-bold" @onclick='() => SwitchTab("password")'>Change Password</button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Main Content Section -->
+                    <div class="col-lg-9 col-md-8">
+                        <div class="shadow p-4">
+                            @if (ActiveTab == "profile")
+                            {
+                            <div>
+                                <h4 class="text-primary">Profile Details</h4>
+                                <div class="shadow-sm p-3 mb-4  rounded">
+                                    <div class="text-center mb-3">
+                                        <i class="fa fa-user-circle fa-5x text-primary"></i>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Username:</strong></p>
+                                        </div>
+                                        <div class="col-md-6 text-end">
+                                            <p>@_userName</p>
+                                        </div>
+                                    </div>
+                                    <hr />
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Email:</strong></p>
+                                        </div>
+                                        <div class="col-md-6 text-end">
+                                            <p>@_userEmail</p>
+                                        </div>
+                                    </div>
+                                    <hr />
+                                    <div class="text-center mt-4">
+                                        <button class="btn btn-warning">
+                                            <i class="fa fa-edit"></i> Edit Profile
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            }
+                            else if (ActiveTab == "orders")
+                            {
+                                <div>
+                                    <h4 class="text-primary">My Orders</h4>
+                                    @if (_orderItems != null && _orderItems.Any())
+                                    {
+                                        var groupedOrders = _orderItems.GroupBy(order => order.DatePurchased.Date);
+
+                                        @foreach (var group in groupedOrders)
+                                        {
+                                            <div class="mb-3 shadow-sm">
+                                                <div class="card-header bg-light text-dark">
+                                                    <strong>Order Date:</strong> @group.Key.ToShortDateString()
+                                                </div>
+                                                <div class="card-body">
+                                                    @foreach (var order in group)
+                                                    {
+                                                        <ul>
+                                                            <li><strong>Product:</strong> @order.ProductName</li>
+                                                            <li><strong>Quantity:</strong> @order.QuantityOrdered</li>
+                                                            <li><strong>Price:</strong> €@order.AmountPayed</li>
+                                                        </ul>
+                                                        <hr />
+                                                    }
+                                                    <div class="text-end fw-bold">
+                                                        Total for @group.Key.ToShortDateString(): €@group.Sum(order => order.AmountPayed)
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+
+                                        <div class="alert alert-success text-end fw-bold mt-3">
+                                            Overall Total: €@groupedOrders.Sum(group => group.Sum(order => order.AmountPayed))
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="alert alert-info text-center">You have no orders yet.</div>
+                                    }
+                                </div>
+                            }
+                            else if (ActiveTab == "password")
+                            {
+                                <div>
+                                    <h4 class="text-primary">Change Password</h4>
+                                    <EditForm Model="@_changePasswordModel" OnValidSubmit="ChangePasswordAsync">
+                                        <DataAnnotationsValidator/>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Current Password:</label>
+                                            <InputText type="password" class="form-control" @bind-Value="_changePasswordModel.CurrentPassword" requred/>
+                                            <ValidationMessage For="@(() => _changePasswordModel.CurrentPassword)"/>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">New Password:</label>
+                                            <InputText type="password" class="form-control" @bind-Value="_changePasswordModel.NewPassword" requred/>
+                                            <ValidationMessage For="@(() => _changePasswordModel.NewPassword)"/>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Confirm New Password:</label>
+                                            <InputText type="password" class="form-control" @bind-Value="_changePasswordModel.ConfirmPassword" required/>
+                                            <ValidationMessage For="@(() => _changePasswordModel.ConfirmPassword)"/>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-success w-100">Change Password</button>
+                                    </EditForm>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .active-tab {
+        background-color: rgba(0, 123, 255, 0.1);
+        font-weight: bold;
+    }
+
+        .active-tab button {
+            color: #007bff !important;
+        }
+
+    .card {
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+    }
+
+    .card-body {
+        font-size: 1rem;
+    }
+
+    .fa-user-circle {
+        margin-bottom: 10px;
+    }
+
+    .btn-link {
+        text-decoration: none;
+    }
+</style>
+
+@code {
+    private string ActiveTab = "profile"; // Default active tab
+    private PasswordChangeModel _changePasswordModel = new();
+    private string _userEmail = string.Empty;
+    private string _userName = string.Empty;
+    private IEnumerable<GetOrderItem> _orderItems = new List<GetOrderItem>();
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthState).User;
+
+        var emailClaim = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email);
+        if (emailClaim != null)
+        {
+            _userEmail = emailClaim.Value;
+        }
+
+        _userName = _userEmail;
+
+        _orderItems = await CartService.GetCheckoutHistoryByUserId();
+    }
+
+    private void SwitchTab(string tabName)
+    {
+        ActiveTab = tabName;
+        StateHasChanged();
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        var response = await AuthenticationService.ChangePassword(_changePasswordModel);
+
+        if (response.Success)
+        {
+            ToastService.ShowSuccessToast("Password changed successfully.");
+            _changePasswordModel = new ();
+        }
+        else
+        {
+            ToastService.ShowErrorToast(response.Message);
+        }
+    }
+}

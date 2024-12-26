@@ -27,6 +27,7 @@
             public const string Register = "authentication/create";
             public const string Login = "authentication/login";
             public const string ReviveToke = "authentication/refreshToken";
+            public const string ChangePassword = "authentication/change-password";
         }
 
         public static class ApiCallType
@@ -60,6 +61,7 @@
             public const string SaveCart = "cart/save-checkout";
             public const string Name = "my-cart";
             public const string GetOrderItems = "cart/order-items";
+            public const string GetUserOrderItems = "cart/user/order-items";
         }
 
         public static class Administration

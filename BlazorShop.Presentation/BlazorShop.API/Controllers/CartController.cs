@@ -5,6 +5,7 @@
 
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
+    using System.Security.Claims;
 
     [Route("api/[controller]")]
     [ApiController]
@@ -54,5 +55,28 @@
             var result = await _cartService.GetOrderItemsAsync();
             return result.Any() ? this.Ok(result) : this.NotFound();
         }
+
+        /// <summary>
+        /// Get order items for the logged-in user
+        /// </summary>
+        /// <returns>The ordered items for the user</returns>
+        [HttpGet("user/order-items")]
+        [Authorize(Roles = "User, Admin")]
+        public async Task<IActionResult> GetUserOrderItems()
+        {
+            // Извличане на userId от токена
+            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return this.Unauthorized("User ID is invalid or not found.");
+            }
+
+
+            // Вземане на поръчките за текущия потребител
+            var result = await _cartService.GetCheckoutHistoryByUserId(userId);
+            return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
+        }
+
     }
 }

@@ -1,10 +1,12 @@
 ﻿namespace BlazorShop.API.Controllers
 {
+    using System.Security.Claims;
     using System.Web;
 
     using BlazorShop.Application.DTOs.UserIdentity;
     using BlazorShop.Application.Services.Contracts.Authentication;
 
+    using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
 
     [Route("api/[controller]")]
@@ -53,6 +55,30 @@
             var encodedRefreshToken = HttpUtility.UrlDecode(refreshToken);
             var result = await _authenticationService.ReviveToken(encodedRefreshToken);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
+        }
+
+        /// <summary>
+        /// Change the password of the user
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns> The result of the change </returns>
+        [HttpPost("change-password")]
+        [Authorize(Roles = "User, Admin")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePassword dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return this.Unauthorized();
+            }
+
+            var result = await _authenticationService.ChangePassword(dto, userId);
+            if (!result.Success)
+            {
+                return this.BadRequest(result);
+            }
+
+            return this.Ok(result);
         }
     }
 }

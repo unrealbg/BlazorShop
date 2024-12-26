@@ -96,7 +96,27 @@
             return result is null || !result.IsSuccessStatusCode
                        ? new LoginResponse(Message: this._apiCallHelper.ConnectionError().Message)
                        : await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
-       
+
         }
+
+        public async Task<ServiceResponse> ChangePassword(PasswordChangeModel changePasswordDto)
+        {
+            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var currentApiCall = new ApiCall
+            {
+                Route = Constant.Authentication.ChangePassword,
+                Type = Constant.ApiCallType.Post,
+                Client = client,
+                Id = null!,
+                Model = changePasswordDto,
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<PasswordChangeModel>(currentApiCall);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+        }
+
     }
 }

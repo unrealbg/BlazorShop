@@ -7,6 +7,7 @@
     using BlazorShop.Application.Services.Contracts.Authentication;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Validations;
+    using BlazorShop.Application.Validations.Authentication;
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Entities.Identity;
 
@@ -21,6 +22,7 @@
         private readonly IMapper _mapper;
         private readonly IValidator<CreateUser> _createUserValidator;
         private readonly IValidator<LoginUser> _loginUserValidator;
+        private readonly IValidator<ChangePassword> _changePasswordValidator;
         private readonly IValidationService _validationService;
 
         public AuthenticationService(
@@ -31,7 +33,8 @@
             IMapper mapper,
             IValidator<CreateUser> createUserValidator,
             IValidator<LoginUser> loginUserValidator,
-            IValidationService validationService)
+            IValidationService validationService,
+            IValidator<ChangePassword> changePasswordValidator)
         {
             _tokenManager = tokenManager;
             _userManager = userManager;
@@ -41,6 +44,7 @@
             _createUserValidator = createUserValidator;
             _loginUserValidator = loginUserValidator;
             _validationService = validationService;
+            _changePasswordValidator = changePasswordValidator;
         }
 
         // TODO: Email Confirmation
@@ -151,6 +155,38 @@
             //var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(userId, newRefreshToken);
 
             return new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
+        }
+
+        public async Task<ServiceResponse> ChangePassword(ChangePassword changePasswordDto, string userId)
+        {
+            var user = await _userManager.GetUserByIdAsync(userId);
+            if (user == null)
+            {
+                return new ServiceResponse { Message = "User not found." };
+            }
+
+            var validationResult = await this._validationService.ValidateAsync(
+                                       changePasswordDto,
+                                       _changePasswordValidator);
+            if (!validationResult.Success)
+            {
+                return validationResult;
+            }
+
+            var result = await _userManager.ChangePasswordAsync(user, changePasswordDto.CurrentPassword, changePasswordDto.NewPassword);
+            if (!result)
+            {
+                return new ServiceResponse { Message = "Error occurred while changing password." };
+            }
+
+            _logger.LogInformation($"Password changed successfully for user with ID: {userId}");
+
+            return new ServiceResponse { Success = true, Message = "Password changed successfully." };
+        }
+
+        public async Task<bool> CheckPasswordAsync(AppUser user, string password)
+        {
+            return await _userManager.CheckPasswordAsync(user, password);
         }
     }
 }

@@ -19,5 +19,9 @@
         Task<int> RemoveUserByEmail(string email);
 
         Task<List<Claim>> GetUserClaimsAsync(string email);
+
+        Task<bool> ChangePasswordAsync(AppUser user, string currentPassword, string newPassword);
+
+        Task<bool> CheckPasswordAsync(AppUser user, string password);
     }
 }

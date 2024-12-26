@@ -121,11 +121,11 @@
 
             try
             {
-                var uploadedFileUrl = await this.FileUploadService.UploadFileAsync(file);
+                var result = await this.FileUploadService.UploadFileAsync(file);
 
-                if (!string.IsNullOrEmpty(uploadedFileUrl))
+                if (result.Success)
                 {
-                    this._product.Image = uploadedFileUrl;
+                    this._product.Image = result.Url;
                 }
                 else
                 {

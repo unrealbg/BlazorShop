@@ -10,5 +10,7 @@
         Task<ServiceResponse> CheckoutAsync(Checkout checkout);
 
         Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync();
+
+        Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId(string userId);
     }
 }

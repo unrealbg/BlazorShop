@@ -25,5 +25,12 @@
         {
             return await _context.CheckoutOrderItems.AsNoTracking().ToListAsync();
         }
+
+        public async Task<IEnumerable<OrderItem>> GetCheckoutHistoryByUserId(string userId)
+        {
+            return await _context.CheckoutOrderItems
+                       .Where(o => o.UserId == userId)
+                       .ToListAsync();
+        }
     }
 }
