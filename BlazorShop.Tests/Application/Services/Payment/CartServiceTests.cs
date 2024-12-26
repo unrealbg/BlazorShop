@@ -247,5 +247,80 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.NotNull(result);
             Assert.Empty(result);
         }
+
+        [Fact]
+        public async Task GetCheckoutHistoryByUserId_ShouldReturnOrderItems_WhenHistoryExists()
+        {
+            // Arrange
+            var userId = "user1";
+            var history = new List<OrderItem>
+                              {
+                                  new OrderItem
+                                      {
+                                          ProductId = Guid.NewGuid(),
+                                          Quantity = 3,
+                                          UserId = userId,
+                                          CreatedOn = DateTime.UtcNow
+                                      }
+                              };
+
+            var products = new List<Product>
+                               {
+                                   new Product
+                                       {
+                                           Id = history.First().ProductId,
+                                           Name = "Product B",
+                                           Price = 30m
+                                       }
+                               };
+
+            var user = new AppUser
+                           {
+                               Id = userId,
+                               UserName = "User One",
+                               Email = "user1@example.com"
+                           };
+
+            _cartMock
+                .Setup(cart => cart.GetCheckoutHistoryByUserId(userId))
+                .ReturnsAsync(history);
+
+            _productRepositoryMock
+                .Setup(repo => repo.GetAllAsync())
+                .ReturnsAsync(products);
+
+            _userManagerMock
+                .Setup(manager => manager.GetUserByIdAsync(userId))
+                .ReturnsAsync(user);
+
+            // Act
+            var orderItems = await _cartService.GetCheckoutHistoryByUserId(userId);
+
+            // Assert
+            Assert.Single(orderItems);
+            var item = orderItems.First();
+            Assert.Equal("User One", item.CustomerName);
+            Assert.Equal("user1@example.com", item.CustomerEmail);
+            Assert.Equal("Product B", item.ProductName);
+            Assert.Equal(90m, item.AmountPayed);
+            Assert.Equal(3, item.QuantityOrdered);
+        }
+
+        [Fact]
+        public async Task GetCheckoutHistoryByUserId_ShouldReturnEmptyList_WhenNoHistoryExists()
+        {
+            // Arrange
+            var userId = "user1";
+
+            _cartMock
+                .Setup(cart => cart.GetCheckoutHistoryByUserId(userId))
+                .ReturnsAsync(new List<OrderItem>());
+
+            // Act
+            var orderItems = await _cartService.GetCheckoutHistoryByUserId(userId);
+
+            // Assert
+            Assert.Empty(orderItems);
+        }
     }
 }
