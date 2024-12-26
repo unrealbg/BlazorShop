@@ -1,4 +1,4 @@
-![Build Status](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml/badge.svg)
+[![.NET](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml)
 
 ## Table of Contents
 - [Introduction](#introduction)
