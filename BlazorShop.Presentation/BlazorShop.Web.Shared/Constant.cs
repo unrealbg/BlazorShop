@@ -27,6 +27,7 @@
             public const string Register = "authentication/create";
             public const string Login = "authentication/login";
             public const string ReviveToke = "authentication/refreshToken";
+            public const string ChangePassword = "authentication/change-password";
         }
 
         public static class ApiCallType

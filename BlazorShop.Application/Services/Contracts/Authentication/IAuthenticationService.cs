@@ -10,5 +10,7 @@
         Task<LoginResponse> LoginUser(LoginUser user);
 
         Task<LoginResponse> ReviveToken(string refreshToken);
+
+        Task<ServiceResponse> ChangePassword(ChangePassword changePasswordDto, string userId);
     }
 }

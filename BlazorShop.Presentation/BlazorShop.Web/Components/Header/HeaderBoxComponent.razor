@@ -26,12 +26,21 @@
         <div class="dropdown-menu">
             <AuthorizeView>
                 <Authorized>
-                    @if (IsAdmin)
+                    @if (_isAdmin)
                     {
                         <div class="dropdown-item">
                             <div class="hstack gap-1">
                                 <i class="fa fa-cog"></i>
                                 <a href="admin">&nbsp;Admin Menu</a>
+                            </div>
+                        </div>
+                    }
+                    @if (_isAdmin || _isUser)
+                    {
+                        <div class="dropdown-item">
+                            <div class="hstack gap-1">
+                                <i class="fa fa-user"></i>
+                                <a href="profile"> &nbsp;Profile</a>
                             </div>
                         </div>
                     }

@@ -97,5 +97,15 @@
 
             return claims;
         }
+        public async Task<bool> ChangePasswordAsync(AppUser user, string currentPassword, string newPassword)
+        {
+            var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            return result.Succeeded;
+        }
+
+        public async Task<bool> CheckPasswordAsync(AppUser user, string password)
+        {
+            return await _userManager.CheckPasswordAsync(user, password);
+        }
     }
 }

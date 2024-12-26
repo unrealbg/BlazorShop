@@ -9,10 +9,12 @@
 
     public partial class HeaderBoxComponent
     {
+        private bool _isAdmin;
+        private bool _isUser;
+        
         [CascadingParameter]
         private Task<AuthenticationState> AuthState { get; set; } = default!;
 
-        private bool IsAdmin;
 
         private string UserEmail = string.Empty;
 
@@ -20,7 +22,8 @@
         {
             var user = (await this.AuthState).User;
 
-            this.IsAdmin = user.IsInRole(Constant.Administration.AdminRole);
+            _isAdmin = user.IsInRole(Constant.Administration.AdminRole);
+            _isUser = user.Identity?.IsAuthenticated ?? false;
 
             var emailClaim = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email);
             if (emailClaim != null)
