@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.API.Controllers
 {
+    using BlazorShop.Application.DTOs;
+
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
 
@@ -22,11 +24,9 @@
         [HttpPost("image")]
         public async Task<IActionResult> UploadFile(IFormFile file)
         {
-            Console.WriteLine($"Received file: {file?.FileName}, Content-Type: {file?.ContentType}");
-
             if (file == null || file.Length == 0)
             {
-                return BadRequest("No file uploaded.");
+                return this.BadRequest("No file uploaded.");
             }
 
             var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\uploads");
@@ -45,7 +45,8 @@
 
             var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{file.FileName}";
 
-            return Ok(new { Message = "File uploaded successfully.", FileUrl = fileUrl });
+            return this.Ok(
+                new FileUploadResponse { Success = true, Message = "File uploaded successfully.", Url = fileUrl });
         }
     }
 }

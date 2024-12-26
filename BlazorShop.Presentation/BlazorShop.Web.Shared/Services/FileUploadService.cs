@@ -20,7 +20,7 @@
             _apiCallHelper = apiCallHelper;
         }
 
-        public async Task<string?> UploadFileAsync(IBrowserFile file)
+        public async Task<FileUploadResponse> UploadFileAsync(IBrowserFile file)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();
 
@@ -44,15 +44,11 @@
 
             if (result != null && result.IsSuccessStatusCode)
             {
-                var response = await _apiCallHelper.GetServiceResponse<UploadedFileResult>(result);
-                return response?.FileUrl;
+                var response = await _apiCallHelper.GetServiceResponse<FileUploadResponse>(result);
+                return response;
             }
 
             throw new Exception("File upload failed");
         }
-
-        private record UploadedFileResult(
-            [property: JsonPropertyName("message")] string Message,
-            [property: JsonPropertyName("fileUrl")] string FileUrl);
     }
 }
