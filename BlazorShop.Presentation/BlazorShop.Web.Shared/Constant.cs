@@ -28,6 +28,7 @@
             public const string Login = "authentication/login";
             public const string ReviveToke = "authentication/refreshToken";
             public const string ChangePassword = "authentication/change-password";
+            public const string ConfirmEmail = "authentication/confirm-email";
         }
 
         public static class ApiCallType

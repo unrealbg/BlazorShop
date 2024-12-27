@@ -118,5 +118,23 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
+        public async Task<ServiceResponse> ConfirmEmail(string userId, string token)
+        {
+            var client = _httpClientHelper.GetPublicClient();
+            var currentApiCall = new ApiCall
+                                     {
+                                         Route = $"{Constant.Authentication.ConfirmEmail}?userId={HttpUtility.UrlEncode(userId)}&token={HttpUtility.UrlEncode(token)}",
+                                         Type = Constant.ApiCallType.Get,
+                                         Client = client,
+                                     };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+        }
+
+
     }
 }

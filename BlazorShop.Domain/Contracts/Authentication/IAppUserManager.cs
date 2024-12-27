@@ -23,5 +23,10 @@
         Task<bool> ChangePasswordAsync(AppUser user, string currentPassword, string newPassword);
 
         Task<bool> CheckPasswordAsync(AppUser user, string password);
+
+        Task<string> GenerateEmailConfirmationTokenAsync(AppUser user);
+
+        Task<bool> ConfirmEmailAsync(AppUser user, string token);
+
     }
 }
