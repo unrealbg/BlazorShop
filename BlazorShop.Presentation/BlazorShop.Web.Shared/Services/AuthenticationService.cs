@@ -3,7 +3,6 @@
     using System.Net.Http.Json;
     using System.Web;
 
-    using BlazorShop.Web.Shared.Helper;
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Authentication;
@@ -134,7 +133,5 @@
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
-
-
     }
 }
