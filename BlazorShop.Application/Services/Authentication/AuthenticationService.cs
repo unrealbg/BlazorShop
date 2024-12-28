@@ -105,7 +105,6 @@
             return new ServiceResponse { Success = true, Message = "User created successfully." };
         }
 
-
         public async Task<LoginResponse> LoginUser(LoginUser user)
         {
             var validationResult = await _validationService.ValidateAsync(user, _loginUserValidator);

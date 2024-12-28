@@ -1,0 +1,50 @@
+﻿@page "/confirm-email"
+
+<h3>Email Confirmation</h3>
+
+@if (isLoading)
+{
+    <p>Processing your request...</p>
+}
+else if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    private string? UserId { get; set; }
+    private string? Token { get; set; }
+    private string? message;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        UserId = query.Get("userId");
+        Token = query.Get("token");
+
+        if (string.IsNullOrEmpty(UserId) || string.IsNullOrEmpty(Token))
+        {
+            message = "Invalid confirmation link.";
+            isLoading = false;
+            return;
+        }
+
+        var response = await AuthenticationService.ConfirmEmail(UserId, Token);
+
+        if (response.Success)
+        {
+            message = "Your email has been confirmed successfully.";
+            ToastService.ShowSuccessToast("Email confirmed successfully.");
+        }
+        else
+        {
+            message = $"Failed to confirm email: {response.Message}";
+            ToastService.ShowErrorToast($"Failed to confirm email: {response.Message}");
+        }
+
+        isLoading = false;
+    }
+}
