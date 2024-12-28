@@ -75,7 +75,8 @@
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(mappedUser);
                 var confirmationLink = $"https://localhost:7258/confirm-email?userId={mappedUser.Id}&token={Uri.EscapeDataString(token)}";
 
-                await this.SendConfirmationEmail(user.Email, confirmationLink);
+                await this.SendConfirmationEmail(user.Email,
+                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
             }
             catch (Exception ex)
             {
@@ -125,6 +126,25 @@
             }
 
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
+
+            if (!currentUser!.EmailConfirmed)
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
+                var confirmationLink = $"https://localhost:7258/confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}";
+
+                await this.SendConfirmationEmail(currentUser.Email,
+                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+
+                _logger.LogWarning($"User with unconfirmed email tried to log in. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+
+                return new LoginResponse
+                           {
+                               Success = false,
+                               Message = "Email not confirmed. A new confirmation link has been sent to your email."
+                           };
+            }
+
+
             var claims = await _userManager.GetUserClaimsAsync(currentUser!.Email!);
 
             var accessToken = _tokenManager.GenerateAccessToken(claims);
