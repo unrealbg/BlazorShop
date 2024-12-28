@@ -14,7 +14,8 @@
 
                 if (response.Success)
                 {
-                    this.ToastService.ShowSuccessToast("Registration successful. You can now log in.");
+                    this.ToastService.ShowSuccessToast("Registration successful.");
+                    this.ToastService.ShowInfoToast("Please check your email to confirm your account.");
                     this.NavigationManager.NavigateTo("/authentication/login");
                 }
                 else
