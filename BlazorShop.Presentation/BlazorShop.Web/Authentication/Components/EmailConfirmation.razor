@@ -1,50 +1,32 @@
 ﻿@page "/confirm-email"
 
-<h3>Email Confirmation</h3>
-
-@if (isLoading)
-{
-    <p>Processing your request...</p>
-}
-else if (!string.IsNullOrEmpty(message))
-{
-    <p>@message</p>
-}
-
-@code {
-    private string? UserId { get; set; }
-    private string? Token { get; set; }
-    private string? message;
-    private bool isLoading = true;
-
-    protected override async Task OnInitializedAsync()
-    {
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-
-        UserId = query.Get("userId");
-        Token = query.Get("token");
-
-        if (string.IsNullOrEmpty(UserId) || string.IsNullOrEmpty(Token))
-        {
-            message = "Invalid confirmation link.";
-            isLoading = false;
-            return;
-        }
-
-        var response = await AuthenticationService.ConfirmEmail(UserId, Token);
-
-        if (response.Success)
-        {
-            message = "Your email has been confirmed successfully.";
-            ToastService.ShowSuccessToast("Email confirmed successfully.");
-        }
-        else
-        {
-            message = $"Failed to confirm email: {response.Message}";
-            ToastService.ShowErrorToast($"Failed to confirm email: {response.Message}");
-        }
-
-        isLoading = false;
-    }
-}
+<div class="container mt-5">
+    <div class="col-lg-12">
+        <div class="p-2 w-100" style="background-color: rgba(255, 255, 255, 0.5);">
+            <div class="card m-2" style="background-color: rgba(255, 255, 255, 0.7);">
+                <div class="card-header text-center">
+                    <h2>Email Confirmation</h2>
+                </div>
+                <div class="card-body text-center">
+                    @if (_isLoading)
+                    {
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Processing your request...</p>
+                    }
+                    else if (!string.IsNullOrEmpty(_message))
+                    {
+                        <div class="alert @(_isSuccess ? "alert-success" : "alert-danger")">
+                            <p>@_message</p>
+                        </div>
+                        @if (_isSuccess)
+                        {
+                            <a href="/authentication/login" class="btn btn-primary mt-3">Go to Login</a>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
