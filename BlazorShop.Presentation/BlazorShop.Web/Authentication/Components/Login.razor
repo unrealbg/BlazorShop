@@ -21,13 +21,13 @@
                     <EditForm Model="User" OnValidSubmit="LoginUser">
                         <DataAnnotationsValidator />
                         <div class="form-floating mb-3">
-                            <FloatingTextInput class="form-control" @bind-Value="User.Email" Label="Email Address" Type="text" Placeholder="my@email.com" />
                             <ValidationMessage For="@(() => User.Email)" />
+                            <FloatingTextInput class="form-control" @bind-Value="User.Email" Label="Email Address" Type="text" Placeholder="my@email.com" />
                         </div>
 
                         <div class="form-floating mb-3">
-                            <FloatingTextInput class="form-control" @bind-Value="User.Password" Label="Password" Type="Password" Placeholder="Password" />
                             <ValidationMessage For="@(() => User.Password)" />
+                            <FloatingTextInput class="form-control" @bind-Value="User.Password" Label="Password" Type="Password" Placeholder="Password" />
                         </div>
 
                         <div class="d-grid gap-2">
