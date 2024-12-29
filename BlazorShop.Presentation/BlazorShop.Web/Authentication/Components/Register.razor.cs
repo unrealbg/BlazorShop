@@ -1,13 +1,18 @@
 ﻿namespace BlazorShop.Web.Authentication.Components
 {
+    using System.ComponentModel.DataAnnotations;
+
     using BlazorShop.Web.Shared.Models.Authentication;
 
     public partial class Register
     {
         private CreateUser _user = new();
+        private bool _isLoading = false;
 
         private async Task HandleRegister()
         {
+            _isLoading = true;
+
             try
             {
                 var response = await this.AuthenticationService.CreateUser(_user);
@@ -26,6 +31,10 @@
             catch (Exception ex)
             {
                 this.ToastService.ShowErrorToast($"An error occurred: {ex.Message}");
+            }
+            finally
+            {
+                _isLoading = false;
             }
         }
     }
