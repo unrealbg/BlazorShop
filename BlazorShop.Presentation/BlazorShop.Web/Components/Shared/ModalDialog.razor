@@ -8,9 +8,12 @@
             <div class="modal-body">
                 @Body
             </div>
-            <div class="modal-footer">
-                @Footer
-            </div>
+            @if (Footer != null)
+            {
+                <div class="modal-footer">
+                    @Footer
+                </div>
+            }
         </div>
     </div>
 </div>
