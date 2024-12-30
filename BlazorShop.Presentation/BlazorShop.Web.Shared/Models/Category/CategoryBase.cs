@@ -4,7 +4,7 @@
 
     public class CategoryBase
     {
-        [Required]
+        [Required(ErrorMessage = "The Category Name field is required.")]
         public string Name { get; set; }
     }
 }
