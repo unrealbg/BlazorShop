@@ -25,7 +25,7 @@
                                         <th>Price</th>
                                         <th>Quantity</th>
                                         <th>Created Date</th>
-                                        <th class="text-danger">Actions</th>
+                                        <th class="text-danger text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -40,7 +40,7 @@
                                             <td>@product.Quantity</td>
                                             <td>@product.CreatedOn</td>
                                             <td>
-                                                <i class="fa fa-trash text-danger buy_bt" @onclick="() => ConfirmDelete(product.Id)">
+                                                <i class="fa fa-trash text-danger text-center buy_bt" @onclick="() => ConfirmDelete(product.Id)">
                                                 </i>
                                             </td>
                                         </tr>
@@ -67,20 +67,25 @@
     </Header>
     <Body>
         <EditForm Model="_product" OnValidSubmit="SaveProduct">
-            <div class="form-group p-2">
+            <DataAnnotationsValidator />
+            <div class="form-group">
                 <FloatingTextInput @bind-Value="_product.Name" Label="Product Name" class="form-control" />
+                <ValidationMessage For="@(() => _product.Name)" />
             </div>
-            <div class="form-group p-2">
-                <label class="form-label">Price</label>
+            <div class="form-group">
                 <InputNumber @bind-Value="_product.Price" class="form-control" />
+                <label class="form-label">Price</label>
+                <ValidationMessage For="@(() => _product.Price)" />
             </div>
-            <div class="form-group p-2">
+            <div class="form-group">
                 <FloatingNumberInput @bind-Value="_product.Quantity" Label="Quantity" class="form-control" />
+                <ValidationMessage For="@(() => _product.Quantity)" />
             </div>
-            <div class="form-group p-2">
+            <div class="form-group">
                 <FloatingTextAreaInput @bind-Value="_product.Description" Label="Product Description" class="form-control" />
+                <ValidationMessage For="@(() => _product.Description)" />
             </div>
-            <div class="form-group p-2">
+            <div class="form-group">
                 <label for="category" class="form-label">Category</label>
                 <InputSelect id="category" class="form-control" @bind-Value="_product.CategoryId">
                     <option value="">-- Select a Category --</option>
@@ -89,17 +94,27 @@
                         <option value="@category.Id">@category.Name</option>
                     }
                 </InputSelect>
+                <ValidationMessage For="@(() => _product.CategoryId)" />
             </div>
-            <div class="form-group p-2">
-                <label class="form-label">Image</label>
-                <InputFile OnChange="EventCallback.Factory.Create < InputFileChangeEventArgs > (this, OnFileSelected)" accept="image/*" />
+            <div class="form-group d-flex justify-content-between align-items-center">
+                <label class="custom-upload-btn">
+                    Upload Image
+                    <InputFile OnChange="EventCallback.Factory.Create < InputFileChangeEventArgs > (this, OnFileSelected)" accept="image/*" style="display: none;" />
+                </label>
+                @if (!string.IsNullOrEmpty(_previewImageUrl))
+                {
+                    <img src="@_previewImageUrl" alt="Preview Image" class="img-thumbnail" />
+                }
+                <ValidationMessage For="@(() => _product.Image)" />
+            </div>
+
+            <hr />
+            <div class="d-flex justify-content-end">
+                <button class="btn btn-primary mr-2" type="submit">Save</button>
+                <button class="btn btn-danger" type="button" @onclick="Cancel">Cancel</button>
             </div>
         </EditForm>
     </Body>
-    <Footer>
-        <button class="btn btn-primary" @onclick="SaveProduct">Save</button>
-        <button class="btn btn-danger" @onclick="Cancel">Cancel</button>
-    </Footer>
 </ModalDialog>
 
 <ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
@@ -107,7 +122,8 @@
         <h5 class="modal-title">Confirm Delete</h5>
     </Header>
     <Body>
-        <p>Are you sure you want to delete this product?</p>
+        Are you sure you want to delete the product
+        <span class="text-danger"><strong>@_producToDeleteName</strong></span>?
     </Body>
     <Footer>
         <button class="btn btn-danger" @onclick="DeleteProductConfirmed">Yes, Delete</button>
@@ -115,3 +131,54 @@
     </Footer>
 </ModalDialog>
 
+<style>
+
+    .form-group {
+        margin-bottom: 10px; /* Намалете отстоянието между формовите групи */
+    }
+
+    .form-floating {
+        margin-bottom: 10px; /* Намалете разстоянието за floating input полета */
+    }
+
+    .custom-upload-container {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+
+    .custom-upload-btn {
+        background-color: #007bff; /* Син цвят */
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        text-align: center;
+        transition: background-color 0.3s ease;
+    }
+
+        .custom-upload-btn:hover {
+            background-color: #0056b3; /* По-тъмен син цвят при hover */
+        }
+
+        .custom-upload-btn:active {
+            background-color: #004085; /* По-тъмен цвят при натискане */
+        }
+
+        .custom-upload-btn input[type="file"] {
+            display: none; /* Скриване на стандартния InputFile елемент */
+        }
+
+    .img-thumbnail {
+        max-width: 100px;
+        max-height: 100px;
+        margin-left: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+</style>

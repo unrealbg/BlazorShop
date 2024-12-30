@@ -7,14 +7,11 @@
     public partial class CategoryPage
     {
         private bool _showDialog = false;
-
         private bool _showConfirmDeleteDialog = false;
-
         private Guid _categoryToDelete;
-
-        private IEnumerable<GetCategory> _categories = [];
-
+        private IEnumerable<GetCategory> _categories = Enumerable.Empty<GetCategory>();
         private CreateCategory _category = new();
+        private string _categoryToDeleteName;
 
         protected override async Task OnInitializedAsync()
         {
@@ -23,7 +20,14 @@
 
         private async Task GetCategories()
         {
-            _categories = await this.CategoryService.GetAllAsync();
+            try
+            {
+                _categories = await this.CategoryService.GetAllAsync();
+            }
+            catch
+            {
+                this.ToastService.ShowToast(ToastLevel.Error, "Failed to load categories.", "Error", ToastIcon.Error);
+            }
         }
 
         private void AddCategory()
@@ -40,6 +44,7 @@
         private void ConfirmDelete(Guid id)
         {
             _categoryToDelete = id;
+            _categoryToDeleteName = _categories.FirstOrDefault(c => c.Id == _categoryToDelete)?.Name;
             _showConfirmDeleteDialog = true;
         }
 

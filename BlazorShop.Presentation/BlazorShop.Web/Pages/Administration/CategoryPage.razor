@@ -20,7 +20,7 @@
                                     <tr class="bg-light mb-5">
                                         <th>Id</th>
                                         <th>Name</th>
-                                        <th class="text-danger">Actions</th>
+                                        <th class="text-danger text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -29,8 +29,9 @@
                                         <tr>
                                             <td>@category.Id</td>
                                             <td>@category.Name</td>
+
                                             <td>
-                                                <i class="fa fa-trash text-danger buy_bt" @onclick="() => ConfirmDelete(category.Id)">
+                                                <i class="fa fa-trash text-danger text-center buy_bt" @onclick="() => ConfirmDelete(category.Id)">
                                                 </i>
                                             </td>
                                         </tr>
@@ -57,15 +58,18 @@
     </Header>
     <Body>
         <EditForm Model="_category" OnValidSubmit="SaveCategory">
+            <DataAnnotationsValidator />
             <div class="form-group p-2">
                 <FloatingTextInput @bind-Value="_category.Name" Label="Category Name" class="form-control" />
+                <ValidationMessage For="@(() => _category.Name)" />
+            </div>
+            <hr />
+            <div class="d-flex justify-content-end">
+                <button class="btn btn-primary mr-2" type="submit">Save</button>
+                <button class="btn btn-danger" type="button" @onclick="Cancel">Cancel</button>
             </div>
         </EditForm>
     </Body>
-    <Footer>
-        <button class="btn btn-primary mt-3" @onclick="SaveCategory">Save</button>
-        <button class="btn btn-danger mt-3" @onclick="Cancel">Cancel</button>
-    </Footer>
 </ModalDialog>
 
 <ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
@@ -73,7 +77,8 @@
         <h5 class="modal-title">Confirm Delete</h5>
     </Header>
     <Body>
-        <p>Are you sure you want to delete this category?</p>
+        Are you sure you want to delete the category
+        <span class="text-danger"><strong>@_categoryToDeleteName</strong></span>?
     </Body>
     <Footer>
         <button class="btn btn-danger" @onclick="DeleteCategoryConfirmed">Yes, Delete</button>
