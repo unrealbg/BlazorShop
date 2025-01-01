@@ -68,6 +68,12 @@ Follow these steps to set up and run BlazorShop:
 ### User Home View
 ![User Home View](https://vps.unrealbg.com/blazorblog/UserHomeView.png)
 
+### Register Page
+![Register Page](https://vps.unrealbg.com/blazorblog/RegisterPage.png)
+
+### Login Page
+![Login Page](https://vps.unrealbg.com/blazorblog/LoginPage.png)
+
 ### User Dropdown Menu
 ![User Dropdown Menu](https://vps.unrealbg.com/blazorblog/UserDropDown.png)
 
@@ -118,6 +124,9 @@ Follow these steps to set up and run BlazorShop:
 
 ### Category Deletion Success
 ![Category Deletion Success](https://vps.unrealbg.com/blazorblog/CategoryDeleteSuccessfully.png)
+
+### Sales Page
+![Sales Page](https://vps.unrealbg.com/blazorblog/SalesPage.png)
 
 ## Contributing
 We welcome contributions to BlazorShop! Here’s how you can get involved:
