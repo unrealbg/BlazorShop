@@ -33,9 +33,13 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateUser>(currentApiCall);
 
-            return result is null || !result.IsSuccessStatusCode
-                       ? _apiCallHelper.ConnectionError()
-                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+            if (result is null || !result.IsSuccessStatusCode)
+            {
+                var errorResponse = await result.Content.ReadFromJsonAsync<ServiceResponse>();
+                return errorResponse ?? new ServiceResponse(Message: "An error occurred.");
+            }
+
+            return await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<LoginResponse> LoginUser(LoginUser user)
@@ -121,11 +125,11 @@
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = $"{Constant.Authentication.ConfirmEmail}?userId={HttpUtility.UrlEncode(userId)}&token={HttpUtility.UrlEncode(token)}",
-                                         Type = Constant.ApiCallType.Get,
-                                         Client = client,
-                                     };
+            {
+                Route = $"{Constant.Authentication.ConfirmEmail}?userId={HttpUtility.UrlEncode(userId)}&token={HttpUtility.UrlEncode(token)}",
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+            };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
 
