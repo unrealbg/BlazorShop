@@ -21,6 +21,6 @@
         public int Quantity { get; set; }
 
         [Required(ErrorMessage = "The Category field is required.")]
-        public Guid CategoryId { get; set; }
+        public Guid? CategoryId { get; set; }
     }
 }
