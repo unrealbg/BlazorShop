@@ -86,14 +86,14 @@
                 <ValidationMessage For="@(() => _product.Description)" />
             </div>
             <div class="form-group">
-                <label for="category" class="form-label">Category</label>
                 <InputSelect id="category" class="form-control" @bind-Value="_product.CategoryId">
-                    <option value="">-- Select a Category --</option>
+                    <option value="" selected>-- Select a Category --</option>
                     @foreach (var category in _categories)
                     {
                         <option value="@category.Id">@category.Name</option>
                     }
                 </InputSelect>
+                    <label for="category" class="form-label">Category</label>
                 <ValidationMessage For="@(() => _product.CategoryId)" />
             </div>
             <div class="form-group d-flex justify-content-between align-items-center">
