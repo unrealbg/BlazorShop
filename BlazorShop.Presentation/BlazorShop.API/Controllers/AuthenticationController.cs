@@ -80,5 +80,25 @@
 
             return this.Ok(result);
         }
+
+
+        /// <summary>
+        ///  Confirm the email of the user
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="token"></param>
+        /// <returns> The result of the confirmation </returns>
+        [HttpGet("confirm-email")]
+        public async Task<IActionResult> ConfirmEmail(string userId, string token)
+        {
+            var response = await _authenticationService.ConfirmEmail(userId, token);
+
+            if (!response.Success)
+            {
+                return this.BadRequest(response);
+            }
+
+            return this.Ok(response);
+        }
     }
 }

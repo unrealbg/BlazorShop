@@ -72,7 +72,7 @@
 
                     this.ToastService.ShowToast(
                         ToastLevel.Success,
-                        $"Product {productName} added to cart",
+                        $"[{productName}] added to cart",
                         "Cart",
                         ToastIcon.Success,
                         ToastPosition.BottomRight);

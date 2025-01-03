@@ -12,16 +12,13 @@
     public partial class ProductPage
     {
         private bool _showDialog = false;
-
         private bool _showConfirmDeleteDialog = false;
-
         private Guid _productToDelete;
-
         private IEnumerable<GetProduct> _products = [];
-
         private IEnumerable<GetCategory> _categories = [];
-
         private CreateProduct _product = new();
+        private string? _previewImageUrl;
+        private string? _producToDeleteName;
 
         [Inject]
         private IFileUploadService FileUploadService { get; set; } = default!;
@@ -40,17 +37,20 @@
         private void AddProduct()
         {
             _product = new CreateProduct();
+            _previewImageUrl = null;
             _showDialog = true;
         }
 
         private void Cancel()
         {
             _showDialog = false;
+            _previewImageUrl = null;
         }
 
         private void ConfirmDelete(Guid id)
         {
             _productToDelete = id;
+            _producToDeleteName = _products.FirstOrDefault(p => p.Id == _productToDelete)?.Name;
             _showConfirmDeleteDialog = true;
         }
 
@@ -125,7 +125,8 @@
 
                 if (result.Success)
                 {
-                    this._product.Image = result.Url;
+                    _product.Image = result.Url;
+                    _previewImageUrl = result.Url;
                 }
                 else
                 {

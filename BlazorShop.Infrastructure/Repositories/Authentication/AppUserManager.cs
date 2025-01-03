@@ -107,5 +107,16 @@
         {
             return await _userManager.CheckPasswordAsync(user, password);
         }
+
+        public async Task<string> GenerateEmailConfirmationTokenAsync(AppUser user)
+        {
+            return await _userManager.GenerateEmailConfirmationTokenAsync(user);
+        }
+
+        public async Task<bool> ConfirmEmailAsync(AppUser user, string token)
+        {
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            return result.Succeeded;
+        }
     }
 }

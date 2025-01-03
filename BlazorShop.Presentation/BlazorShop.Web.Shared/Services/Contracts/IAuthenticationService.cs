@@ -12,5 +12,7 @@
         Task<LoginResponse> ReviveToken(string refreshToken);
 
         Task<ServiceResponse> ChangePassword(PasswordChangeModel changePasswordDto);
+
+        Task<ServiceResponse> ConfirmEmail(string userId, string token);
     }
 }

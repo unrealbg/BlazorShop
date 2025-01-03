@@ -3,7 +3,6 @@
     using System.Net.Http.Json;
     using System.Web;
 
-    using BlazorShop.Web.Shared.Helper;
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Authentication;
@@ -34,9 +33,16 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateUser>(currentApiCall);
 
-            return result is null || !result.IsSuccessStatusCode
-                       ? _apiCallHelper.ConnectionError()
-                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+            if (result == null || !result.IsSuccessStatusCode)
+            {
+                var errorResponse = result?.Content != null
+                                        ? await result.Content.ReadFromJsonAsync<ServiceResponse>()
+                                        : null;
+
+                return errorResponse ?? new ServiceResponse { Success = false, Message = "Connection error" };
+            }
+
+            return await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<LoginResponse> LoginUser(LoginUser user)
@@ -118,5 +124,21 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
+        public async Task<ServiceResponse> ConfirmEmail(string userId, string token)
+        {
+            var client = _httpClientHelper.GetPublicClient();
+            var currentApiCall = new ApiCall
+            {
+                Route = $"{Constant.Authentication.ConfirmEmail}?userId={HttpUtility.UrlEncode(userId)}&token={HttpUtility.UrlEncode(token)}",
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+        }
     }
 }

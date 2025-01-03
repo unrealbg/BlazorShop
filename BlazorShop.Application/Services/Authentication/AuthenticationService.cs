@@ -7,7 +7,7 @@
     using BlazorShop.Application.Services.Contracts.Authentication;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Validations;
-    using BlazorShop.Application.Validations.Authentication;
+    using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Entities.Identity;
 
@@ -24,6 +24,7 @@
         private readonly IValidator<LoginUser> _loginUserValidator;
         private readonly IValidator<ChangePassword> _changePasswordValidator;
         private readonly IValidationService _validationService;
+        private readonly IEmailService _emailService;
 
         public AuthenticationService(
             IAppTokenManager tokenManager,
@@ -34,7 +35,8 @@
             IValidator<CreateUser> createUserValidator,
             IValidator<LoginUser> loginUserValidator,
             IValidationService validationService,
-            IValidator<ChangePassword> changePasswordValidator)
+            IValidator<ChangePassword> changePasswordValidator,
+            IEmailService emailService)
         {
             _tokenManager = tokenManager;
             _userManager = userManager;
@@ -45,9 +47,9 @@
             _loginUserValidator = loginUserValidator;
             _validationService = validationService;
             _changePasswordValidator = changePasswordValidator;
+            _emailService = emailService;
         }
 
-        // TODO: Email Confirmation
         public async Task<ServiceResponse> CreateUser(CreateUser user)
         {
             var validationResult = await _validationService.ValidateAsync(user, _createUserValidator);
@@ -68,10 +70,24 @@
                 return new ServiceResponse { Message = "User already exists." };
             }
 
+            try
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(mappedUser);
+                var confirmationLink = $"https://localhost:7258/confirm-email?userId={mappedUser.Id}&token={Uri.EscapeDataString(token)}";
+
+                await this.SendConfirmationEmail(user.Email,
+                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send email confirmation link to {user.Email}");
+                return new ServiceResponse { Message = "Failed to send confirmation email." };
+            }
+
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
             var users = await _userManager.GetAllUsersAsync();
 
-            bool assignedResult = await _roleManager.AddUserToRoleAsync(currentUser!, users!.Count() > 1 ? "User" : "Admin");
+            bool assignedResult = await _roleManager.AddUserToRoleAsync(currentUser!, users.Count() > 1 ? "User" : "Admin");
 
             if (!assignedResult)
             {
@@ -79,7 +95,8 @@
 
                 if (removeUserResult <= 0)
                 {
-                    this._logger.LogError(new Exception($"User with Email as {currentUser!.Email} failed to be removed as a result of failed role assignment."), "User could not be assigned a role and could not be removed.");
+                    _logger.LogError(new Exception($"User with Email {currentUser.Email} failed to be removed after failed role assignment."),
+                        "User could not be assigned a role and could not be removed.");
                     return new ServiceResponse { Message = "Error occurred in creating account." };
                 }
 
@@ -109,6 +126,25 @@
             }
 
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
+
+            if (!currentUser!.EmailConfirmed)
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
+                var confirmationLink = $"https://localhost:7258/confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}";
+
+                await this.SendConfirmationEmail(currentUser.Email,
+                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+
+                _logger.LogWarning($"User with unconfirmed email tried to log in. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+
+                return new LoginResponse
+                           {
+                               Success = false,
+                               Message = "Email not confirmed. A new confirmation link has been sent to your email."
+                           };
+            }
+
+
             var claims = await _userManager.GetUserClaimsAsync(currentUser!.Email!);
 
             var accessToken = _tokenManager.GenerateAccessToken(claims);
@@ -187,6 +223,28 @@
         public async Task<bool> CheckPasswordAsync(AppUser user, string password)
         {
             return await _userManager.CheckPasswordAsync(user, password);
+        }
+
+        public async Task<ServiceResponse> ConfirmEmail(string userId, string token)
+        {
+            var user = await _userManager.GetUserByIdAsync(userId);
+            if (user == null)
+            {
+                return new ServiceResponse { Message = "Invalid user ID." };
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            if (!result)
+            {
+                return new ServiceResponse { Message = "Email confirmation failed." };
+            }
+
+            return new ServiceResponse { Success = true, Message = "Email confirmed successfully." };
+        }
+
+        public async Task SendConfirmationEmail(string email, string confirmationLink)
+        {
+            await _emailService.SendEmailAsync(email, "Confirm your email", confirmationLink);
         }
     }
 }

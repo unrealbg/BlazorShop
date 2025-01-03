@@ -11,22 +11,22 @@
                     <EditForm Model="_user" OnValidSubmit="HandleRegister">
                         <DataAnnotationsValidator />
                         <div class="form-floating mb-3">
-                            <FloatingTextInput type="text" id="username" class="form-control" @bind-Value="_user.FullName" Label="Full Name" placeholder="John Doe" />
                             <ValidationMessage For="@(() => _user.FullName)" />
+                            <FloatingTextInput type="text" id="username" class="form-control" @bind-Value="_user.FullName" Label="Full Name" placeholder="John Doe" />
                         </div>
                         <div class="form-floating mb-3">
-                            <FloatingTextInput type="text" id="email" class="form-control" @bind-Value="_user.Email" Label="Email Address" Placeholder="john@email.com" />
                             <ValidationMessage For="@(() => _user.Email)" />
+                            <FloatingTextInput type="text" id="email" class="form-control" @bind-Value="_user.Email" Label="Email Address" Placeholder="john@email.com" />
                         </div>
                         <div class="form-floating mb-3">
-                            <FloatingTextInput id="password" class="form-control" @bind-Value="_user.Password" Label="Password" Type="Password" Placeholder="My Password" />
                             <ValidationMessage For="@(() => _user.Password)" />
+                            <FloatingTextInput id="password" class="form-control" @bind-Value="_user.Password" Label="Password" Type="Password" Placeholder="My Password" />
                         </div>
                         <div class="form-floating mb-3">
-                            <FloatingTextInput type="Password" id="confirmPassword" class="form-control" @bind-Value="_user.ConfirmPassword" Label="Confirm Password" placeholder="Confirm Password" />
                             <ValidationMessage For="@(() => _user.ConfirmPassword)" />
+                            <FloatingTextInput type="Password" id="confirmPassword" class="form-control" @bind-Value="_user.ConfirmPassword" Label="Confirm Password" placeholder="Confirm Password" />
                         </div>
-                        <button class="btn btn-warning w-100 mt-3" type="submit">Register</button>
+                        <button class="btn btn-warning w-100 mt-3" type="submit" disabled="@_isLoading">Register</button>
                     </EditForm>
                 </div>
                 <div class="card-footer bg-transparent text-center py-3 mb-2">
@@ -38,4 +38,10 @@
             </div>
         </div>
     </div>
+    @if (_isLoading)
+    {
+        <div class="loading-overlay">
+            <Spinner />
+        </div>
+    }
 </div>

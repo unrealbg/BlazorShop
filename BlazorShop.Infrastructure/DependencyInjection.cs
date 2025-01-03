@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Infrastructure
 {
+    using BlazorShop.Application.DTOs;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts;
@@ -90,6 +91,9 @@
             services.AddScoped<ICart, CartRepository>();
 
             Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
+
+            services.Configure<EmailSettings>(config.GetSection("EmailSettings"));
+            services.AddTransient<IEmailService, EmailService>();
 
             return services;
         }

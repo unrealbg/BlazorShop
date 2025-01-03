@@ -9,4 +9,3 @@
         public ICollection<GetProduct>? Products { get; set; }
     }
 }
- 
