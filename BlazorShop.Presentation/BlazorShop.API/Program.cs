@@ -7,6 +7,7 @@ namespace BlazorShop.API
     using BlazorShop.Infrastructure;
 
     using Microsoft.AspNetCore.Builder;
+    using Microsoft.Extensions.Hosting;
 
     using Serilog;
 
@@ -30,6 +31,8 @@ namespace BlazorShop.API
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddSwaggerGen();
 
+            builder.AddServiceDefaults();
+
             builder.Services.AddInfrastructure(builder.Configuration);
             builder.Services.AddApplication();
             builder.Services.AddCors(
@@ -41,7 +44,10 @@ namespace BlazorShop.API
                                     opt.AllowAnyHeader()
                                         .AllowAnyMethod()
                                         .AllowCredentials()
-                                    .WithOrigins("https://localhost:7258");
+                                    //.WithOrigins("https://localhost:7258");
+                                        .SetIsOriginAllowed(origin =>
+                                            origin.StartsWith("http://localhost") ||
+                                            origin.StartsWith("https://localhost"));
                                 });
                     });
 
