@@ -31,7 +31,7 @@
         public async Task<GetProduct> GetByIdAsync(Guid id)
         {
             var result = await _productRepository.GetByIdAsync(id);
-            return result != null ? _mapper.Map<GetProduct>(result) : new GetProduct();
+            return result != null ? _mapper.Map<GetProduct>(result) : null;
         }
 
         public async Task<ServiceResponse> AddAsync(CreateProduct product)
