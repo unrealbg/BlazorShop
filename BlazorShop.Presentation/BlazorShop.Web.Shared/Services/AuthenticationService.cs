@@ -33,10 +33,13 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<CreateUser>(currentApiCall);
 
-            if (result is null || !result.IsSuccessStatusCode)
+            if (result == null || !result.IsSuccessStatusCode)
             {
-                var errorResponse = await result.Content.ReadFromJsonAsync<ServiceResponse>();
-                return errorResponse ?? new ServiceResponse(Message: "An error occurred.");
+                var errorResponse = result?.Content != null
+                                        ? await result.Content.ReadFromJsonAsync<ServiceResponse>()
+                                        : null;
+
+                return errorResponse ?? new ServiceResponse { Success = false, Message = "Connection error" };
             }
 
             return await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
