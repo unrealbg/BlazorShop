@@ -105,23 +105,22 @@
         }
 
         [Fact]
-        public async Task GetByIdAsync_WhenProductDoesNotExist_ShouldReturnEmptyProduct()
+        public async Task GetByIdAsync_WhenProductDoesNotExist_ShouldReturnNull()
         {
             // Arrange
             var productId = Guid.NewGuid();
             this._mockProductRepository.Setup(repo => repo.GetByIdAsync(productId))
-                                  .ReturnsAsync((Product)null);
+                .ReturnsAsync((Product)null);
 
             // Act
             var result = await this._productService.GetByIdAsync(productId);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(default, result.Id);
-            Assert.Null(result.Name);
+            Assert.Null(result);
             this._mockProductRepository.Verify(repo => repo.GetByIdAsync(productId), Times.Once);
             this._mockMapper.Verify(mapper => mapper.Map<GetProduct>(It.IsAny<Product>()), Times.Never);
         }
+
 
         [Fact]
         public async Task AddAsync_WhenProductIsAdded_ShouldReturnSuccessResponse()
