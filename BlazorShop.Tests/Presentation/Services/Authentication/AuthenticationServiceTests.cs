@@ -59,18 +59,25 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
         {
             // Arrange
             var user = new CreateUser
-            {
-                FullName = "John Doe",
-                Email = "john@example.com",
-                Password = "Password123",
-                ConfirmPassword = "Password123"
-            };
-            var httpClient = new HttpClient();
-            HttpResponseMessage apiCallResult = null;
+                           {
+                               FullName = "John Doe",
+                               Email = "john@example.com",
+                               Password = "Password123",
+                               ConfirmPassword = "Password123"
+                           };
 
-            this._httpClientHelperMock.Setup(h => h.GetPrivateClientAsync()).ReturnsAsync(httpClient);
-            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<CreateUser>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
-            this._apiCallHelperMock.Setup(a => a.ConnectionError()).Returns(new ServiceResponse { Success = false, Message = "Connection error" });
+            var httpClient = new HttpClient();
+            this._httpClientHelperMock
+                .Setup(h => h.GetPrivateClientAsync())
+                .ReturnsAsync(httpClient);
+
+            this._apiCallHelperMock
+                .Setup(a => a.ApiCallTypeCall<CreateUser>(It.IsAny<ApiCall>()))
+                .ReturnsAsync((HttpResponseMessage)null);
+
+            this._apiCallHelperMock
+                .Setup(a => a.ConnectionError())
+                .Returns(new ServiceResponse { Success = false, Message = "Connection error" });
 
             // Act
             var result = await this._authenticationService.CreateUser(user);

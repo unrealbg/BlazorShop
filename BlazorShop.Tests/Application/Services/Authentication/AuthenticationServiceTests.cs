@@ -258,31 +258,64 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             // Arrange
             var loginUser = new LoginUser { Email = "test@example.com", Password = "Password123" };
             var validationResult = new ServiceResponse { Success = true };
-            var appUser = new AppUser { Email = loginUser.Email, PasswordHash = loginUser.Password };
-            var claims = new List<Claim>();
+            var appUser = new AppUser
+            {
+                Id = "userId",
+                Email = loginUser.Email,
+                PasswordHash = loginUser.Password,
+                EmailConfirmed = true
+            };
+            var claims = new List<Claim> { new Claim(ClaimTypes.Name, "Test User") };
             var accessToken = "accessToken";
             var refreshToken = "refreshToken";
 
-            _validationServiceMock.Setup(v => v.ValidateAsync(loginUser, this._loginUserValidatorMock.Object))
+            _validationServiceMock
+                .Setup(v => v.ValidateAsync(loginUser, this._loginUserValidatorMock.Object))
                 .ReturnsAsync(validationResult);
-            _mapperMock.Setup(m => m.Map<AppUser>(loginUser)).Returns(appUser);
-            _userManagerMock.Setup(u => u.LoginUserAsync(appUser)).ReturnsAsync(true);
-            _userManagerMock.Setup(u => u.GetUserByEmailAsync(loginUser.Email)).ReturnsAsync(appUser);
-            _userManagerMock.Setup(u => u.GetUserClaimsAsync(loginUser.Email)).ReturnsAsync(claims);
-            _tokenManagerMock.Setup(t => t.GenerateAccessToken(claims)).Returns(accessToken);
-            _tokenManagerMock.Setup(t => t.GetReFreshToken()).Returns(refreshToken);
-            _tokenManagerMock.Setup(t => t.ValidateRefreshTokenAsync(refreshToken)).ReturnsAsync(true);
-            _tokenManagerMock.Setup(t => t.UpdateRefreshTokenAsync(appUser.Id, refreshToken)).ReturnsAsync(1);
+
+            _mapperMock
+                .Setup(m => m.Map<AppUser>(loginUser))
+                .Returns(appUser);
+
+            _userManagerMock
+                .Setup(u => u.LoginUserAsync(appUser))
+                .ReturnsAsync(true);
+
+            _userManagerMock
+                .Setup(u => u.GetUserByEmailAsync(loginUser.Email))
+                .ReturnsAsync(appUser);
+
+            _userManagerMock
+                .Setup(u => u.GetUserClaimsAsync(loginUser.Email))
+                .ReturnsAsync(claims);
+
+            _tokenManagerMock
+                .Setup(t => t.GenerateAccessToken(claims))
+                .Returns(accessToken);
+
+            _tokenManagerMock
+                .Setup(t => t.GetReFreshToken())
+                .Returns(refreshToken);
+
+            _tokenManagerMock
+                .Setup(t => t.ValidateRefreshTokenAsync(refreshToken))
+                .ReturnsAsync(true);
+
+            _tokenManagerMock
+                .Setup(t => t.UpdateRefreshTokenAsync(appUser.Id, refreshToken))
+                .ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.LoginUser(loginUser);
 
             // Assert
+            Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("Login successful.", result.Message);
             Assert.Equal(accessToken, result.Token);
             Assert.Equal(refreshToken, result.RefreshToken);
         }
+
 
         [Fact]
         public async Task LoginUser_ReturnsError_WhenValidationFails()
@@ -335,7 +368,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         {
             // Arrange
             var user = new LoginUser { Email = "test@example.com", Password = "Password123" };
-            var appUser = new AppUser { Id = "userId", Email = user.Email, PasswordHash = user.Password };
+            var appUser = new AppUser { Id = "userId", Email = user.Email, EmailConfirmed = false };
 
             _validationServiceMock
                 .Setup(v => v.ValidateAsync(user, _loginUserValidatorMock.Object))
@@ -347,6 +380,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             _userManagerMock.Setup(u => u.LoginUserAsync(It.IsAny<AppUser>())).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(user.Email)).ReturnsAsync(appUser);
+            _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(It.IsAny<AppUser>())).ReturnsAsync("valid_token");
+
             _tokenManagerMock.Setup(t => t.ValidateRefreshTokenAsync(It.IsAny<string>())).ReturnsAsync(false);
             _tokenManagerMock.Setup(t => t.AddRefreshTokenAsync(appUser.Id, It.IsAny<string>())).ReturnsAsync(1);
 
@@ -355,10 +390,9 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             // Assert
             Assert.NotNull(result);
-            Assert.True(result.Success);
-            Assert.Equal("Login successful.", result.Message);
+            Assert.False(result.Success);
+            Assert.Equal("Email not confirmed. A new confirmation link has been sent to your email.", result.Message);
         }
-
 
         [Fact]
         public async Task ReviveToken_ShouldReturnSuccess_WhenTokenIsValid()
