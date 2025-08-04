@@ -14,7 +14,7 @@ We release patches for security vulnerabilities in the following versions:
 If you find a security vulnerability in BlazorShop, please report it to us as follows:
 
 1. **Do not open a GitHub issue if it involves sensitive information.**
-2. Send an email to [security@example.com](mailto:security@unrealbg.com) with the details of the vulnerability.
+2. Send an email to [security@unrealbg.com](mailto:security@unrealbg.com) with the details of the vulnerability.
 3. Include the following:
    - A description of the vulnerability.
    - Detailed steps to reproduce the issue.
