@@ -1,0 +1,64 @@
+version: '3.8'
+
+# Production overrides for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  mssql:
+    environment:
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-BlazorShop123!}
+    volumes:
+      - mssql_data:/var/opt/mssql
+    # Remove port mapping for security (only accessible internally)
+    ports: []
+    
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Server=mssql,1433;Database=BlazorShopDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-BlazorShop123!};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - Security__RequireHttps=true
+      - Security__EnableHsts=true
+      - Security__AllowedOrigins__0=${WEB_URL:-https://localhost}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_ENDPOINT:-}
+      # Override sensitive settings with environment variables
+      - Jwt__Key=${JWT_KEY:-4cc17386da975a90af4c383aad20a77dacc94b86a857ec13150269bbbd8b2df8}
+      - Stripe__SecretKey=${STRIPE_SECRET_KEY:-}
+      - EmailSettings__Username=${EMAIL_USERNAME:-}
+      - EmailSettings__Password=${EMAIL_PASSWORD:-}
+    # Remove port mapping - use reverse proxy instead
+    ports: []
+    restart: always
+    
+  web:
+    environment:
+      - API_BASE_URL=${API_BASE_URL:-https://api.blazorshop.com}
+    ports:
+      - "80:80"
+      - "443:80"
+    restart: always
+    
+  # Remove development tools in production
+  jaeger:
+    profiles:
+      - development
+      
+  seq:
+    profiles:
+      - development
+
+  # Add reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: blazorshop-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - web
+    restart: always
+    networks:
+      - blazorshop-network

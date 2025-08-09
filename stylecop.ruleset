@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ruleset name="BlazorShop StyleCop Rules" description="Practical StyleCop rules for BlazorShop - focused on readability without being overly restrictive">
+  <description>This ruleset includes StyleCop rules that improve code quality and consistency without being overly nitpicky.</description>
+
+  <!-- Include all StyleCop rules by default -->
+  <include path="stylecop.analyzers.ruleset" action="default" />
+
+  <!-- Disable overly restrictive documentation rules -->
+  <rules analyticsRuleId="SA0001" action="none" /> <!-- XML comment analysis disabled -->
+  <rules analyticsRuleId="SA1600" action="none" /> <!-- Elements should be documented -->
+  <rules analyticsRuleId="SA1601" action="none" /> <!-- Partial elements should be documented -->
+  <rules analyticsRuleId="SA1602" action="none" /> <!-- Enumeration items should be documented -->
+  <rules analyticsRuleId="SA1633" action="none" /> <!-- File should have header -->
+  <rules analyticsRuleId="SA1634" action="none" /> <!-- File header should show copyright -->
+  <rules analyticsRuleId="SA1635" action="none" /> <!-- File header should have copyright text -->
+  <rules analyticsRuleId="SA1636" action="none" /> <!-- File header copyright text should match -->
+  <rules analyticsRuleId="SA1637" action="none" /> <!-- File header should contain file name -->
+  <rules analyticsRuleId="SA1638" action="none" /> <!-- File header file name documentation should match file name -->
+  <rules analyticsRuleId="SA1639" action="none" /> <!-- File header should have summary -->
+  <rules analyticsRuleId="SA1640" action="none" /> <!-- File header should have valid company text -->
+  <rules analyticsRuleId="SA1641" action="none" /> <!-- File header company name text should match -->
+
+  <!-- Disable overly restrictive ordering rules -->
+  <rules analyticsRuleId="SA1200" action="none" /> <!-- Using directives should be placed correctly -->
+  <rules analyticsRuleId="SA1208" action="none" /> <!-- System using directives should be placed before other using directives -->
+
+  <!-- Disable rules that conflict with modern C# practices -->
+  <rules analyticsRuleId="SA1101" action="none" /> <!-- Prefix local calls with this -->
+  <rules analyticsRuleId="SA1309" action="none" /> <!-- Field names should not begin with underscore (conflicts with our naming convention) -->
+  <rules analyticsRuleId="SA1413" action="none" /> <!-- Use trailing comma in multi-line initializers -->
+
+  <!-- Keep important readability rules as warnings -->
+  <rules analyticsRuleId="SA1000" action="warning" /> <!-- Keywords should be spaced correctly -->
+  <rules analyticsRuleId="SA1003" action="warning" /> <!-- Symbols should be spaced correctly -->
+  <rules analyticsRuleId="SA1008" action="warning" /> <!-- Opening parenthesis should be spaced correctly -->
+  <rules analyticsRuleId="SA1009" action="warning" /> <!-- Closing parenthesis should be spaced correctly -->
+  <rules analyticsRuleId="SA1024" action="warning" /> <!-- Colons Should Be Spaced Correctly -->
+  <rules analyticsRuleId="SA1025" action="warning" /> <!-- Code should not contain multiple whitespace in a row -->
+
+  <!-- Keep naming rules as errors -->
+  <rules analyticsRuleId="SA1300" action="error" /> <!-- Element should begin with upper-case letter -->
+  <rules analyticsRuleId="SA1302" action="error" /> <!-- Interface names should begin with I -->
+  <rules analyticsRuleId="SA1303" action="error" /> <!-- Const field names should begin with upper-case letter -->
+  <rules analyticsRuleId="SA1307" action="error" /> <!-- Accessible fields should begin with upper-case letter -->
+  <rules analyticsRuleId="SA1311" action="error" /> <!-- Static readonly fields should begin with upper-case letter -->
+
+  <!-- Keep layout rules as warnings -->
+  <rules analyticsRuleId="SA1500" action="warning" /> <!-- Braces for multi-line statements should not share line -->
+  <rules analyticsRuleId="SA1501" action="warning" /> <!-- Statement should not be on a single line -->
+  <rules analyticsRuleId="SA1502" action="warning" /> <!-- Element should not be on a single line -->
+  <rules analyticsRuleId="SA1503" action="warning" /> <!-- Braces should not be omitted -->
+  <rules analyticsRuleId="SA1505" action="warning" /> <!-- Opening braces should not be followed by blank line -->
+  <rules analyticsRuleId="SA1506" action="warning" /> <!-- Element documentation headers should not be followed by blank line -->
+  <rules analyticsRuleId="SA1507" action="warning" /> <!-- Code should not contain multiple blank lines in a row -->
+  <rules analyticsRuleId="SA1508" action="warning" /> <!-- Closing braces should not be preceded by blank line -->
+
+</ruleset>
