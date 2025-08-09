@@ -1,81 +1,157 @@
-﻿namespace BlazorShop.Infrastructure.ExceptionsMiddleware
+﻿namespace BlazorShop.Infrastructure.ExceptionsMiddleware;
+
+using System.Text.Json;
+using BlazorShop.Application.Services.Contracts.Logging;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+public class ExceptionHandlingMiddleware
 {
-    using System.Text.Json;
+    private readonly RequestDelegate _next;
 
-    using BlazorShop.Application.Services.Contracts.Logging;
-
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.Data.SqlClient;
-    using Microsoft.EntityFrameworkCore;
-    using Microsoft.Extensions.DependencyInjection;
-
-    public class ExceptionHandlingMiddleware
+    public ExceptionHandlingMiddleware(RequestDelegate next)
     {
-        private readonly RequestDelegate _next;
+        _next = next;
+    }
 
-        public ExceptionHandlingMiddleware(RequestDelegate next)
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
         {
-            _next = next;
+            await _next(context);
         }
-
-        public async Task InvokeAsync(HttpContext context)
+        catch (DbUpdateException ex)
         {
-            try
-            {
-                await _next(context);
-            }
-            catch (DbUpdateException ex)
-            {
-                var logger = context.RequestServices.GetRequiredService<IAppLogger<ExceptionHandlingMiddleware>>();
+            var logger = context.RequestServices.GetRequiredService<IAppLogger<ExceptionHandlingMiddleware>>();
 
-                if (ex.InnerException is SqlException innerException)
+            if (ex.InnerException is SqlException innerException)
+            {
+                logger.LogError(innerException, "A database update error occurred. TraceId: {TraceId}", context.TraceIdentifier);
+
+                var problemDetails = innerException.Number switch
                 {
-                    logger.LogError(innerException, "A database update error occurred.");
+                    515 => CreateProblemDetails(
+                        context,
+                        StatusCodes.Status400BadRequest,
+                        "Validation Error",
+                        "Some required fields are missing.",
+                        "https://tools.ietf.org/html/rfc7231#section-6.5.1"),
+                    547 => CreateProblemDetails(
+                        context,
+                        StatusCodes.Status409Conflict,
+                        "Constraint Violation",
+                        "Foreign key constraint violation.",
+                        "https://tools.ietf.org/html/rfc7231#section-6.5.8"),
+                    2601 or 2627 => CreateProblemDetails(
+                        context,
+                        StatusCodes.Status409Conflict,
+                        "Duplicate Record",
+                        "This record already exists in the database.",
+                        "https://tools.ietf.org/html/rfc7231#section-6.5.8"),
+                    _ => CreateProblemDetails(
+                        context,
+                        StatusCodes.Status500InternalServerError,
+                        "Database Error",
+                        "An unexpected database error occurred.",
+                        "https://tools.ietf.org/html/rfc7231#section-6.6.1")
+                };
 
-                    switch (innerException.Number)
-                    {
-                        case 515:
-                            await this.WriteJsonResponse(context, StatusCodes.Status400BadRequest, "Some required fields are missing.");
-                            break;
-                        case 547:
-                            await this.WriteJsonResponse(context, StatusCodes.Status409Conflict, "Foreign key constraint violation.");
-                            break;
-                        case 2601:
-                        case 2627:
-                            await this.WriteJsonResponse(context, StatusCodes.Status409Conflict, "This record already exists in the database.");
-                            break;
-                        default:
-                            await this.WriteJsonResponse(context, StatusCodes.Status500InternalServerError, "An unexpected database error occurred.");
-                            break;
-                    }
-                }
-                else
-                {
-                    logger.LogError(ex, "A database update error occurred.");
-                    await this.WriteJsonResponse(context, StatusCodes.Status500InternalServerError, "A database update error occurred.");
-                }
+                await WriteProblemDetailsResponse(context, problemDetails);
             }
-            catch (Exception ex)
+            else
             {
-                var logger = context.RequestServices.GetRequiredService<IAppLogger<ExceptionHandlingMiddleware>>();
-                logger.LogError(ex, "An error occurred.");
+                logger.LogError(ex, "A database update error occurred. TraceId: {TraceId}", context.TraceIdentifier);
+                var problemDetails = CreateProblemDetails(
+                    context,
+                    StatusCodes.Status500InternalServerError,
+                    "Database Error",
+                    "A database update error occurred.",
+                    "https://tools.ietf.org/html/rfc7231#section-6.6.1");
 
-                await this.WriteJsonResponse(context, StatusCodes.Status500InternalServerError, $"An error occurred: {ex.Message}");
+                await WriteProblemDetailsResponse(context, problemDetails);
             }
         }
-
-        private async Task WriteJsonResponse(HttpContext context, int statusCode, string message)
+        catch (ArgumentException ex)
         {
-            context.Response.ContentType = "application/json";
-            context.Response.StatusCode = statusCode;
+            var logger = context.RequestServices.GetRequiredService<IAppLogger<ExceptionHandlingMiddleware>>();
+            logger.LogWarning(ex, "Invalid argument provided. TraceId: {TraceId}", context.TraceIdentifier);
 
-            var response = new
-            {
-                StatusCode = statusCode,
-                Message = message
-            };
+            var problemDetails = CreateProblemDetails(
+                context,
+                StatusCodes.Status400BadRequest,
+                "Invalid Argument",
+                ex.Message,
+                "https://tools.ietf.org/html/rfc7231#section-6.5.1");
 
-            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            await WriteProblemDetailsResponse(context, problemDetails);
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            var logger = context.RequestServices.GetRequiredService<IAppLogger<ExceptionHandlingMiddleware>>();
+            logger.LogWarning(ex, "Unauthorized access attempt. TraceId: {TraceId}", context.TraceIdentifier);
+
+            var problemDetails = CreateProblemDetails(
+                context,
+                StatusCodes.Status401Unauthorized,
+                "Unauthorized",
+                "You are not authorized to access this resource.",
+                "https://tools.ietf.org/html/rfc7235#section-3.1");
+
+            await WriteProblemDetailsResponse(context, problemDetails);
+        }
+        catch (Exception ex)
+        {
+            var logger = context.RequestServices.GetRequiredService<IAppLogger<ExceptionHandlingMiddleware>>();
+            logger.LogError(ex, "An unexpected error occurred. TraceId: {TraceId}", context.TraceIdentifier);
+
+            var problemDetails = CreateProblemDetails(
+                context,
+                StatusCodes.Status500InternalServerError,
+                "Internal Server Error",
+                "An unexpected error occurred while processing your request.",
+                "https://tools.ietf.org/html/rfc7231#section-6.6.1");
+
+            await WriteProblemDetailsResponse(context, problemDetails);
+        }
+    }
+
+    private static ProblemDetails CreateProblemDetails(
+        HttpContext context,
+        int statusCode,
+        string title,
+        string detail,
+        string? type = null)
+    {
+        return new ProblemDetails
+        {
+            Type = type,
+            Title = title,
+            Status = statusCode,
+            Detail = detail,
+            Instance = context.Request.Path,
+            Extensions =
+            {
+                ["traceId"] = context.TraceIdentifier,
+                ["timestamp"] = DateTimeOffset.UtcNow.ToString("O")
+            }
+        };
+    }
+
+    private static async Task WriteProblemDetailsResponse(HttpContext context, ProblemDetails problemDetails)
+    {
+        context.Response.ContentType = "application/problem+json";
+        context.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        };
+
+        var json = JsonSerializer.Serialize(problemDetails, options);
+        await context.Response.WriteAsync(json);
     }
 }
