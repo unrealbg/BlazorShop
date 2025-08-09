@@ -1,0 +1,61 @@
+# Dockerfile and docker-compose files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+azure-pipelines.yml
+
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+**/coverage/
+**/coveragereport/
+
+# Dependencies
+**/node_modules/
+**/packages/
+
+# IDE files
+**/.vs/
+**/.vscode/
+**/*.user
+**/.idea/
+**/*.suo
+**/*.sln.docstates
+**/.editorconfig
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Logs
+**/logs/
+**/*.log
+
+# Temporary files
+**/tmp/
+**/temp/
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE*
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+
+# Test files
+**/*Tests/
+**/*.Tests/
+
+# Development tools
+**/.devcontainer/

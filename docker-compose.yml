@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # SQL Server database
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: blazorshop-mssql
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=BlazorShop123!
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P BlazorShop123! -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - blazorshop-network
+
+  # BlazorShop API
+  api:
+    build:
+      context: .
+      dockerfile: BlazorShop.Presentation/BlazorShop.API/Dockerfile
+    container_name: blazorshop-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=mssql,1433;Database=BlazorShopDb;User Id=sa;Password=BlazorShop123!;TrustServerCertificate=True;MultipleActiveResultSets=true
+      - Security__RequireHttps=false
+      - Security__EnableHsts=false
+      - Security__AllowedOrigins__0=http://localhost:3000
+      - Security__AllowedOrigins__1=http://localhost:8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=BlazorShop.API
+      - OTEL_SERVICE_VERSION=1.0.0
+    ports:
+      - "5000:80"
+    depends_on:
+      mssql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - blazorshop-network
+
+  # BlazorShop Web (Blazor WebAssembly)
+  web:
+    build:
+      context: .
+      dockerfile: BlazorShop.Presentation/BlazorShop.Web/Dockerfile
+    container_name: blazorshop-web
+    environment:
+      - API_BASE_URL=http://localhost:5000
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - blazorshop-network
+
+  # Jaeger for distributed tracing (optional)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: blazorshop-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    restart: unless-stopped
+    networks:
+      - blazorshop-network
+
+  # Seq for structured logging (optional)
+  seq:
+    image: datalust/seq:latest
+    container_name: blazorshop-seq
+    environment:
+      - ACCEPT_EULA=Y
+    ports:
+      - "5341:80"
+    volumes:
+      - seq_data:/data
+    restart: unless-stopped
+    networks:
+      - blazorshop-network
+
+volumes:
+  mssql_data:
+    driver: local
+  seq_data:
+    driver: local
+
+networks:
+  blazorshop-network:
+    driver: bridge
+
+# Development override file instructions:
+# Create docker-compose.override.yml for local development customizations
+# Example override content:
+# version: '3.8'
+# services:
+#   api:
+#     environment:
+#       - ASPNETCORE_ENVIRONMENT=Development
+#       - Serilog__WriteTo__1__Args__serverUrl=http://seq
+#     volumes:
+#       - ./logs:/app/logs
+#   web:
+#     volumes:
+#       - ./BlazorShop.Presentation/BlazorShop.Web/wwwroot:/usr/share/nginx/html
