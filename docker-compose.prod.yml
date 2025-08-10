@@ -21,7 +21,7 @@ services:
       - Security__AllowedOrigins__0=${WEB_URL:-https://localhost}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_ENDPOINT:-}
       # Override sensitive settings with environment variables
-      - Jwt__Key=${JWT_KEY:-4cc17386da975a90af4c383aad20a77dacc94b86a857ec13150269bbbd8b2df8}
+      - Jwt__Key=${JWT_KEY}
       - Stripe__SecretKey=${STRIPE_SECRET_KEY:-}
       - EmailSettings__Username=${EMAIL_USERNAME:-}
       - EmailSettings__Password=${EMAIL_PASSWORD:-}
