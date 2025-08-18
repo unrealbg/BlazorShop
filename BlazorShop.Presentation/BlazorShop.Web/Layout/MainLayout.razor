@@ -1,6 +1,6 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="min-h-screen bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
+<div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
 
     <div class="clip-diagonal bg-neutral-900 text-neutral-100">
@@ -48,9 +48,9 @@
         </div>
     </header>
 
-    <div class="">
+    <main class="flex-1">
         @Body
-    </div>
+    </main>
 
     <Footer />
 </div>
