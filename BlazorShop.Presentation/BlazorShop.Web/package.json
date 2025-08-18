@@ -1,0 +1,14 @@
+{
+  "name": "blazorshop-web",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "tailwind:build": "tailwindcss -c tailwind.config.js -i ./wwwroot/css/input.css -o ./wwwroot/css/site.css --minify",
+    "tailwind:dev": "tailwindcss -c tailwind.config.js -i ./wwwroot/css/input.css -o ./wwwroot/css/site.css --watch"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.11"
+  }
+}

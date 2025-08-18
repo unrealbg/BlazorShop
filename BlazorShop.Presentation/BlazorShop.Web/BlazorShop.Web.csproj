@@ -23,4 +23,11 @@
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 
+  <!-- Tailwind build on publish/build -->
+  <Target Name="TailwindBuild" BeforeTargets="Build">
+    <Message Text="Running Tailwind build..." Importance="high" />
+    <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="npm run tailwind:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
 </Project>
