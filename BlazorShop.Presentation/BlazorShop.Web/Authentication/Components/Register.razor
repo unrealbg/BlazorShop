@@ -1,47 +1,46 @@
 ﻿@page "/authentication/register"
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-6 col-md-8 col-sm-12">
-            <div class="card shadow-lg border-0 rounded-3 mb-5">
-                <div class="card-header bg-warning text-light text-center">
-                    <h4 class="fw-bold m-0">Register</h4>
-                </div>
-                <div class="card-body p-4">
-                    <EditForm Model="_user" OnValidSubmit="HandleRegister">
-                        <DataAnnotationsValidator />
-                        <div class="form-floating mb-3">
-                            <ValidationMessage For="@(() => _user.FullName)" />
-                            <FloatingTextInput type="text" id="username" class="form-control" @bind-Value="_user.FullName" Label="Full Name" placeholder="John Doe" />
-                        </div>
-                        <div class="form-floating mb-3">
-                            <ValidationMessage For="@(() => _user.Email)" />
-                            <FloatingTextInput type="text" id="email" class="form-control" @bind-Value="_user.Email" Label="Email Address" Placeholder="john@email.com" />
-                        </div>
-                        <div class="form-floating mb-3">
-                            <ValidationMessage For="@(() => _user.Password)" />
-                            <FloatingTextInput id="password" class="form-control" @bind-Value="_user.Password" Label="Password" Type="Password" Placeholder="My Password" />
-                        </div>
-                        <div class="form-floating mb-3">
-                            <ValidationMessage For="@(() => _user.ConfirmPassword)" />
-                            <FloatingTextInput type="Password" id="confirmPassword" class="form-control" @bind-Value="_user.ConfirmPassword" Label="Confirm Password" placeholder="Confirm Password" />
-                        </div>
-                        <button class="btn btn-warning w-100 mt-3" type="submit" disabled="@_isLoading">Register</button>
-                    </EditForm>
-                </div>
-                <div class="card-footer bg-transparent text-center py-3 mb-2">
-                    <small>
-                        Already have an account?
-                        <a href="/authentication/login" class="text-warning fw-bold">Login</a>
-                    </small>
-                </div>
-            </div>
-        </div>
+<section class="min-h-[70vh] grid place-items-center px-4 py-10">
+  <div class="w-full max-w-md">
+    <div class="rounded-2xl shadow-[0_12px_30px_rgba(0,0,0,.08)] border border-black/5 overflow-hidden bg-white/80 mb-8">
+      <div class="px-6 py-4 bg-amber-400/90 text-neutral-900 text-center">
+        <h4 class="text-lg font-extrabold m-0">Register</h4>
+      </div>
+      <div class="px-6 py-6">
+        <EditForm Model="_user" OnValidSubmit="HandleRegister">
+          <DataAnnotationsValidator />
+          <div class="mb-4">
+            <ValidationMessage For="@(() => _user.FullName)" />
+            <FloatingTextInput type="text" id="username" class="w-full border rounded px-3 py-2" @bind-Value="_user.FullName" Label="Full Name" placeholder="John Doe" />
+          </div>
+          <div class="mb-4">
+            <ValidationMessage For="@(() => _user.Email)" />
+            <FloatingTextInput type="text" id="email" class="w-full border rounded px-3 py-2" @bind-Value="_user.Email" Label="Email Address" Placeholder="john@email.com" />
+          </div>
+          <div class="mb-4">
+            <ValidationMessage For="@(() => _user.Password)" />
+            <FloatingTextInput id="password" class="w-full border rounded px-3 py-2" @bind-Value="_user.Password" Label="Password" Type="Password" Placeholder="My Password" />
+          </div>
+          <div class="mb-6">
+            <ValidationMessage For="@(() => _user.ConfirmPassword)" />
+            <FloatingTextInput type="Password" id="confirmPassword" class="w-full border rounded px-3 py-2" @bind-Value="_user.ConfirmPassword" Label="Confirm Password" placeholder="Confirm Password" />
+          </div>
+          <button class="w-full inline-flex items-center justify-center rounded bg-amber-500 text-white px-4 py-2.5 font-semibold hover:bg-amber-600 shadow-sm disabled:opacity-60" type="submit" disabled="@_isLoading">Register</button>
+        </EditForm>
+      </div>
+      <div class="px-6 py-4 bg-white/80 text-center">
+        <small>
+          Already have an account?
+          <a href="/authentication/login" class="text-amber-600 font-semibold hover:underline">Login</a>
+        </small>
+      </div>
     </div>
+
     @if (_isLoading)
     {
-        <div class="loading-overlay">
-            <Spinner />
-        </div>
+      <div class="fixed inset-0 bg-black/20 backdrop-blur-sm grid place-items-center">
+        <Spinner />
+      </div>
     }
-</div>
+  </div>
+</section>
