@@ -1,18 +1,31 @@
 ﻿@if (IsVisible)
 {
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="fixed inset-0 bg-black/50" @onclick="Close"></div>
-        <div class="relative z-10 w-full max-w-lg rounded-xl bg-white shadow-lg overflow-hidden">
-            <div class="flex items-center justify-between px-4 py-3 border-b">
-                <div class="font-semibold text-lg">@Header</div>
-                <button type="button" class="text-2xl leading-none px-2" @onclick="Close" aria-label="Close">×</button>
+    <div class="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" @onkeydown="HandleKeyDown" tabindex="-1">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @onclick="OnBackdropClick"></div>
+
+        <div class="relative z-10 w-full @GetMaxWidth() mx-4 sm:mx-6 rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden transition-all">
+            <div class="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-neutral-900 to-neutral-700 text-white">
+                <div class="flex items-center gap-3">
+                    <div class="h-7 w-7 grid place-items-center rounded-md bg-white/10 text-white/90">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                    </div>
+                    <div class="font-semibold text-base sm:text-lg">@Header</div>
+                </div>
+                @if (ShowCloseButton)
+                {
+                    <button type="button" class="inline-flex items-center justify-center rounded-md p-2 text-white/80 hover:text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30" @onclick="Close" aria-label="Close">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M6 18L18 6"/></svg>
+                    </button>
+                }
             </div>
-            <div class="p-4">
+
+            <div class="p-5">
                 @Body
             </div>
+
             @if (Footer != null)
             {
-                <div class="px-4 py-3 border-t bg-neutral-50">
+                <div class="px-5 py-3 bg-neutral-50 border-t border-neutral-200">
                     @Footer
                 </div>
             }

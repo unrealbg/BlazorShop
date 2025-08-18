@@ -19,7 +19,7 @@
                         <tr class="bg-neutral-100/90 text-left">
                             <th class="px-3 py-2">Id</th>
                             <th class="px-3 py-2">Name</th>
-                            <th class="px-3 py-2 text-red-600 text-center">Actions</th>
+                            <th class="px-3 py-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-neutral-200">
@@ -28,10 +28,15 @@
                             <tr>
                                 <td class="px-3 py-2">@category.Id</td>
                                 <td class="px-3 py-2">@category.Name</td>
-                                <td class="px-3 py-2 text-center">
-                                    <button class="inline-flex items-center justify-center rounded text-red-600 hover:text-red-700 px-2 py-1" title="Delete" @onclick="() => ConfirmDelete(category.Id)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
-                                    </button>
+                                <td class="px-3 py-2">
+                                    <div class="flex items-center justify-center gap-3">
+                                        <button title="Edit" class="text-blue-600 hover:text-blue-700" @onclick="() => StartEdit(category)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                        </button>
+                                        <button class="inline-flex items-center justify-center rounded text-red-600 hover:text-red-700 px-2 py-1" title="Delete" @onclick="() => ConfirmDelete(category.Id)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -48,6 +53,7 @@
     </div>
 </section>
 
+<!-- Add Category Dialog -->
 <ModalDialog @bind-IsVisible="_showDialog">
     <Header>
         <h5 class="text-lg font-semibold">Add New Category</h5>
@@ -63,6 +69,27 @@
             <div class="flex justify-end gap-2">
                 <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Save</button>
                 <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
+            </div>
+        </EditForm>
+    </Body>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showEditDialog">
+    <Header>
+        <h5 class="text-lg font-semibold">Edit Category</h5>
+    </Header>
+    <Body>
+        <EditForm Model="_editCategory" OnValidSubmit="UpdateCategoryAsync">
+            <DataAnnotationsValidator />
+            <div class="p-2">
+                <label class="block text-sm text-neutral-700 mb-1">Category Name</label>
+                <InputText @bind-Value="_editCategory.Name" class="w-full border rounded px-3 py-2" autofocus />
+                <ValidationMessage For="@(() => _editCategory.Name)" />
+            </div>
+            <hr />
+            <div class="flex justify-end gap-2">
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Update</button>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="CancelEdit">Cancel</button>
             </div>
         </EditForm>
     </Body>

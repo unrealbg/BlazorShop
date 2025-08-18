@@ -16,9 +16,11 @@
         {
             // CreateMap<Source, Destination>();
             this.CreateMap<CreateCategory, Category>();
+            this.CreateMap<UpdateCategory, Category>();
             this.CreateMap<Category, GetCategory>();
 
             this.CreateMap<CreateProduct, Product>();
+            this.CreateMap<UpdateProduct, Product>();
             this.CreateMap<Product, GetProduct>();
 
             this.CreateMap<CreateUser, AppUser>();

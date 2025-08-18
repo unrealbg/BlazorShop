@@ -12,18 +12,22 @@
             {
                 @foreach (var product in group)
                 {
-                    <article class="rounded-2xl bg-white shadow-[0_12px_30px_rgba(0,0,0,.08)] border border-black/5 overflow-hidden">
+                    <article class="group relative rounded-2xl bg-white/95 border border-neutral-200/70 shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden hover:-translate-y-0.5">
                         <div class="p-6">
-                            <h3 class="text-lg font-extrabold">@product.Name</h3>
-                            <p class="mt-1 text-[15px]"><span class="text-rose-500 font-semibold">Price</span> € @product.Price</p>
-                            <div class="mt-6 aspect-[4/3] rounded-lg bg-center bg-contain bg-no-repeat" style="background-image:url('@product.Image');"></div>
+                            <div class="flex items-start justify-between">
+                                <h3 class="text-lg font-extrabold text-neutral-900">@product.Name</h3>
+                            </div>
+                            <p class="mt-2 text-sm"><span class="text-rose-600 font-semibold">Price</span> <span class="font-semibold">€ @product.Price</span></p>
+                            <div class="mt-5 relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
+                                <img src="@product.Image" alt="@product.Name" class="absolute inset-0 w-full h-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
+                            </div>
                         </div>
-                        <div class="flex items-center justify-between px-6 py-4 text-sm text-neutral-600">
-                            <button class="inline-flex items-center gap-2" @onclick="() => AddItemToCart(product.Id)">
+                        <div class="flex items-center justify-between px-6 py-4 border-t border-neutral-100 text-sm">
+                            <button class="inline-flex items-center gap-2 rounded-md bg-neutral-900 text-white px-3 py-1.5 font-medium hover:bg-neutral-800" @onclick="() => AddItemToCart(product.Id)">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/></svg>
                                 Add To Cart
                             </button>
-                            <button class="inline-flex items-center gap-2" @onclick="() => ShowDetails(product)">
+                            <button class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100" @onclick="() => ShowDetails(product)">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/></svg>
                                 See More
                             </button>
@@ -34,8 +38,8 @@
         </div>
 
         <div class="mt-8 flex items-center justify-center gap-4">
-            <button class="h-11 w-11 grid place-items-center rounded-sm bg-neutral-900 text-white">‹</button>
-            <button class="h-11 w-11 grid place-items-center rounded-sm bg-neutral-900 text-white">›</button>
+            <button class="h-11 w-11 grid place-items-center rounded-md bg-neutral-900 text-white hover:bg-neutral-800">‹</button>
+            <button class="h-11 w-11 grid place-items-center rounded-md bg-neutral-900 text-white hover:bg-neutral-800">›</button>
         </div>
     }
   </div>

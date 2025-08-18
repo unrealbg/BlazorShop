@@ -19,6 +19,9 @@
         public bool IsVisible { get; set; }
 
         [Parameter]
+        public EventCallback<bool> IsVisibleChanged { get; set; }
+
+        [Parameter]
         public EventCallback<Guid> OnAddToCart { get; set; }
 
         private async Task HandleAddToCart()
@@ -28,13 +31,22 @@
                 await this.OnAddToCart.InvokeAsync(this.Product.Id);
             }
 
-            this.CloseModal();
+            await CloseModalInternal();
         }
 
-        private void CloseModal()
+        private async Task CloseModalInternal()
         {
-            this.IsVisible = false;
-            this.OnClose.InvokeAsync();
+            IsVisible = false;
+            if (IsVisibleChanged.HasDelegate)
+            {
+                await IsVisibleChanged.InvokeAsync(IsVisible);
+            }
+            await OnClose.InvokeAsync();
+        }
+
+        private async Task CloseModal()
+        {
+            await CloseModalInternal();
         }
     }
 }
