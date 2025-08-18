@@ -1,14 +1,56 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="banner_bg_main page-container d-flex flex-column min-vh-100">
-    <div>
-        <Toast />
-        <NavBar />
+<div class="min-h-screen bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
+    <Toast />
+
+    <div class="clip-diagonal bg-neutral-900 text-neutral-100">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
+            <nav class="flex items-center gap-8 sm:gap-12 text-[0.95rem] font-medium">
+                <a href="/" class="hover:text-white/80">Home</a>
+                <a href="about-us" class="hover:text-white/80">About us</a>
+                <a href="new-releases" class="hover:text-white/80">New Releases</a>
+                <a href="todays-deals" class="hover:text-white/80">Today's Deals</a>
+                <a href="customer-service" class="hover:text-white/80">Customer Service</a>
+            </nav>
+        </div>
     </div>
 
-    <div class="content flex-grow-1">
-        <Header />
+    <header class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
+        <a href="/" class="mr-2 hidden sm:flex flex-col leading-none select-none">
+            <span class="text-xl font-extrabold tracking-wider">BLAZORSHOP®</span>
+            <span class="text-[11px] text-neutral-500 -mt-0.5">E‑COMMERCE APPLICATION</span>
+        </a>
+        <button class="flex flex-col gap-1.5 shrink-0" aria-label="Open menu">
+            <span class="block h-0.5 w-8 bg-neutral-900"></span>
+            <span class="block h-0.5 w-8 bg-neutral-900"></span>
+            <span class="block h-0.5 w-8 bg-neutral-900"></span>
+        </button>
+        <div class="flex-1 relative">
+            <input type="search" placeholder="Search products…" class="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2.5 shadow-sm focus:outline-none" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 select-none">✕</span>
+        </div>
+        <div class="flex items-center gap-5 text-sm">
+            <div class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+                <a href="my-cart" class="hover:underline">CART</a>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="profile" class="hover:underline">Profile</a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="authentication/login" class="hover:underline">Login</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </header>
+
+    <div class="">
         @Body
     </div>
+
     <Footer />
 </div>
