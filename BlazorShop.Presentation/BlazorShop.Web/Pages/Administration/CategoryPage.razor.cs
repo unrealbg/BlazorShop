@@ -7,10 +7,12 @@
     public partial class CategoryPage
     {
         private bool _showDialog = false;
+        private bool _showEditDialog = false;
         private bool _showConfirmDeleteDialog = false;
         private Guid _categoryToDelete;
         private IEnumerable<GetCategory> _categories = Enumerable.Empty<GetCategory>();
         private CreateCategory _category = new();
+        private UpdateCategory _editCategory = new();
         private string? _categoryToDeleteName;
 
         protected override async Task OnInitializedAsync()
@@ -35,10 +37,22 @@
             _showDialog = true;
         }
 
+        private void StartEdit(GetCategory category)
+        {
+            _editCategory = new UpdateCategory { Id = category.Id, Name = category.Name };
+            _showEditDialog = true;
+        }
+
         private void Cancel()
         {
             _showDialog = false;
             _category = new CreateCategory();
+        }
+
+        private void CancelEdit()
+        {
+            _showEditDialog = false;
+            _editCategory = new UpdateCategory();
         }
 
         private void ConfirmDelete(Guid id)
@@ -77,6 +91,18 @@
             }
 
             this.ShowToast(result, "Add-Category");
+        }
+
+        private async Task UpdateCategoryAsync()
+        {
+            var result = await this.CategoryService.UpdateAsync(_editCategory);
+            if (result.Success)
+            {
+                _showEditDialog = false;
+                await this.GetCategories();
+            }
+
+            this.ShowToast(result, "Edit-Category");
         }
 
         private void ShowToast(ServiceResponse result, string heading)
