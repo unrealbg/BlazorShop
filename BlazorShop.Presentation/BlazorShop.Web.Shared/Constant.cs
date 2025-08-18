@@ -9,6 +9,7 @@
             public const string Add = "product/add";
             public const string Update = "product/update";
             public const string Delete = "product/delete";
+            public const string Variants = "product"; // base for product-specific variant routes
         }
 
         public static class Category
