@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom helpers matching the preview */
+.clip-diagonal { clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%); }
+.hero-bg { background: url('https://images.unsplash.com/photo-1618354691442-4bc4b2b2be4a?q=80&w=1600&auto=format&fit=crop') center/cover no-repeat; }
+.text-shadow { text-shadow: 0 2px 8px rgba(0,0,0,.15); }
