@@ -1,76 +1,59 @@
 ﻿@page "/my-cart"
-<div class="container mb-3">
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-6">
     @if (_selectedProducts.Any())
     {
-        <div class="col-lg-12">
-            <div class="p-2 mt-3 w-100 bg-warning">
-                <div class="card m-2">
-                    <div class="card-header">
-                        <h4 class="text-center">My Cart</h4>
-                    </div>
-                    <div class="card-body">
-                        <TemplateTable TableFormat="Styles.TableFormats.Bordered"
-                                       HeaderBackground="Styles.BackgroundColors.Info"
-                                       HeaderTextColor="Styles.TextColors.Dark"
-                                       HeaderFont="Styles.FontStyles.Georgia"
-                                       HeaderFontSize="18px"
-                                       ContentBackground="Styles.BackgroundColors.Light"
-                                       ContentTextColor="Styles.TextColors.Secondary"
-                                       ContentFont="Styles.FontStyles.Calibri"
-                                       ContentFontSize="14px">
-                            <HeaderTemplate>
+        <div class="mt-6 rounded-xl bg-amber-100/60">
+            <div class="p-6">
+                <h4 class="text-center text-xl font-bold">My Cart</h4>
+                <div class="mt-4 overflow-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="bg-neutral-100 text-left">
+                                <th class="px-3 py-2">Image</th>
+                                <th class="px-3 py-2 w-56">Name</th>
+                                <th class="px-3 py-2">Price (€)</th>
+                                <th class="px-3 py-2">Quantity</th>
+                                <th class="px-3 py-2">Total</th>
+                                <th class="px-3 py-2 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-neutral-200">
+                            @foreach (var product in _selectedProducts)
+                            {
+                                Guid productId = product.Id;
                                 <tr>
-                                    <th>Image</th>
-                                    <th style="width: 150px">Name</th>
-                                    <th>Price (€)</th>
-                                    <th>Quantity</th>
-                                    <th>Total</th>
-                                    <th class="text-center">Actions</th>
+                                    <td class="px-3 py-2 w-40"><img src="@product.Image" alt="@product.Name" class="h-16 w-24 object-contain" /></td>
+                                    <td class="px-3 py-2 w-56">@product.Name</td>
+                                    <td class="px-3 py-2">€ @product.Price</td>
+                                    <td class="px-3 py-2">
+                                        <input class="w-20 text-center border rounded px-2 py-1"
+                                               type="number"
+                                               value="@(GetProductQuantity(productId))"
+                                               min="1"
+                                               @oninput="(e) => HandleInputChange(e, productId)" />
+                                    </td>
+                                    <td class="px-3 py-2">€ @GetProductTotalPrice(productId)</td>
+                                    <td class="px-3 py-2 text-center">
+                                        <button class="text-red-600 hover:text-red-700" title="Remove" @onclick="() => RemoveCartItem(product.Id)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                        </button>
+                                    </td>
                                 </tr>
-                            </HeaderTemplate>
-                            <ContentTemplate>
-                                @foreach (var product in _selectedProducts)
-                                {
-                                    Guid productId = product.Id;
-                                    <tr>
-                                        <td style="width: 150px"><img src="@product.Image" alt="@product.Name" class="img-fluid" /></td>
-                                        <td style="width: 250px">@product.Name</td>
-                                        <td style="width: 250px">€ @product.Price</td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <input class="form-control"
-                                                       type="number"
-                                                       value="@(GetProductQuantity(productId))"
-                                                       min="1"
-                                                       @oninput="(e) => HandleInputChange(e, productId)"
-                                                       style="width: 80px; text-align: center; font-size: 1rem; padding: 0.4rem;" />
-                                            </div>
-                                        </td>
-                                        <td style="width: 150px">€ @GetProductTotalPrice(productId)</td>
-                                        <td class="text-center">
-                                            <i class="fa fa-trash text-danger" @onclick="() => RemoveCartItem(product.Id)"></i>
-                                        </td>
-                                    </tr>
-                                }
-                            </ContentTemplate>
-                        </TemplateTable>
-                    </div>
-                    <div class="card-footer">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <h4>Total: € @(GetGrandTotal(_selectedProducts))</h4>
-                            </div>
-                            <div>
-                                <AuthorizeView>
-                                    <Authorized>
-                                        <button class="btn btn-primary" @onclick="() => _showPaymentDialog = true">Checkout</button>
-                                    </Authorized>
-                                    <NotAuthorized>
-                                        <button class="btn btn-primary" @onclick="() => Checkout()">Checkout</button>
-                                    </NotAuthorized>
-                                </AuthorizeView>
-                            </div>
-                        </div>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <h4 class="text-lg font-bold">Total: € @(GetGrandTotal(_selectedProducts))</h4>
+                    <div>
+                        <AuthorizeView>
+                            <Authorized>
+                                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="() => _showPaymentDialog = true">Checkout</button>
+                            </Authorized>
+                            <NotAuthorized>
+                                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="() => Checkout()">Checkout</button>
+                            </NotAuthorized>
+                        </AuthorizeView>
                     </div>
                 </div>
             </div>
@@ -78,46 +61,43 @@
     }
     else
     {
-        <div class="col-lg-12 m-5">
-            <div class="p-2 mt-3 w-100 bg-warning">
-                <div class="card m-2">
-                    <div class="card-header">
-                        <h4 class="text-center">My Cart</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-warning text-center">
-                            <h4>Your cart is empty</h4>
-                        </div>
-                    </div>
+        <div class="mt-16">
+            <div class="rounded-xl bg-amber-100/60 p-6">
+                <h4 class="text-center text-xl font-bold">My Cart</h4>
+                <div class="mt-4 text-center rounded-md bg-yellow-50 text-yellow-800 px-6 py-5 shadow">
+                    <h4>Your cart is empty</h4>
                 </div>
             </div>
         </div>
     }
 
-    <ModalDialog @bind-IsVisible="_showPaymentDialog">
-        <Header>
-            <h5 class="modal-title">Select Payment Method</h5>
-        </Header>
-        <Body>
-            <ul class="list-group">
-                @foreach (var paymentMethod in _paymentMethods)
-                {
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        @paymentMethod.Name
-                        @if (_paying != null)
-                        {
-                            <span class="text-success me-2">@_paying</span>
-                        }
-                        else
-                        {
-                            <button class="btn btn-primary btn-sm" @onclick="() => SelectPaymentMethod(paymentMethod)">Select</button>
-                        }
-                    </li>
-                }
-            </ul>
-        </Body>
-        <Footer>
-            <button class="btn btn-danger" @onclick="Cancel">Cancel</button>
-        </Footer>
-    </ModalDialog>
-</div>
+    @if (_showPaymentDialog)
+    {
+        <ModalDialog @bind-IsVisible="_showPaymentDialog">
+            <Header>
+                <h5 class="text-lg font-semibold">Select Payment Method</h5>
+            </Header>
+            <Body>
+                <ul class="divide-y">
+                    @foreach (var paymentMethod in _paymentMethods)
+                    {
+                        <li class="flex items-center justify-between py-2">
+                            @paymentMethod.Name
+                            @if (_paying != null)
+                            {
+                                <span class="text-emerald-600 mr-2">@_paying</span>
+                            }
+                            else
+                            {
+                                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="() => SelectPaymentMethod(paymentMethod)">Select</button>
+                            }
+                        </li>
+                    }
+                </ul>
+            </Body>
+            <Footer>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" @onclick="Cancel">Cancel</button>
+            </Footer>
+        </ModalDialog>
+    }
+</section>

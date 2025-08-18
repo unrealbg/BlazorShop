@@ -1,58 +1,45 @@
 ﻿@using BlazorShop.Web.Shared.Toast
 @implements IAsyncDisposable
 
-<div class="fashion_section container-fluid">
-    <div id="main_slider" class="carousel slide" data-ride="carousel">
-        <div class="carousel-inner">
-            @if (_productGroups.Any())
+<section id="latest" class="relative z-[1]">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-10">
+    <h2 class="text-3xl font-extrabold tracking-tight text-center">Latest Products</h2>
+
+    @if (_productGroups.Any())
+    {
+        <div class="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            @foreach (var group in _productGroups)
             {
-                int sn = 1;
-                foreach (var group in _productGroups)
+                @foreach (var product in group)
                 {
-                    <div class="carousel-item @(sn == 1 ? "active" : null)">
-                        <div class="container-fluid">
-                            <div class="container">
-                                <h1 class="fashion_taital fw-bold">Latest Products</h1>
-                                <div class="fashion_section_2">
-                                    <div class="d-flex flex-nowrap justify-content-center align-content-center">
-                                        @foreach (var product in group)
-                                        {
-                                            <div class="col-lg-4 col-sm-3">
-                                                <div class="box_main">
-                                                    <h4 class="shirt_text">@product.Name</h4>
-                                                    <p class="price_text">Price <span style="color: #262626;">€ @product.Price</span></p>
-                                                    <div class="tshirt_img"><img src="@product.Image"/></div>
-                                                    <div class="btn_main">
-                                                        <div class="buy_bt text-danger" @onclick="() => AddItemToCart(product.Id)">
-                                                            <i class="fa fa-cart-plus" aria-hidden="true"></i>Add To Cart
-                                                        </div>
-                                                        <div class="seemore_bt" @onclick="() => ShowDetails(product)">
-                                                            <i class="fa fa-eye"></i> See More
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
+                    <article class="rounded-2xl bg-white shadow-[0_12px_30px_rgba(0,0,0,.08)] border border-black/5 overflow-hidden">
+                        <div class="p-6">
+                            <h3 class="text-lg font-extrabold">@product.Name</h3>
+                            <p class="mt-1 text-[15px]"><span class="text-rose-500 font-semibold">Price</span> € @product.Price</p>
+                            <div class="mt-6 aspect-[4/3] rounded-lg bg-center bg-contain bg-no-repeat" style="background-image:url('@product.Image');"></div>
                         </div>
-                    </div>
-                    sn++;
+                        <div class="flex items-center justify-between px-6 py-4 text-sm text-neutral-600">
+                            <button class="inline-flex items-center gap-2" @onclick="() => AddItemToCart(product.Id)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/></svg>
+                                Add To Cart
+                            </button>
+                            <button class="inline-flex items-center gap-2" @onclick="() => ShowDetails(product)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/></svg>
+                                See More
+                            </button>
+                        </div>
+                    </article>
                 }
             }
         </div>
-        @if (_products.Any())
-        {
-            <a class="carousel-control-prev" href="#main_slider" role="button" data-slide="prev">
-                <i class="fa fa-angle-left"></i>
-            </a>
-            <a class="carousel-control-next" href="#main_slider" role="button" data-slide="next">
-                <i class="fa fa-angle-right"></i>
-            </a>
-        }
-    </div>
-</div>
+
+        <div class="mt-8 flex items-center justify-center gap-4">
+            <button class="h-11 w-11 grid place-items-center rounded-sm bg-neutral-900 text-white">‹</button>
+            <button class="h-11 w-11 grid place-items-center rounded-sm bg-neutral-900 text-white">›</button>
+        </div>
+    }
+  </div>
+</section>
 
 <ProductDetails Product="SelectedProduct"
                 IsVisible="_showModal"
