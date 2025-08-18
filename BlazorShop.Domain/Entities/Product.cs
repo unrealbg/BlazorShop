@@ -24,5 +24,7 @@
         public Guid CategoryId { get; set; }
 
         public Category? Category { get; set; }
+
+        public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
     }
 }
