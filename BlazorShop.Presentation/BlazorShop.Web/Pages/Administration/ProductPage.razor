@@ -24,7 +24,7 @@
                             <th class="px-3 py-2">Price</th>
                             <th class="px-3 py-2">Quantity</th>
                             <th class="px-3 py-2">Created Date</th>
-                            <th class="px-3 py-2 text-red-600 text-center">Actions</th>
+                            <th class="px-3 py-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-neutral-200">
@@ -39,9 +39,14 @@
                                 <td class="px-3 py-2 align-top">@product.Quantity</td>
                                 <td class="px-3 py-2 align-top">@product.CreatedOn</td>
                                 <td class="px-3 py-2 align-top">
-                                    <button class="mx-auto block text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
-                                    </button>
+                                    <div class="flex items-center justify-center gap-3">
+                                        <button class="text-blue-600 hover:text-blue-700" title="Edit" @onclick="() => StartEdit(product)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                        </button>
+                                        <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -58,6 +63,7 @@
     </div>
 </section>
 
+<!-- Add Product Dialog -->
 <ModalDialog @bind-IsVisible="_showDialog">
     <Header>
         <h5 class="text-lg font-semibold">Add New Product</h5>
@@ -110,6 +116,64 @@
             <div class="flex justify-end gap-2">
                 <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Save</button>
                 <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
+            </div>
+        </EditForm>
+    </Body>
+</ModalDialog>
+
+<!-- Edit Product Dialog -->
+<ModalDialog @bind-IsVisible="_showEditDialog">
+    <Header>
+        <h5 class="text-lg font-semibold">Edit Product</h5>
+    </Header>
+    <Body>
+        <EditForm Model="_editProduct" OnValidSubmit="UpdateProductAsync">
+            <DataAnnotationsValidator />
+            <div class="form-group">
+                <FloatingTextInput @bind-Value="_editProduct.Name" Label="Product Name" class="w-full" />
+                <ValidationMessage For="@(() => _editProduct.Name)" />
+            </div>
+            <div class="form-group">
+                <InputNumber @bind-Value="_editProduct.Price" class="w-full border rounded px-3 py-2" />
+                <label class="block text-sm text-neutral-600 mt-1">Price</label>
+                <ValidationMessage For="@(() => _editProduct.Price)" />
+            </div>
+            <div class="form-group">
+                <FloatingNumberInput @bind-Value="_editProduct.Quantity" Label="Quantity" class="w-full" />
+                <ValidationMessage For="@(() => _editProduct.Quantity)" />
+            </div>
+            <div class="form-group">
+                <FloatingTextAreaInput @bind-Value="_editProduct.Description" Label="Product Description" class="w-full" />
+                <ValidationMessage For="@(() => _editProduct.Description)" />
+            </div>
+            <div class="form-group">
+                <InputSelect id="edit-category" class="w-full border rounded px-3 py-2" @bind-Value="_editProduct.CategoryId">
+                    <option value="" selected>-- Select a Category --</option>
+                    @foreach (var category in _categories)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </InputSelect>
+                <label for="edit-category" class="block text-sm text-neutral-600 mt-1">Category</label>
+                <ValidationMessage For="@(() => _editProduct.CategoryId)" />
+            </div>
+            <div class="form-group flex items-center justify-between">
+                <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                    <span>Upload Image</span>
+                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnEditFileSelected)" accept="image/*" class="sr-only" />
+                </label>
+                @if (!string.IsNullOrEmpty(_previewImageUrl))
+                {
+                    <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
+                }
+                <ValidationMessage For="@(() => _editProduct.Image)" />
+            </div>
+
+            <hr />
+            <div class="flex justify-end gap-2">
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Update</button>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="CancelEdit">Cancel</button>
             </div>
         </EditForm>
     </Body>

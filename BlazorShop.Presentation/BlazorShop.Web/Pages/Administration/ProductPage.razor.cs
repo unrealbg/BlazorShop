@@ -12,11 +12,13 @@
     public partial class ProductPage
     {
         private bool _showDialog = false;
+        private bool _showEditDialog = false;
         private bool _showConfirmDeleteDialog = false;
         private Guid _productToDelete;
         private IEnumerable<GetProduct> _products = [];
         private IEnumerable<GetCategory> _categories = [];
         private CreateProduct _product = new();
+        private UpdateProduct _editProduct = new();
         private string? _previewImageUrl;
         private string? _producToDeleteName;
 
@@ -41,9 +43,32 @@
             _showDialog = true;
         }
 
+        private void StartEdit(GetProduct product)
+        {
+            _editProduct = new UpdateProduct
+            {
+                Id = product.Id,
+                Name = product.Name,
+                Description = product.Description,
+                Image = product.Image,
+                Price = product.Price,
+                Quantity = product.Quantity,
+                CategoryId = product.CategoryId
+            };
+
+            _previewImageUrl = product.Image;
+            _showEditDialog = true;
+        }
+
         private void Cancel()
         {
             _showDialog = false;
+            _previewImageUrl = null;
+        }
+
+        private void CancelEdit()
+        {
+            _showEditDialog = false;
             _previewImageUrl = null;
         }
 
@@ -96,6 +121,29 @@
             this.ShowToast(result, "Add-Product");
         }
 
+        private async Task UpdateProductAsync()
+        {
+            if (string.IsNullOrEmpty(_editProduct.Name))
+            {
+                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Edit-Product");
+            }
+
+            if (string.IsNullOrEmpty(_editProduct.Image))
+            {
+                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Edit-Product");
+                return;
+            }
+
+            var result = await this.ProductService.UpdateAsync(_editProduct);
+            if (result.Success)
+            {
+                _showEditDialog = false;
+                await this.GetProducts();
+            }
+
+            this.ShowToast(result, "Edit-Product");
+        }
+
         private async Task OnFileSelected(InputFileChangeEventArgs e)
         {
             var file = e.File;
@@ -126,6 +174,57 @@
                 if (result.Success)
                 {
                     _product.Image = result.Url;
+                    _previewImageUrl = result.Url;
+                }
+                else
+                {
+                    this.ToastService.ShowToast(
+                        level: ToastLevel.Error,
+                        message: "Failed to upload the file.",
+                        heading: "Upload Image",
+                        iconClass: ToastIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                this.ToastService.ShowToast(
+                    level: ToastLevel.Error,
+                    message: ex.Message,
+                    heading: "Upload Image",
+                    iconClass: ToastIcon.Error);
+            }
+        }
+
+        private async Task OnEditFileSelected(InputFileChangeEventArgs e)
+        {
+            var file = e.File;
+
+            var allowedImageFormats = new List<string>
+                                          {
+                                              "image/jpeg",
+                                              "image/png",
+                                              "image/gif",
+                                              "image/bmp",
+                                              "image/webp"
+                                          };
+
+            if (!allowedImageFormats.Contains(file.ContentType))
+            {
+                this.ToastService.ShowToast(
+                    level: ToastLevel.Error,
+                    message: $"Invalid file type. Only image files are allowed.",
+                    heading: "Upload Image",
+                    iconClass: ToastIcon.Error);
+                return;
+            }
+
+            try
+            {
+                var result = await this.FileUploadService.UploadFileAsync(file);
+
+                if (result.Success)
+                {
+                    _editProduct.Image = result.Url;
                     _previewImageUrl = result.Url;
                 }
                 else
