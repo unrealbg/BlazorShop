@@ -3,17 +3,17 @@
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
 
-    <div class="clip-diagonal bg-neutral-900 text-neutral-100">
+    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
-            <nav class="flex items-center gap-8 sm:gap-12 text-[0.95rem] font-medium">
-                <a href="/" class="hover:text-white/80">Home</a>
-                <a href="about-us" class="hover:text-white/80">About us</a>
-                <a href="new-releases" class="hover:text-white/80">New Releases</a>
-                <a href="todays-deals" class="hover:text-white/80">Today's Deals</a>
-                <a href="customer-service" class="hover:text-white/80">Customer Service</a>
+            <nav class="flex items-center gap-2 sm:gap-3 text-[0.95rem] font-medium">
+                <NavLink href="/" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
+                <NavLink href="about-us" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About us</NavLink>
+                <NavLink href="new-releases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New Releases</NavLink>
+                <NavLink href="todays-deals" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Today's Deals</NavLink>
+                <NavLink href="customer-service" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Customer Service</NavLink>
                 <AuthorizeView Roles="Admin">
                     <Authorized>
-                        <a href="admin" class="hover:text-white/80">Admin</a>
+                        <NavLink href="admin" class="px-3 py-1.5 rounded-md text-amber-300 hover:text-white hover:bg-amber-400/10 transition-colors" ActiveClass="bg-amber-400/20 text-white">Admin</NavLink>
                     </Authorized>
                 </AuthorizeView>
             </nav>
