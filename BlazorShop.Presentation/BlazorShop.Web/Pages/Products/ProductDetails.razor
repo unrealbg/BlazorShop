@@ -9,7 +9,7 @@
                     </div>
                     <h5 class="text-base sm:text-lg font-semibold">@Product?.Name</h5>
                 </div>
-                <div class="text-sm font-semibold bg-white/10 rounded px-2 py-0.5">€ @Product?.Price</div>
+                <div class="text-sm font-semibold bg-white/10 rounded px-2 py-0.5">€ @DisplayedPrice</div>
             </div>
         </Header>
         <Body>
@@ -19,22 +19,31 @@
                 </div>
                 <div class="flex flex-col gap-3 text-sm text-neutral-700">
                     <p>@Product?.Description</p>
-                    <div class="flex items-center gap-3">
-                        <span class="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-semibold">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-                            In stock: @Product?.Quantity
-                        </span>
-                    </div>
+
+                    @if (Product?.Variants?.Any() == true)
+                    {
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size</label>
+                            <select class="w-full border rounded px-3 py-2" @onchange="OnVariantChanged">
+                                <option value="">-- Select size --</option>
+                                @foreach (var v in Product.Variants)
+                                {
+                                    <option value="@v.Id">@v.SizeValue (@ScaleLabel(v.SizeScale)) @(v.Price.HasValue ? $"- € {v.Price}" : string.Empty)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+
                     <div class="mt-2">
                         <div class="text-sm text-neutral-500">Price</div>
-                        <div class="text-2xl font-extrabold">€ @Product?.Price</div>
+                        <div class="text-2xl font-extrabold">€ @DisplayedPrice</div>
                     </div>
                 </div>
             </div>
         </Body>
         <Footer>
             <div class="flex items-center justify-end gap-2">
-                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="HandleAddToCart">
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-50" @onclick="HandleAddToCart" disabled="@IsAddDisabled">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/></svg>
                     Add to Cart
                 </button>

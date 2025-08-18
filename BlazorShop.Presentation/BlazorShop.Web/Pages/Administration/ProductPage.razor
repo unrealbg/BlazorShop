@@ -40,7 +40,7 @@
                                 <td class="px-3 py-2 align-top">@product.CreatedOn</td>
                                 <td class="px-3 py-2 align-top">
                                     <div class="flex items-center justify-center gap-3">
-                                        <button class="text-blue-600 hover:text-blue-700" title="Edit" @onclick="() => StartEdit(product)">
+                                        <button class="text-blue-600 hover:text-blue-700" title="Edit" @onclick="async () => await StartEdit(product)">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                                         </button>
                                         <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
@@ -63,115 +63,324 @@
     </div>
 </section>
 
-<!-- Add Product Dialog -->
-<ModalDialog @bind-IsVisible="_showDialog">
+<ModalDialog @bind-IsVisible="_showDialog" Size="xl">
     <Header>
-        <h5 class="text-lg font-semibold">Add New Product</h5>
+        <div class="flex items-center justify-between w-full">
+            <h5 class="text-lg font-semibold">@(!_addStep2 ? "Add New Product" : "Add Variants")</h5>
+            @if (_addStep2)
+            {
+                <span class="text-xs text-neutral-500">Step 2 of 2</span>
+            }
+            else
+            {
+                <span class="text-xs text-neutral-500">Step 1 of 2</span>
+            }
+        </div>
     </Header>
     <Body>
-        <EditForm Model="_product" OnValidSubmit="SaveProduct">
-            <DataAnnotationsValidator />
-            <div class="form-group">
-                <FloatingTextInput @bind-Value="_product.Name" Label="Product Name" class="w-full" />
-                <ValidationMessage For="@(() => _product.Name)" />
-            </div>
-            <div class="form-group">
-                <InputNumber @bind-Value="_product.Price" class="w-full border rounded px-3 py-2" />
-                <label class="block text-sm text-neutral-600 mt-1">Price</label>
-                <ValidationMessage For="@(() => _product.Price)" />
-            </div>
-            <div class="form-group">
-                <FloatingNumberInput @bind-Value="_product.Quantity" Label="Quantity" class="w-full" />
-                <ValidationMessage For="@(() => _product.Quantity)" />
-            </div>
-            <div class="form-group">
-                <FloatingTextAreaInput @bind-Value="_product.Description" Label="Product Description" class="w-full" />
-                <ValidationMessage For="@(() => _product.Description)" />
-            </div>
-            <div class="form-group">
-                <InputSelect id="category" class="w-full border rounded px-3 py-2" @bind-Value="_product.CategoryId">
-                    <option value="" selected>-- Select a Category --</option>
-                    @foreach (var category in _categories)
+        @if (!_addStep2)
+        {
+            <EditForm Model="_product" OnValidSubmit="SaveProduct">
+                <DataAnnotationsValidator />
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Product Name</label>
+                    <InputText @bind-Value="_product.Name" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Name)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Price</label>
+                    <InputNumber @bind-Value="_product.Price" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Price)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Quantity</label>
+                    <InputNumber @bind-Value="_product.Quantity" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Quantity)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Product Description</label>
+                    <InputTextArea @bind-Value="_product.Description" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Description)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label for="category" class="block text-xs text-neutral-600 mb-1">Category</label>
+                    <InputSelect id="category" class="w-full border rounded px-3 py-2" @bind-Value="_product.CategoryId">
+                        <option value="" selected>-- Select a Category --</option>
+                        @foreach (var category in _categories)
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => _product.CategoryId)" />
+                </div>
+                <div class="form-group mb-3 flex items-center justify-between">
+                    <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                        <span>Upload Image</span>
+                        <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileSelected)" accept="image/*" class="sr-only" />
+                    </label>
+                    @if (!string.IsNullOrEmpty(_previewImageUrl))
                     {
-                        <option value="@category.Id">@category.Name</option>
+                        <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
                     }
-                </InputSelect>
-                <label for="category" class="block text-sm text-neutral-600 mt-1">Category</label>
-                <ValidationMessage For="@(() => _product.CategoryId)" />
-            </div>
-            <div class="form-group flex items-center justify-between">
-                <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
-                    <span>Upload Image</span>
-                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileSelected)" accept="image/*" class="sr-only" />
-                </label>
-                @if (!string.IsNullOrEmpty(_previewImageUrl))
-                {
-                    <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
-                }
-                <ValidationMessage For="@(() => _product.Image)" />
-            </div>
+                    <ValidationMessage For="@(() => _product.Image)" />
+                </div>
+            </EditForm>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="col-span-2">
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size Scale</label>
+                            <select class="w-full border rounded px-3 py-2" @onchange="OnScaleChangedAdd" value="@_newVariantForm.SizeScale">
+                                <option value="1">Clothing (XS-XXL)</option>
+                                <option value="2">Clothing Numeric EU</option>
+                                <option value="10">Shoes EU</option>
+                                <option value="11">Shoes US</option>
+                                <option value="12">Shoes UK</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size</label>
+                            <select class="w-full border rounded px-3 py-2" @bind="_newVariantForm.SizeValue">
+                                @foreach (var v in GetSizeOptions(_newVariantForm.SizeScale))
+                                {
+                                    <option value="@v">@v</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">SKU</label>
+                            <InputText @bind-Value="_newVariantForm.Sku" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Price (optional)</label>
+                            <InputNumber @bind-Value="_newVariantForm.Price" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Stock</label>
+                            <InputNumber @bind-Value="_newVariantForm.Stock" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Color (optional)</label>
+                            <InputText @bind-Value="_newVariantForm.Color" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div class="col-span-2 flex items-center gap-3">
+                            <input id="isDefaultNew" type="checkbox" @bind="_newVariantForm.IsDefault" class="h-4 w-4" />
+                            <label for="isDefaultNew" class="text-sm">Set as default</label>
+                            <div class="ml-auto">
+                                <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800" @onclick="AddVariantForNewAsync">Add Variant</button>
+                            </div>
+                        </div>
+                    </div>
 
-            <hr />
-            <div class="flex justify-end gap-2">
-                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Save</button>
-                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
+                    <div class="mt-4 overflow-auto max-h-64">
+                        <table class="min-w-full text-xs">
+                            <thead>
+                                <tr class="bg-neutral-100 text-left">
+                                    <th class="px-2 py-1">SizeScale</th>
+                                    <th class="px-2 py-1">Size</th>
+                                    <th class="px-2 py-1">SKU</th>
+                                    <th class="px-2 py-1">Price</th>
+                                    <th class="px-2 py-1">Stock</th>
+                                    <th class="px-2 py-1">Color</th>
+                                    <th class="px-2 py-1">Default</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-neutral-200">
+                                @foreach (var v in _newVariants)
+                                {
+                                    <tr>
+                                        <td class="px-2 py-1">@ScaleLabel(v.SizeScale)</td>
+                                        <td class="px-2 py-1">@v.SizeValue</td>
+                                        <td class="px-2 py-1">@v.Sku</td>
+                                        <td class="px-2 py-1">@(v.Price?.ToString() ?? "—")</td>
+                                        <td class="px-2 py-1">@v.Stock</td>
+                                        <td class="px-2 py-1">@v.Color</td>
+                                        <td class="px-2 py-1">@(v.IsDefault ? "Yes" : "No")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </EditForm>
+        }
     </Body>
+    <Footer>
+        @if (!_addStep2)
+        {
+            <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="button" @onclick="() => InvokeAsync(() => SaveProduct())">Save & Continue</button>
+            <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
+        }
+        else
+        {
+            <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300" type="button" @onclick="Cancel">Close</button>
+            <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="button" @onclick="FinishAdd">Finish</button>
+        }
+    </Footer>
 </ModalDialog>
 
-<!-- Edit Product Dialog -->
-<ModalDialog @bind-IsVisible="_showEditDialog">
+<ModalDialog @bind-IsVisible="_showEditDialog" Size="xl">
     <Header>
         <h5 class="text-lg font-semibold">Edit Product</h5>
     </Header>
     <Body>
         <EditForm Model="_editProduct" OnValidSubmit="UpdateProductAsync">
             <DataAnnotationsValidator />
-            <div class="form-group">
-                <FloatingTextInput @bind-Value="_editProduct.Name" Label="Product Name" class="w-full" />
-                <ValidationMessage For="@(() => _editProduct.Name)" />
-            </div>
-            <div class="form-group">
-                <InputNumber @bind-Value="_editProduct.Price" class="w-full border rounded px-3 py-2" />
-                <label class="block text-sm text-neutral-600 mt-1">Price</label>
-                <ValidationMessage For="@(() => _editProduct.Price)" />
-            </div>
-            <div class="form-group">
-                <FloatingNumberInput @bind-Value="_editProduct.Quantity" Label="Quantity" class="w-full" />
-                <ValidationMessage For="@(() => _editProduct.Quantity)" />
-            </div>
-            <div class="form-group">
-                <FloatingTextAreaInput @bind-Value="_editProduct.Description" Label="Product Description" class="w-full" />
-                <ValidationMessage For="@(() => _editProduct.Description)" />
-            </div>
-            <div class="form-group">
-                <InputSelect id="edit-category" class="w-full border rounded px-3 py-2" @bind-Value="_editProduct.CategoryId">
-                    <option value="" selected>-- Select a Category --</option>
-                    @foreach (var category in _categories)
-                    {
-                        <option value="@category.Id">@category.Name</option>
-                    }
-                </InputSelect>
-                <label for="edit-category" class="block text-sm text-neutral-600 mt-1">Category</label>
-                <ValidationMessage For="@(() => _editProduct.CategoryId)" />
-            </div>
-            <div class="form-group flex items-center justify-between">
-                <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
-                    <span>Upload Image</span>
-                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnEditFileSelected)" accept="image/*" class="sr-only" />
-                </label>
-                @if (!string.IsNullOrEmpty(_previewImageUrl))
-                {
-                    <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
-                }
-                <ValidationMessage For="@(() => _editProduct.Image)" />
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="space-y-4">
+                    <div class="form-group mb-3">
+                        <label class="block text-xs text-neutral-600 mb-1">Product Name</label>
+                        <InputText @bind-Value="_editProduct.Name" class="w-full border rounded px-3 py-2" />
+                        <ValidationMessage For="@(() => _editProduct.Name)" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="block text-xs text-neutral-600 mb-1">Price</label>
+                        <InputNumber @bind-Value="_editProduct.Price" class="w-full border rounded px-3 py-2" />
+                        <ValidationMessage For="@(() => _editProduct.Price)" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="block text-xs text-neutral-600 mb-1">Quantity</label>
+                        <InputNumber @bind-Value="_editProduct.Quantity" class="w-full border rounded px-3 py-2" />
+                        <ValidationMessage For="@(() => _editProduct.Quantity)" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="block text-xs text-neutral-600 mb-1">Product Description</label>
+                        <InputTextArea @bind-Value="_editProduct.Description" class="w-full border rounded px-3 py-2" />
+                        <ValidationMessage For="@(() => _editProduct.Description)" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="edit-category" class="block text-xs text-neutral-600 mb-1">Category</label>
+                        <InputSelect id="edit-category" class="w-full border rounded px-3 py-2" @bind-Value="_editProduct.CategoryId">
+                            <option value="" selected>-- Select a Category --</option>
+                            @foreach (var category in _categories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => _editProduct.CategoryId)" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="block text-xs text-neutral-600 mb-1">Image</label>
+                        <div class="flex items-center justify-between">
+                            <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                                <span>Upload Image</span>
+                                <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnEditFileSelected)" accept="image/*" class="sr-only" />
+                            </label>
+                            @if (!string.IsNullOrEmpty(_previewImageUrl))
+                            {
+                                <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
+                            }
+                        </div>
+                        <ValidationMessage For="@(() => _editProduct.Image)" />
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between">
+                        <h6 class="text-base font-semibold">Variants</h6>
+                        @if (_editingVariantId is not null)
+                        {
+                            <span class="text-xs text-neutral-500">Editing variant</span>
+                        }
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size Scale</label>
+                            <select class="w-full border rounded px-3 py-2" @onchange="OnScaleChanged" value="@_variantForm.SizeScale">
+                                <option value="1">Clothing (XS-XXL)</option>
+                                <option value="2">Clothing Numeric EU</option>
+                                <option value="10">Shoes EU</option>
+                                <option value="11">Shoes US</option>
+                                <option value="12">Shoes UK</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size</label>
+                            <select class="w-full border rounded px-3 py-2" @bind="_variantForm.SizeValue">
+                                @foreach (var v in GetSizeOptions(_variantForm.SizeScale))
+                                {
+                                    <option value="@v">@v</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">SKU</label>
+                            <InputText @bind-Value="_variantForm.Sku" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Price (optional)</label>
+                            <InputNumber @bind-Value="_variantForm.Price" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Stock</label>
+                            <InputNumber @bind-Value="_variantForm.Stock" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Color (optional)</label>
+                            <InputText @bind-Value="_variantForm.Color" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div class="col-span-2 flex items-center gap-3">
+                            <input id="isDefault" type="checkbox" @bind="_variantForm.IsDefault" class="h-4 w-4" />
+                            <label for="isDefault" class="text-sm">Set as default</label>
+                            <div class="ml-auto flex gap-2">
+                                @if (_editingVariantId is null)
+                                {
+                                    <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800" @onclick="AddVariantAsync">Add Variant</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800" @onclick="UpdateVariantAsync">Update Variant</button>
+                                    <button type="button" class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-3 py-1.5 font-semibold hover:bg-neutral-300" @onclick="CancelVariantEdit">Cancel</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 overflow-auto max-h-64">
+                        <table class="min-w-full text-xs">
+                            <thead>
+                                <tr class="bg-neutral-100 text-left">
+                                    <th class="px-2 py-1">SizeScale</th>
+                                    <th class="px-2 py-1">Size</th>
+                                    <th class="px-2 py-1">SKU</th>
+                                    <th class="px-2 py-1">Price</th>
+                                    <th class="px-2 py-1">Stock</th>
+                                    <th class="px-2 py-1">Color</th>
+                                    <th class="px-2 py-1">Default</th>
+                                    <th class="px-2 py-1 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-neutral-200">
+                                @foreach (var v in _variants)
+                                {
+                                    <tr>
+                                        <td class="px-2 py-1">@ScaleLabel(v.SizeScale)</td>
+                                        <td class="px-2 py-1">@v.SizeValue</td>
+                                        <td class="px-2 py-1">@v.Sku</td>
+                                        <td class="px-2 py-1">@(v.Price?.ToString() ?? "—")</td>
+                                        <td class="px-2 py-1">@v.Stock</td>
+                                        <td class="px-2 py-1">@v.Color</td>
+                                        <td class="px-2 py-1">@(v.IsDefault ? "Yes" : "No")</td>
+                                        <td class="px-2 py-1 text-center">
+                                            <button class="text-blue-600 hover:text-blue-700 mr-2" title="Edit" @onclick="() => BeginVariantEdit(v)">Edit</button>
+                                            <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => DeleteVariantAsync(v.Id)">Delete</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
-            <hr />
-            <div class="flex justify-end gap-2">
+            <hr class="mt-6" />
+            <div class="flex justify-end gap-2 mt-4">
                 <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Update</button>
                 <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="CancelEdit">Cancel</button>
             </div>
