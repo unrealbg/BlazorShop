@@ -31,27 +31,39 @@
     {
         try
         {
-            var user = (await UserAuthState)?.User;
-            if (user.Identity!.IsAuthenticated)
+            if (UserAuthState is null)
+            {
+                return;
+            }
+
+            var authState = await UserAuthState;
+            var user = authState?.User;
+            if (user?.Identity?.IsAuthenticated == true)
             {
                 var cartString = await CookieStorageService.GetAsync(Constant.Cart.Name);
                 if (!string.IsNullOrEmpty(cartString))
                 {
-                    var list = JsonSerializer.Deserialize<IEnumerable<ProcessCart>>(cartString);
-                    var arc = list!.Select(x => new CreateOrderItem
-                                                    {
+                    var list = JsonSerializer.Deserialize<IEnumerable<ProcessCart>>(cartString) ?? Enumerable.Empty<ProcessCart>();
+                    var userId = user.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
+
+                    if (!string.IsNullOrEmpty(userId) && list.Any())
+                    {
+                        var arc = list.Select(x => new CreateOrderItem
+                        {
                             ProductId = x.ProductId,
                             Quantity = x.Quantity,
-                                    UserId = user.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)!.Value
-                                                    });
+                            UserId = userId
+                        });
 
-                    await CartService.SaveCheckoutHistory(arc);
-                    await CookieStorageService.RemoveAsync(Constant.Cart.Name);
+                        await CartService.SaveCheckoutHistory(arc);
+                        await CookieStorageService.RemoveAsync(Constant.Cart.Name);
+                    }
                 }
             }
         }
         catch
         {
+            // ignored
         }
     }
 }

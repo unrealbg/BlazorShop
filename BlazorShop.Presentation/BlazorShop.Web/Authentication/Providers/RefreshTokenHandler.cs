@@ -44,7 +44,7 @@
 
                 var loginResponse = await this.MakeApiCall(refreshToken);
 
-                if (loginResponse == null)
+                if (loginResponse is null)
                 {
                     return result;
                 }
@@ -57,7 +57,7 @@
             return result;
         }
 
-        private async Task<LoginResponse> MakeApiCall(string refreshToken)
+        private async Task<LoginResponse?> MakeApiCall(string refreshToken)
         {
             var result = await _authenticationService.ReviveToken(refreshToken);
 

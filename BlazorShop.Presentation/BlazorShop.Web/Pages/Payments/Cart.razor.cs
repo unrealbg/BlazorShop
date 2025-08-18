@@ -12,7 +12,7 @@
 
     public partial class Cart
     {
-        private string _paying = null!;
+        private string? _paying;
 
         private bool _showPaymentDialog = false;
 
@@ -43,14 +43,15 @@
                     ToastIcon.Error);
             }
 
-            string cartString = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
+            var cartString = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
 
             if (string.IsNullOrEmpty(cartString))
             {
                 return;
             }
 
-            _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartString);
+            var carts = JsonSerializer.Deserialize<List<ProcessCart>>(cartString);
+            _myCarts = carts ?? [];
 
             if (!_myCarts.Any())
             {
@@ -65,7 +66,7 @@
             try
             {
                 var user = (await this.UserAuthState!)!.User;
-                if (!user.Identity.IsAuthenticated)
+                if (user?.Identity?.IsAuthenticated != true)
                 {
                     this.NavigationManager.NavigateTo($"authentication/login/{Constant.Cart.Name}");
                 }
@@ -82,35 +83,35 @@
 
         private void GetCart()
         {
-            _selectedProducts?.Clear();
+            _selectedProducts.Clear();
 
             foreach (var processCart in _myCarts)
             {
                 var product = _products.FirstOrDefault(x => x.Id == processCart.ProductId);
 
-                if (product != null && !_selectedProducts.Contains(product))
+                if (product is not null && !_selectedProducts.Contains(product))
                 {
                     _selectedProducts.Add(product);
                 }
             }
 
-            _selectedProducts!.OrderBy(x => x.Name);
+            _selectedProducts = _selectedProducts.OrderBy(x => x.Name).ToList();
         }
 
         private int GetProductQuantity(Guid productId)
         {
-            return this.GetCartItem(productId).Quantity;
+            return this.GetCartItem(productId)?.Quantity ?? 0;
         }
 
-        private ProcessCart GetCartItem(Guid productId)
+        private ProcessCart? GetCartItem(Guid productId)
         {
-            return _myCarts.FirstOrDefault(x => x.ProductId == productId)!;
+            return _myCarts.FirstOrDefault(x => x.ProductId == productId);
         }
 
         private decimal GetProductTotalPrice(Guid productId)
         {
             var quantity = this.GetProductQuantity(productId);
-            var price = _products.FirstOrDefault(x => x.Id == productId)!.Price;
+            var price = _products.FirstOrDefault(x => x.Id == productId)?.Price ?? 0m;
             return quantity * price;
         }
 
@@ -118,10 +119,14 @@
         {
             try
             {
-                var newQuantity = int.Parse(e.Value?.ToString()!);
-                _myCarts.FirstOrDefault(x => x.ProductId == productId)!.Quantity = newQuantity;
-                await this.SaveCart(_myCarts);
-                this.GetCart();
+                var newQuantity = int.Parse(e.Value?.ToString() ?? "0");
+                var item = _myCarts.FirstOrDefault(x => x.ProductId == productId);
+                if (item is not null)
+                {
+                    item.Quantity = newQuantity;
+                    await this.SaveCart(_myCarts);
+                    this.GetCart();
+                }
             }
             catch
             {
@@ -154,9 +159,16 @@
         private async Task RemoveCartItem(Guid productId)
         {
             var cartItem = this.GetCartItem(productId);
-            _myCarts.Remove(cartItem!);
+            if (cartItem is not null)
+            {
+                _myCarts.Remove(cartItem);
+            }
+
             var product = _selectedProducts.FirstOrDefault(x => x.Id == productId);
-            _selectedProducts.Remove(product!);
+            if (product is not null)
+            {
+                _selectedProducts.Remove(product);
+            }
 
             this.ToastService.ShowToast(ToastLevel.Warning, "Product removed from cart", "Cart", ToastIcon.Warning);
 
@@ -166,7 +178,7 @@
 
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
         {
-            if (paymentMethod != null)
+            if (paymentMethod is not null)
             {
                 _paying = "Processing... please wait";
 

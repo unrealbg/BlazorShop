@@ -21,10 +21,12 @@
         {
             ArgumentNullException.ThrowIfNull(builder);
 
+            var current = CurrentValueAsString ?? string.Empty;
+
             builder.OpenElement(0, "input");
             builder.AddMultipleAttributes(1, AdditionalAttributes);
             builder.AddAttribute(2, "class", CssClass);
-            builder.AddAttribute(3, "value", BindConverter.FormatValue(CurrentValueAsString));
+            builder.AddAttribute(3, "value", BindConverter.FormatValue(current));
             builder.AddAttribute(4, "type", Type?.ToLowerInvariant() ?? "text");
             builder.AddAttribute(5, "placeholder", Placeholder);
             builder.AddAttribute(
@@ -33,7 +35,7 @@
                 EventCallback.Factory.CreateBinder<string>(
                     this,
                     value => CurrentValueAsString = value,
-                CurrentValueAsString));
+                current));
             builder.CloseElement();
 
             if (!string.IsNullOrEmpty(Label))

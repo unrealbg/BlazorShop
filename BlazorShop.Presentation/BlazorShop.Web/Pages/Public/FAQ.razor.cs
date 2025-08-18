@@ -38,9 +38,9 @@
 
         private class FaqItem
         {
-            public string Question { get; set; }
+            public required string Question { get; set; }
 
-            public string Answer { get; set; }
+            public required string Answer { get; set; }
         }
     }
 }
