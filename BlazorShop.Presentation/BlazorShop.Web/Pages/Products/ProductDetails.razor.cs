@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Web.Pages.Products
 {
+    using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
 
     using Microsoft.AspNetCore.Components;
@@ -24,15 +25,74 @@
         [Parameter]
         public EventCallback<Guid> OnAddToCart { get; set; }
 
+        [Parameter]
+        public EventCallback<ProcessCart> OnAddToCartVariant { get; set; }
+
+        private Guid? _selectedVariantId;
+        private decimal DisplayedPrice => Product?.Variants?.Any() == true
+            ? (Product.Variants.FirstOrDefault(v => v.Id == _selectedVariantId)?.Price ?? Product.Price)
+            : Product?.Price ?? 0m;
+
+        private bool IsAddDisabled => Product?.Variants?.Any() == true && _selectedVariantId is null;
+
         private async Task HandleAddToCart()
         {
-            if (this.OnAddToCart.HasDelegate)
+            if (Product?.Variants?.Any() == true)
+            {
+                if (_selectedVariantId is null)
+                {
+                    return;
+                }
+
+                if (OnAddToCartVariant.HasDelegate)
+                {
+                    var v = Product.Variants.First(x => x.Id == _selectedVariantId);
+                    var payload = new ProcessCart
+                    {
+                        ProductId = Product.Id,
+                        VariantId = v.Id,
+                        SizeValue = v.SizeValue,
+                        UnitPrice = v.Price ?? Product.Price,
+                        Quantity = 1
+                    };
+                    await OnAddToCartVariant.InvokeAsync(payload);
+                }
+                else if (OnAddToCart.HasDelegate)
+                {
+                    await this.OnAddToCart.InvokeAsync(this.Product.Id);
+                }
+            }
+            else if (this.OnAddToCart.HasDelegate)
             {
                 await this.OnAddToCart.InvokeAsync(this.Product.Id);
             }
 
             await CloseModalInternal();
         }
+
+        private void OnVariantChanged(ChangeEventArgs e)
+        {
+            var value = e?.Value?.ToString();
+            if (Guid.TryParse(value, out var id))
+            {
+                _selectedVariantId = id;
+            }
+            else
+            {
+                _selectedVariantId = null;
+            }
+            StateHasChanged();
+        }
+
+        private static string ScaleLabel(int scale) => scale switch
+        {
+            1 => "Clothing",
+            2 => "Clothing EU",
+            10 => "Shoes EU",
+            11 => "Shoes US",
+            12 => "Shoes UK",
+            _ => "—"
+        };
 
         private async Task CloseModalInternal()
         {

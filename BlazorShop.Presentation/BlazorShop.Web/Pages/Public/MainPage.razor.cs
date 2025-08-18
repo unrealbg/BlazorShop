@@ -46,6 +46,17 @@
             _productsByCategory = await this.CategoryService.GetProductsByCategoryAsync(Guid.Parse(this.CategoryId));
         }
 
+        private async Task HandleAddToCart(GetProduct product)
+        {
+            if (product.Variants?.Any() == true)
+            {
+                ShowDetails(product);
+                return;
+            }
+
+            await AddItemToCart(product.Id);
+        }
+
         private async Task AddItemToCart(Guid productId)
         {
             if (_isAddingToCart) return;
@@ -54,12 +65,13 @@
             {
                 _isAddingToCart = true;
 
-                var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId);
-                var productName = (await this.ProductService.GetByIdAsync(productId)).Name;
+                var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
+                var product = await this.ProductService.GetByIdAsync(productId);
+                var productName = product.Name;
 
                 if (getCart == null)
                 {
-                    _myCarts.Add(new ProcessCart { ProductId = productId, Quantity = 1 });
+                    _myCarts.Add(new ProcessCart { ProductId = productId, Quantity = 1, UnitPrice = product.Price });
 
                     this.ToastService.ShowToast(
                         ToastLevel.Success,
@@ -82,7 +94,36 @@
             finally
             {
                 _isAddingToCart = false;
+                await PersistCartAsync();
             }
+        }
+
+        private async Task AddVariantToCart(ProcessCart payload)
+        {
+            var getCart = _myCarts.FirstOrDefault(x => x.ProductId == payload.ProductId && x.VariantId == payload.VariantId);
+            if (getCart is null)
+            {
+                _myCarts.Add(payload);
+            }
+            else
+            {
+                getCart.Quantity += payload.Quantity;
+            }
+
+            var name = (await this.ProductService.GetByIdAsync(payload.ProductId)).Name;
+            this.ToastService.ShowToast(
+                ToastLevel.Success,
+                $"Product {name} (size {payload.SizeValue}) added to cart",
+                "Cart",
+                ToastIcon.Success,
+                ToastPosition.BottomRight);
+
+            await PersistCartAsync();
+        }
+
+        private async Task PersistCartAsync()
+        {
+            await this.CookieStorageService.SetAsync(Constant.Cart.Name, JsonSerializer.Serialize(_myCarts), 30);
         }
 
         private void ShowDetails(GetProduct product)

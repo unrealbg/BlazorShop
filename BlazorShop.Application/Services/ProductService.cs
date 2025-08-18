@@ -39,7 +39,9 @@
             var mappedData = _mapper.Map<Product>(product);
             int result = await _productRepository.AddAsync(mappedData);
 
-            return result > 0 ? new ServiceResponse(true, "Product added successfully") : new ServiceResponse(false, "Product not added");
+            return result > 0
+                ? new ServiceResponse(true, "Product added successfully", mappedData.Id)
+                : new ServiceResponse(false, "Product not added");
         }
 
         public async Task<ServiceResponse> UpdateAsync(UpdateProduct product)

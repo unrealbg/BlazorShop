@@ -5,6 +5,7 @@
     using BlazorShop.Application.DTOs.Category;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.DTOs.Product;
+    using BlazorShop.Application.DTOs.Product.ProductVariant;
     using BlazorShop.Application.DTOs.UserIdentity;
     using BlazorShop.Domain.Entities;
     using BlazorShop.Domain.Entities.Identity;
@@ -21,7 +22,12 @@
 
             this.CreateMap<CreateProduct, Product>();
             this.CreateMap<UpdateProduct, Product>();
-            this.CreateMap<Product, GetProduct>();
+            this.CreateMap<Product, GetProduct>()
+                .ForMember(dest => dest.Variants, opt => opt.MapFrom(src => src.Variants));
+
+            this.CreateMap<CreateProductVariant, ProductVariant>();
+            this.CreateMap<UpdateProductVariant, ProductVariant>();
+            this.CreateMap<ProductVariant, GetProductVariant>();
 
             this.CreateMap<CreateUser, AppUser>();
             this.CreateMap<LoginUser, AppUser>();

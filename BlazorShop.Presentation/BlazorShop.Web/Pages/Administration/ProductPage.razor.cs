@@ -12,6 +12,11 @@
     public partial class ProductPage
     {
         private bool _showDialog = false;
+        private bool _addStep2 = false;
+        private Guid _newProductId;
+        private List<GetProductVariant> _newVariants = new();
+        private CreateOrUpdateProductVariant _newVariantForm = new() { SizeScale = 1, SizeValue = "XS", Stock = 0 };
+
         private bool _showEditDialog = false;
         private bool _showConfirmDeleteDialog = false;
         private Guid _productToDelete;
@@ -22,8 +27,15 @@
         private string? _previewImageUrl;
         private string? _producToDeleteName;
 
+        private List<GetProductVariant> _variants = [];
+        private CreateOrUpdateProductVariant _variantForm = new();
+        private Guid? _editingVariantId;
+
         [Inject]
         private IFileUploadService FileUploadService { get; set; } = default!;
+
+        [Inject]
+        private IProductVariantService ProductVariantService { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
         {
@@ -40,10 +52,27 @@
         {
             _product = new CreateProduct();
             _previewImageUrl = null;
+            _addStep2 = false;
+            _newProductId = Guid.Empty;
+            _newVariants.Clear();
+            _newVariantForm = new CreateOrUpdateProductVariant { SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
             _showDialog = true;
         }
 
-        private void StartEdit(GetProduct product)
+        private async Task LoadVariantsAsync(Guid productId)
+        {
+            _variants = (await this.ProductVariantService.GetByProductIdAsync(productId)).ToList();
+            _variantForm = new CreateOrUpdateProductVariant
+            {
+                ProductId = productId,
+                SizeScale = _variantForm.SizeScale == 0 ? 1 : _variantForm.SizeScale,
+                SizeValue = GetSizeOptions(_variantForm.SizeScale == 0 ? 1 : _variantForm.SizeScale).FirstOrDefault() ?? string.Empty,
+                Stock = 0,
+            };
+            _editingVariantId = null;
+        }
+
+        private async Task StartEdit(GetProduct product)
         {
             _editProduct = new UpdateProduct
             {
@@ -57,12 +86,16 @@
             };
 
             _previewImageUrl = product.Image;
+
             _showEditDialog = true;
+            await LoadVariantsAsync(product.Id);
         }
 
         private void Cancel()
         {
             _showDialog = false;
+            _addStep2 = false;
+            _newProductId = Guid.Empty;
             _previewImageUrl = null;
         }
 
@@ -70,6 +103,8 @@
         {
             _showEditDialog = false;
             _previewImageUrl = null;
+            _variants.Clear();
+            _editingVariantId = null;
         }
 
         private void ConfirmDelete(Guid id)
@@ -92,12 +127,6 @@
             this.ShowToast(result, "Delete-Product");
         }
 
-        private void CancelDelete()
-        {
-            _showConfirmDeleteDialog = false;
-            _productToDelete = Guid.Empty;
-        }
-
         private async Task SaveProduct()
         {
             if (string.IsNullOrEmpty(_product.Name))
@@ -114,34 +143,127 @@
             var result = await this.ProductService.AddAsync(_product);
             if (result.Success)
             {
-                _showDialog = false;
                 await this.GetProducts();
+                _newProductId = result.Id ?? Guid.Empty;
+                _addStep2 = true;
+                _newVariantForm.ProductId = _newProductId;
             }
 
             this.ShowToast(result, "Add-Product");
         }
 
-        private async Task UpdateProductAsync()
+        private async Task FinishAdd()
         {
-            if (string.IsNullOrEmpty(_editProduct.Name))
-            {
-                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Edit-Product");
-            }
+            _showDialog = false;
+            _addStep2 = false;
+            _newProductId = Guid.Empty;
+            _newVariants.Clear();
+            await this.GetProducts();
+        }
 
-            if (string.IsNullOrEmpty(_editProduct.Image))
+        private void OnScaleChanged(ChangeEventArgs e)
+        {
+            if (int.TryParse(e?.Value?.ToString(), out var scale))
             {
-                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Edit-Product");
+                _variantForm.SizeScale = scale;
+                _variantForm.SizeValue = GetSizeOptions(scale).FirstOrDefault() ?? string.Empty;
+            }
+        }
+
+        private void OnScaleChangedAdd(ChangeEventArgs e)
+        {
+            if (int.TryParse(e?.Value?.ToString(), out var scale))
+            {
+                _newVariantForm.SizeScale = scale;
+                _newVariantForm.SizeValue = GetSizeOptions(scale).FirstOrDefault() ?? string.Empty;
+            }
+        }
+
+        private async Task AddVariantAsync()
+        {
+            if (_editProduct.Id == Guid.Empty)
+            {
+                this.ToastService.ShowToast(ToastLevel.Error, "Save product first.", "Variant");
                 return;
             }
 
-            var result = await this.ProductService.UpdateAsync(_editProduct);
-            if (result.Success)
+            var response = await this.ProductVariantService.AddAsync(_editProduct.Id, _variantForm);
+            this.ShowToast(response, "Add-Variant");
+            if (response.Success)
             {
-                _showEditDialog = false;
-                await this.GetProducts();
+                await LoadVariantsAsync(_editProduct.Id);
+            }
+        }
+
+        private async Task AddVariantForNewAsync()
+        {
+            if (_newProductId == Guid.Empty)
+            {
+                this.ToastService.ShowToast(ToastLevel.Error, "Save product first.", "Variant");
+                return;
             }
 
-            this.ShowToast(result, "Edit-Product");
+            var response = await this.ProductVariantService.AddAsync(_newProductId, _newVariantForm);
+            this.ShowToast(response, "Add-Variant");
+            if (response.Success)
+            {
+                var list = await this.ProductVariantService.GetByProductIdAsync(_newProductId);
+                _newVariants = list.ToList();
+                _newVariantForm = new CreateOrUpdateProductVariant { ProductId = _newProductId, SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
+            }
+        }
+
+        private void BeginVariantEdit(GetProductVariant v)
+        {
+            _editingVariantId = v.Id;
+            _variantForm = new CreateOrUpdateProductVariant
+            {
+                Id = v.Id,
+                ProductId = v.ProductId,
+                Sku = v.Sku,
+                SizeScale = v.SizeScale,
+                SizeValue = v.SizeValue,
+                Price = v.Price,
+                Stock = v.Stock,
+                Color = v.Color,
+                IsDefault = v.IsDefault
+            };
+        }
+
+        private async Task UpdateVariantAsync()
+        {
+            if (_editingVariantId is null)
+            {
+                return;
+            }
+
+            var response = await this.ProductVariantService.UpdateAsync(_variantForm);
+            this.ShowToast(response, "Update-Variant");
+            if (response.Success)
+            {
+                await LoadVariantsAsync(_editProduct.Id);
+            }
+        }
+
+        private void CancelVariantEdit()
+        {
+            _editingVariantId = null;
+            _variantForm = new CreateOrUpdateProductVariant
+            {
+                ProductId = _editProduct.Id,
+                SizeScale = 1,
+                SizeValue = GetSizeOptions(1).FirstOrDefault() ?? string.Empty
+            };
+        }
+
+        private async Task DeleteVariantAsync(Guid id)
+        {
+            var response = await this.ProductVariantService.DeleteAsync(id);
+            this.ShowToast(response, "Delete-Variant");
+            if (response.Success)
+            {
+                await LoadVariantsAsync(_editProduct.Id);
+            }
         }
 
         private async Task OnFileSelected(InputFileChangeEventArgs e)
@@ -173,7 +295,14 @@
 
                 if (result.Success)
                 {
-                    _product.Image = result.Url;
+                    if (!_addStep2)
+                    {
+                        _product.Image = result.Url;
+                    }
+                    else
+                    {
+                        _editProduct.Image = result.Url;
+                    }
                     _previewImageUrl = result.Url;
                 }
                 else
@@ -246,12 +375,61 @@
             }
         }
 
+        private IEnumerable<string> GetSizeOptions(int scale) => scale switch
+        {
+            1 => new[] { "XS", "S", "M", "L", "XL", "XXL" },
+            2 => Enumerable.Range(36, 20).Select(x => x.ToString()),
+            10 => Enumerable.Range(35, 14).Select(x => x.ToString()),
+            11 => new[] { "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12" },
+            12 => new[] { "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11" },
+            _ => Array.Empty<string>()
+        };
+
+        private string ScaleLabel(int scale) => scale switch
+        {
+            1 => "Clothing",
+            2 => "Clothing EU",
+            10 => "Shoes EU",
+            11 => "Shoes US",
+            12 => "Shoes UK",
+            _ => "—"
+        };
+
         private void ShowToast(ServiceResponse result, string heading)
         {
             var level = result.Success ? ToastLevel.Success : ToastLevel.Error;
             var icon = result.Success ? ToastIcon.Success : ToastIcon.Error;
 
             this.ToastService.ShowToast(level: level, message: result.Message, heading: heading, iconClass: icon);
+        }
+
+        private async Task UpdateProductAsync()
+        {
+            if (string.IsNullOrEmpty(_editProduct.Name))
+            {
+                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Edit-Product");
+            }
+
+            if (string.IsNullOrEmpty(_editProduct.Image))
+            {
+                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Edit-Product");
+                return;
+            }
+
+            var result = await this.ProductService.UpdateAsync(_editProduct);
+            if (result.Success)
+            {
+                _showEditDialog = false;
+                await this.GetProducts();
+            }
+
+            this.ShowToast(result, "Edit-Product");
+        }
+
+        private void CancelDelete()
+        {
+            _showConfirmDeleteDialog = false;
+            _productToDelete = Guid.Empty;
         }
     }
 }

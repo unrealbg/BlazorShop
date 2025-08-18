@@ -9,6 +9,8 @@
 
     public class RefreshTokenHandler : DelegatingHandler
     {
+        private static readonly HttpRequestOptionsKey<bool> RetriedKey = new("X-Refresh-Retried");
+
         private readonly ITokenService _tokenService;
         private readonly IHttpClientHelper _httpClientHelper;
         private readonly IAuthenticationService _authenticationService;
@@ -22,39 +24,34 @@
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var isPost = request.Method == HttpMethod.Post;
-            var isPut = request.Method == HttpMethod.Put;
-            var isDelete = request.Method == HttpMethod.Delete;
+            var response = await base.SendAsync(request, cancellationToken);
 
-            var result = await base.SendAsync(request, cancellationToken);
-
-            if (isPost || isPut || isDelete)
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
             {
-                if (result.StatusCode != HttpStatusCode.Unauthorized)
-                {
-                    return result;
-                }
-
-                var refreshToken = await _tokenService.GetJwtTokenAsync(Constant.Cookie.Name);
-
-                if (string.IsNullOrEmpty(refreshToken))
-                {
-                    return result;
-                }
-
-                var loginResponse = await this.MakeApiCall(refreshToken);
-
-                if (loginResponse is null)
-                {
-                    return result;
-                }
-
-                await this._httpClientHelper.GetPrivateClientAsync();
-
-                return await base.SendAsync(request, cancellationToken);
+                return response;
             }
 
-            return result;
+            if (!request.Options.TryGetValue(RetriedKey, out var retried) || !retried)
+            {
+                var refreshToken = await _tokenService.GetJwtTokenAsync(Constant.Cookie.Name);
+                if (!string.IsNullOrEmpty(refreshToken))
+                {
+                    var loginResponse = await this.MakeApiCall(refreshToken);
+                    if (loginResponse is not null)
+                    {
+                        await this._httpClientHelper.GetPrivateClientAsync();
+
+                        if (request.Method == HttpMethod.Get || request.Content is null)
+                        {
+                            request.Options.Set(RetriedKey, true);
+                            response.Dispose();
+                            return await base.SendAsync(request, cancellationToken);
+                        }
+                    }
+                }
+            }
+
+            return response;
         }
 
         private async Task<LoginResponse?> MakeApiCall(string refreshToken)

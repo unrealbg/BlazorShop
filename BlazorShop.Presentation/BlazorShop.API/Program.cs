@@ -1,12 +1,13 @@
-
 namespace BlazorShop.API
 {
     using System.Text.Json.Serialization;
 
     using BlazorShop.Application;
     using BlazorShop.Infrastructure;
+    using BlazorShop.Infrastructure.Data;
 
     using Microsoft.AspNetCore.Builder;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Hosting;
 
     using Serilog;
@@ -54,6 +55,13 @@ namespace BlazorShop.API
             try
             {
                 var app = builder.Build();
+
+                // Apply EF Core migrations at startup
+                using (var scope = app.Services.CreateScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    db.Database.Migrate();
+                }
 
                 app.UseCors();
                 app.UseSerilogRequestLogging();

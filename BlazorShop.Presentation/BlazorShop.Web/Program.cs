@@ -42,6 +42,7 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<ICartService, CartService>();
             builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
             builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+            builder.Services.AddScoped<IProductVariantService, ProductVariantService>();
             builder.Services.AddSingleton<IToastService, ToastService>();
 
             await builder.Build().RunAsync();

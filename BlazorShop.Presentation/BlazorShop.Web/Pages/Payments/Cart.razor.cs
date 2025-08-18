@@ -6,74 +6,31 @@
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Toast;
-
     using Microsoft.AspNetCore.Components;
-    using Microsoft.AspNetCore.Components.Authorization;
 
     public partial class Cart
     {
-        private string? _paying;
-
-        private bool _showPaymentDialog = false;
-
-        private IEnumerable<GetPaymentMethod> _paymentMethods = [];
-
-        private List<GetProduct> _selectedProducts = [];
-
-        private IEnumerable<GetProduct> _products = [];
-
         private List<ProcessCart> _myCarts = [];
-
-        [CascadingParameter]
-        public Task<AuthenticationState>? UserAuthState { get; set; }
+        private List<GetProduct> _selectedProducts = [];
+        private IEnumerable<GetProduct> _products = [];
+        private IEnumerable<GetPaymentMethod> _paymentMethods = [];
+        private string _paying = string.Empty;
+        private bool _showPaymentDialog;
 
         protected override async Task OnInitializedAsync()
         {
             try
             {
-                _paymentMethods = await this.PaymentMethodService.GetPaymentMethods();
+                var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
+                if (!string.IsNullOrEmpty(cartJson))
+                {
+                    _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
+                }
+
                 _products = await this.ProductService.GetAllAsync();
-            }
-            catch
-            {
-                this.ToastService.ShowToast(
-                    ToastLevel.Error,
-                    "An error occurred while loading the page",
-                    "Cart",
-                    ToastIcon.Error);
-            }
+                this.GetCart();
 
-            var cartString = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
-
-            if (string.IsNullOrEmpty(cartString))
-            {
-                return;
-            }
-
-            var carts = JsonSerializer.Deserialize<List<ProcessCart>>(cartString);
-            _myCarts = carts ?? [];
-
-            if (!_myCarts.Any())
-            {
-                return;
-            }
-
-            this.GetCart();
-        }
-
-        private async Task Checkout()
-        {
-            try
-            {
-                var user = (await this.UserAuthState!)!.User;
-                if (user?.Identity?.IsAuthenticated != true)
-                {
-                    this.NavigationManager.NavigateTo($"authentication/login/{Constant.Cart.Name}");
-                }
-                else
-                {
-                    _showPaymentDialog = true;
-                }
+                _paymentMethods = await this.PaymentMethodService.GetPaymentMethods();
             }
             catch
             {
@@ -100,19 +57,24 @@
 
         private int GetProductQuantity(Guid productId)
         {
-            return this.GetCartItem(productId)?.Quantity ?? 0;
+            return _myCarts.Where(x => x.ProductId == productId).Sum(x => x.Quantity);
         }
 
         private ProcessCart? GetCartItem(Guid productId)
         {
-            return _myCarts.FirstOrDefault(x => x.ProductId == productId);
+            return _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
         }
 
         private decimal GetProductTotalPrice(Guid productId)
         {
-            var quantity = this.GetProductQuantity(productId);
-            var price = _products.FirstOrDefault(x => x.Id == productId)?.Price ?? 0m;
-            return quantity * price;
+            var lineItems = _myCarts.Where(x => x.ProductId == productId);
+            decimal total = 0m;
+            foreach (var li in lineItems)
+            {
+                var price = li.UnitPrice ?? _products.FirstOrDefault(x => x.Id == li.ProductId)?.Price ?? 0m;
+                total += li.Quantity * price;
+            }
+            return total;
         }
 
         private async Task HandleInputChange(ChangeEventArgs e, Guid productId)
@@ -120,7 +82,7 @@
             try
             {
                 var newQuantity = int.Parse(e.Value?.ToString() ?? "0");
-                var item = _myCarts.FirstOrDefault(x => x.ProductId == productId);
+                var item = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
                 if (item is not null)
                 {
                     item.Quantity = newQuantity;
@@ -146,8 +108,7 @@
 
         private decimal GetGrandTotal(List<GetProduct> products)
         {
-            var total = 0.00m;
-
+            decimal total = 0m;
             foreach (var product in products)
             {
                 total += this.GetProductTotalPrice(product.Id);
@@ -186,29 +147,43 @@
                 {
                     var checkout = new Checkout() { PaymentMethodId = paymentMethod.Id, Carts = _myCarts };
 
-                    var (success, paymentLink) = await this.CartService.Checkout(checkout);
+                    var result = await this.CartService.Checkout(checkout);
 
-                    if (success)
+                    if (result.Success)
                     {
-                        _paying = null;
-                        this.NavigationManager.NavigateTo(paymentLink);
+                        var paymentLink = result.Message;
+                        if (!string.IsNullOrWhiteSpace(paymentLink) && (paymentLink.StartsWith("http://") || paymentLink.StartsWith("https://")))
+                        {
+                            this.NavigationManager.NavigateTo(paymentLink, true);
+                        }
+                        else
+                        {
+                            this.ToastService.ShowToast(ToastLevel.Success, result.Message ?? "Payment successful.", "Checkout", ToastIcon.Success);
+                        }
                     }
                     else
                     {
-                        this.ToastService.ShowToast(ToastLevel.Error, "Checkout failed. Please try again.", "Checkout");
+                        this.ToastService.ShowToast(ToastLevel.Error, result.Message ?? "Payment processing failed.", "Checkout", ToastIcon.Error);
                     }
+                }
+                catch
+                {
+                    this.ToastService.ShowToast(ToastLevel.Error, "Payment processing failed.", "Checkout", ToastIcon.Error);
                 }
                 finally
                 {
-                    _paying = null;
-                    _showPaymentDialog = false;
+                    _paying = string.Empty;
                 }
             }
         }
 
+        private void Checkout()
+        {
+            this.NavigationManager.NavigateTo($"authentication/login/{Constant.Cart.Name}");
+        }
+
         private void Cancel()
         {
-            _paying = null;
             _showPaymentDialog = false;
         }
     }
