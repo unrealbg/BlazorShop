@@ -19,6 +19,8 @@
 
         public DbSet<Product> Products { get; set; }
 
+        public DbSet<ProductVariant> ProductVariants { get; set; } // new
+
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         public DbSet<PaymentMethod> PaymentMethods { get; set; }
@@ -28,6 +30,17 @@
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // ProductVariant configuration
+            builder.Entity<ProductVariant>()
+                   .HasIndex(v => new { v.ProductId, v.SizeScale, v.SizeValue })
+                   .IsUnique();
+
+            builder.Entity<ProductVariant>()
+                   .HasOne(v => v.Product)
+                   .WithMany(p => p.Variants)
+                   .HasForeignKey(v => v.ProductId)
+                   .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<PaymentMethod>().HasData(
                 new PaymentMethod
