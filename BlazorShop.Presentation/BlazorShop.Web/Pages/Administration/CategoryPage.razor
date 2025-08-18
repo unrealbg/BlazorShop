@@ -5,7 +5,8 @@
     <div class="bg-white/80 rounded-xl shadow p-6">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">Manage Categories</h2>
-            <button class="inline-flex items-center rounded border border-emerald-600 text-emerald-700 px-4 py-2 font-semibold hover:bg-emerald-50" @onclick="AddCategory">
+            <button class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="AddCategory">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
                 Add Category
             </button>
         </div>
@@ -14,8 +15,8 @@
             @if (_categories.Any())
             {
                 <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="bg-neutral-100 text-left">
+                    <thead class="sticky top-0 z-10">
+                        <tr class="bg-neutral-100/90 text-left">
                             <th class="px-3 py-2">Id</th>
                             <th class="px-3 py-2">Name</th>
                             <th class="px-3 py-2 text-red-600 text-center">Actions</th>
@@ -28,8 +29,8 @@
                                 <td class="px-3 py-2">@category.Id</td>
                                 <td class="px-3 py-2">@category.Name</td>
                                 <td class="px-3 py-2 text-center">
-                                    <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(category.Id)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                    <button class="inline-flex items-center justify-center rounded text-red-600 hover:text-red-700 px-2 py-1" title="Delete" @onclick="() => ConfirmDelete(category.Id)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
                                     </button>
                                 </td>
                             </tr>

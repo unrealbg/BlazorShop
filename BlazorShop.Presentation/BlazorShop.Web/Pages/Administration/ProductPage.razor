@@ -5,7 +5,8 @@
     <div class="bg-white/80 rounded-xl shadow p-6">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">Manage Products</h2>
-            <button class="inline-flex items-center rounded border border-emerald-600 text-emerald-700 px-4 py-2 font-semibold hover:bg-emerald-50" @onclick="AddProduct">
+            <button class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="AddProduct">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
                 Add Product
             </button>
         </div>
@@ -14,8 +15,8 @@
             @if (_products.Any())
             {
                 <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="bg-neutral-100 text-left">
+                    <thead class="sticky top-0 z-10">
+                        <tr class="bg-neutral-100/90 text-left">
                             <th class="px-3 py-2">Id</th>
                             <th class="px-3 py-2">Image</th>
                             <th class="px-3 py-2">Name</th>
@@ -92,10 +93,11 @@
                 <label for="category" class="block text-sm text-neutral-600 mt-1">Category</label>
                 <ValidationMessage For="@(() => _product.CategoryId)" />
             </div>
-            <div class="form-group flex justify-between items-center">
-                <label class="custom-upload-btn">
-                    Upload Image
-                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileSelected)" accept="image/*" style="display: none;" />
+            <div class="form-group flex items-center justify-between">
+                <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                    <span>Upload Image</span>
+                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileSelected)" accept="image/*" class="sr-only" />
                 </label>
                 @if (!string.IsNullOrEmpty(_previewImageUrl))
                 {
@@ -126,11 +128,3 @@
         <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300" @onclick="CancelDelete">Cancel</button>
     </Footer>
 </ModalDialog>
-
-<style>
-    .form-group { margin-bottom: 10px; }
-    .custom-upload-btn { background-color: #007bff; color: white; padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; text-align: center; transition: background-color 0.3s ease; }
-    .custom-upload-btn:hover { background-color: #0056b3; }
-    .custom-upload-btn:active { background-color: #004085; }
-    .custom-upload-btn input[type="file"] { display: none; }
-</style>

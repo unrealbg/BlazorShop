@@ -3,29 +3,32 @@
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
 
-    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
-            <nav class="flex items-center gap-2 sm:gap-3 text-[0.95rem] font-medium">
+    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10 hidden md:block">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 grid grid-cols-[auto_1fr_auto] items-center">
+            <a href="/" class="hidden sm:inline-flex flex-col leading-none select-none justify-self-start">
+                <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
+                <span class="text-[10px] text-neutral-400 -mt-0.5">E‑COMMERCE APPLICATION</span>
+            </a>
+
+            <nav class="hidden md:flex justify-self-center items-center gap-2 sm:gap-3 text-sm sm:text-[0.95rem] font-medium whitespace-nowrap">
                 <NavLink href="/" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
-                <NavLink href="about-us" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About us</NavLink>
-                <NavLink href="new-releases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New Releases</NavLink>
-                <NavLink href="todays-deals" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Today's Deals</NavLink>
-                <NavLink href="customer-service" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Customer Service</NavLink>
+                <NavLink href="about-us" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About&nbsp;us</NavLink>
+                <NavLink href="new-releases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New&nbsp;Releases</NavLink>
+                <NavLink href="todays-deals" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Today&#39;s&nbsp;Deals</NavLink>
+                <NavLink href="customer-service" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Customer&nbsp;Service</NavLink>
                 <AuthorizeView Roles="Admin">
                     <Authorized>
                         <NavLink href="admin" class="px-3 py-1.5 rounded-md text-amber-300 hover:text-white hover:bg-amber-400/10 transition-colors" ActiveClass="bg-amber-400/20 text-white">Admin</NavLink>
                     </Authorized>
                 </AuthorizeView>
             </nav>
+
+            <div class="justify-self-end"></div>
         </div>
     </div>
 
     <header class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-        <a href="/" class="mr-2 hidden sm:flex flex-col leading-none select-none">
-            <span class="text-xl font-extrabold tracking-wider">BLAZORSHOP®</span>
-            <span class="text-[11px] text-neutral-500 -mt-0.5">E‑COMMERCE APPLICATION</span>
-        </a>
-        <button class="flex flex-col gap-1.5 shrink-0" aria-label="Open menu">
+        <button class="flex flex-col gap-1.5 shrink-0 md:hidden" aria-label="Open menu" @onclick="ToggleMobileMenu">
             <span class="block h-0.5 w-8 bg-neutral-900"></span>
             <span class="block h-0.5 w-8 bg-neutral-900"></span>
             <span class="block h-0.5 w-8 bg-neutral-900"></span>
@@ -56,9 +59,41 @@
         </div>
     </header>
 
+    @if (IsMobileMenuOpen)
+    {
+        <div class="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+            <div class="absolute inset-0 bg-black/50" @onclick="CloseMobileMenu"></div>
+            <div class="absolute right-0 top-0 h-full w-72 max-w-[80vw] bg-white shadow-xl p-4 flex flex-col">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm font-semibold tracking-wide">Menu</div>
+                    <button class="p-1 rounded hover:bg-neutral-100" @onclick="CloseMobileMenu" aria-label="Close">✕</button>
+                </div>
+                <nav class="mt-4 flex-1 space-y-1 text-sm">
+                    <NavLink href="/" Match="NavLinkMatch.All" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">Home</NavLink>
+                    <NavLink href="about-us" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">About us</NavLink>
+                    <NavLink href="new-releases" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">New Releases</NavLink>
+                    <NavLink href="todays-deals" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">Today&#39;s Deals</NavLink>
+                    <NavLink href="customer-service" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">Customer Service</NavLink>
+                    <AuthorizeView Roles="Admin">
+                        <Authorized>
+                            <NavLink href="admin" class="block rounded px-3 py-2 hover:bg-neutral-100 text-amber-700" ActiveClass="bg-amber-100" @onclick="CloseMobileMenu">Admin</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                </nav>
+            </div>
+        </div>
+    }
+
     <main class="flex-1">
         @Body
     </main>
 
     <Footer />
 </div>
+
+@code {
+    private bool IsMobileMenuOpen;
+
+    private void ToggleMobileMenu() => IsMobileMenuOpen = !IsMobileMenuOpen;
+    private void CloseMobileMenu() => IsMobileMenuOpen = false;
+}
