@@ -22,6 +22,7 @@
             services.AddAutoMapper(typeof(MappingConfig));
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
+            services.AddScoped<IProductVariantService, ProductVariantService>();
 
             services.AddFluentValidationAutoValidation();
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
