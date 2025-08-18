@@ -1,5 +1,5 @@
-﻿<div class="main">
-    <div class="input-group bg-light text-dark">
+﻿<div class="w-full">
+    <div class="w-full">
         <BlazoredTypeahead 
             Placeholder="Search Products..." 
             SearchMethod="SearchProducts"
@@ -7,7 +7,7 @@
             <SelectedTemplate>@context.Name</SelectedTemplate>
             <ResultTemplate>@context.Name</ResultTemplate>
             <NotFoundTemplate>
-                <span>No Products Found</span>
+                <span class="text-sm text-neutral-600">No Products Found</span>
             </NotFoundTemplate>
         </BlazoredTypeahead>
     </div>

@@ -1,25 +1,31 @@
 ﻿@page "/faq"
 
-<div class="container mb-3">
-    <div class="col-lg-12">
-        <div class="p-2 mt-3 w-100" style="background-color: rgba(255, 255, 255, 0.5);">
-            <div class="card m-2 text-center" style="background-color: rgba(255, 255, 255, 0.7);">
-                <div class="card-header">
-                    <h1>Frequently Asked Questions</h1>
-                </div>
-                <div class="card-body">
-                    <p>Here you can find answers to the most common questions from our customers.</p>
-                    <div class="faq-section">
-                        @foreach (var faq in FAQs)
-                        {
-                            <div class="faq-item">
-                                <h3 class="faq-question">@faq.Question</h3>
-                                <p class="faq-answer">@faq.Answer</p>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
+<section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
+  <div class="rounded-2xl bg-white/80 shadow p-6">
+    <header class="text-center mb-6">
+      <h1 class="text-2xl font-extrabold">Frequently Asked Questions</h1>
+      <p class="mt-1 text-sm text-neutral-700">Find quick answers to common questions about orders, shipping, returns, and more.</p>
+    </header>
+
+    <div class="space-y-3">
+      @foreach (var faq in FAQs)
+      {
+        <details class="group rounded-lg border border-neutral-200 bg-white/70">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <span class="text-[0.95rem] font-semibold">@faq.Question</span>
+            <svg class="h-5 w-5 text-neutral-500 transition-transform duration-200 group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clip-rule="evenodd" />
+            </svg>
+          </summary>
+          <div class="px-4 pb-4 text-sm text-neutral-700">
+            @faq.Answer
+          </div>
+        </details>
+      }
     </div>
-</div>
+
+    <footer class="mt-8 text-center text-sm text-neutral-600">
+      Still need help? <a href="customer-service" class="font-semibold text-neutral-900 underline hover:no-underline">Contact Customer Service</a>.
+    </footer>
+  </div>
+</section>

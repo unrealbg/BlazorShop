@@ -4,21 +4,8 @@
 
     public partial class ModalDialog
     {
-        private bool _isVisible;
-
         [Parameter]
-        public bool IsVisible
-        {
-            get => this._isVisible;
-            set
-            {
-                if (this._isVisible != value)
-                {
-                    this._isVisible = value;
-                    this.IsVisibleChanged.InvokeAsync(value);
-                }
-            }
-        }
+        public bool IsVisible { get; set; }
 
         [Parameter]
         public EventCallback<bool> IsVisibleChanged { get; set; }
@@ -35,10 +22,11 @@
         [Parameter]
         public EventCallback OnClose { get; set; }
 
-        private void Close()
+        private async Task Close()
         {
-            this.IsVisible = false;
-            this.OnClose.InvokeAsync();
+            IsVisible = false;
+            await IsVisibleChanged.InvokeAsync(IsVisible);
+            await OnClose.InvokeAsync();
         }
     }
 }

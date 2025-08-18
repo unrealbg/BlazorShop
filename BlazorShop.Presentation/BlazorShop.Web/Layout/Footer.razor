@@ -1,34 +1,49 @@
-﻿<div class="footer_section pt-4">
-    <div class="container">
-        <div class="footer_logo"><a href="/"><img src="images/footer-logo.png"></a></div>
-        <div class="input_bt">
-            <input type="text" class="mail_bt" placeholder="Your Email" name="Your Email">
-            <span class="subscribe_bt" id="basic-addon2"><a href="#">Subscribe</a></span>
+﻿<div class="bg-neutral-900 text-neutral-100">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div>
+        <div class="text-lg font-extrabold tracking-wider">BLAZORSHOP®</div>
+        <p class="mt-1 text-sm text-neutral-300">E‑COMMERCE APPLICATION</p>
+        <p class="mt-3 text-sm text-neutral-400">Quality products, fair prices, fast delivery.</p>
+      </div>
+
+      <div>
+        <div class="text-sm font-semibold uppercase text-neutral-300">Shop</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="new-releases" class="hover:text-white/80">New Releases</a></li>
+          <li><a href="todays-deals" class="hover:text-white/80">Today's Deals</a></li>
+          <li><a href="my-cart" class="hover:text-white/80">Cart</a></li>
+          <li><a href="about-us" class="hover:text-white/80">About us</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="text-sm font-semibold uppercase text-neutral-300">Support</div>
+        <ul class="mt-3 space-y-2 text-sm">
+          <li><a href="customer-service" class="hover:text-white/80">Customer Service</a></li>
+          <li><a href="faq" class="hover:text-white/80">FAQ</a></li>
+          <li><a href="#" class="hover:text-white/80">Privacy</a></li>
+          <li><a href="#" class="hover:text-white/80">Terms</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="text-sm font-semibold uppercase text-neutral-300">Stay up to date</div>
+        <div class="mt-3 flex items-center gap-2">
+          <input type="email" placeholder="Your email" class="w-full rounded-md bg-white/10 border border-white/20 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-white/40" />
+          <button type="button" class="inline-flex items-center rounded bg-white text-neutral-900 px-3 py-2 text-sm font-semibold hover:bg-white/90">Subscribe</button>
         </div>
-        <div class="footer_menu mb-2">
-            <ul>
-                <li><a href="about-us">About us</a></li>
-                <li><a href="new-releases">New Releases</a></li>
-                <li><a href="todays-deals">Today's Deals</a></li>
-                <li><a href="customer-service">Customer Service</a></li>
-            </ul>
-        </div>
-        @* <div class="location_main">Help Line  Number : <a href="#">+1 1800 1200 1200</a></div> *@
+        <p class="mt-2 text-xs text-neutral-400">By subscribing you agree to our <a href="#" class="underline">Privacy</a>.</p>
+      </div>
     </div>
-</div>
-<!-- footer section end -->
-<!-- copyright section start -->
-<div class="copyright_section" style="font-size: 0.8rem; line-height: 1.5; ">
-    <div class="container text-light text-center">
-        <div>
-            Build with <strong>Blazor + .NET 9</strong> by <a target="_blank" class="text-secondary font-weight-bold" href="http://www.unrealbg.com/">UnrealBG</a>.
-        </div>
-        <div>
-            Made with <a target="_blank" class="text-secondary font-weight-bold" href="https://html.design">Eflyer Free Website Template</a>
-        </div>
-        <div>
-            @* <span class="navbar-brand mr-2"><strong class="text-light">BlazorShop</strong></span>  *@
-            Copyright &copy; @DateTime.Today.Year. All rights reserved.
-        </div>
+
+    <div class="mt-10 border-t border-white/10 pt-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="text-xs text-neutral-400">© @DateTime.Today.Year BlazorShop. All rights reserved.</p>
+      <nav class="flex items-center gap-5 text-sm">
+        <a href="#" class="hover:text-white/80">Facebook</a>
+        <a href="#" class="hover:text-white/80">Instagram</a>
+        <a href="#" class="hover:text-white/80">GitHub</a>
+      </nav>
     </div>
+  </div>
 </div>

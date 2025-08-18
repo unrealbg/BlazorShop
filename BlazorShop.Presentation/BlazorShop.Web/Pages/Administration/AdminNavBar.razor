@@ -1,53 +1,40 @@
-﻿<a href="/" class="logo-container">
-    <img src="images/header-logo.png" alt="Logo" class="logo-image">
-</a>
-<button class="menu-toggle" @onclick="ToggleMenu">☰</button>
-<div class="mobile-side-menu @(IsMenuVisible ? "show" : "")">
-    <ul>
-        <li>
-            <a href="admin" @onclick="HideMenu">
-                <i class="fa fa-home"></i> Home
-            </a>
-        </li>
-        <li>
-            <a href="product" @onclick="HideMenu">
-                <i class="fa fa-box"></i> Products
-            </a>
-        </li>
-        <li>
-            <a href="category" @onclick="HideMenu">
-                <i class="fa fa-list"></i> Categories
-            </a>
-        </li>
-        <li>
-            <a href="authentication/logout" class="text-danger" @onclick="HideMenu">
-                <i class="fa fa-sign-out"></i> Logout
-            </a>
-        </li>
-    </ul>
-</div>
+﻿@inherits LayoutComponentBase
 
-<div class="container">
-    <div class="header_section_top">
-        <div class="row">
-            <div class="col-sm-12" style="position: relative;">
-                <div class="custom_menu">
-                    <ul>
-                        <li>
-                            <a href="admin">Home</a>
-                        </li>
-                        <li>
-                            <a href="product">Products</a>
-                        </li>
-                        <li>
-                            <a href="category">Categories</a>
-                        </li>
-                        <li>
-                            <a class="text-warning" href="authentication/logout">Logout</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
+<div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-between">
+        <a href="/" class="hidden sm:inline-flex flex-col leading-none select-none">
+            <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
+            <span class="text-[10px] text-neutral-400 -mt-0.5">ADMIN</span>
+        </a>
+
+        <nav class="hidden md:flex items-center gap-2 text-[0.95rem] font-medium">
+            <NavLink href="admin" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
+            <NavLink href="product" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Products</NavLink>
+            <NavLink href="category" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Categories</NavLink>
+            <a href="/authentication/logout" class="px-3 py-1.5 rounded-md text-amber-300 hover:text-white hover:bg-amber-400/10 transition-colors">Logout</a>
+        </nav>
+
+        <button class="md:hidden inline-flex items-center justify-center rounded px-2 py-1.5 hover:bg-white/10" @onclick="ToggleMenu" aria-label="Open admin menu">
+            <span class="block h-0.5 w-6 bg-neutral-100"></span>
+        </button>
     </div>
 </div>
+
+@if (IsMenuVisible)
+{
+    <div class="fixed inset-0 z-50" aria-modal="true" role="dialog">
+        <div class="absolute inset-0 bg-black/50" @onclick="HideMenu"></div>
+        <div class="absolute right-0 top-0 h-full w-64 bg-white shadow-xl p-4 flex flex-col">
+            <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold tracking-wide">Admin Menu</div>
+                <button class="p-1 rounded hover:bg-neutral-100" @onclick="HideMenu" aria-label="Close">✕</button>
+            </div>
+            <nav class="mt-4 flex-1 space-y-2 text-sm">
+                <NavLink href="admin" Match="NavLinkMatch.All" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Home</NavLink>
+                <NavLink href="product" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Products</NavLink>
+                <NavLink href="category" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Categories</NavLink>
+                <a href="/authentication/logout" class="block rounded px-3 py-2 text-red-600 hover:bg-red-50" @onclick="HideMenu">Logout</a>
+            </nav>
+        </div>
+    </div>
+}

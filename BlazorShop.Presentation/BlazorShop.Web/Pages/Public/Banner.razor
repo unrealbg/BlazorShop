@@ -1,54 +1,27 @@
-﻿<div class="banner_section layout_padding">
-    <div class="container">
-        <div id="my_slider" class="carousel slide" data-ride="carousel">
-            <div class="carousel-inner">
-                <!-- Първи слайд -->
-                <div class="carousel-item active">
-                    <div class="row text-center">
-                        <div class="col-sm-12">
-                            <h1 class="banner_taital">
-                                Start Your Favorite <br> Shopping
-                            </h1>
-                            <p class="mt-3">Discover a wide range of products tailored to your needs.</p>
-                            <div class="buynow_bt mt-4"><a href="#">Buy Now</a></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Втори слайд -->
-                <div class="carousel-item">
-                    <div class="row text-center">
-                        <div class="col-sm-12">
-                            <h1 class="banner_taital">
-                                Get <span class="text-danger fw-bold bg-light p-1" style="border-radius:15px">30%</span> Discount
-                            </h1>
-                            <p class="mt-3">Take advantage of our special Black Friday deals.</p>
-                            <div class="buynow_bt mt-4"><a href="#">Shop Now</a></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Трети слайд -->
-                <div class="carousel-item">
-                    <div class="row text-center">
-                        <div class="col-sm-12">
-                            <h1 class="banner_taital">
-                                Stay Updated with <br> <span class="fw-bold text-success bg-light p-1" style="border-radius: 15px">Notifications</span>
-                            </h1>
-                            <p class="mt-3">Subscribe to our newsletter for the latest updates.</p>
-                            <div class="buynow_bt mt-4"><a href="#">Subscribe</a></div>
-                        </div>
-                    </div>
-                </div>
+﻿<div class="relative">
+    <section id="home" class="relative">
+      <div class="hero-bg">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+          <div class="grid md:grid-cols-2 gap-8 items-center">
+            <!-- Text -->
+            <div class="text-center md:text-left">
+              <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-shadow">START YOUR FAVORITE <br class="hidden sm:block"/> SHOPPING</h1>
+              <p class="mt-3 text-neutral-700 max-w-xl mx-auto md:mx-0">Discover a wide range of products tailored to your needs.</p>
+              <div class="mt-6">
+                <a href="#latest" class="inline-flex items-center rounded-md bg-neutral-900 px-6 py-3 text-white font-semibold hover:bg-neutral-800">BUY NOW</a>
+              </div>
             </div>
-
-            <!-- Контролери -->
-            <a class="carousel-control-prev" href="#my_slider" role="button" data-slide="prev">
-                <i class="fa fa-angle-left"></i>
-            </a>
-            <a class="carousel-control-next" href="#my_slider" role="button" data-slide="next">
-                <i class="fa fa-angle-right"></i>
-            </a>
+            <!-- Visual placeholder (right) -->
+            <div class="hidden md:block">
+              <div class="aspect-[4/3] rounded-3xl bg-gradient-to-br from-brand-100 to-brand-300 shadow-2xl border border-white/40"></div>
+            </div>
+          </div>
         </div>
-    </div>
+      </div>
+      <!-- round chevrons over the hero (decorative) -->
+      <div class="pointer-events-none absolute inset-x-0 -bottom-6 flex justify-between px-6 sm:px-10">
+        <div class="h-10 w-10 rounded-full bg-yellow-200/80 grid place-items-center text-neutral-700">‹</div>
+        <div class="h-10 w-10 rounded-full bg-yellow-200/80 grid place-items-center text-neutral-700">›</div>
+      </div>
+    </section>
 </div>

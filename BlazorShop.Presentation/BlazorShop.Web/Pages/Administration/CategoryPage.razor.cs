@@ -11,7 +11,7 @@
         private Guid _categoryToDelete;
         private IEnumerable<GetCategory> _categories = Enumerable.Empty<GetCategory>();
         private CreateCategory _category = new();
-        private string _categoryToDeleteName;
+        private string? _categoryToDeleteName;
 
         protected override async Task OnInitializedAsync()
         {

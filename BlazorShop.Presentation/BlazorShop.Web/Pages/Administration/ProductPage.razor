@@ -1,117 +1,115 @@
 ﻿@page "/product"
 @layout AdminLayout
 
-<div class="banner_section mt-5">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-                <div class="card p-5 m-2">
-                    <div class="card-header text-center fs-3">Manage Products</div>
-                    <div class="card-title">
-                        <button class="btn btn-outline-success btn-lg mt-2 float-end" @onclick="AddProduct">
-                            Add Product
-                        </button>
-                    </div>
-                    <div class="card-body" style="height: 500px; overflow: auto">
-                        @if (_products.Any())
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
+    <div class="bg-white/80 rounded-xl shadow p-6">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold">Manage Products</h2>
+            <button class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="AddProduct">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
+                Add Product
+            </button>
+        </div>
+
+        <div class="mt-4 overflow-auto" style="max-height:500px">
+            @if (_products.Any())
+            {
+                <table class="min-w-full text-sm">
+                    <thead class="sticky top-0 z-10">
+                        <tr class="bg-neutral-100/90 text-left">
+                            <th class="px-3 py-2">Id</th>
+                            <th class="px-3 py-2">Image</th>
+                            <th class="px-3 py-2">Name</th>
+                            <th class="px-3 py-2">Description</th>
+                            <th class="px-3 py-2">Price</th>
+                            <th class="px-3 py-2">Quantity</th>
+                            <th class="px-3 py-2">Created Date</th>
+                            <th class="px-3 py-2 text-red-600 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-neutral-200">
+                        @foreach (var product in _products)
                         {
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr class="bg-light mb-5">
-                                        <th>Id</th>
-                                        <th>Image</th>
-                                        <th>Name</th>
-                                        <th>Description</th>
-                                        <th>Price</th>
-                                        <th>Quantity</th>
-                                        <th>Created Date</th>
-                                        <th class="text-danger text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var product in _products)
-                                    {
-                                        <tr>
-                                            <td>@product.Id</td>
-                                            <td><img src="@product.Image" alt="@product.Name" width="50" height="50" /></td>
-                                            <td>@product.Name</td>
-                                            <td>@product.Description</td>
-                                            <td>@product.Price</td>
-                                            <td>@product.Quantity</td>
-                                            <td>@product.CreatedOn</td>
-                                            <td>
-                                                <i class="fa fa-trash text-danger text-center buy_bt" @onclick="() => ConfirmDelete(product.Id)">
-                                                </i>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
+                            <tr>
+                                <td class="px-3 py-2 align-top">@product.Id</td>
+                                <td class="px-3 py-2 align-top"><img src="@product.Image" alt="@product.Name" class="h-12 w-12 object-cover rounded" /></td>
+                                <td class="px-3 py-2 align-top">@product.Name</td>
+                                <td class="px-3 py-2 align-top">@product.Description</td>
+                                <td class="px-3 py-2 align-top">@product.Price</td>
+                                <td class="px-3 py-2 align-top">@product.Quantity</td>
+                                <td class="px-3 py-2 align-top">@product.CreatedOn</td>
+                                <td class="px-3 py-2 align-top">
+                                    <button class="mx-auto block text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                    </button>
+                                </td>
+                            </tr>
                         }
-                        else
-                        {
-                            <div class="alert alert-info fw-bold text-center" role="alert">
-                                No products found.
-                            </div>
-                        }
-                    </div>
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mt-6 rounded-md bg-blue-50 text-blue-800 px-6 py-5 text-center shadow font-semibold">
+                    No products found.
                 </div>
-            </div>
+            }
         </div>
     </div>
-</div>
+</section>
 
 <ModalDialog @bind-IsVisible="_showDialog">
     <Header>
-        <h5 class="modal-title">Add New Product</h5>
+        <h5 class="text-lg font-semibold">Add New Product</h5>
     </Header>
     <Body>
         <EditForm Model="_product" OnValidSubmit="SaveProduct">
             <DataAnnotationsValidator />
             <div class="form-group">
-                <FloatingTextInput @bind-Value="_product.Name" Label="Product Name" class="form-control" />
+                <FloatingTextInput @bind-Value="_product.Name" Label="Product Name" class="w-full" />
                 <ValidationMessage For="@(() => _product.Name)" />
             </div>
             <div class="form-group">
-                <InputNumber @bind-Value="_product.Price" class="form-control" />
-                <label class="form-label">Price</label>
+                <InputNumber @bind-Value="_product.Price" class="w-full border rounded px-3 py-2" />
+                <label class="block text-sm text-neutral-600 mt-1">Price</label>
                 <ValidationMessage For="@(() => _product.Price)" />
             </div>
             <div class="form-group">
-                <FloatingNumberInput @bind-Value="_product.Quantity" Label="Quantity" class="form-control" />
+                <FloatingNumberInput @bind-Value="_product.Quantity" Label="Quantity" class="w-full" />
                 <ValidationMessage For="@(() => _product.Quantity)" />
             </div>
             <div class="form-group">
-                <FloatingTextAreaInput @bind-Value="_product.Description" Label="Product Description" class="form-control" />
+                <FloatingTextAreaInput @bind-Value="_product.Description" Label="Product Description" class="w-full" />
                 <ValidationMessage For="@(() => _product.Description)" />
             </div>
             <div class="form-group">
-                <InputSelect id="category" class="form-control" @bind-Value="_product.CategoryId">
+                <InputSelect id="category" class="w-full border rounded px-3 py-2" @bind-Value="_product.CategoryId">
                     <option value="" selected>-- Select a Category --</option>
                     @foreach (var category in _categories)
                     {
                         <option value="@category.Id">@category.Name</option>
                     }
                 </InputSelect>
-                    <label for="category" class="form-label">Category</label>
+                <label for="category" class="block text-sm text-neutral-600 mt-1">Category</label>
                 <ValidationMessage For="@(() => _product.CategoryId)" />
             </div>
-            <div class="form-group d-flex justify-content-between align-items-center">
-                <label class="custom-upload-btn">
-                    Upload Image
-                    <InputFile OnChange="EventCallback.Factory.Create < InputFileChangeEventArgs > (this, OnFileSelected)" accept="image/*" style="display: none;" />
+            <div class="form-group flex items-center justify-between">
+                <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                    <span>Upload Image</span>
+                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileSelected)" accept="image/*" class="sr-only" />
                 </label>
                 @if (!string.IsNullOrEmpty(_previewImageUrl))
                 {
-                    <img src="@_previewImageUrl" alt="Preview Image" class="img-thumbnail" />
+                    <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
                 }
                 <ValidationMessage For="@(() => _product.Image)" />
             </div>
 
             <hr />
-            <div class="d-flex justify-content-end">
-                <button class="btn btn-primary mr-2" type="submit">Save</button>
-                <button class="btn btn-danger" type="button" @onclick="Cancel">Cancel</button>
+            <div class="flex justify-end gap-2">
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Save</button>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
             </div>
         </EditForm>
     </Body>
@@ -119,66 +117,14 @@
 
 <ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
     <Header>
-        <h5 class="modal-title">Confirm Delete</h5>
+        <h5 class="text-lg font-semibold">Confirm Delete</h5>
     </Header>
     <Body>
         Are you sure you want to delete the product
-        <span class="text-danger"><strong>@_producToDeleteName</strong></span>?
+        <span class="text-red-600"><strong>@_producToDeleteName</strong></span>?
     </Body>
     <Footer>
-        <button class="btn btn-danger" @onclick="DeleteProductConfirmed">Yes, Delete</button>
-        <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+        <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" @onclick="DeleteProductConfirmed">Yes, Delete</button>
+        <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300" @onclick="CancelDelete">Cancel</button>
     </Footer>
 </ModalDialog>
-
-<style>
-
-    .form-group {
-        margin-bottom: 10px; /* Намалете отстоянието между формовите групи */
-    }
-
-    .form-floating {
-        margin-bottom: 10px; /* Намалете разстоянието за floating input полета */
-    }
-
-    .custom-upload-container {
-        margin-top: 10px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
-
-
-    .custom-upload-btn {
-        background-color: #007bff; /* Син цвят */
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        border: none;
-        cursor: pointer;
-        font-size: 14px;
-        text-align: center;
-        transition: background-color 0.3s ease;
-    }
-
-        .custom-upload-btn:hover {
-            background-color: #0056b3; /* По-тъмен син цвят при hover */
-        }
-
-        .custom-upload-btn:active {
-            background-color: #004085; /* По-тъмен цвят при натискане */
-        }
-
-        .custom-upload-btn input[type="file"] {
-            display: none; /* Скриване на стандартния InputFile елемент */
-        }
-
-    .img-thumbnail {
-        max-width: 100px;
-        max-height: 100px;
-        margin-left: 15px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-    }
-</style>

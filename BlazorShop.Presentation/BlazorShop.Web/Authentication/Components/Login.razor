@@ -1,48 +1,41 @@
 ﻿@page "/authentication/login"
 @page "/authentication/login/{route}"
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-6 col-md-8 col-sm-10">
-            <div class="card shadow-lg border-0 rounded-3">
-                <div class="card-header bg-warning text-dark text-center">
-                    <h4 class="fw-bold m-0">Login</h4>
-                </div>
-                <div class="card-body p-4">
-                    <!-- Validation Message -->
-                    @if (!string.IsNullOrEmpty(_message))
-                    {
-                        <div class="alert alert-@_alertType" role="alert">
-                            @_message
-                        </div>
-                    }
+<section class="min-h-[70vh] grid place-items-center px-4 py-10">
+  <div class="w-full max-w-md">
+    <div class="rounded-2xl shadow-[0_12px_30px_rgba(0,0,0,.08)] border border-black/5 overflow-hidden bg-white/80">
+      <div class="px-6 py-4 bg-amber-400/90 text-neutral-900 text-center">
+        <h4 class="text-lg font-extrabold m-0">Login</h4>
+      </div>
+      <div class="px-6 py-6">
+        @if (!string.IsNullOrEmpty(_message))
+        {
+          <div class="mb-4 rounded-md px-4 py-3 text-sm font-medium @( _alertType == "danger" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700")" role="alert">
+            @_message
+          </div>
+        }
 
-                    <!-- Login Form -->
-                    <EditForm Model="User" OnValidSubmit="LoginUser">
-                        <DataAnnotationsValidator />
-                        <div class="form-floating mb-3">
-                            <ValidationMessage For="@(() => User.Email)" />
-                            <FloatingTextInput class="form-control" @bind-Value="User.Email" Label="Email Address" Type="text" Placeholder="my@email.com" />
-                        </div>
+        <EditForm Model="User" OnValidSubmit="LoginUser">
+          <DataAnnotationsValidator />
+          <div class="mb-4">
+            <ValidationMessage For="@(() => User.Email)" />
+            <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="User.Email" Label="Email Address" Type="text" Placeholder="my@email.com" />
+          </div>
 
-                        <div class="form-floating mb-3">
-                            <ValidationMessage For="@(() => User.Password)" />
-                            <FloatingTextInput class="form-control" @bind-Value="User.Password" Label="Password" Type="Password" Placeholder="Password" />
-                        </div>
+          <div class="mb-6">
+            <ValidationMessage For="@(() => User.Password)" />
+            <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="User.Password" Label="Password" Type="Password" Placeholder="Password" />
+          </div>
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-warning fw-bold text-light shadow-sm">Login</button>
-                        </div>
-                    </EditForm>
-                </div>
-
-                <div class="card-footer bg-transparent text-center py-3">
-                    <small>Don't have an account? 
-                        <a href="/authentication/register" class="text-warning fw-bold">Register Here</a>
-                    </small>
-                </div>
-            </div>
-        </div>
+          <button type="submit" class="w-full inline-flex items-center justify-center rounded bg-amber-500 text-white px-4 py-2.5 font-semibold hover:bg-amber-600 shadow-sm">Login</button>
+        </EditForm>
+      </div>
+      <div class="px-6 py-4 bg-white/80 text-center">
+        <small>Don't have an account?
+          <a href="/authentication/register" class="text-amber-600 font-semibold hover:underline">Register Here</a>
+        </small>
+      </div>
     </div>
-</div>
+  </div>
+</section>
 

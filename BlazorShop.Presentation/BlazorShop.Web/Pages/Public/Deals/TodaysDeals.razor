@@ -3,46 +3,42 @@
 
 @implements IAsyncDisposable
 
-<div class="container">
-    <div class="fashion_section container-fluid mt-5">
-        <h2 class="fashion_taital text-light fw-bold">Today's Deals</h2>
-        <div class="row">
-            @if (_todaysDeals.Any())
-            {
-                @foreach (var product in _todaysDeals)
-                {
-                    <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
-                        <div class="deal-card">
-                            <div class="deal-card-header">
-                                <img src="@product.Image" alt="@product.Name" class="img-fluid deal-card-image" />
-                            </div>
-                            <div class="deal-card-body">
-                                <h5 class="deal-card-title">@product.Name</h5>
-                                <p class="deal-card-price">€ @product.Price</p>
-                                <div class="deal-card-actions">
-                                    <div class="btn_main">
-                                        <div class="buy_bt text-danger" @onclick="() => AddItemToCart(product.Id)">
-                                            <i class="fa fa-cart-plus"></i> Add to Cart
-                                        </div>
-                                        <div class="seemore_bt text-primary" @onclick="() => ShowDetails(product)">
-                                            <i class="fa fa-eye"></i> See More
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <div class="col-12 text-center">
-                    <div class="alert alert-info">No deals available for today. Check back later!</div>
-                </div>
-            }
-        </div>
-    </div>
-</div>
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-10 pb-12">
+  <h2 class="text-3xl font-extrabold tracking-tight text-center">Today's Deals</h2>
+  @if (_todaysDeals.Any())
+  {
+      <div class="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          @foreach (var product in _todaysDeals)
+          {
+              <article class="rounded-2xl bg-white shadow-[0_12px_30px_rgba(0,0,0,.08)] border border-black/5 overflow-hidden">
+                  <div class="p-4">
+                      <img src="@product.Image" alt="@product.Name" class="w-full aspect-[4/3] object-contain rounded" />
+                      <h3 class="mt-4 text-base font-semibold">@product.Name</h3>
+                      <p class="mt-1 text-sm"><span class="text-rose-500 font-semibold">Price</span> € @product.Price</p>
+                  </div>
+                  <div class="flex items-center justify-between px-4 pb-4 text-sm text-neutral-700">
+                      <button class="inline-flex items-center gap-2" @onclick="() => AddItemToCart(product.Id)">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/></svg>
+                          Add to Cart
+                      </button>
+                      <button class="inline-flex items-center gap-2" @onclick="() => ShowDetails(product)">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/></svg>
+                          See More
+                      </button>
+                  </div>
+              </article>
+          }
+      </div>
+  }
+  else
+  {
+      <div class="mt-10 flex justify-center">
+          <div class="rounded-md bg-blue-50 text-blue-800 px-6 py-5 text-center shadow">
+              No deals available for today. Check back later!
+          </div>
+      </div>
+  }
+</section>
 
 <ProductDetails Product="SelectedProduct"
                 IsVisible="_showModal"

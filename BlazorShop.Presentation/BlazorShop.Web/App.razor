@@ -5,11 +5,9 @@
                 <NotAuthorized />
             </NotAuthorized>
             <Authorizing>
-                <div class="text-center mt-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Loading...</span>
-                    </div>
-                    <p>Authorizing, please wait...</p>
+                <div class="flex flex-col items-center justify-center mt-10 text-neutral-700">
+                    <div class="h-10 w-10 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900"></div>
+                    <p class="mt-3">Authorizing, please wait...</p>
                 </div>
             </Authorizing>
         </AuthorizeRouteView>
