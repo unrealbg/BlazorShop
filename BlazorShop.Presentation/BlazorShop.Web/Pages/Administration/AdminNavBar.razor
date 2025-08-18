@@ -1,4 +1,18 @@
-﻿<a href="/" class="flex items-center gap-2">
+﻿@inherits LayoutComponentBase
+
+<!-- Admin top band styled like MainLayout -->
+<div class="clip-diagonal bg-neutral-900 text-neutral-100">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
+        <nav class="flex items-center justify-center gap-6 text-sm font-medium">
+            <a href="admin" class="hover:text-white/80">Home</a>
+            <a href="product" class="hover:text-white/80">Products</a>
+            <a href="category" class="hover:text-white/80">Categories</a>
+            <a href="/authentication/logout" class="text-amber-400 hover:text-amber-300">Logout</a>
+        </nav>
+    </div>
+</div>
+
+<a href="/" class="flex items-center gap-2">
     <img src="images/header-logo.png" alt="Logo" class="h-8 w-auto">
 </a>
 <button class="ml-auto md:hidden p-2 border rounded" @onclick="ToggleMenu">☰</button>
@@ -30,13 +44,4 @@
             </a>
         </li>
     </ul>
-</div>
-
-<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
-    <nav class="flex items-center justify-center gap-6 text-sm">
-        <a href="admin" class="hover:underline">Home</a>
-        <a href="product" class="hover:underline">Products</a>
-        <a href="category" class="hover:underline">Categories</a>
-        <a class="text-amber-500 hover:underline" href="authentication/logout">Logout</a>
-    </nav>
 </div>

@@ -1,9 +1,10 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="banner_bg_main">
+<div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
-    <AdminNavBar/>
-    @Body
+    <AdminNavBar />
+    <main class="flex-1">
+        @Body
+    </main>
+    <Footer />
 </div>
-
-<Footer />

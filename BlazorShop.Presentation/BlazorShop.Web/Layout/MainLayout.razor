@@ -11,6 +11,11 @@
                 <a href="new-releases" class="hover:text-white/80">New Releases</a>
                 <a href="todays-deals" class="hover:text-white/80">Today's Deals</a>
                 <a href="customer-service" class="hover:text-white/80">Customer Service</a>
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <a href="admin" class="hover:text-white/80">Admin</a>
+                    </Authorized>
+                </AuthorizeView>
             </nav>
         </div>
     </div>
@@ -38,7 +43,10 @@
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
                 <AuthorizeView>
                     <Authorized>
-                        <a href="profile" class="hover:underline">Profile</a>
+                        <div class="flex items-center gap-3">
+                            <a href="profile" class="hover:underline">Profile</a>
+                            <a href="/authentication/logout" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800">Logout</a>
+                        </div>
                     </Authorized>
                     <NotAuthorized>
                         <a href="authentication/login" class="hover:underline">Login</a>
