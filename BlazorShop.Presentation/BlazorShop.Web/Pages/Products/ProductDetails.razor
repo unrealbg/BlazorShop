@@ -1,26 +1,45 @@
 ﻿@if (IsVisible)
 {
-  <div class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="fixed inset-0 bg-black/50" @onclick="CloseModal"></div>
-    <div class="relative z-10 w-full max-w-2xl rounded-xl bg-white shadow-lg overflow-hidden">
-      <div class="flex items-center justify-between px-4 py-3 border-b">
-        <h5 class="text-lg font-semibold">@Product?.Name</h5>
-        <button type="button" class="text-2xl leading-none px-2" @onclick="CloseModal" aria-label="Close">×</button>
-      </div>
-      <div class="p-4">
-        <div class="text-center">
-          <img src="@Product?.Image" alt="@Product?.Name" class="mx-auto rounded mb-3 shadow max-h-64 object-contain" />
-          <p class="text-sm text-neutral-700">@Product?.Description</p>
-          <div class="mt-3 text-sm">
-            <p class="font-semibold text-emerald-700">€ @Product?.Price</p>
-            <p class="text-neutral-700"><strong>Quantity Available:</strong> @Product?.Quantity</p>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 py-3 border-t bg-neutral-50 flex items-center justify-end gap-2">
-        <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="HandleAddToCart">Add to Cart</button>
-        <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" @onclick="CloseModal">Close</button>
-      </div>
-    </div>
-  </div>
+    <ModalDialog @bind-IsVisible="IsVisible" OnClose="CloseModal" Size="xl" CloseOnBackdrop="true" ShowCloseButton="true">
+        <Header>
+            <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-3">
+                    <div class="h-7 w-7 grid place-items-center rounded-md bg-white/10 text-white/90">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+                    </div>
+                    <h5 class="text-base sm:text-lg font-semibold">@Product?.Name</h5>
+                </div>
+                <div class="text-sm font-semibold bg-white/10 rounded px-2 py-0.5">€ @Product?.Price</div>
+            </div>
+        </Header>
+        <Body>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
+                    <img src="@Product?.Image" alt="@Product?.Name" class="absolute inset-0 w-full h-full object-contain" />
+                </div>
+                <div class="flex flex-col gap-3 text-sm text-neutral-700">
+                    <p>@Product?.Description</p>
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-semibold">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                            In stock: @Product?.Quantity
+                        </span>
+                    </div>
+                    <div class="mt-2">
+                        <div class="text-sm text-neutral-500">Price</div>
+                        <div class="text-2xl font-extrabold">€ @Product?.Price</div>
+                    </div>
+                </div>
+            </div>
+        </Body>
+        <Footer>
+            <div class="flex items-center justify-end gap-2">
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="HandleAddToCart">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/></svg>
+                    Add to Cart
+                </button>
+                <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300" @onclick="CloseModal">Close</button>
+            </div>
+        </Footer>
+    </ModalDialog>
 }
