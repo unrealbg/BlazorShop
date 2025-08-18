@@ -1,0 +1,15 @@
+/* Smooth fade + slight slide animation when page changes */
+.fade-slide {
+  animation: fadeSlideIn 450ms ease-in-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
