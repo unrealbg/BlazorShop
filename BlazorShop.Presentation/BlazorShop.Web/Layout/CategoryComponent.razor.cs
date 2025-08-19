@@ -1,10 +1,14 @@
 ﻿namespace BlazorShop.Web.Layout
 {
     using BlazorShop.Web.Shared.Models.Category;
+    using Microsoft.AspNetCore.Components;
 
     public partial class CategoryComponent
     {
         private IEnumerable<GetCategory> _categories = [];
+
+        [Parameter]
+        public EventCallback OnCategorySelected { get; set; }
 
         protected override async Task OnInitializedAsync()
         {
@@ -30,6 +34,15 @@
                 ("bg-fuchsia-500","ring-fuchsia-200"),
             };
             return palette[index % palette.Length];
+        }
+
+        private async Task SelectCategory(Guid categoryId)
+        {
+            this.NavigationManager.NavigateTo($"main/products/category/{categoryId}");
+            if (OnCategorySelected.HasDelegate)
+            {
+                await OnCategorySelected.InvokeAsync();
+            }
         }
     }
 }

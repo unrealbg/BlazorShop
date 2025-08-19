@@ -6,7 +6,8 @@
             {
                 var category = _categories.ElementAt(i);
                 var color = GetColor(i);
-                <a href="@($"main/products/category/{category.Id}")" class="shrink-0 group relative rounded-xl border border-neutral-200 bg-white/90 px-4 py-3 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+                var url = $"main/products/category/{category.Id}";
+                <a href="@url" @onclick:preventDefault @onclick="() => SelectCategory(category.Id)" class="shrink-0 group relative rounded-xl border border-neutral-200 bg-white/90 px-4 py-3 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
                     <div class="flex items-center gap-3">
                         <div class="h-10 w-10 rounded-full grid place-items-center text-white @color.bg">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

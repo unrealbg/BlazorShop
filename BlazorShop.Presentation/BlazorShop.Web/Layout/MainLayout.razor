@@ -68,7 +68,7 @@
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="-mt-2 mb-2 rounded-lg border border-neutral-200 bg-white/80 shadow">
                 <div class="p-4">
-                    <BlazorShop.Web.Layout.CategoryComponent />
+                    <BlazorShop.Web.Layout.CategoryComponent OnCategorySelected="CloseCategories" />
                 </div>
             </div>
         </div>
@@ -113,4 +113,5 @@
     private void ToggleMobileMenu() => IsMobileMenuOpen = !IsMobileMenuOpen;
     private void CloseMobileMenu() => IsMobileMenuOpen = false;
     private void ToggleCategories() => _showCategories = !_showCategories;
+    private void CloseCategories() => _showCategories = false;
 }
