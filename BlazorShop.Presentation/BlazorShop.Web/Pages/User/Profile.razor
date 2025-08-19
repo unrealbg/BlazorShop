@@ -14,6 +14,9 @@
                         <li class="px-4 py-2 @(ActiveTab == "profile" ? "bg-neutral-100 font-semibold" : null)">
                             <button class="text-left w-full" @onclick='() => SwitchTab("profile")'>Profile Details</button>
                         </li>
+                        <li class="px-4 py-2 @(ActiveTab == "edit" ? "bg-neutral-100 font-semibold" : null)">
+                            <button class="text-left w-full" @onclick='() => SwitchTab("edit")'>Edit Profile</button>
+                        </li>
                         <li class="px-4 py-2 @(ActiveTab == "orders" ? "bg-neutral-100 font-semibold" : null)">
                             <button class="text-left w-full" @onclick='() => SwitchTab("orders")'>My Orders</button>
                         </li>
@@ -47,13 +50,33 @@
                                     <p><strong>Email:</strong></p>
                                     <p class="text-right">@_userEmail</p>
                                 </div>
-                                <hr class="my-2" />
-                                <div class="text-center mt-4">
-                                    <button class="inline-flex items-center rounded bg-amber-500 text-white px-4 py-2 font-semibold hover:bg-amber-600">
-                                        Edit Profile
-                                    </button>
-                                </div>
                             </div>
+                        </div>
+                    }
+                    else if (ActiveTab == "edit")
+                    {
+                        <div>
+                            <h4 class="text-neutral-900 font-bold">Edit Profile</h4>
+                            <EditForm Model="@_updateProfile" OnValidSubmit="UpdateProfileAsync">
+                                <DataAnnotationsValidator />
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <ValidationMessage For="@(() => _updateProfile.FullName)" />
+                                        <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="_updateProfile.FullName" Label="Full Name" Placeholder="John Doe" />
+                                    </div>
+                                    <div>
+                                        <ValidationMessage For="@(() => _updateProfile.Email)" />
+                                        <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="_updateProfile.Email" Label="Email Address" Type="text" Placeholder="john@email.com" />
+                                    </div>
+                                    <div>
+                                        <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="_updateProfile.PhoneNumber" Label="Phone (optional)" Type="text" Placeholder="+359 ..." />
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex gap-2">
+                                    <button type="submit" class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800">Save Changes</button>
+                                    <button type="button" class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300" @onclick='() => SwitchTab("profile")'>Cancel</button>
+                                </div>
+                            </EditForm>
                         </div>
                     }
                     else if (ActiveTab == "orders")
@@ -130,6 +153,7 @@
 @code {
     private string ActiveTab = "profile"; // Default active tab
     private PasswordChangeModel _changePasswordModel = new();
+    private BlazorShop.Web.Shared.Models.Authentication.UpdateProfileModel _updateProfile = new();
     private string _userEmail = string.Empty;
     private string _userName = string.Empty;
     private IEnumerable<GetOrderItem> _orderItems = new List<GetOrderItem>();
@@ -145,9 +169,19 @@
         if (emailClaim != null)
         {
             _userEmail = emailClaim.Value;
+            _updateProfile.Email = _userEmail;
         }
 
-        _userName = _userEmail;
+        var fullNameClaim = user.Claims.FirstOrDefault(c => c.Type == "FullName");
+        if (fullNameClaim != null)
+        {
+            _updateProfile.FullName = fullNameClaim.Value;
+            _userName = fullNameClaim.Value;
+        }
+        else
+        {
+            _userName = _userEmail;
+        }
 
         _orderItems = await CartService.GetCheckoutHistoryByUserId();
     }
@@ -166,6 +200,22 @@
         {
             ToastService.ShowSuccessToast("Password changed successfully.");
             _changePasswordModel = new ();
+        }
+        else
+        {
+            ToastService.ShowErrorToast(response.Message);
+        }
+    }
+
+    private async Task UpdateProfileAsync()
+    {
+        var response = await AuthenticationService.UpdateProfile(_updateProfile);
+        if (response.Success)
+        {
+            ToastService.ShowSuccessToast("Profile updated.");
+            _userEmail = _updateProfile.Email;
+            _userName = _updateProfile.FullName;
+            ActiveTab = "profile";
         }
         else
         {

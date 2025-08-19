@@ -28,5 +28,7 @@
 
         Task<bool> ConfirmEmailAsync(AppUser user, string token);
 
+        Task<bool> UpdateUserAsync(string userId, string fullName, string email, string? phoneNumber);
+
     }
 }

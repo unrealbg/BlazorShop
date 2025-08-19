@@ -118,5 +118,22 @@
             var result = await _userManager.ConfirmEmailAsync(user, token);
             return result.Succeeded;
         }
+
+        public async Task<bool> UpdateUserAsync(string userId, string fullName, string email, string? phoneNumber)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user is null)
+            {
+                return false;
+            }
+
+            user.FullName = fullName;
+            user.Email = email;
+            user.UserName = email;
+            user.PhoneNumber = phoneNumber;
+
+            var result = await _userManager.UpdateAsync(user);
+            return result.Succeeded;
+        }
     }
 }
