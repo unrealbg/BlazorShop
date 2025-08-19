@@ -1,27 +1,124 @@
-﻿<div class="relative">
+﻿@using System.Threading
+@implements IAsyncDisposable
+
+<div class="relative" @onmouseenter="() => _pause = true" @onmouseleave="() => _pause = false">
     <section id="home" class="relative">
       <div class="hero-bg">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
           <div class="grid md:grid-cols-2 gap-8 items-center">
             <!-- Text -->
             <div class="text-center md:text-left">
-              <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-shadow">START YOUR FAVORITE <br class="hidden sm:block"/> SHOPPING</h1>
-              <p class="mt-3 text-neutral-700 max-w-xl mx-auto md:mx-0">Discover a wide range of products tailored to your needs.</p>
+              <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-shadow">@_slides[_index].Title</h1>
+              <p class="mt-3 text-neutral-700 max-w-xl mx-auto md:mx-0">@_slides[_index].Subtitle</p>
               <div class="mt-6">
-                <a href="#latest" class="inline-flex items-center rounded-md bg-neutral-900 px-6 py-3 text-white font-semibold hover:bg-neutral-800">BUY NOW</a>
+                <a href="@_slides[_index].CtaHref" class="inline-flex items-center rounded-md bg-neutral-900 px-6 py-3 text-white font-semibold hover:bg-neutral-800">@_slides[_index].CtaText</a>
+              </div>
+              <!-- Feature badges under CTA -->
+              <div class="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-neutral-700">
+                <div class="inline-flex items-center gap-2 bg-white/60 rounded-full px-3 py-1 border border-white/60 shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M3 12l3 3 3-3-3-3-3 3Z"/></svg>
+                  Free Shipping
+                </div>
+                <div class="inline-flex items-center gap-2 bg-white/60 rounded-full px-3 py-1 border border-white/60 shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l2 2"/></svg>
+                  24/7 Support
+                </div>
+                <div class="inline-flex items-center gap-2 bg-white/60 rounded-full px-3 py-1 border border-white/60 shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                  Secure Payment
+                </div>
               </div>
             </div>
-            <!-- Visual placeholder (right) -->
+            <!-- Visual (right) -->
             <div class="hidden md:block">
-              <div class="aspect-[4/3] rounded-3xl bg-gradient-to-br from-brand-100 to-brand-300 shadow-2xl border border-white/40"></div>
+              @switch (_slides[_index].Visual)
+              {
+                  case VisualType.GradientCard:
+                      <div class="aspect-[4/3] rounded-3xl bg-gradient-to-br from-brand-100 to-brand-300 shadow-2xl border border-white/40"></div>
+                      break;
+                  case VisualType.ProductStack:
+                      <div class="relative aspect-[4/3]">
+                        <div class="absolute inset-0 rounded-3xl bg-white/60 blur-xl"></div>
+                        <div class="absolute left-6 right-6 top-8 h-40 rounded-2xl bg-white/90 border shadow-md"></div>
+                        <div class="absolute left-10 right-10 top-24 h-40 rounded-2xl bg-white/90 border shadow-lg rotate-1"></div>
+                        <div class="absolute left-14 right-14 top-40 h-40 rounded-2xl bg-white/90 border shadow-xl -rotate-1"></div>
+                      </div>
+                      break;
+                  case VisualType.DiscountBadge:
+                      <div class="aspect-[4/3] grid place-items-center">
+                        <div class="relative">
+                          <div class="h-56 w-56 rounded-full bg-amber-300/90 shadow-2xl grid place-items-center border border-white/60">
+                            <div class="text-center">
+                              <div class="text-5xl font-black">-30%</div>
+                              <div class="text-sm font-semibold tracking-wide">Summer Sale</div>
+                            </div>
+                          </div>
+                          <div class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white grid place-items-center shadow">🔥</div>
+                        </div>
+                      </div>
+                      break;
+              }
             </div>
           </div>
         </div>
       </div>
-      <!-- round chevrons over the hero (decorative) -->
-      <div class="pointer-events-none absolute inset-x-0 -bottom-6 flex justify-between px-6 sm:px-10">
-        <div class="h-10 w-10 rounded-full bg-yellow-200/80 grid place-items-center text-neutral-700">‹</div>
-        <div class="h-10 w-10 rounded-full bg-yellow-200/80 grid place-items-center text-neutral-700">›</div>
+      <!-- arrows centered -->
+      <div class="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-6 sm:px-10">
+        <button class="h-11 w-11 rounded-full bg-yellow-200/90 grid place-items-center text-neutral-700 shadow hover:bg-yellow-200" @onclick="Prev" aria-label="Previous slide">‹</button>
+        <button class="h-11 w-11 rounded-full bg-yellow-200/90 grid place-items-center text-neutral-700 shadow hover:bg-yellow-200" @onclick="Next" aria-label="Next slide">›</button>
+      </div>
+      <!-- dots -->
+      <div class="absolute bottom-4 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2">
+        @for (var i = 0; i < _slides.Count; i++)
+        {
+            <button class="h-2.5 w-2.5 rounded-full @(i==_index?"bg-neutral-900":"bg-neutral-300 hover:bg-neutral-400")" @onclick="(() => GoTo(i))" aria-label="Go to slide @(i+1)"></button>
+        }
       </div>
     </section>
 </div>
+
+@code {
+    private readonly List<HeroSlide> _slides = new()
+    {
+        new("START YOUR FAVORITE SHOPPING", "Discover a wide range of products tailored to your needs.", "BUY NOW", "#latest", VisualType.GradientCard),
+        new("FRESH ARRIVALS THIS WEEK", "Hand‑picked items just for you.", "SEE NEW RELEASES", "new-releases", VisualType.ProductStack),
+        new("HOT DEALS YOU CAN'T MISS", "Save big with limited‑time offers.", "TODAY'S DEALS", "todays-deals", VisualType.DiscountBadge)
+    };
+
+    private int _index = 0;
+    private PeriodicTimer? _timer;
+    private bool _pause;
+
+    protected override void OnInitialized()
+    {
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(6));
+        _ = AutoRotateAsync();
+    }
+
+    private async Task AutoRotateAsync()
+    {
+        try
+        {
+            while (_timer != null && await _timer.WaitForNextTickAsync())
+            {
+                if (_pause) { continue; }
+                _index = (_index + 1) % _slides.Count;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch { }
+    }
+
+    private void Next() => _index = (_index + 1) % _slides.Count;
+    private void Prev() => _index = (_index - 1 + _slides.Count) % _slides.Count;
+    private void GoTo(int i) { if (i>=0 && i<_slides.Count) _index = i; }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        await Task.CompletedTask;
+    }
+
+    private record HeroSlide(string Title, string Subtitle, string CtaText, string CtaHref, VisualType Visual);
+    private enum VisualType { GradientCard, ProductStack, DiscountBadge }
+}
