@@ -193,3 +193,138 @@ code { color: #c02d76; }
 #newTag { position: absolute; right: 0; top: 0; }
 
 .buy_bt { cursor: pointer; }
+/* ---------------------------------------------
+   Toast notifications – refined glass look
+   --------------------------------------------- */
+:root {
+    --toast-bg: rgba(255,255,255,0.78);
+    --toast-text: #0f172a; /* slate-900 */
+}
+
+.custom-toast-container {
+    position: fixed;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    pointer-events: none; /* allow clicks through gaps */
+}
+/* Force all containers to the top-right */
+.custom-toast-container.top-right,
+.custom-toast-container.top-left,
+.custom-toast-container.bottom-right,
+.custom-toast-container.bottom-left {
+    top: 16px; right: 16px; left: auto; bottom: auto;
+}
+
+.custom-toast {
+    position: relative;
+    width: min(92vw, 380px);
+    pointer-events: auto; /* allow interactions on the toast */
+    border-radius: 14px;
+    padding: 10px 12px 12px 12px;
+    background: var(--toast-bg) !important; /* force glass even if other rules exist */
+    backdrop-filter: saturate(140%) blur(12px);
+    -webkit-backdrop-filter: saturate(140%) blur(12px);
+    border: 1px solid rgba(255,255,255,0.7);
+    box-shadow: 0 22px 60px rgba(0,0,0,0.22);
+    color: var(--toast-text);
+    transform: translateY(8px) translateX(8px) scale(0.985);
+    opacity: 0;
+    animation: toast-in 180ms ease-out forwards;
+    overflow: hidden;
+}
+
+/* Accent bar */
+.custom-toast::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--toast-accent, #0f172a) 90%, transparent), transparent);
+}
+
+/* Auto-hide progress hint */
+.custom-toast::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 2px;
+    background: color-mix(in srgb, var(--toast-accent, #0f172a) 85%, transparent);
+    transform-origin: left;
+    animation: toast-progress 5s linear forwards;
+    opacity: 0.9;
+}
+
+@keyframes toast-in {
+    from { transform: translateY(8px) translateX(8px) scale(0.985); opacity: 0; }
+    to   { transform: translateY(0)   translateX(0)   scale(1);     opacity: 1; }
+}
+@keyframes toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Header + body */
+.custom-toast-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 2px 6px 2px;
+}
+.custom-toast-header i {
+    display: inline-grid;
+    place-items: center;
+    width: 28px; height: 28px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--toast-accent, #0f172a) 22%, white);
+    color: color-mix(in srgb, var(--toast-accent, #0f172a) 92%, black);
+    font-size: 14px;
+}
+.custom-toast-header strong { 
+    color: var(--toast-text) !important; 
+    letter-spacing: 0.1px; 
+}
+.custom-toast-header small { 
+    color: rgba(15,23,42,0.6) !important; 
+    margin-left: auto; 
+    font-size: 12px; 
+    font-weight: 600; 
+}
+.custom-toast-header .close {
+    margin-left: 6px;
+    border: none;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(17,17,17,0.06);
+    color: var(--toast-text) !important;
+    opacity: 1 !important;
+    font-weight: 900;
+    cursor: pointer;
+    display: inline-grid; place-items: center;
+    transition: background-color .2s ease;
+}
+.custom-toast-header .close span {
+    color: inherit !important;
+    opacity: 1 !important;
+    font-size: 18px;
+    line-height: 1;
+    display: inline-block;
+}
+.custom-toast-header .close:hover { background: rgba(17,17,17,0.14); }
+.custom-toast-header .close:focus { outline: 2px solid rgba(15,23,42,0.25); outline-offset: 2px; }
+
+.custom-toast-body { 
+    padding: 2px 2px 4px 2px; 
+    color: var(--toast-text); 
+    background: transparent !important; 
+    box-shadow: none !important; 
+    border: none !important; 
+}
+
+/* Level accents only (keep glass background) */
+.custom-toast.Info    { --toast-accent: #0284c7; /* sky-600 */ }
+.custom-toast.Success { --toast-accent: #10b981; /* emerald-500 */ }
+.custom-toast.Warning { --toast-accent: #f59e0b; /* amber-500 */ }
+.custom-toast.Error   { --toast-accent: #ef4444; /* red-500 */ }
+
+/* Optional hover lift */
+.custom-toast:hover { transform: translateY(-1px) translateX(0) scale(1.01); box-shadow: 0 26px 70px rgba(0,0,0,0.28); }
