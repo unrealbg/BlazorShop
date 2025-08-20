@@ -1,14 +1,40 @@
 ﻿<div class="w-full">
-    <div class="w-full">
-        <BlazoredTypeahead 
-            Placeholder="Search Products..." 
-            SearchMethod="SearchProducts"
-            @bind-Value="SelectedProduct">
-            <SelectedTemplate>@context.Name</SelectedTemplate>
-            <ResultTemplate>@context.Name</ResultTemplate>
-            <NotFoundTemplate>
-                <span class="text-sm text-neutral-600">No Products Found</span>
-            </NotFoundTemplate>
-        </BlazoredTypeahead>
+    <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5"><path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 4.252 11.973l3.262 3.262a.75.75 0 1 0 1.06-1.06l-3.262-3.263A6.75 6.75 0 0 0 10.5 3.75Zm-5.25 6.75a5.25 5.25 0 1 1 10.5 0 5.25 5.25 0 0 1-10.5 0Z" clip-rule="evenodd"/></svg>
+                </span>
+                <input type="text"
+                       class="w-full rounded-lg border border-neutral-300 bg-white px-10 py-2.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-black/10"
+                       placeholder="Search products…"
+                       value="@_query"
+                       @oninput="OnInput"
+                       @onkeydown="OnKeyDown"
+                       @onfocus="OnFocus"
+                       @onblur="async _ => await OnBlur()" />
+                @if (_isOpen)
+                {
+                    <div class="absolute z-10 mt-1 w-full rounded-lg border border-neutral-200 bg-white shadow">
+                        @foreach (var (p, i) in _matches.Select((p, i) => (p, i)))
+                        {
+                            <button type="button"
+                                    class="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 @(i == _activeIndex ? "bg-neutral-50" : string.Empty)"
+                                    @onclick="() => SelectSuggestion(i)">
+                                <div class="flex items-center gap-2">
+                                    <img src="@p.Image" alt="@p.Name" class="h-6 w-6 rounded object-cover" />
+                                    <span>@p.Name</span>
+                                    <span class="ml-auto text-xs text-neutral-500">€ @p.Price</span>
+                                </div>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            <button type="button" class="shrink-0 inline-flex items-center gap-2 rounded-md bg-neutral-900 text-white px-3 py-2 text-sm font-medium hover:bg-neutral-800"
+                    @onclick="NavigateToQuery" disabled="@string.IsNullOrWhiteSpace(_query)">
+                Search
+            </button>
+        </div>
     </div>
 </div>
