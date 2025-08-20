@@ -11,25 +11,101 @@
 }
 
 #blazor-error-ui {
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    background: transparent; /* override default banner style */
+    bottom: auto;
+    box-shadow: none;
     box-sizing: border-box;
-    display: none;
+    display: none; /* will be set to block by Blazor on error */
     left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    padding: 0;
     position: fixed;
     width: 100%;
-    z-index: 1000;
+    z-index: 10000;
 }
 
 #blazor-error-ui .dismiss {
     cursor: pointer;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
 }
 
+/* Fancy error popup overlay */
+#blazor-error-ui.error-popup { inset: 0; background: rgba(0,0,0,0.35); }
+
+#blazor-error-ui .error-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 92%;
+    max-width: 520px;
+    border-radius: 16px;
+    padding: 18px 18px 14px 18px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 22px 60px rgba(0,0,0,0.25);
+    animation: error-pop 200ms ease-out both;
+}
+
+@keyframes error-pop {
+    from { transform: translate(-50%, -50%) scale(0.96); opacity: 0; }
+    to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+#blazor-error-ui .error-message {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#blazor-error-ui .error-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background: #111;
+    color: #fff;
+    font-size: 18px;
+}
+
+#blazor-error-ui .error-text {
+    font-weight: 800;
+    color: #111;
+}
+
+#blazor-error-ui .error-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+#blazor-error-ui .reload-btn {
+    background-color: #111;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+    border: none;
+}
+#blazor-error-ui .reload-btn:hover { background-color: #2a2a2a; }
+
+#blazor-error-ui .dismiss {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(17,17,17,0.06);
+    color: #111;
+}
+#blazor-error-ui .dismiss:hover { background: rgba(17,17,17,0.12); }
+
+/* Loader styles remain below ... */
+
+/* Initial loader overlay */
 .loader_main {
     position: fixed;
     inset: 0;
@@ -41,6 +117,7 @@
     z-index: 1000;
 }
 
+/* Branded spinner (bigger, thinner ring) */
 .spinner {
     position: relative;
     width: 128px;
@@ -57,7 +134,6 @@
 
 @keyframes spinner-rotate { to { transform: rotate(360deg); } }
 
-/* Center percentage text inside spinner using existing element */
 .loader_main { position: fixed; }
 .loader_main .loading-progress-text {
     position: absolute;
@@ -73,6 +149,7 @@
     content: var(--blazor-load-percentage-text, "Loading");
 }
 
+/* Default blazor progress (kept for fallback) */
 .loading-progress {
     position: relative;
     display: block;
@@ -102,9 +179,7 @@
     inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
 }
 
-code {
-    color: #c02d76;
-}
+code { color: #c02d76; }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);
@@ -115,12 +190,6 @@ code {
     text-align: start;
 }
 
-#newTag {
-    position: absolute;
-    right: 0;
-    top: 0;
-}
+#newTag { position: absolute; right: 0; top: 0; }
 
-.buy_bt {
-    cursor: pointer;
-}
+.buy_bt { cursor: pointer; }
