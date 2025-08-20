@@ -1,44 +1,51 @@
 ﻿<div class="flex items-center gap-4">
-    <div class="">
-        <a href="my-cart" class="inline-flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
-            <span>&nbsp;Cart</span>
+    <div class="inline-flex items-center gap-2">
+        <a href="my-cart" class="relative inline-block" aria-label="Cart">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+            @if (_cartCount > 0)
+            {
+                <span class="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold h-5 min-w-5 px-1 z-20">@_cartCount</span>
+            }
         </a>
     </div>
     <div class="relative">
-        <details class="group">
-            <summary class="list-none inline-flex items-center gap-2 cursor-pointer select-none">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
-                <span class="text-neutral-800">
-                    <AuthorizeView>
-                        <Authorized>
-                            <span>&nbsp;@UserEmail</span>
-                        </Authorized>
-                        <NotAuthorized>
-                            <span>&nbsp;ACCOUNT</span>
-                        </NotAuthorized>
-                    </AuthorizeView>
-                </span>
+        <details class="group" @ref="_accountDetails">
+            <summary class="list-none inline-flex items-center gap-2 cursor-pointer select-none" aria-label="Account">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
             </summary>
-            <div class="absolute right-0 mt-2 w-44 rounded-md border border-neutral-200 bg-white shadow-lg p-1 hidden group-open:block">
+            <div class="absolute right-0 mt-2 w-44 rounded-md border border-neutral-200 bg-white shadow-lg p-1 hidden group-open:block z-50">
                 <AuthorizeView>
                     <Authorized>
                         @if (_isAdmin)
                         {
-                            <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="admin">Admin Menu</a>
+                            <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="admin" @onclick="CloseMenu">Admin Menu</a>
                         }
                         @if (_isAdmin || _isUser)
                         {
-                            <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="profile">Profile</a>
+                            <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="profile" @onclick="CloseMenu">Profile</a>
                         }
-                        <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/logout">Logout</a>
+                        <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/logout" @onclick="CloseMenu">Logout</a>
                     </Authorized>
                     <NotAuthorized>
-                        <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/login">Login</a>
-                        <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/register">Register</a>
+                        <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/login" @onclick="CloseMenu">Login</a>
+                        <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/register" @onclick="CloseMenu">Register</a>
                     </NotAuthorized>
                 </AuthorizeView>
             </div>
         </details>
     </div>
 </div>
+
+@code {
+    private ElementReference _accountDetails;
+
+    private async Task CloseMenu()
+    {
+        try
+        {
+            var mod = await Js.InvokeAsync<IJSObjectReference>("import", "./js/cartBadge.js");
+            await mod.InvokeVoidAsync("closeDetails", _accountDetails);
+        }
+        catch { }
+    }
+}}

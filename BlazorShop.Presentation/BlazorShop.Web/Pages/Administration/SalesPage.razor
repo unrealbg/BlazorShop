@@ -189,3 +189,28 @@
     }
   </div>
 </section>
+
+<ModalDialog @bind-IsVisible="_showEdit">
+  <Header>
+    <h5 class="text-lg font-semibold">Edit Tracking</h5>
+  </Header>
+  <Body>
+    <div class="space-y-2">
+      <div class="text-xs text-neutral-600">Order: @_editOrder?.Reference</div>
+      <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
+      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
+      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
+      <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
+        <option>PendingShipment</option>
+        <option>Shipped</option>
+        <option>InTransit</option>
+        <option>OutForDelivery</option>
+        <option>Delivered</option>
+      </select>
+    </div>
+  </Body>
+  <Footer>
+    <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="SaveEditAsync">Save</button>
+    <button class="inline-flex items-center rounded bg-neutral-600 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-700 ml-2" @onclick="() => _showEdit = false">Close</button>
+  </Footer>
+</ModalDialog>
