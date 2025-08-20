@@ -27,7 +27,8 @@
         [Authorize(Roles = "User")]
         public async Task<IActionResult> Checkout(Checkout checkout)
         {
-            var result = await _cartService.CheckoutAsync(checkout);
+            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var result = await _cartService.CheckoutAsync(checkout, userId);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 
@@ -77,6 +78,5 @@
             var result = await _cartService.GetCheckoutHistoryByUserId(userId);
             return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
         }
-
     }
 }

@@ -4,6 +4,7 @@ using BlazorShop.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlazorShop.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250820125853_AddMorePaymentMethods")]
+    partial class AddMorePaymentMethods
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,35 +148,6 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("NewsletterSubscribers");
                 });
 
-            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.Order", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Reference")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Orders");
-                });
-
             modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -195,31 +169,6 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("CheckoutOrderItems");
-                });
-
-            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrderId");
-
-                    b.ToTable("OrderLines");
                 });
 
             modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.PaymentMethod", b =>
@@ -482,17 +431,6 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderLine", b =>
-                {
-                    b.HasOne("BlazorShop.Domain.Entities.Payment.Order", "Order")
-                        .WithMany("Lines")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-                });
-
             modelBuilder.Entity("BlazorShop.Domain.Entities.Product", b =>
                 {
                     b.HasOne("BlazorShop.Domain.Entities.Category", "Category")
@@ -569,11 +507,6 @@ namespace BlazorShop.Infrastructure.Migrations
             modelBuilder.Entity("BlazorShop.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Products");
-                });
-
-            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.Order", b =>
-                {
-                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("BlazorShop.Domain.Entities.Product", b =>

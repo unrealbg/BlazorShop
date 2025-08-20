@@ -18,6 +18,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Domain.Entities.Payment;
 
+    using Microsoft.Extensions.Options;
     using Moq;
 
     using Xunit;
@@ -29,7 +30,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IGenericRepository<Product>> _productRepositoryMock;
         private readonly Mock<IPaymentMethodService> _paymentMethodServiceMock;
         private readonly Mock<IPaymentService> _paymentServiceMock;
+        private readonly Mock<IPayPalPaymentService> _paypalServiceMock;
         private readonly Mock<IAppUserManager> _userManagerMock;
+        private readonly Mock<IOrderRepository> _orderRepositoryMock;
+        private readonly Mock<IEmailService> _emailServiceMock;
+        private readonly Mock<IOptions<BankTransferSettings>> _btOptionsMock;
         private readonly CartService _cartService;
 
         public CartServiceTests()
@@ -39,7 +44,12 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _productRepositoryMock = new Mock<IGenericRepository<Product>>();
             _paymentMethodServiceMock = new Mock<IPaymentMethodService>();
             _paymentServiceMock = new Mock<IPaymentService>();
+            _paypalServiceMock = new Mock<IPayPalPaymentService>();
             _userManagerMock = new Mock<IAppUserManager>();
+            _orderRepositoryMock = new Mock<IOrderRepository>();
+            _emailServiceMock = new Mock<IEmailService>();
+            _btOptionsMock = new Mock<IOptions<BankTransferSettings>>();
+            _btOptionsMock.Setup(o => o.Value).Returns(new BankTransferSettings());
 
             _cartService = new CartService(
                 _cartMock.Object,
@@ -47,7 +57,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _productRepositoryMock.Object,
                 _paymentMethodServiceMock.Object,
                 _paymentServiceMock.Object,
-                _userManagerMock.Object);
+                _paypalServiceMock.Object,
+                _userManagerMock.Object,
+                _orderRepositoryMock.Object,
+                _emailServiceMock.Object,
+                _btOptionsMock.Object);
         }
 
         [Fact]

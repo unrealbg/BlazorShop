@@ -1,6 +1,7 @@
 ﻿namespace BlazorShop.Infrastructure
 {
     using BlazorShop.Application.DTOs;
+    using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts;
@@ -90,6 +91,8 @@
 
             services.AddScoped<IPaymentMethod, PaymentMethodRepository>();
             services.AddScoped<IPaymentService, StripePaymentService>();
+            services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
+            services.AddScoped<IOrderRepository, OrderRepository>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 
@@ -98,6 +101,7 @@
             Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
 
             services.Configure<EmailSettings>(config.GetSection("EmailSettings"));
+            services.Configure<BankTransferSettings>(config.GetSection("BankTransfer"));
             services.AddTransient<IEmailService, EmailService>();
 
             return services;
