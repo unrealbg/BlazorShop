@@ -73,7 +73,10 @@
             try
             {
                 var items = JsonSerializer.Deserialize<List<ProcessCart>>(json) ?? new();
-                _cartCount = items.Sum(i => i.Quantity);
+                _cartCount = items
+                    .Select(i => new { i.ProductId, i.VariantId })
+                    .Distinct()
+                    .Count();
             }
             catch
             {

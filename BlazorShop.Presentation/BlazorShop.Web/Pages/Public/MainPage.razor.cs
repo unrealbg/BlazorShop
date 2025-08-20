@@ -137,16 +137,9 @@
             _showModal = false;
         }
 
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            if (_myCarts != null && _myCarts.Any())
-            {
-                await this.CookieStorageService.SetAsync(
-                    Constant.Cart.Name,
-                    JsonSerializer.Serialize(_myCarts),
-                    30,
-                    "/");
-            }
+            return ValueTask.CompletedTask;
         }
     }
 }

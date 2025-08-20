@@ -98,7 +98,14 @@
                 var item = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
                 if (item is not null)
                 {
-                    item.Quantity = newQuantity;
+                    if (newQuantity <= 0)
+                    {
+                        _myCarts.RemoveAll(x => x.ProductId == productId);
+                    }
+                    else
+                    {
+                        item.Quantity = newQuantity;
+                    }
                     await this.SaveCart(_myCarts);
                     this.GetCart();
                 }
@@ -132,11 +139,7 @@
 
         private async Task RemoveCartItem(Guid productId)
         {
-            var cartItem = this.GetCartItem(productId);
-            if (cartItem is not null)
-            {
-                _myCarts.Remove(cartItem);
-            }
+            _myCarts.RemoveAll(x => x.ProductId == productId);
 
             var product = _selectedProducts.FirstOrDefault(x => x.Id == productId);
             if (product is not null)
@@ -146,8 +149,9 @@
 
             this.ToastService.ShowToast(ToastLevel.Warning, "Product removed from cart", "Cart", ToastIcon.Warning);
 
-            await this.CookieStorageService.RemoveAsync(Constant.Cookie.Name);
+            await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
             await this.SaveCart(_myCarts);
+            this.StateHasChanged();
         }
 
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
