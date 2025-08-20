@@ -3,48 +3,128 @@
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
   <div class="rounded-xl bg-white/80 shadow p-6" style="min-height: 600px; overflow: auto">
-    <header class="flex items-center justify-between">
-      <h2 class="text-2xl font-bold">Orders</h2>
-      <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="ReloadAsync">Reload</button>
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <h2 class="text-2xl font-bold">Orders by Customer</h2>
+      <div class="flex items-center gap-2">
+        <input class="border rounded px-2 py-1 text-sm w-60" placeholder="Search name/email" @bind="_customerQuery" />
+        <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-3 py-1 text-sm font-semibold hover:bg-neutral-300" @onclick="ToggleAll">@(_allExpanded ? "Collapse All" : "Expand All")</button>
+        <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="ReloadAsync">Reload</button>
+      </div>
     </header>
 
-    <div class="mt-4 overflow-auto">
-      <table class="min-w-full text-sm">
-        <thead>
-          <tr class="bg-neutral-50 text-left">
-            <th class="px-3 py-2">Created</th>
-            <th class="px-3 py-2">Reference</th>
-            <th class="px-3 py-2">Status</th>
-            <th class="px-3 py-2">Shipping</th>
-            <th class="px-3 py-2">Total (ˆ)</th>
-            <th class="px-3 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-neutral-200">
-          @if (_orders.Any())
-          {
-            @foreach (var o in _orders)
+    <div class="mt-4 space-y-4">
+      @if (_orders.Any())
+      {
+        var groups = _orders
+            .GroupBy(o => new { o.UserId, Name = o.CustomerName ?? o.CustomerEmail ?? "(Unknown)", Email = o.CustomerEmail })
+            .OrderBy(g => g.Key.Name)
+            .Where(g => string.IsNullOrWhiteSpace(_customerQuery)
+                || (g.Key.Name?.Contains(_customerQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (g.Key.Email?.Contains(_customerQuery, StringComparison.OrdinalIgnoreCase) ?? false));
+
+        @foreach (var g in groups)
+        {
+          var key = g.Key.UserId ?? g.Key.Name;
+          bool isOpen = _expanded.Contains(key);
+
+          <article class="rounded border">
+            <button type="button" class="w-full px-4 py-2 bg-neutral-100 flex items-start sm:items-center justify-between gap-3" @onclick="() => Toggle(key)">
+              <div class="text-left">
+                <div class="font-semibold break-all">@g.Key.Name</div>
+                <div class="text-xs text-neutral-600 break-all">@g.Key.Email</div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="text-sm">Orders: <b>@g.Count()</b></div>
+                <div class="text-sm">Total: <b>ˆ @g.Sum(x => x.TotalAmount).ToString("F2")</b></div>
+              </div>
+            </button>
+
+            @if (isOpen)
             {
-              <tr>
-                <td class="px-3 py-2">@o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
-                <td class="px-3 py-2">@o.Reference</td>
-                <td class="px-3 py-2">@o.Status</td>
-                <td class="px-3 py-2">@o.ShippingStatus</td>
-                <td class="px-3 py-2">@o.TotalAmount.ToString("F2")</td>
-                <td class="px-3 py-2">
-                  <button class="text-blue-700 hover:underline" @onclick="() => OpenTrackDialog(o)">Edit Tracking</button>
-                </td>
-              </tr>
+              <div class="p-3 space-y-3">
+                @foreach (var o in g.OrderByDescending(x => x.CreatedOn))
+                {
+                  <div class="rounded border">
+                    <div class="px-3 py-2 bg-neutral-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div class="text-sm flex items-center gap-2 flex-wrap">
+                        <span><span class="font-semibold">Ref:</span> @o.Reference</span>
+                        <button class="text-blue-700 underline text-xs" @onclick="() => CopyAsync(o.Reference)">Copy</button>
+                        <span class="ml-2"><span class="font-semibold">Date:</span> @o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                      </div>
+                      <div class="text-sm">
+                        <span class="mr-3">Status: <b>@o.ShippingStatus</b></span>
+                        <button class="text-blue-700 hover:underline" @onclick="() => OpenTrackDialog(o)">Edit</button>
+                      </div>
+                    </div>
+                    <div class="p-3 overflow-x-auto">
+                      <table class="min-w-full text-xs table-fixed">
+                        <colgroup>
+                          <col class="w-[56%] sm:w-[52%]" />
+                          <col class="w-[10%] sm:w-[8%]" />
+                          <col class="w-[16%] sm:w-[14%]" />
+                          <col class="w-[16%] sm:w-[14%]" />
+                          <col class="w-[24%] sm:w-[12%]" />
+                        </colgroup>
+                        <thead>
+                          <tr class="bg-neutral-50 text-left">
+                            <th class="px-2 py-1">Product</th>
+                            <th class="px-2 py-1">Qty</th>
+                            <th class="px-2 py-1">Unit (ˆ)</th>
+                            <th class="px-2 py-1">Total (ˆ)</th>
+                            <th class="px-2 py-1">Tracking</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-neutral-200">
+                          @foreach (var l in o.Lines)
+                          {
+                            <tr class="align-middle h-9">
+                              <td class="px-2 py-1"><Tooltip Text="@l.ProductName"><div class="truncate" title="@l.ProductName">@l.ProductName</div></Tooltip></td>
+                              <td class="px-2 py-1">@l.Quantity</td>
+                              <td class="px-2 py-1">@l.UnitPrice.ToString("F2")</td>
+                              <td class="px-2 py-1">@((l.UnitPrice * l.Quantity).ToString("F2"))</td>
+                              <td class="px-2 py-1">
+                                <div class="flex items-center gap-2">
+                                  @if (!string.IsNullOrWhiteSpace(o.TrackingUrl))
+                                  {
+                                    <Tooltip Text="@o.TrackingUrl">
+                                      <a class="text-blue-700 hover:underline truncate max-w-[10rem] sm:max-w-none" href="@o.TrackingUrl" target="_blank" rel="noopener">Track</a>
+                                    </Tooltip>
+                                    <button class="text-blue-700 underline text-xs" @onclick="() => CopyAsync(o.TrackingUrl!)">Copy</button>
+                                  }
+                                  else if (!string.IsNullOrWhiteSpace(o.TrackingNumber))
+                                  {
+                                    <Tooltip Text="@o.TrackingNumber">
+                                      <span class="text-neutral-600 truncate max-w-[10rem] sm:max-w-none">@o.TrackingNumber</span>
+                                    </Tooltip>
+                                    <button class="text-blue-700 underline text-xs" @onclick="() => CopyAsync(o.TrackingNumber!)">Copy</button>
+                                  }
+                                  else
+                                  {
+                                    <span class="text-neutral-500">Pending</span>
+                                  }
+                                </div>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                      <div class="mt-2 text-right text-sm font-semibold">Order Total: ˆ @o.TotalAmount.ToString("F2")</div>
+                      <div class="text-right text-xs text-neutral-600">
+                        @if (o.ShippedOn.HasValue) {<span class="mr-3">Shipped: @o.ShippedOn.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>}
+                        @if (o.DeliveredOn.HasValue) {<span>Delivered: @o.DeliveredOn.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>}
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
             }
-          }
-          else
-          {
-            <tr>
-              <td class="px-3 py-6 text-center text-neutral-500" colspan="6">No orders</td>
-            </tr>
-          }
-        </tbody>
-      </table>
+          </article>
+        }
+      }
+      else
+      {
+        <div class="mt-6 rounded-md bg-blue-50 text-blue-800 px-6 py-5 text-center shadow font-semibold">No orders</div>
+      }
     </div>
   </div>
 </section>
@@ -55,10 +135,16 @@
   </Header>
   <Body>
     <div class="space-y-2">
-      <div class="text-xs text-neutral-600">Order: @_editOrder?.Reference</div>
+      <div class="text-xs text-neutral-600">Order: @_editOrder?.Reference <button class="text-blue-700 underline text-xs" @onclick="() => CopyAsync(_editOrder?.Reference ?? string.Empty)">Copy</button></div>
       <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
-      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
-      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
+      <div class="flex items-center gap-2">
+        <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
+        <button class="text-blue-700 underline text-xs shrink-0" @onclick="() => CopyAsync(_trackingNumber)">Copy</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
+        <button class="text-blue-700 underline text-xs shrink-0" @onclick="() => CopyAsync(_trackingUrl)">Copy</button>
+      </div>
       <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
         <option>PendingShipment</option>
         <option>Shipped</option>
@@ -83,6 +169,12 @@
   private string _trackingUrl = string.Empty;
   private string _shippingStatus = "PendingShipment";
 
+  private string _customerQuery = string.Empty;
+  private bool _allExpanded = false;
+  private HashSet<string> _expanded = new();
+
+  [Inject] private IJSRuntime JS { get; set; } = default!;
+
   protected override async Task OnInitializedAsync()
   {
       await ReloadAsync();
@@ -94,6 +186,32 @@
     var api = new ApiCall { Client = client, Route = Constant.Cart.GetAllOrders, Type = Constant.ApiCallType.Get };
     var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
     _orders = http is null || !http.IsSuccessStatusCode ? new() : (await ApiCallHelper.GetServiceResponse<IEnumerable<GetOrder>>(http)).ToList();
+
+    _expanded.Clear();
+    _allExpanded = false;
+  }
+
+  private void Toggle(string key)
+  {
+    if (_expanded.Contains(key)) _expanded.Remove(key); else _expanded.Add(key);
+    StateHasChanged();
+  }
+
+  private void ToggleAll()
+  {
+    if (_allExpanded)
+    {
+      _expanded.Clear();
+      _allExpanded = false;
+    }
+    else
+    {
+      _expanded = _orders
+        .Select(o => o.UserId ?? (o.CustomerName ?? o.CustomerEmail ?? string.Empty))
+        .Distinct()
+        .ToHashSet();
+      _allExpanded = true;
+    }
   }
 
   private void OpenTrackDialog(GetOrder order)
@@ -127,6 +245,20 @@
     else
     {
       ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "Failed to save", "Orders");
+    }
+  }
+
+  private async Task CopyAsync(string? text)
+  {
+    if (string.IsNullOrEmpty(text)) return;
+    try
+    {
+      await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+      ToastService.ShowSuccessToast("Copied to clipboard");
+    }
+    catch
+    {
+      ToastService.ShowErrorToast("Copy failed");
     }
   }
 }

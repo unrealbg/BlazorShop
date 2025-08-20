@@ -11,8 +11,6 @@
 
     public partial class SalesPage : ComponentBase
     {
-        private IEnumerable<GetOrderItem> _orderItems = [];
-
         private List<GetOrder> _orders = new();
         private List<GetOrder> _recentOrders = new();
         private decimal _totalRevenue;
@@ -45,8 +43,6 @@
 
         protected override async Task OnInitializedAsync()
         {
-            this._orderItems = await this.CartService.GetOrderItemsAsync();
-
             try
             {
                 var client = await this.HttpClientHelper.GetPrivateClientAsync();

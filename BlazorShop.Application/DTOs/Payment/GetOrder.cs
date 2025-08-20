@@ -24,6 +24,12 @@ namespace BlazorShop.Application.DTOs.Payment
 
         public DateTime? DeliveredOn { get; set; }
 
+        public string? UserId { get; set; }
+
+        public string? CustomerName { get; set; }
+
+        public string? CustomerEmail { get; set; }
+
         public IEnumerable<GetOrderLine> Lines { get; set; } = Array.Empty<GetOrderLine>();
     }
 }

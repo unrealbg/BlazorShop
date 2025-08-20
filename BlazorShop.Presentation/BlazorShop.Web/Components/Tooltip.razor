@@ -1,0 +1,16 @@
+@inherits Microsoft.AspNetCore.Components.ComponentBase
+
+<span class="relative inline-block group" tabindex="0">
+    @ChildContent
+    @if (!string.IsNullOrWhiteSpace(Text))
+    {
+        <span class="pointer-events-none absolute z-50 hidden group-hover:inline-block group-focus:inline-block bg-neutral-900 text-white text-[11px] rounded px-2 py-1 whitespace-pre-wrap shadow max-w-[80vw] md:max-w-[32rem]" style="transform: translateY(-100%); top: -0.25rem; left: 0;">
+            @Text
+        </span>
+    }
+</span>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

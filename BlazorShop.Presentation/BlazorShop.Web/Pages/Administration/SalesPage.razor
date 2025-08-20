@@ -134,65 +134,21 @@
       </div>
     </article>
 
-    <article class="mt-6 rounded border">
-      <div class="px-4 py-2 bg-neutral-100 font-semibold">Top Products</div>
-      <div class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-        @if (_topProducts.Any())
-        {
-          @foreach (var p in _topProducts)
-          {
-            <div class="rounded border p-3">
-              <div class="font-semibold">@p.Name</div>
-              <div class="text-neutral-600">Qty: @p.Quantity</div>
-              <div class="text-neutral-900">Revenue: € @p.Revenue.ToString("F2")</div>
-            </div>
-          }
-        }
-        else
-        {
-          <div class="text-neutral-500">No products</div>
-        }
-      </div>
-    </article>
-
-    <ModalDialog @bind-IsVisible="_showEdit">
-      <Header>
-        <h5 class="text-lg font-semibold">Edit Tracking</h5>
-      </Header>
-      <Body>
-        <div class="space-y-2">
-          <div class="text-xs text-neutral-600">Order: @_editOrder?.Reference</div>
-          <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
-          <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
-          <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
-          <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
-            <option>PendingShipment</option>
-            <option>Shipped</option>
-            <option>InTransit</option>
-            <option>OutForDelivery</option>
-            <option>Delivered</option>
-          </select>
-        </div>
-      </Body>
-      <Footer>
-        <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="SaveEditAsync">Save</button>
-        <button class="inline-flex items-center rounded bg-neutral-600 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-700 ml-2" @onclick="() => _showEdit = false">Close</button>
-      </Footer>
-    </ModalDialog>
-
-    @if (_orderItems.Any())
+    @if (_orders.Any())
     {
-      var groupByDate = _orderItems.GroupBy(x => x.DatePurchased.Date).ToList();
-      decimal grandTotal = 0;
-
-      foreach (var group in groupByDate)
+      var groups = _orders.GroupBy(x => x.CreatedOn.Date).OrderByDescending(g => g.Key).ToList();
+      decimal grand = 0m;
+      foreach (var g in groups)
       {
-        decimal dailyTotal = group.Sum(x => x.AmountPayed);
-        grandTotal += dailyTotal;
+        var rows = g
+          .SelectMany(o => o.Lines.Select(l => new { o.CustomerName, o.CustomerEmail, l.ProductName, l.Quantity, Amount = l.UnitPrice * l.Quantity }))
+          .ToList();
+        var daily = rows.Sum(r => r.Amount);
+        grand += daily;
 
         <article class="mt-6 rounded border">
           <div class="px-4 py-2 bg-neutral-100 font-semibold">
-            @group.Key.ToShortDateString() - Total: € @dailyTotal.ToString("F2")
+            @g.Key.ToShortDateString() - Total: € @daily.ToString("F2")
           </div>
           <div class="p-4 overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -206,14 +162,14 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-neutral-200">
-                @foreach (var orderItem in group)
+                @foreach (var r in rows)
                 {
                   <tr>
-                    <td class="px-3 py-2">@orderItem.CustomerName</td>
-                    <td class="px-3 py-2">@orderItem.CustomerEmail</td>
-                    <td class="px-3 py-2">@orderItem.ProductName</td>
-                    <td class="px-3 py-2">@orderItem.QuantityOrdered</td>
-                    <td class="px-3 py-2">@orderItem.AmountPayed.ToString("F2")</td>
+                    <td class="px-3 py-2">@r.CustomerName</td>
+                    <td class="px-3 py-2">@r.CustomerEmail</td>
+                    <td class="px-3 py-2">@r.ProductName</td>
+                    <td class="px-3 py-2">@r.Quantity</td>
+                    <td class="px-3 py-2">@r.Amount.ToString("F2")</td>
                   </tr>
                 }
               </tbody>
@@ -221,9 +177,8 @@
           </div>
         </article>
       }
-
       <footer class="mt-4 text-right font-bold">
-        Grand Total: € @grandTotal.ToString("F2")
+        Grand Total: € @grand.ToString("F2")
       </footer>
     }
     else
