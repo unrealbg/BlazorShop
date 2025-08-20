@@ -6,3 +6,38 @@
 .clip-diagonal { clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%); }
 .hero-bg { background: url('https://images.unsplash.com/photo-1618354691442-4bc4b2b2be4a?q=80&w=1600&auto=format&fit=crop') center/cover no-repeat; }
 .text-shadow { text-shadow: 0 2px 8px rgba(0,0,0,.15); }
+
+/* BlazoredTypeahead fixes */
+.blazored-typeahead,
+.blazored-typeahead .typeahead__control { width: 100% !important; display: block; background: transparent !important; }
+
+.blazored-typeahead .typeahead__input { background: transparent !important; }
+
+.blazored-typeahead input,
+.blazored-typeahead .typeahead__input input {
+  width: 100% !important;
+  min-width: 0;
+  display: block;
+  height: 2.75rem; /* ~44px */
+  padding-left: 2.25rem; /* room for magnifier icon */
+  padding-right: 1rem; /* no overlaying button inside */
+  border-radius: 0.5rem; /* rounded */
+  border: 1px solid #d1d5db; /* neutral-300 */
+  background: #fff;
+}
+
+/* Focus state matching default size (no jump) */
+.blazored-typeahead input:focus,
+.blazored-typeahead .typeahead__input input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, .5); /* ring sky-300 */
+}
+
+/* Hide built-in clear/spinner controls from the library */
+.blazored-typeahead .typeahead__controls { display: none !important; }
+.blazored-typeahead .typeahead__clear { display: none !important; }
+.blazored-typeahead .typeahead__loading { display: none !important; }
+
+/* Hide native browser clear X in search inputs (WebKit/Edge) */
+.blazored-typeahead input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; height: 0; width: 0; margin: 0; }
+.blazored-typeahead input[type="search"]::-ms-clear { display: none; width: 0; height: 0; }
