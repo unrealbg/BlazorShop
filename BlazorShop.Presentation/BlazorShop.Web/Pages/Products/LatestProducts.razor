@@ -3,11 +3,11 @@
 
 <section id="latest" class="relative z-[1]">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-10">
-    <h2 class="text-3xl font-extrabold tracking-tight">Latest Products</h2>
+    <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-center mb-4">Latest Products</h2>
 
     @if (CurrentPageItems?.Any() == true)
     {
-        <div class="mt-8" @key="_currentPage" @onmouseenter="_ => PauseAutoSlide()" @onmouseleave="_ => ResumeAutoSlide()">
+        <div class="mt-10" @key="_currentPage" @onmouseenter="_ => PauseAutoSlide()" @onmouseleave="_ => ResumeAutoSlide()">
             <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 fade-slide">
                 @foreach (var product in CurrentPageItems)
                 {
