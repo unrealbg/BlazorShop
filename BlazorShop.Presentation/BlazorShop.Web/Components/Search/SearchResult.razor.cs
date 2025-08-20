@@ -15,6 +15,10 @@
         private List<ProcessCart> _myCarts = new();
         private bool _isAddingToCart = false;
 
+        private bool _showModal = false;
+        [Parameter]
+        public GetProduct SelectedProduct { get; set; } = new();
+
         [Parameter]
         public string Filter { get; set; } = string.Empty;
 
@@ -38,6 +42,17 @@
             }
         }
 
+        private void ShowDetails(GetProduct product)
+        {
+            SelectedProduct = product;
+            _showModal = true;
+        }
+
+        private void CloseDetails()
+        {
+            _showModal = false;
+        }
+
         private async Task AddItemToCart(Guid productId)
         {
             if (_isAddingToCart) return;
@@ -46,15 +61,17 @@
             {
                 _isAddingToCart = true;
 
-                var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId);
-                var productName = (await ProductService.GetByIdAsync(productId)).Name;
+                var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
+                var product = await ProductService.GetByIdAsync(productId);
+                var productName = product.Name;
 
                 if (getCart == null)
                 {
                     _myCarts.Add(new ProcessCart
                                      {
                                          ProductId = productId,
-                                         Quantity = 1
+                                         Quantity = 1,
+                                         UnitPrice = product.Price
                                      });
 
                     ToastService.ShowToast(ToastLevel.Success, $"Product {productName} added to cart", "Cart", ToastIcon.Success, ToastPosition.BottomRight);
@@ -68,6 +85,19 @@
             finally
             {
                 _isAddingToCart = false;
+            }
+        }
+
+        private void AddVariantToCart(ProcessCart payload)
+        {
+            var getCart = _myCarts.FirstOrDefault(x => x.ProductId == payload.ProductId && x.VariantId == payload.VariantId);
+            if (getCart is null)
+            {
+                _myCarts.Add(payload);
+            }
+            else
+            {
+                getCart.Quantity += payload.Quantity;
             }
         }
 

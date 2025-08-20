@@ -32,6 +32,8 @@
             services.AddScoped<ICartService, CartService>();
             services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 
+            services.AddScoped<INewsletterService, NewsletterService>();
+
             return services;
         }
     }

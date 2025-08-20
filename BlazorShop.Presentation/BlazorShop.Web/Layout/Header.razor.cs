@@ -5,6 +5,7 @@
     public partial class Header
     {
         protected IEnumerable<GetProduct> Products = new List<GetProduct>();
+        private bool _showCategories;
 
         protected override async Task OnInitializedAsync()
         {
@@ -17,5 +18,7 @@
                 // handle error
             }
         }
+
+        private void ToggleCategories() => _showCategories = !_showCategories;
     }
 }

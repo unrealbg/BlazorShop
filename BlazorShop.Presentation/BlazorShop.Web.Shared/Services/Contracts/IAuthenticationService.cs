@@ -14,5 +14,7 @@
         Task<ServiceResponse> ChangePassword(PasswordChangeModel changePasswordDto);
 
         Task<ServiceResponse> ConfirmEmail(string userId, string token);
+
+        Task<ServiceResponse> UpdateProfile(UpdateProfileModel model);
     }
 }

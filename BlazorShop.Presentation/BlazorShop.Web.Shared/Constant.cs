@@ -30,6 +30,7 @@
             public const string ReviveToke = "authentication/refreshToken";
             public const string ChangePassword = "authentication/change-password";
             public const string ConfirmEmail = "authentication/confirm-email";
+            public const string UpdateProfile = "authentication/update-profile";
         }
 
         public static class ApiCallType
@@ -74,6 +75,11 @@
         public static class File
         {
             public const string Upload = "upload/image";
+        }
+
+        public static class Newsletter
+        {
+            public const string Subscribe = "newsletter/subscribe";
         }
     }
 }

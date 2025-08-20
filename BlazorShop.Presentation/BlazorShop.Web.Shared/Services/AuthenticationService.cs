@@ -140,5 +140,24 @@
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
+
+        public async Task<ServiceResponse> UpdateProfile(UpdateProfileModel model)
+        {
+            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var currentApiCall = new ApiCall
+            {
+                Route = Constant.Authentication.UpdateProfile,
+                Type = Constant.ApiCallType.Post,
+                Client = client,
+                Id = null!,
+                Model = model,
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<UpdateProfileModel>(currentApiCall);
+
+            return result is null || !result.IsSuccessStatusCode
+                ? _apiCallHelper.ConnectionError()
+                : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+        }
     }
 }

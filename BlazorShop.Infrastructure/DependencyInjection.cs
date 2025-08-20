@@ -22,6 +22,7 @@
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.IdentityModel.Tokens;
@@ -31,13 +32,17 @@
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
         {
             services.AddDbContext<AppDbContext>(
-                opt => opt.UseSqlServer(
-                    config.GetConnectionString("DefaultConnection"),
-                    sqlOptions =>
-                        {
-                            sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
-                            sqlOptions.EnableRetryOnFailure();
-                        }).UseExceptionProcessor());
+                opt => opt
+                    .UseSqlServer(
+                        config.GetConnectionString("DefaultConnection"),
+                        sqlOptions =>
+                            {
+                                sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                                sqlOptions.EnableRetryOnFailure();
+                            })
+                    .UseExceptionProcessor()
+                    .ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning))
+            );
 
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             services.AddScoped(typeof(IAppLogger<>), typeof(LoggerAdapter<>));

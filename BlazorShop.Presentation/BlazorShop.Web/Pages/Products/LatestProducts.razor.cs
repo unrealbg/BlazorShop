@@ -1,6 +1,7 @@
 ﻿namespace BlazorShop.Web.Pages.Products
 {
     using System.Text.Json;
+    using System.Threading;
 
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Payment;
@@ -9,20 +10,31 @@
 
     using Microsoft.AspNetCore.Components;
 
-    public partial class LatestProducts
+    public partial class LatestProducts : IAsyncDisposable
     {
         private IEnumerable<GetProduct> _products = [];
 
-        private List<List<GetProduct>> _productGroups = new();
+        private readonly List<GetProduct> _latestProducts = new();
 
         private List<ProcessCart> _myCarts = [];
 
         private bool _isAddingToCart = false;
 
         private bool _showModal = false;
+        private bool _showCategories = false;
+
+        private const int PageSize = 3;
+        private int _currentPage = 0;
+        private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)_latestProducts.Count / PageSize));
+        private IEnumerable<GetProduct> CurrentPageItems => _latestProducts.Skip(_currentPage * PageSize).Take(PageSize);
+
+        private PeriodicTimer? _autoTimer;
+        private Task? _autoSlideTask;
 
         [Parameter]
         public GetProduct SelectedProduct { get; set; } = new();
+
+        private void ToggleCategories() => _showCategories = !_showCategories;
 
         protected override async Task OnInitializedAsync()
         {
@@ -49,9 +61,68 @@
 
             if (_products.Any())
             {
-                _productGroups = _products.Where(x => x.CreatedOn.AddDays(7) >= DateTime.UtcNow)
-                    .Select((product, index) => new { product, index }).GroupBy(x => x.index / 4)
-                    .Select(g => g.Select(v => v.product).ToList()).ToList();
+                foreach (var p in _products.OrderByDescending(p => p.CreatedOn).Take(12))
+                {
+                    _latestProducts.Add(p);
+                }
+
+                StartAutoSlide();
+            }
+        }
+
+        private void NextPage()
+        {
+            if (_latestProducts.Count == 0) return;
+            _currentPage = (_currentPage + 1) % TotalPages;
+        }
+
+        private void PrevPage()
+        {
+            if (_latestProducts.Count == 0) return;
+            _currentPage = (_currentPage - 1 + TotalPages) % TotalPages;
+        }
+
+        private void GoToPage(int index)
+        {
+            if (_latestProducts.Count == 0) return;
+            if (index < 0 || index >= TotalPages) return;
+            _currentPage = index;
+        }
+
+        private void StartAutoSlide()
+        {
+            _autoTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            _autoSlideTask = Task.Run(async () =>
+            {
+                try
+                {
+                    while (await _autoTimer!.WaitForNextTickAsync())
+                    {
+                        await InvokeAsync(() =>
+                        {
+                            NextPage();
+                            StateHasChanged();
+                        });
+                    }
+                }
+                catch
+                {
+                    // ignored
+                }
+            });
+        }
+
+        private void PauseAutoSlide()
+        {
+            _autoTimer?.Dispose();
+            _autoTimer = null;
+        }
+
+        private void ResumeAutoSlide()
+        {
+            if (_autoTimer is null)
+            {
+                StartAutoSlide();
             }
         }
 
@@ -148,6 +219,7 @@
 
         public async ValueTask DisposeAsync()
         {
+            _autoTimer?.Dispose();
             if (_myCarts != null && _myCarts.Any())
             {
                 await this.CookieStorageService.SetAsync(

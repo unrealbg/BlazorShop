@@ -44,6 +44,7 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IFileUploadService, FileUploadService>();
             builder.Services.AddScoped<IProductVariantService, ProductVariantService>();
             builder.Services.AddSingleton<IToastService, ToastService>();
+            builder.Services.AddScoped<INewsletterService, NewsletterService>();
 
             await builder.Build().RunAsync();
         }

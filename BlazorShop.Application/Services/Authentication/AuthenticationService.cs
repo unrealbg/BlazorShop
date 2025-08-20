@@ -246,5 +246,23 @@
         {
             await _emailService.SendEmailAsync(email, "Confirm your email", confirmationLink);
         }
+
+        public async Task<ServiceResponse> UpdateProfile(string userId, UpdateProfile dto)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new ServiceResponse(false, "Invalid user id.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.FullName))
+            {
+                return new ServiceResponse(false, "Full name and email are required.");
+            }
+
+            var ok = await _userManager.UpdateUserAsync(userId, dto.FullName, dto.Email, dto.PhoneNumber);
+            return ok
+                ? new ServiceResponse(true, "Profile updated successfully.")
+                : new ServiceResponse(false, "Failed to update profile.");
+        }
     }
 }

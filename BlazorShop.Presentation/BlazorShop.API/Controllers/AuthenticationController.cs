@@ -100,5 +100,24 @@
 
             return this.Ok(response);
         }
+
+        /// <summary>
+        /// Update the profile of the user
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns> The result of the update </returns>
+        [HttpPost("update-profile")]
+        [Authorize(Roles = "User, Admin")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfile dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return this.Unauthorized();
+            }
+
+            var result = await _authenticationService.UpdateProfile(userId, dto);
+            return result.Success ? this.Ok(result) : this.BadRequest(result);
+        }
     }
 }

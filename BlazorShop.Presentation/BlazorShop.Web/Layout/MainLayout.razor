@@ -1,16 +1,19 @@
-﻿@inherits LayoutComponentBase
+﻿@using BlazorShop.Web.Components.Header
+@using BlazorShop.Web.Shared.Models.Product
+@using BlazorShop.Web.Shared.Services.Contracts
+@inherits LayoutComponentBase
 
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
 
-    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10 hidden md:block">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 grid grid-cols-[auto_1fr_auto] items-center">
-            <a href="/" class="hidden sm:inline-flex flex-col leading-none select-none justify-self-start">
-                <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
-                <span class="text-[10px] text-neutral-400 -mt-0.5">E‑COMMERCE APPLICATION</span>
-            </a>
+    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10 hidden md:block relative">
+        <a href="/" class="hidden md:inline-flex flex-col leading-none select-none absolute left-20 sm:left-24 lg:left-28 top-1/2 -translate-y-1/2">
+            <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
+            <span class="text-[10px] text-neutral-400 -mt-0.5">E‑COMMERCE APPLICATION</span>
+        </a>
 
-            <nav class="hidden md:flex justify-self-center items-center gap-2 sm:gap-3 text-sm sm:text-[0.95rem] font-medium whitespace-nowrap">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
+            <nav class="hidden md:flex items-center gap-2 sm:gap-3 text-sm sm:text-[0.95rem] font-medium whitespace-nowrap">
                 <NavLink href="/" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
                 <NavLink href="about-us" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About&nbsp;us</NavLink>
                 <NavLink href="new-releases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New&nbsp;Releases</NavLink>
@@ -22,8 +25,6 @@
                     </Authorized>
                 </AuthorizeView>
             </nav>
-
-            <div class="justify-self-end"></div>
         </div>
     </div>
 
@@ -33,9 +34,12 @@
             <span class="block h-0.5 w-8 bg-neutral-900"></span>
             <span class="block h-0.5 w-8 bg-neutral-900"></span>
         </button>
-        <div class="flex-1 relative">
-            <input type="search" placeholder="Search products…" class="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2.5 shadow-sm focus:outline-none" />
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 select-none">✕</span>
+        <button class="hidden md:inline-flex items-center gap-2 rounded-md bg-neutral-900 text-white px-3 py-2 text-sm font-medium hover:bg-neutral-800" @onclick="ToggleCategories">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            Categories
+        </button>
+        <div class="flex-1 flex justify-center">
+            <SearchBarComponent Products="@_headerProducts" />
         </div>
         <div class="flex items-center gap-5 text-sm">
             <div class="flex items-center gap-2">
@@ -58,6 +62,17 @@
             </div>
         </div>
     </header>
+
+    @if (_showCategories)
+    {
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="-mt-2 mb-2 rounded-lg border border-neutral-200 bg-white/80 shadow">
+                <div class="p-4">
+                    <BlazorShop.Web.Layout.CategoryComponent OnCategorySelected="CloseCategories" />
+                </div>
+            </div>
+        </div>
+    }
 
     @if (IsMobileMenuOpen)
     {
@@ -93,7 +108,23 @@
 
 @code {
     private bool IsMobileMenuOpen;
+    private bool _showCategories;
+    private IEnumerable<GetProduct> _headerProducts = Enumerable.Empty<GetProduct>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _headerProducts = await ProductService.GetAllAsync();
+        }
+        catch
+        {
+            _headerProducts = Enumerable.Empty<GetProduct>();
+        }
+    }
 
     private void ToggleMobileMenu() => IsMobileMenuOpen = !IsMobileMenuOpen;
     private void CloseMobileMenu() => IsMobileMenuOpen = false;
+    private void ToggleCategories() => _showCategories = !_showCategories;
+    private void CloseCategories() => _showCategories = false;
 }
