@@ -30,83 +30,47 @@
     top: 0.5rem;
 }
 
-.error-popup {
+.loader_main {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(200%, -50%);
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-    padding: 15px;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    z-index: 1000;
-    width: 80%;
-    max-width: 400px;
-    max-height: 150px;
-    text-align: center;
-    font-family: Arial, sans-serif;
-}
-
-.error-content {
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, #e0f2fe, #bae6fd);
+    z-index: 1000;
 }
 
-.error-message {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
+.spinner {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    border-radius: 9999px;
+    background: conic-gradient(from 0deg, #111 0deg, #111 120deg, rgba(17,17,17,0.04) 120deg 360deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 2px), #000 calc(50% - 2px));
+            mask: radial-gradient(farthest-side, transparent calc(50% - 2px), #000 calc(50% - 2px));
+    animation: spinner-rotate 1.1s linear infinite;
+    box-shadow: 0 0 28px rgba(0,0,0,0.06);
 }
 
-.error-icon {
-    font-size: 24px;
-    margin-right: 10px;
-}
+.spinner::after { content: ""; }
 
-.error-text {
-    font-weight: bold;
+@keyframes spinner-rotate { to { transform: rotate(360deg); } }
+
+/* Center percentage text inside spinner using existing element */
+.loader_main { position: fixed; }
+.loader_main .loading-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    font-weight: 800;
     font-size: 18px;
+    color: #111;
 }
-
-.error-actions {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    margin: 10px;
-}
-
-.reload-btn {
-    background-color: #007bff;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 5px;
-    text-decoration: none;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
-    border: none;
-    cursor: pointer;
-    flex: 1;
-    margin-right: 10px;
-    text-align: center;
-}
-
-.reload-btn:hover {
-    background-color: #0056b3;
-}
-
-.dismiss {
-    color: #721c24;
-    text-decoration: none;
-    font-weight: bold;
-    cursor: pointer;
-    flex: 0 0 auto;
-}
-
-.dismiss:hover {
-    text-decoration: underline;
+.loader_main .loading-progress-text::after {
+    content: var(--blazor-load-percentage-text, "Loading");
 }
 
 .loading-progress {
@@ -137,10 +101,6 @@
     font-weight: bold;
     inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
 }
-
-    .loading-progress-text:after {
-        content: var(--blazor-load-percentage-text, "Loading");
-    }
 
 code {
     color: #c02d76;
