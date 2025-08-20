@@ -154,6 +154,14 @@
             this.StateHasChanged();
         }
 
+        private static bool TryGetProp(JsonElement obj, string name, out JsonElement value)
+        {
+            if (obj.TryGetProperty(name, out value)) return true;
+            // Fallback to PascalCase if API happens to send it
+            var pascal = char.ToUpperInvariant(name[0]) + name.Substring(1);
+            return obj.TryGetProperty(pascal, out value);
+        }
+
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
         {
             if (paymentMethod is null)
@@ -184,15 +192,18 @@
                             try
                             {
                                 var payload = result.Payload.Value;
-                                _btInfo = new BtInfo
+                                if (payload.ValueKind == JsonValueKind.Object)
                                 {
-                                    Iban = payload.GetProperty("Iban").GetString() ?? string.Empty,
-                                    Beneficiary = payload.GetProperty("Beneficiary").GetString() ?? string.Empty,
-                                    BankName = payload.GetProperty("BankName").GetString() ?? string.Empty,
-                                    Reference = payload.GetProperty("Reference").GetString() ?? string.Empty,
-                                    Amount = payload.GetProperty("Amount").GetDecimal(),
-                                    AdditionalInfo = payload.TryGetProperty("AdditionalInfo", out var ai) ? ai.GetString() : null
-                                };
+                                    _btInfo = new BtInfo
+                                    {
+                                        Iban = TryGetProp(payload, "iban", out var iban) ? (iban.GetString() ?? string.Empty) : string.Empty,
+                                        Beneficiary = TryGetProp(payload, "beneficiary", out var ben) ? (ben.GetString() ?? string.Empty) : string.Empty,
+                                        BankName = TryGetProp(payload, "bankName", out var bank) ? (bank.GetString() ?? string.Empty) : string.Empty,
+                                        Reference = TryGetProp(payload, "reference", out var @ref) ? (@ref.GetString() ?? string.Empty) : string.Empty,
+                                        Amount = TryGetProp(payload, "amount", out var amt) ? (amt.TryGetDecimal(out var d) ? d : 0m) : 0m,
+                                        AdditionalInfo = TryGetProp(payload, "additionalInfo", out var ai) ? ai.GetString() : null
+                                    };
+                                }
                             }
                             catch { }
 
