@@ -6,14 +6,14 @@
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
 
-    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10 hidden md:block">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 grid grid-cols-[auto_1fr_auto] items-center">
-            <a href="/" class="hidden sm:inline-flex flex-col leading-none select-none justify-self-start">
-                <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
-                <span class="text-[10px] text-neutral-400 -mt-0.5">E‑COMMERCE APPLICATION</span>
-            </a>
+    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10 hidden md:block relative">
+        <a href="/" class="hidden md:inline-flex flex-col leading-none select-none absolute left-20 sm:left-24 lg:left-28 top-1/2 -translate-y-1/2">
+            <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
+            <span class="text-[10px] text-neutral-400 -mt-0.5">E‑COMMERCE APPLICATION</span>
+        </a>
 
-            <nav class="hidden md:flex justify-self-center items-center gap-2 sm:gap-3 text-sm sm:text-[0.95rem] font-medium whitespace-nowrap">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
+            <nav class="hidden md:flex items-center gap-2 sm:gap-3 text-sm sm:text-[0.95rem] font-medium whitespace-nowrap">
                 <NavLink href="/" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
                 <NavLink href="about-us" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About&nbsp;us</NavLink>
                 <NavLink href="new-releases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New&nbsp;Releases</NavLink>
@@ -25,8 +25,6 @@
                     </Authorized>
                 </AuthorizeView>
             </nav>
-
-            <div class="justify-self-end"></div>
         </div>
     </div>
 
