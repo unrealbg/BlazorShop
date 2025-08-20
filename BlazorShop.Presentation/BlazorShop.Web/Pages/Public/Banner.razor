@@ -9,15 +9,26 @@
                     <div class="@(ShowRightVisuals ? "grid md:grid-cols-2 gap-10 items-center w-full" : "w-full")">
                         <!-- Text column -->
                         <div class="text-center mx-auto max-w-4xl">
-                            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-shadow">@_slides[_index].Title</h1>
-                            <p class="mt-4 text-neutral-700 max-w-2xl mx-auto text-center">@_slides[_index].Subtitle</p>
+                            @if (!string.IsNullOrWhiteSpace(_slides[_index].TitleLine1) && !string.IsNullOrWhiteSpace(_slides[_index].TitleLine2))
+                            {
+                                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-shadow leading-tight">
+                                    <span class="block">@_slides[_index].TitleLine1</span>
+                                    <span class="block">@_slides[_index].TitleLine2</span>
+                                </h1>
+                            }
+                            else
+                            {
+                                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-shadow">@_slides[_index].Title</h1>
+                            }
 
-                            <div class="mt-8 flex justify-center">
+                            <p class="mt-6 text-neutral-700 max-w-2xl mx-auto text-center text-lg sm:text-xl">@_slides[_index].Subtitle</p>
+
+                            <div class="mt-10 flex justify-center">
                                 <a href="@_slides[_index].CtaHref" class="inline-flex items-center rounded-md bg-neutral-900 px-6 py-3 text-white font-semibold hover:bg-neutral-800">@_slides[_index].CtaText</a>
                             </div>
 
                             <!-- Feature badges under CTA -->
-                            <div class="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-neutral-700">
+                            <div class="mt-8 flex flex-wrap items-center justify-center gap-5 text-sm text-neutral-700">
                                 <div class="inline-flex items-center gap-2 bg-white/60 rounded-full px-3 py-1 border border-white/60 shadow-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M3 12l3 3 3-3-3-3-3 3Z"/></svg>
                                     Free Shipping
@@ -86,13 +97,16 @@
             </div>
         </div>
 
-        <!-- arrows centered -->
-        <div class="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-6 sm:px-10">
-            <button class="h-11 w-11 rounded-full bg-yellow-200/90 grid place-items-center text-neutral-700 shadow hover:bg-yellow-200" @onclick="Prev" aria-label="Previous slide">‹</button>
-            <button class="h-11 w-11 rounded-full bg-yellow-200/90 grid place-items-center text-neutral-700 shadow hover:bg-yellow-200" @onclick="Next" aria-label="Next slide">›</button>
+        <!-- arrows centered inside container -->
+        <div class="pointer-events-none absolute inset-0">
+            <div class="mx-auto max-w-7xl h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+                <button class="pointer-events-auto h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-yellow-200/90 grid place-items-center text-neutral-700 shadow hover:bg-yellow-200" @onclick="Prev" aria-label="Previous slide">‹</button>
+                <button class="pointer-events-auto h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-yellow-200/90 grid place-items-center text-neutral-700 shadow hover:bg-yellow-200" @onclick="Next" aria-label="Next slide">›</button>
+            </div>
         </div>
+
         <!-- dots -->
-        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2">
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2">
             @for (var i = 0; i < _slides.Count; i++)
             {
                 <button class="h-2.5 w-2.5 rounded-full @(i==_index?"bg-neutral-900":"bg-neutral-300 hover:bg-neutral-400")" @onclick="(() => GoTo(i))" aria-label="Go to slide @(i+1)"></button>
@@ -107,7 +121,7 @@
 
     private readonly List<HeroSlide> _slides = new()
     {
-        new("START YOUR FAVORITE SHOPPING", "Discover a wide range of products tailored to your needs.", "BUY NOW", "#latest", VisualType.GradientCard),
+        new("START YOUR FAVORITE SHOPPING", "Discover a wide range of products tailored to your needs.", "BUY NOW", "#latest", VisualType.GradientCard, TitleLine1: "START YOUR FAVORITE", TitleLine2: "SHOPPING"),
         new("FRESH ARRIVALS THIS WEEK", "Hand‑picked items just for you.", "SEE NEW RELEASES", "new-releases", VisualType.ProductStack),
         new("HOT DEALS YOU CAN'T MISS", "Save big with limited‑time offers.", "TODAY'S DEALS", "todays-deals", VisualType.DiscountBadge),
         new("BACK TO SCHOOL", "Save on backpacks, shoes and more.", "SHOP SCHOOL", "search-result/School", VisualType.PromoBanner, "images/banners/back-to-school.png", "-25% OFF"),
@@ -148,6 +162,16 @@
         return ValueTask.CompletedTask;
     }
 
-    private record HeroSlide(string Title, string Subtitle, string CtaText, string CtaHref, VisualType Visual, string? ImageUrl = null, string? BadgeText = null);
+    private record HeroSlide(
+        string Title,
+        string Subtitle,
+        string CtaText,
+        string CtaHref,
+        VisualType Visual,
+        string? ImageUrl = null,
+        string? BadgeText = null,
+        string? TitleLine1 = null,
+        string? TitleLine2 = null);
+
     private enum VisualType { GradientCard, ProductStack, DiscountBadge, PromoBanner }
 }
