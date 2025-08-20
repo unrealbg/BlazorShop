@@ -57,6 +57,21 @@
                         </div>
                       </div>
                       break;
+                  case VisualType.PromoBanner:
+                      <div class="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl border border-white/40">
+                        @if (!string.IsNullOrWhiteSpace(_slides[_index].ImageUrl))
+                        {
+                            <img src="@_slides[_index].ImageUrl" alt="promo" class="absolute inset-0 h-full w-full object-cover" />
+                        }
+                        <div class="absolute inset-0 bg-gradient-to-tr from-black/20 to-white/10"></div>
+                        @if (!string.IsNullOrWhiteSpace(_slides[_index].BadgeText))
+                        {
+                            <div class="absolute top-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-neutral-800 shadow">
+                                <span>@_slides[_index].BadgeText</span>
+                            </div>
+                        }
+                      </div>
+                      break;
               }
             </div>
           </div>
@@ -82,7 +97,9 @@
     {
         new("START YOUR FAVORITE SHOPPING", "Discover a wide range of products tailored to your needs.", "BUY NOW", "#latest", VisualType.GradientCard),
         new("FRESH ARRIVALS THIS WEEK", "Hand‑picked items just for you.", "SEE NEW RELEASES", "new-releases", VisualType.ProductStack),
-        new("HOT DEALS YOU CAN'T MISS", "Save big with limited‑time offers.", "TODAY'S DEALS", "todays-deals", VisualType.DiscountBadge)
+        new("HOT DEALS YOU CAN'T MISS", "Save big with limited‑time offers.", "TODAY'S DEALS", "todays-deals", VisualType.DiscountBadge),
+        new("BACK TO SCHOOL", "Save on backpacks, shoes and more.", "SHOP SCHOOL", "search-result/School", VisualType.PromoBanner, "images/banners/back-to-school.png", "-25% OFF"),
+        new("WEEKEND FLASH SALE", "Limited time, limited stock.", "GRAB DEALS", "todays-deals", VisualType.PromoBanner, "images/banners/flash-sale.png", "FLASH • 48H")
     };
 
     private int _index = 0;
@@ -119,6 +136,6 @@
         await Task.CompletedTask;
     }
 
-    private record HeroSlide(string Title, string Subtitle, string CtaText, string CtaHref, VisualType Visual);
-    private enum VisualType { GradientCard, ProductStack, DiscountBadge }
+    private record HeroSlide(string Title, string Subtitle, string CtaText, string CtaHref, VisualType Visual, string? ImageUrl = null, string? BadgeText = null);
+    private enum VisualType { GradientCard, ProductStack, DiscountBadge, PromoBanner }
 }
