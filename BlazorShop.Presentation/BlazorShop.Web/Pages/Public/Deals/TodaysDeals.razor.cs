@@ -9,14 +9,11 @@
 
     using Microsoft.AspNetCore.Components;
 
-    public partial class TodaysDeals
+    public partial class TodaysDeals : IAsyncDisposable
     {
         private IEnumerable<GetProduct> _todaysDeals = [];
-
+        private List<ProcessCart> _myCarts = new();
         private bool _isAddingToCart = false;
-
-        private List<ProcessCart> _myCarts = [];
-
         private bool _showModal = false;
 
         [Parameter]
@@ -24,13 +21,13 @@
 
         protected override async Task OnInitializedAsync()
         {
-            try
+            var all = await this.ProductService.GetAllAsync();
+            _todaysDeals = all.ToList();
+
+            var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
+            if (!string.IsNullOrEmpty(cartJson))
             {
-                _todaysDeals = (await this.ProductService.GetAllAsync()).OrderBy(p => p.Price).Take(10);
-            }
-            catch
-            {
-                this.ToastService.ShowToast(ToastLevel.Error, "Failed to load today's deals.", "Error");
+                _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? new List<ProcessCart>();
             }
         }
 
@@ -63,7 +60,7 @@
 
                     this.ToastService.ShowToast(
                         ToastLevel.Success,
-                        $"Product {productName} added to cart",
+                        $"[{productName}] added to cart",
                         "Cart",
                         ToastIcon.Success,
                         ToastPosition.BottomRight);
@@ -125,16 +122,9 @@
             _showModal = false;
         }
 
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            if (_myCarts != null && _myCarts.Any())
-            {
-                await this.CookieStorageService.SetAsync(
-                    Constant.Cart.Name,
-                    JsonSerializer.Serialize(_myCarts),
-                    30,
-                    "/");
-            }
+            return ValueTask.CompletedTask;
         }
     }
 }

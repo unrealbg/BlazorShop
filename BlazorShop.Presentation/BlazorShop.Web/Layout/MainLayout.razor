@@ -2,6 +2,7 @@
 @using BlazorShop.Web.Shared.Models.Product
 @using BlazorShop.Web.Shared.Services.Contracts
 @inherits LayoutComponentBase
+@implements IAsyncDisposable
 
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
@@ -42,23 +43,35 @@
             <SearchBarComponent Products="@_headerProducts" />
         </div>
         <div class="flex items-center gap-5 text-sm">
-            <div class="flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
-                <a href="my-cart" class="hover:underline">CART</a>
+            <div class="relative inline-flex items-center gap-2">
+                <a href="my-cart" class="relative inline-block" aria-label="Cart">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+                    @if (_cartCount > 0)
+                    {
+                        <span class="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold h-5 min-w-5 px-1 z-20">@_cartCount</span>
+                    }
+                </a>
             </div>
-            <div class="flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
-                <AuthorizeView>
-                    <Authorized>
-                        <div class="flex items-center gap-3">
-                            <a href="profile" class="hover:underline">Profile</a>
-                            <a href="/authentication/logout" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800">Logout</a>
-                        </div>
-                    </Authorized>
-                    <NotAuthorized>
-                        <a href="authentication/login" class="hover:underline">Login</a>
-                    </NotAuthorized>
-                </AuthorizeView>
+            <div class="relative">
+                <details class="group" @ref="_mainAccountDetails">
+                    <summary class="list-none inline-flex items-center gap-2 cursor-pointer select-none" aria-label="Account">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+                    </summary>
+                    <div class="absolute right-0 mt-2 w-44 rounded-md border border-neutral-200 bg-white shadow-lg p-1 hidden group-open:block z-50">
+                        <AuthorizeView>
+                            <Authorized>
+                                <div class="px-3 py-2 text-xs text-neutral-500">Signed in</div>
+                                <div class="h-px bg-neutral-200 my-1"></div>
+                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="profile" @onclick="CloseHeaderMenu">Profile</a>
+                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/logout" @onclick="CloseHeaderMenu">Logout</a>
+                            </Authorized>
+                            <NotAuthorized>
+                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/login" @onclick="CloseHeaderMenu">Login</a>
+                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/register" @onclick="CloseHeaderMenu">Register</a>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    </div>
+                </details>
             </div>
         </div>
     </header>
@@ -111,6 +124,12 @@
     private bool _showCategories;
     private IEnumerable<GetProduct> _headerProducts = Enumerable.Empty<GetProduct>();
 
+    private int _cartCount;
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+    private IJSObjectReference? _cartModule;
+    private DotNetObjectReference<MainLayout>? _selfRef;
+    private ElementReference _mainAccountDetails;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -121,10 +140,91 @@
         {
             _headerProducts = Enumerable.Empty<GetProduct>();
         }
+
+        await LoadCartCountAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _cartModule = await Js.InvokeAsync<IJSObjectReference>("import", "./js/cartBadge.js");
+            _selfRef = DotNetObjectReference.Create(this);
+            if (_cartModule is not null)
+            {
+                try
+                {
+                    var json = await _cartModule.InvokeAsync<string?>("getCartCookie");
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        UpdateCountFromJson(json!);
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch { }
+
+                await _cartModule.InvokeVoidAsync("subscribeCartChanges", _selfRef);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task RefreshCartCount()
+    {
+        await LoadCartCountAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateCountFromJson(string json)
+    {
+        try
+        {
+            var items = System.Text.Json.JsonSerializer.Deserialize<List<BlazorShop.Web.Shared.Models.Payment.ProcessCart>>(json) ?? new();
+            _cartCount = items.Sum(i => i.Quantity);
+        }
+        catch { _cartCount = 0; }
+    }
+
+    private async Task LoadCartCountAsync()
+    {
+        try
+        {
+            var json = await CookieStorageService.GetAsync(Constant.Cart.Name);
+            if (string.IsNullOrWhiteSpace(json)) { _cartCount = 0; return; }
+            UpdateCountFromJson(json);
+        }
+        catch { _cartCount = 0; }
     }
 
     private void ToggleMobileMenu() => IsMobileMenuOpen = !IsMobileMenuOpen;
     private void CloseMobileMenu() => IsMobileMenuOpen = false;
     private void ToggleCategories() => _showCategories = !_showCategories;
     private void CloseCategories() => _showCategories = false;
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_cartModule is not null)
+            {
+                await _cartModule.InvokeVoidAsync("unsubscribeCartChanges");
+                await _cartModule.DisposeAsync();
+            }
+        }
+        catch { }
+        _selfRef?.Dispose();
+    }
+
+    private async Task CloseHeaderMenu()
+    {
+        try
+        {
+            var mod = await Js.InvokeAsync<IJSObjectReference>("import", "./js/cartBadge.js");
+            await mod.InvokeVoidAsync("closeDetails", _mainAccountDetails);
+        }
+        catch
+        {
+            // ignored
+        }
+    }
 }

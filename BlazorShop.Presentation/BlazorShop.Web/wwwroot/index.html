@@ -18,6 +18,51 @@
     <link href="BlazorShop.Web.styles.css" rel="stylesheet" />
 
     <link href="css/input.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <script>
+        window.blz = window.blz || {};
+        window.blz.downloadFile = function (fileName, content, contentType) {
+            try {
+                const blob = new Blob([content], { type: contentType || 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName || 'download.txt';
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a); URL.revokeObjectURL(url);
+            } catch { /* noop */ }
+        };
+        window.blz._charts = {};
+        window.blz.renderLineChart = function (canvasId, labels, values) {
+            if (!window.Chart) return;
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            const ctx = el.getContext('2d');
+            if (window.blz._charts[canvasId]) {
+                window.blz._charts[canvasId].destroy();
+            }
+            window.blz._charts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Revenue (€)',
+                        data: values,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16,185,129,0.15)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        };
+    </script>
 </head>
 
 <body>

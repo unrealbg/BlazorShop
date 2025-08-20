@@ -14,8 +14,21 @@
         private List<GetProduct> _selectedProducts = [];
         private IEnumerable<GetProduct> _products = [];
         private IEnumerable<GetPaymentMethod> _paymentMethods = [];
-        private string _paying = string.Empty;
+        private Guid? _processingMethodId = null;
         private bool _showPaymentDialog;
+
+        private bool _showBtDialog;
+        private BtInfo _btInfo = new();
+
+        private sealed class BtInfo
+        {
+            public string Iban { get; set; } = string.Empty;
+            public string Beneficiary { get; set; } = string.Empty;
+            public string BankName { get; set; } = string.Empty;
+            public string Reference { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+            public string? AdditionalInfo { get; set; }
+        }
 
         protected override async Task OnInitializedAsync()
         {
@@ -85,7 +98,14 @@
                 var item = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
                 if (item is not null)
                 {
-                    item.Quantity = newQuantity;
+                    if (newQuantity <= 0)
+                    {
+                        _myCarts.RemoveAll(x => x.ProductId == productId);
+                    }
+                    else
+                    {
+                        item.Quantity = newQuantity;
+                    }
                     await this.SaveCart(_myCarts);
                     this.GetCart();
                 }
@@ -119,11 +139,7 @@
 
         private async Task RemoveCartItem(Guid productId)
         {
-            var cartItem = this.GetCartItem(productId);
-            if (cartItem is not null)
-            {
-                _myCarts.Remove(cartItem);
-            }
+            _myCarts.RemoveAll(x => x.ProductId == productId);
 
             var product = _selectedProducts.FirstOrDefault(x => x.Id == productId);
             if (product is not null)
@@ -133,48 +149,85 @@
 
             this.ToastService.ShowToast(ToastLevel.Warning, "Product removed from cart", "Cart", ToastIcon.Warning);
 
-            await this.CookieStorageService.RemoveAsync(Constant.Cookie.Name);
+            await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
             await this.SaveCart(_myCarts);
+            this.StateHasChanged();
         }
 
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
         {
-            if (paymentMethod is not null)
+            if (paymentMethod is null)
             {
-                _paying = "Processing... please wait";
+                return;
+            }
 
-                try
+            _processingMethodId = paymentMethod.Id;
+            StateHasChanged();
+
+            try
+            {
+                var checkout = new Checkout() { PaymentMethodId = paymentMethod.Id, Carts = _myCarts };
+                var result = await this.CartService.Checkout(checkout);
+
+                if (result.Success)
                 {
-                    var checkout = new Checkout() { PaymentMethodId = paymentMethod.Id, Carts = _myCarts };
-
-                    var result = await this.CartService.Checkout(checkout);
-
-                    if (result.Success)
+                    var paymentLink = result.Message;
+                    if (!string.IsNullOrWhiteSpace(paymentLink) && (paymentLink.StartsWith("http://") || paymentLink.StartsWith("https://")))
                     {
-                        var paymentLink = result.Message;
-                        if (!string.IsNullOrWhiteSpace(paymentLink) && (paymentLink.StartsWith("http://") || paymentLink.StartsWith("https://")))
-                        {
-                            this.NavigationManager.NavigateTo(paymentLink, true);
-                        }
-                        else
-                        {
-                            this.ToastService.ShowToast(ToastLevel.Success, result.Message ?? "Payment successful.", "Checkout", ToastIcon.Success);
-                        }
+                        this.NavigationManager.NavigateTo(paymentLink, true);
                     }
                     else
                     {
-                        this.ToastService.ShowToast(ToastLevel.Error, result.Message ?? "Payment processing failed.", "Checkout", ToastIcon.Error);
+                        var isBankTransfer = string.Equals(paymentMethod.Name, "Bank Transfer", StringComparison.OrdinalIgnoreCase);
+                        if (isBankTransfer && result.Payload.HasValue)
+                        {
+                            try
+                            {
+                                var payload = result.Payload.Value;
+                                _btInfo = new BtInfo
+                                {
+                                    Iban = payload.GetProperty("Iban").GetString() ?? string.Empty,
+                                    Beneficiary = payload.GetProperty("Beneficiary").GetString() ?? string.Empty,
+                                    BankName = payload.GetProperty("BankName").GetString() ?? string.Empty,
+                                    Reference = payload.GetProperty("Reference").GetString() ?? string.Empty,
+                                    Amount = payload.GetProperty("Amount").GetDecimal(),
+                                    AdditionalInfo = payload.TryGetProperty("AdditionalInfo", out var ai) ? ai.GetString() : null
+                                };
+                            }
+                            catch { }
+
+                            _showPaymentDialog = false;
+                            _showBtDialog = true;
+                            StateHasChanged();
+                        }
+                        else
+                        {
+                            _showPaymentDialog = false;
+                            this.StateHasChanged();
+                            this.NavigationManager.NavigateTo("/payment-success", true);
+                        }
                     }
                 }
-                catch
+                else
                 {
-                    this.ToastService.ShowToast(ToastLevel.Error, "Payment processing failed.", "Checkout", ToastIcon.Error);
-                }
-                finally
-                {
-                    _paying = string.Empty;
+                    this.ToastService.ShowToast(ToastLevel.Error, result.Message ?? "Payment processing failed.", "Checkout", ToastIcon.Error);
                 }
             }
+            catch
+            {
+                this.ToastService.ShowToast(ToastLevel.Error, "Payment processing failed.", "Checkout", ToastIcon.Error);
+            }
+            finally
+            {
+                _processingMethodId = null;
+                StateHasChanged();
+            }
+        }
+
+        private void ConfirmBankTransfer()
+        {
+            _showBtDialog = false;
+            this.NavigationManager.NavigateTo("/payment-success?bt=1", true);
         }
 
         private void Checkout()
@@ -185,6 +238,7 @@
         private void Cancel()
         {
             _showPaymentDialog = false;
+            _processingMethodId = null;
         }
     }
 }

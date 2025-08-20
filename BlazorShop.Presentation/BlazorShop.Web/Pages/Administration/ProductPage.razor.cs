@@ -5,7 +5,6 @@
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Services.Contracts;
     using BlazorShop.Web.Shared.Toast;
-
     using Microsoft.AspNetCore.Components;
     using Microsoft.AspNetCore.Components.Forms;
 
@@ -31,6 +30,10 @@
         private CreateOrUpdateProductVariant _variantForm = new();
         private Guid? _editingVariantId;
 
+        private string _query = string.Empty;
+        private bool _allExpanded = true;
+        private HashSet<Guid> _expandedCats = new();
+
         [Inject]
         private IFileUploadService FileUploadService { get; set; } = default!;
 
@@ -41,11 +44,31 @@
         {
             this._categories = await this.CategoryService.GetAllAsync();
             await this.GetProducts();
+            foreach (var c in _categories) _expandedCats.Add(c.Id);
         }
 
         private async Task GetProducts()
         {
             _products = await this.ProductService.GetAllAsync();
+        }
+
+        private void ToggleCat(Guid id)
+        {
+            if (_expandedCats.Contains(id)) _expandedCats.Remove(id); else _expandedCats.Add(id);
+        }
+
+        private void ToggleAllCats()
+        {
+            if (_allExpanded)
+            {
+                _expandedCats.Clear();
+                _allExpanded = false;
+            }
+            else
+            {
+                _expandedCats = _categories.Select(c => c.Id).ToHashSet();
+                _allExpanded = true;
+            }
         }
 
         private void AddProduct()

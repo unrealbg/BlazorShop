@@ -1,31 +1,28 @@
 ﻿@page "/payment-success"
+@page "/payment-success/{bt:int?}"
 
-<div class="container">
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="p-2 mt-3 w-100 bg-warning">
-                <div class="card m-2">
-                    <div class="card-header">
-                        <h4 class="text-center">Payment Success</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-success" role="alert">
-                            <h4 class="alert-heading text-center">Thank you for your purchase!</h4>
-                            <p class="text-center">Your payment was successful. Your order will be delivered soon.</p>
-                            <hr>
-                            <p class="mb-0 text-center">You can track your order in the <a href="/my-orders">My Orders</a> page.</p>
-                        </div>
-                    </div>
-                </div>
+<section style="width:100%; min-height:50vh; display:flex; justify-content:center; align-items:flex-start; padding:3rem 1rem;">
+    <div class="card shadow-sm" style="width:100%; max-width:720px; margin:0 auto;">
+        <div class="card-header text-center">
+            <h4 class="mb-0">Payment Success</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-success text-center" role="alert">
+                <h4 class="alert-heading">Thank you for your purchase!</h4>
+                <p>Your payment was successful. Your order will be delivered soon.</p>
+                <hr>
+                <p class="mb-0">You can track your order in the <a href="/my-orders">My Orders</a> page.</p>
             </div>
         </div>
     </div>
-</div>
-
+</section>
 
 @code {
     [CascadingParameter]
     public Task<AuthenticationState>? UserAuthState { get; set; }
+
+    [Parameter]
+    public int? Bt { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -48,14 +45,18 @@
 
                     if (!string.IsNullOrEmpty(userId) && list.Any())
                     {
-                        var arc = list.Select(x => new CreateOrderItem
+                        if (Bt.GetValueOrDefault() != 1)
                         {
-                            ProductId = x.ProductId,
-                            Quantity = x.Quantity,
-                            UserId = userId
-                        });
+                            var arc = list.Select(x => new CreateOrderItem
+                            {
+                                ProductId = x.ProductId,
+                                Quantity = x.Quantity,
+                                UserId = userId
+                            });
 
-                        await CartService.SaveCheckoutHistory(arc);
+                            await CartService.SaveCheckoutHistory(arc);
+                        }
+
                         await CookieStorageService.RemoveAsync(Constant.Cart.Name);
                     }
                 }

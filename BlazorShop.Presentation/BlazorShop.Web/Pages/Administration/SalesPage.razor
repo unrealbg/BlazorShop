@@ -2,24 +2,153 @@
 @layout AdminLayout
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
-  <div class="rounded-xl bg-white/80 shadow p-6" style="height: 600px; overflow: auto">
+  <div class="rounded-xl bg-white/80 shadow p-6" style="min-height: 600px; overflow: auto">
     <header class="text-center">
-      <h2 class="text-2xl font-bold">Sales</h2>
+      <h2 class="text-2xl font-bold">Admin Dashboard</h2>
     </header>
 
-    @if (_orderItems.Any())
+    <div class="mt-2 flex items-center justify-end gap-2">
+      <button class="px-3 py-1.5 rounded border hover:bg-neutral-50 text-sm" @onclick="ExportCsvAsync">Export CSV</button>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Total Revenue</div>
+        <div class="text-2xl font-bold">€ @_totalRevenue.ToString("F2")</div>
+      </div>
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Today's Revenue</div>
+        <div class="text-2xl font-bold">€ @_todayRevenue.ToString("F2")</div>
+      </div>
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Orders</div>
+        <div class="text-2xl font-bold">@_countOrders</div>
+      </div>
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Delivered</div>
+        <div class="text-2xl font-bold">@_deliveredCount</div>
+      </div>
+    </div>
+
+    <article class="mt-6 rounded border">
+      <div class="px-4 py-2 bg-neutral-100 font-semibold">Revenue (last 14 days)</div>
+      <div class="p-4" style="height: 220px;">
+        <canvas id="revChart"></canvas>
+      </div>
+    </article>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4 text-sm">
+      <div class="rounded border p-3 text-neutral-700"><b>Pending</b>: @_pendingCount</div>
+      <div class="rounded border p-3 text-blue-700"><b>Shipped</b>: @_shippedCount</div>
+      <div class="rounded border p-3 text-blue-700"><b>InTransit</b>: @_inTransitCount</div>
+      <div class="rounded border p-3 text-emerald-700"><b>OutForDelivery</b>: @_ofdCount</div>
+      <div class="rounded border p-3 text-emerald-800"><b>Delivered</b>: @_deliveredCount</div>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+      <div>
+        <label class="block text-xs text-neutral-600">Status</label>
+        <select class="w-full border rounded px-2 py-1" value="@_statusFilter" @onchange="e => { _statusFilter = e.Value?.ToString() ?? string.Empty; ApplyFilters(); }">
+          <option value="">All</option>
+          <option value="PendingShipment">PendingShipment</option>
+          <option value="Shipped">Shipped</option>
+          <option value="InTransit">InTransit</option>
+          <option value="OutForDelivery">OutForDelivery</option>
+          <option value="Delivered">Delivered</option>
+        </select>
+      </div>
+      <div class="lg:col-span-2">
+        <label class="block text-xs text-neutral-600">Reference</label>
+        <input class="w-full border rounded px-2 py-1" placeholder="Search..." @bind="_refQuery" @oninput="_ => ApplyFilters()" />
+      </div>
+      <div>
+        <label class="block text-xs text-neutral-600">From</label>
+        <input type="date" class="w-full border rounded px-2 py-1" value="@(_fromDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _fromDate = d; else _fromDate = null; ApplyFilters(); }" />
+      </div>
+      <div>
+        <label class="block text-xs text-neutral-600">To</label>
+        <input type="date" class="w-full border rounded px-2 py-1" value="@(_toDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _toDate = d; else _toDate = null; ApplyFilters(); }" />
+      </div>
+    </div>
+
+    <article class="mt-6 rounded border">
+      <div class="px-4 py-2 bg-neutral-100 font-semibold flex items-center justify-between">
+        <span>Recent Orders</span>
+        <div class="text-xs text-neutral-600">Sort:
+          <button class="ml-2 underline" @onclick='@(() => SortBy("Reference"))'>Reference</button>
+          <button class="ml-2 underline" @onclick='@(() => SortBy("CreatedOn"))'>Date</button>
+          <button class="ml-2 underline" @onclick='@(() => SortBy("TotalAmount"))'>Total</button>
+          <button class="ml-2 underline" @onclick='@(() => SortBy("ShippingStatus"))'>Status</button>
+        </div>
+      </div>
+      <div class="p-4 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-neutral-50 text-left">
+              <th class="px-3 py-2">Created</th>
+              <th class="px-3 py-2">Reference</th>
+              <th class="px-3 py-2">Status</th>
+              <th class="px-3 py-2">Total (€)</th>
+              <th class="px-3 py-2">Tracking</th>
+              <th class="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-200">
+            @if (_displayOrders.Any())
+            {
+              @foreach (var o in _displayOrders)
+              {
+                <tr>
+                  <td class="px-3 py-2">@o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                  <td class="px-3 py-2">@o.Reference</td>
+                  <td class="px-3 py-2">@o.ShippingStatus</td>
+                  <td class="px-3 py-2">@o.TotalAmount.ToString("F2")</td>
+                  <td class="px-3 py-2">
+                    @if (!string.IsNullOrWhiteSpace(o.TrackingUrl))
+                    {
+                      <a class="text-blue-700 hover:underline" href="@o.TrackingUrl" target="_blank" rel="noopener">Track</a>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(o.TrackingNumber))
+                    {
+                      <span class="text-neutral-600">@o.TrackingNumber</span>
+                    }
+                    else
+                    {
+                      <span class="text-neutral-500">—</span>
+                    }
+                  </td>
+                  <td class="px-3 py-2">
+                    <button class="text-blue-700 hover:underline" @onclick="() => OpenEdit(o)">Edit</button>
+                  </td>
+                </tr>
+              }
+            }
+            else
+            {
+              <tr>
+                <td class="px-3 py-6 text-center text-neutral-500" colspan="6">No orders</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    @if (_orders.Any())
     {
-      var groupByDate = _orderItems.GroupBy(x => x.DatePurchased.Date).ToList();
-      decimal grandTotal = 0;
-
-      foreach (var group in groupByDate)
+      var groups = _orders.GroupBy(x => x.CreatedOn.Date).OrderByDescending(g => g.Key).ToList();
+      decimal grand = 0m;
+      foreach (var g in groups)
       {
-        decimal dailyTotal = group.Sum(x => x.AmountPayed);
-        grandTotal += dailyTotal;
+        var rows = g
+          .SelectMany(o => o.Lines.Select(l => new { o.CustomerName, o.CustomerEmail, l.ProductName, l.Quantity, Amount = l.UnitPrice * l.Quantity }))
+          .ToList();
+        var daily = rows.Sum(r => r.Amount);
+        grand += daily;
 
-        <article class="mt-4 rounded border">
+        <article class="mt-6 rounded border">
           <div class="px-4 py-2 bg-neutral-100 font-semibold">
-            @group.Key.ToShortDateString() - Total: € @dailyTotal.ToString("F2")
+            @g.Key.ToShortDateString() - Total: € @daily.ToString("F2")
           </div>
           <div class="p-4 overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -33,14 +162,14 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-neutral-200">
-                @foreach (var orderItem in group)
+                @foreach (var r in rows)
                 {
                   <tr>
-                    <td class="px-3 py-2">@orderItem.CustomerName</td>
-                    <td class="px-3 py-2">@orderItem.CustomerEmail</td>
-                    <td class="px-3 py-2">@orderItem.ProductName</td>
-                    <td class="px-3 py-2">@orderItem.QuantityOrdered</td>
-                    <td class="px-3 py-2">@orderItem.AmountPayed.ToString("F2")</td>
+                    <td class="px-3 py-2">@r.CustomerName</td>
+                    <td class="px-3 py-2">@r.CustomerEmail</td>
+                    <td class="px-3 py-2">@r.ProductName</td>
+                    <td class="px-3 py-2">@r.Quantity</td>
+                    <td class="px-3 py-2">@r.Amount.ToString("F2")</td>
                   </tr>
                 }
               </tbody>
@@ -48,9 +177,8 @@
           </div>
         </article>
       }
-
       <footer class="mt-4 text-right font-bold">
-        Grand Total: € @grandTotal.ToString("F2")
+        Grand Total: € @grand.ToString("F2")
       </footer>
     }
     else
@@ -61,3 +189,28 @@
     }
   </div>
 </section>
+
+<ModalDialog @bind-IsVisible="_showEdit">
+  <Header>
+    <h5 class="text-lg font-semibold">Edit Tracking</h5>
+  </Header>
+  <Body>
+    <div class="space-y-2">
+      <div class="text-xs text-neutral-600">Order: @_editOrder?.Reference</div>
+      <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
+      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
+      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
+      <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
+        <option>PendingShipment</option>
+        <option>Shipped</option>
+        <option>InTransit</option>
+        <option>OutForDelivery</option>
+        <option>Delivered</option>
+      </select>
+    </div>
+  </Body>
+  <Footer>
+    <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="SaveEditAsync">Save</button>
+    <button class="inline-flex items-center rounded bg-neutral-600 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-700 ml-2" @onclick="() => _showEdit = false">Close</button>
+  </Footer>
+</ModalDialog>

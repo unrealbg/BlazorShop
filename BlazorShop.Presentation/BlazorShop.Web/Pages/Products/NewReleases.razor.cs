@@ -26,6 +26,12 @@
         {
             try
             {
+                var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
+                if (!string.IsNullOrEmpty(cartJson))
+                {
+                    _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
+                }
+
                 var allProducts = await this.ProductService.GetAllAsync();
                 _newReleases = allProducts.Where(p => p.IsNew).ToList();
             }
@@ -124,18 +130,6 @@
         public void CloseDetails()
         {
             _showModal = false;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_myCarts != null && _myCarts.Any())
-            {
-                await this.CookieStorageService.SetAsync(
-                    Constant.Cart.Name,
-                    JsonSerializer.Serialize(_myCarts),
-                    30,
-                    "/");
-            }
         }
     }
 }

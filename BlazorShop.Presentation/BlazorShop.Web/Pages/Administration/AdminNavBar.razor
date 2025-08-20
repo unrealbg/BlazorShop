@@ -11,6 +11,7 @@
             <NavLink href="admin" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
             <NavLink href="product" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Products</NavLink>
             <NavLink href="category" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Categories</NavLink>
+            <NavLink href="admin/orders" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Orders</NavLink>
             <a href="/authentication/logout" class="px-3 py-1.5 rounded-md text-amber-300 hover:text-white hover:bg-amber-400/10 transition-colors">Logout</a>
         </nav>
 
@@ -33,6 +34,7 @@
                 <NavLink href="admin" Match="NavLinkMatch.All" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Home</NavLink>
                 <NavLink href="product" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Products</NavLink>
                 <NavLink href="category" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Categories</NavLink>
+                <NavLink href="admin/orders" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="HideMenu">Orders</NavLink>
                 <a href="/authentication/logout" class="block rounded px-3 py-2 text-red-600 hover:bg-red-50" @onclick="HideMenu">Logout</a>
             </nav>
         </div>

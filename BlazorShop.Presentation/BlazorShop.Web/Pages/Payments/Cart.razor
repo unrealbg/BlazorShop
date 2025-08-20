@@ -83,9 +83,15 @@
                     {
                         <li class="flex items-center justify-between py-2">
                             @paymentMethod.Name
-                            @if (!string.IsNullOrWhiteSpace(_paying))
+                            @if (_processingMethodId.HasValue && _processingMethodId.Value == paymentMethod.Id)
                             {
-                                <span class="text-emerald-600 mr-2">@_paying</span>
+                                <span class="inline-flex items-center text-emerald-600 mr-2">
+                                    <svg class="animate-spin h-5 w-5 mr-2 text-emerald-600" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                    Processing...
+                                </span>
                             }
                             else
                             {
@@ -97,6 +103,32 @@
             </Body>
             <Footer>
                 <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" @onclick="Cancel">Cancel</button>
+            </Footer>
+        </ModalDialog>
+    }
+
+    @if (_showBtDialog)
+    {
+        <ModalDialog @bind-IsVisible="_showBtDialog">
+            <Header>
+                <h5 class="text-lg font-semibold">Bank Transfer Instructions</h5>
+            </Header>
+            <Body>
+                <div class="space-y-2 text-sm">
+                    <div><span class="font-semibold">Bank:</span> @_btInfo.BankName</div>
+                    <div><span class="font-semibold">Beneficiary:</span> @_btInfo.Beneficiary</div>
+                    <div><span class="font-semibold">IBAN:</span> @_btInfo.Iban</div>
+                    <div><span class="font-semibold">Amount:</span> @_btInfo.Amount.ToString("F2") EUR</div>
+                    <div><span class="font-semibold">Reference:</span> @_btInfo.Reference</div>
+                    @if (!string.IsNullOrWhiteSpace(_btInfo.AdditionalInfo))
+                    {
+                        <div>@_btInfo.AdditionalInfo</div>
+                    }
+                </div>
+            </Body>
+            <Footer>
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="ConfirmBankTransfer">Done</button>
+                <button class="inline-flex items-center rounded bg-neutral-600 text-white px-4 py-2 font-semibold hover:bg-neutral-700 ml-2" @onclick="() => _showBtDialog = false">Close</button>
             </Footer>
         </ModalDialog>
     }

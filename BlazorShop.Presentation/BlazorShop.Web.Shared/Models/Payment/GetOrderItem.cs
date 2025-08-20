@@ -13,5 +13,11 @@
         public decimal AmountPayed { get; set; }
 
         public DateTime DatePurchased { get; set; }
+
+        public string? TrackingNumber { get; set; }
+
+        public string? TrackingUrl { get; set; }
+
+        public string? ShippingStatus { get; set; }
     }
 }

@@ -145,6 +145,57 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("NewsletterSubscribers");
                 });
 
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.Order", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeliveredOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastTrackingUpdate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ShippedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ShippingCarrier")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ShippingStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("TrackingNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TrackingUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Orders");
+                });
+
             modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -168,6 +219,31 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("CheckoutOrderItems");
                 });
 
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("OrderLines");
+                });
+
             modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.PaymentMethod", b =>
                 {
                     b.Property<Guid>("Id")
@@ -187,6 +263,21 @@ namespace BlazorShop.Infrastructure.Migrations
                         {
                             Id = new Guid("3604fc1d-cd6a-46ad-ace4-9b5f8e03f43b"),
                             Name = "Credit Card"
+                        },
+                        new
+                        {
+                            Id = new Guid("a3bb23e6-6a7c-4b7d-9c73-7d5f2bc2f7b1"),
+                            Name = "PayPal"
+                        },
+                        new
+                        {
+                            Id = new Guid("6f2c2a7e-9f9b-4a0d-9f7f-2a1b3c4d5e6f"),
+                            Name = "Cash on Delivery"
+                        },
+                        new
+                        {
+                            Id = new Guid("b2e5c1d4-7a9f-4d2c-8f1e-3a4b5c6d7e8f"),
+                            Name = "Bank Transfer"
                         });
                 });
 
@@ -413,6 +504,17 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.OrderLine", b =>
+                {
+                    b.HasOne("BlazorShop.Domain.Entities.Payment.Order", "Order")
+                        .WithMany("Lines")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("BlazorShop.Domain.Entities.Product", b =>
                 {
                     b.HasOne("BlazorShop.Domain.Entities.Category", "Category")
@@ -489,6 +591,11 @@ namespace BlazorShop.Infrastructure.Migrations
             modelBuilder.Entity("BlazorShop.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Payment.Order", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("BlazorShop.Domain.Entities.Product", b =>

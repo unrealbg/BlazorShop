@@ -35,6 +35,7 @@
 @using BlazorShop.Web.Shared.Services
 @using Blazored.Typeahead
 @using BlazorShop.Web.Shared.CookieStorage.Contracts
+@using BlazorShop.Web.Shared.Models
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ICategoryService CategoryService
 @inject IProductService ProductService
@@ -45,3 +46,5 @@
 @inject IPaymentMethodService PaymentMethodService
 @inject ICartService CartService
 @inject IToastService ToastService
+@inject IHttpClientHelper HttpClientHelper
+@inject IApiCallHelper ApiCallHelper

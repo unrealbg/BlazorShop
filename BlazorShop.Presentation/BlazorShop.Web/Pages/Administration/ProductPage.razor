@@ -1,57 +1,87 @@
 ﻿@page "/product"
 @layout AdminLayout
 
-<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
-    <div class="bg-white/80 rounded-xl shadow p-6">
-        <div class="flex items-center justify-between">
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
+    <div class="bg-white/80 rounded-xl shadow p-6 pb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="text-xl font-bold">Manage Products</h2>
-            <button class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="AddProduct">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
-                Add Product
-            </button>
+            <div class="flex items-center gap-2">
+                <input class="border rounded px-3 py-2 text-sm w-60" placeholder="Search products..." @bind="_query" />
+                <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-3 py-2 text-sm font-semibold hover:bg-neutral-300" @onclick="ToggleAllCats">@(_allExpanded ? "Collapse All" : "Expand All")</button>
+                <button class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="AddProduct">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
+                    Add Product
+                </button>
+            </div>
         </div>
 
-        <div class="mt-4 overflow-auto" style="max-height:500px">
+        <div class="mt-4 space-y-4">
             @if (_products.Any())
             {
-                <table class="min-w-full text-sm">
-                    <thead class="sticky top-0 z-10">
-                        <tr class="bg-neutral-100/90 text-left">
-                            <th class="px-3 py-2">Id</th>
-                            <th class="px-3 py-2">Image</th>
-                            <th class="px-3 py-2">Name</th>
-                            <th class="px-3 py-2">Description</th>
-                            <th class="px-3 py-2">Price</th>
-                            <th class="px-3 py-2">Quantity</th>
-                            <th class="px-3 py-2">Created Date</th>
-                            <th class="px-3 py-2 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-neutral-200">
-                        @foreach (var product in _products)
+                var map = _categories?.ToDictionary(c => c.Id, c => c.Name) ?? new Dictionary<Guid, string>();
+                var filtered = _products
+                    .Where(p => string.IsNullOrWhiteSpace(_query) || (p.Name?.Contains(_query, StringComparison.OrdinalIgnoreCase) ?? false))
+                    .ToList();
+                var groups = filtered
+                    .GroupBy(p => p.CategoryId ?? Guid.Empty)
+                    .Select(g => new { Key = g.Key, Name = (g.Key != Guid.Empty && map.TryGetValue(g.Key, out var n) ? n : "(Uncategorized)"), Items = g.ToList() })
+                    .OrderBy(g => g.Name)
+                    .ToList();
+
+                @foreach (var g in groups)
+                {
+                    bool isOpen = _expandedCats.Contains(g.Key);
+                    <article class="rounded border">
+                        <button type="button" class="w-full px-4 py-2 bg-neutral-100 flex items-center justify-between" @onclick="() => ToggleCat(g.Key)">
+                            <div class="font-semibold">@g.Name</div>
+                            <div class="text-sm">Count: <b>@g.Items.Count</b></div>
+                        </button>
+
+                        @if (isOpen)
                         {
-                            <tr>
-                                <td class="px-3 py-2 align-top">@product.Id</td>
-                                <td class="px-3 py-2 align-top"><img src="@product.Image" alt="@product.Name" class="h-12 w-12 object-cover rounded" /></td>
-                                <td class="px-3 py-2 align-top">@product.Name</td>
-                                <td class="px-3 py-2 align-top">@product.Description</td>
-                                <td class="px-3 py-2 align-top">@product.Price</td>
-                                <td class="px-3 py-2 align-top">@product.Quantity</td>
-                                <td class="px-3 py-2 align-top">@product.CreatedOn</td>
-                                <td class="px-3 py-2 align-top">
-                                    <div class="flex items-center justify-center gap-3">
-                                        <button class="text-blue-600 hover:text-blue-700" title="Edit" @onclick="async () => await StartEdit(product)">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                                        </button>
-                                        <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <div class="p-3 overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead>
+                                        <tr class="bg-neutral-50 text-left">
+                                            <th class="px-3 py-2">Id</th>
+                                            <th class="px-3 py-2">Image</th>
+                                            <th class="px-3 py-2">Name</th>
+                                            <th class="px-3 py-2">Description</th>
+                                            <th class="px-3 py-2">Price</th>
+                                            <th class="px-3 py-2">Quantity</th>
+                                            <th class="px-3 py-2">Created Date</th>
+                                            <th class="px-3 py-2 text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-neutral-200">
+                                        @foreach (var product in g.Items)
+                                        {
+                                            <tr>
+                                                <td class="px-3 py-2 align-top">@product.Id</td>
+                                                <td class="px-3 py-2 align-top"><img src="@product.Image" alt="@product.Name" class="h-12 w-12 object-cover rounded" /></td>
+                                                <td class="px-3 py-2 align-top">@product.Name</td>
+                                                <td class="px-3 py-2 align-top">@product.Description</td>
+                                                <td class="px-3 py-2 align-top">@product.Price</td>
+                                                <td class="px-3 py-2 align-top">@product.Quantity</td>
+                                                <td class="px-3 py-2 align-top">@product.CreatedOn</td>
+                                                <td class="px-3 py-2 align-top">
+                                                    <div class="flex items-center justify-center gap-3">
+                                                        <button class="text-blue-600 hover:text-blue-700" title="Edit" @onclick="async () => await StartEdit(product)">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                                        </button>
+                                                        <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
                         }
-                    </tbody>
-                </table>
+                    </article>
+                }
             }
             else
             {
