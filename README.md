@@ -1,4 +1,8 @@
+# BlazorShop
+
 [![.NET](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml)
+
+BlazorShop is an open?source e?commerce application built with Blazor WebAssembly and ASP.NET Core (.NET 9). It follows a clean, layered architecture and provides a ready?to?extend foundation for real online stores.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -7,6 +11,8 @@
 - [Technologies Used](#technologies-used)
 - [Requirements](#requirements)
 - [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [API & Docs](#api--docs)
 - [Screenshots](#screenshots)
 - [Contributing](#contributing)
 - [Demo](#demo)
@@ -14,142 +20,233 @@
 - [Acknowledgements](#acknowledgements)
 
 ## Introduction
-BlazorShop is an open-source e-commerce platform designed to provide an efficient and user-friendly solution for managing online stores. Built with Blazor, it delivers a seamless experience for both administrators and customers.
+BlazorShop delivers a modern, responsive shopping experience with a Blazor WebAssembly frontend and a secure ASP.NET Core Web API backend. It includes product catalog, cart, checkout with multiple payment methods, order tracking, admin tooling, and more.
 
 ### Who Is It For?
-BlazorShop is ideal for:
-- Small to medium-sized businesses looking to manage their online store efficiently.
-- Developers wanting to explore Blazor WebAssembly and clean architecture in real-world projects.
+- Small/medium businesses looking to bootstrap an online shop on .NET.
+- Developers exploring Blazor WebAssembly, ASP.NET Core, and clean architecture.
 
 ## Features
-- **Product Management**: Add, edit, and remove products effortlessly.
-- **Category Management**: Organize products into categories for better navigation and management.
-- **Order Management**: Handle customer orders with an intuitive interface.
-- **Customer Management**: Track customer information and their order history.
-- **Customization**: Adaptable to your specific business needs.
+- Authentication & Authorization
+  - ASP.NET Core Identity, JWT access tokens + refresh flow
+  - Email confirmation, password change, profile update
+  - Role?based access (Admin/User)
+  - Note: The first registered user becomes Admin; next users get User role.
+- Catalog Management
+  - Categories, products, product variants (size/stock), image upload
+  - Product search/typeahead UI
+- Cart & Checkout
+  - Persistent cart (cookie), quantity updates, totals
+  - Multiple payment methods: Stripe (card), PayPal, Cash on Delivery, Bank Transfer
+  - Bank transfer instructions via email with order reference
+- Orders & Tracking
+  - Save checkout history; admin order list
+  - Update shipping status, carrier tracking number and URL
+- Newsletter
+  - Email subscription with welcome email
+- Admin Area
+  - Manage categories, products, variants, orders, and shipping
+- Developer Experience
+  - OpenAPI/Swagger, Serilog logging, unit tests
+  - Modern UI (Tailwind?style classes), toast notifications, Chart.js
 
 ## Technologies Used
-- **Backend**: ASP.NET Core Web API
-- **Frontend**: Blazor WebAssembly
-- **Database**: Microsoft SQL Server (MSSQL)
-- **Object-Relational Mapping**: EntityFramework Core
-- **Mapping**: AutoMapper
-- **API Documentation**: Swashbuckle (Swagger)
+- .NET 9, ASP.NET Core Web API
+- Blazor WebAssembly (client)
+- Entity Framework Core 9 + SQL Server
+- ASP.NET Core Identity (email confirmation enabled)
+- AutoMapper, FluentValidation
+- Serilog
+- Stripe & PayPal integrations
+- Swashbuckle (Swagger/OpenAPI)
+- xUnit, Moq (tests)
+- Microsoft Aspire AppHost (local orchestrator)
 
 ## Requirements
-Before getting started, ensure you have the following:
 - .NET 9 SDK or later
-- SQL Server instance (local or cloud)
-- A web browser that supports WebAssembly (e.g., Chrome, Edge, Firefox)
+- SQL Server (LocalDB or full instance)
+- Modern browser (WebAssembly capable)
+- Optional: API keys and SMTP for payments/emails
+  - Stripe Secret Key
+  - PayPal settings (if applicable)
+  - SMTP credentials
 
 ## Getting Started
-Follow these steps to set up and run BlazorShop:
+1) Clone the repository
 
-1. **Clone the repository**:
-    ```sh
-    git clone https://github.com/unrealbg/BlazorShop.git
-    ```
-2. **Navigate to the project directory**:
-    ```sh
-    cd BlazorShop
-    ```
-3. **Set up the database**:
-    - Update the `appsettings.json` file with your SQL Server connection string.
-    - Apply migrations (if applicable):
-      ```sh
-      dotnet ef database update
-      ```
-4. **Build and run the project**:
-    ```sh
-    dotnet run
-    ```
+   git clone https://github.com/unrealbg/BlazorShop.git
+   cd BlazorShop
+
+2) Configure the API (appsettings or user?secrets)
+- File: BlazorShop.Presentation/BlazorShop.API/appsettings.json
+- Keys you may need to set/update:
+  - ConnectionStrings:DefaultConnection
+  - Jwt: Key, Issuer, Audience
+  - Stripe: SecretKey
+  - BankTransfer: Iban, Beneficiary, BankName, AdditionalInfo
+  - EmailSettings: From, DisplayName, SmtpServer, Port, UseSsl, Username, Password
+
+Tip: keep secrets out of source control via dotnet user?secrets for the API project.
+
+3) Database
+- The API applies EF Core migrations automatically on startup.
+- Or apply manually from the solution root:
+
+   dotnet ef database update --project BlazorShop.Infrastructure --startup-project BlazorShop.Presentation/BlazorShop.API
+
+4) Run the app (pick one)
+- Using the AppHost (recommended local orchestrator):
+
+   dotnet run --project BlazorShop.AppHost
+
+- Run projects separately (two terminals):
+
+   dotnet run --project BlazorShop.Presentation/BlazorShop.API
+   dotnet run --project BlazorShop.Presentation/BlazorShop.Web
+
+Default dev URLs (may vary by environment):
+- API: https://localhost:7094
+- Web: https://localhost:7258
+- The Web client calls the API at https://localhost:7094/api/
+
+5) Tests
+
+   dotnet test
+
+## Project Structure
+- BlazorShop.Domain – Core entities and contracts
+- BlazorShop.Application – DTOs, services, validations
+- BlazorShop.Infrastructure – EF Core, repositories, Identity, email, payments, logging
+- BlazorShop.Presentation/BlazorShop.API – ASP.NET Core Web API controllers and configuration
+- BlazorShop.Presentation/BlazorShop.Web – Blazor WebAssembly client
+- BlazorShop.Presentation/BlazorShop.Web.Shared – Shared models/services used by the Web client
+- BlazorShop.AppHost – Local orchestrator (Microsoft Aspire) to run API + Web together
+- BlazorShop.Tests – Unit tests
+
+## API & Docs
+- Swagger UI available when API runs in Development at /swagger
+- CORS allows localhost HTTP/HTTPS origins
+
 ## Screenshots
 
-### User Home View
-![User Home View](https://vps.unrealbg.com/blazorblog/UserHomeView.png)
-
-### Register Page
-![Register Page](https://vps.unrealbg.com/blazorblog/RegisterPage.png)
-
-### Login Page
-![Login Page](https://vps.unrealbg.com/blazorblog/LoginPage.png)
-
-### User Dropdown Menu
-![User Dropdown Menu](https://vps.unrealbg.com/blazorblog/UserDropDown.png)
-
-### My Profile Page
-![My Profile Page](https://vps.unrealbg.com/blazorblog/MyProfilePage.png)
-
-### Change Password
-![Change Password](https://vps.unrealbg.com/blazorblog/ChangePassword.png)
-
-### User Adds Product to Cart Once
-![User Adds Product to Cart Once](https://vps.unrealbg.com/blazorblog/UserAddProductToCardOnce.png)
-
-### User Adds Same Product Twice
-![User Adds Same Product Twice](https://vps.unrealbg.com/blazorblog/UserAddSameProductTwice.png)
-
-### See More Product Details
-![See More Product Details](https://vps.unrealbg.com/blazorblog/SeeMore.png)
-
-### User Cart
-![User Cart](https://vps.unrealbg.com/blazorblog/UserCart.png)
-
-### User Select Payment Method
-![User Select Payment Method](https://vps.unrealbg.com/blazorblog/UserSelectPaymentMethod.png)
-
-### Payment Process
-![Payment Process](https://vps.unrealbg.com/blazorblog/Paying.png)
-
-### Payment Success
-![Payment Success](https://vps.unrealbg.com/blazorblog/PaymentSuccess.png)
-
-### Add Category
-![Add Category](https://vps.unrealbg.com/blazorblog/AddCategory.png)
-
-### Add Category Confirmation
-![Add Category Confirmation](https://vps.unrealbg.com/blazorblog/AddCategory2.png)
-
-### Product Management Page
-![Product Management Page](https://vps.unrealbg.com/blazorblog/AddProductPage.png)
-
-### Add Product to Category
-![Add Product to Category](https://vps.unrealbg.com/blazorblog/AddProductToCategory.png)
-
-### Product Added Successfully
-![Product Added Successfully](https://vps.unrealbg.com/blazorblog/ProductAddedSusscessfully.png)
-
-### Delete Category Confirmation
-![Delete Category Confirmation](https://vps.unrealbg.com/blazorblog/DeleteCategoty.png)
-
-### Category Deletion Success
-![Category Deletion Success](https://vps.unrealbg.com/blazorblog/CategoryDeleteSuccessfully.png)
-
-### Sales Page
-![Sales Page](https://vps.unrealbg.com/blazorblog/SalesPage.png)
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/20.png" width="150" alt="Sign Up screen"/><br>
+      <small>Sign Up</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/19.png" width="150" alt="Sign In screen"/><br>
+      <small>Sign In</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/21.png" width="150" alt="Subscribe to newsletter"/><br>
+      <small>Subscribe to Newsletter</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/1.png" width="150" alt="Home page"/><br>
+      <small>Home</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/2.png" width="150" alt="Profile page"/><br>
+      <small>Profile</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/3.png" width="150" alt="Orders list"/><br>
+      <small>Orders</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/4.png" width="150" alt="Cart page"/><br>
+      <small>Cart</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/5.png" width="150" alt="Product quick view modal"/><br>
+      <small>Product Quick View</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/6.png" width="150" alt="Latest products section"/><br>
+      <small>Latest Products</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/7.png" width="150" alt="Choose payment method dialog"/><br>
+      <small>Choose Payment Method</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/8.png" width="150" alt="Bank transfer instructions"/><br>
+      <small>Bank Transfer Instructions</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/9.png" width="150" alt="Stripe checkout page"/><br>
+      <small>Stripe Checkout</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/10.png" width="150" alt="Admin dashboard"/><br>
+      <small>Admin Dashboard</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/11.png" width="150" alt="Manage products"/><br>
+      <small>Manage Products</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/15.png" width="150" alt="Manage orders"/><br>
+      <small>Manage Orders</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/12.png" width="150" alt="Manage categories"/><br>
+      <small>Manage Categories</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/13.png" width="150" alt="Add product form"/><br>
+      <small>Add Product</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/14.png" width="150" alt="Add variants modal"/><br>
+      <small>Add Variants</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/16.png" width="150" alt="Edit tracking modal"/><br>
+      <small>Edit Tracking</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/18.png" width="150" alt="Browse by category menu"/><br>
+      <small>Browse by Category</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/17.png" width="150" alt="Search suggestions"/><br>
+      <small>Search Suggestions</small>
+    </td>
+  </tr>
+</table>
 
 ## Contributing
-We welcome contributions to BlazorShop! Here’s how you can get involved:
 1. Fork the repository.
-2. Create a new branch:
-    ```sh
-    git checkout -b feature-branch
-    ```
-3. Make your changes and commit them:
-    ```sh
-    git commit -m 'Add new feature'
-    ```
-4. Push to your branch:
-    ```sh
-    git push origin feature-branch
-    ```
-5. Open a pull request.
+2. Create a feature branch:
+
+   git checkout -b feature/your-feature
+
+3. Commit your changes:
+
+   git commit -m "feat: add your feature"
+
+4. Push and open a Pull Request.
 
 ## Demo
-Check out a live demo of BlazorShop [shop.unrealbg.com](https://shop.unrealbg.com).
+Live demo: https://shop.unrealbg.com
 
 ## License
-BlazorShop is licensed under the MIT License. See the [LICENSE](./LICENSE) file for more details.
+MIT License. See the LICENSE file for details.
 
 ## Acknowledgements
-- **[unrealbg](https://github.com/unrealbg)**: The creator and main contributor of BlazorShop.
+- https://github.com/unrealbg – Creator and maintainer of BlazorShop.
