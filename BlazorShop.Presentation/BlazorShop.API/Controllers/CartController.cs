@@ -79,8 +79,6 @@
                 return this.Unauthorized("User ID is invalid or not found.");
             }
 
-
-            // Вземане на поръчките за текущия потребител
             var result = await _cartService.GetCheckoutHistoryByUserId(userId);
             return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
         }
@@ -101,7 +99,6 @@
                 return this.Unauthorized("User ID is invalid or not found.");
             }
 
-            // Вземане на поръчките за текущия потребител (чрез новата услуга)
             var result = await _orderQueryService.GetOrdersForUserAsync(userId);
             return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
         }

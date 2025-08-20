@@ -2,39 +2,88 @@
 @layout AdminLayout
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
-  <div class="rounded-xl bg-white/80 shadow p-6" style="height: 600px; overflow: auto">
+  <div class="rounded-xl bg-white/80 shadow p-6" style="min-height: 600px; overflow: auto">
     <header class="text-center">
-      <h2 class="text-2xl font-bold">Sales</h2>
+      <h2 class="text-2xl font-bold">Admin Dashboard</h2>
     </header>
 
-    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="rounded border p-4">
-        <h3 class="font-semibold mb-2">Update Tracking</h3>
-        <div class="space-y-2">
-          <input class="border rounded w-full px-2 py-1" placeholder="Order ID (GUID)" @bind="_trackingOrderId" />
-          <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
-          <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
-          <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
-          <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="UpdateTrackingAsync">Save</button>
-        </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Total Revenue</div>
+        <div class="text-2xl font-bold">€ @_totalRevenue.ToString("F2")</div>
       </div>
-      <div class="rounded border p-4">
-        <h3 class="font-semibold mb-2">Update Shipping Status</h3>
-        <div class="space-y-2">
-          <input class="border rounded w-full px-2 py-1" placeholder="Order ID (GUID)" @bind="_statusOrderId" />
-          <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
-            <option>PendingShipment</option>
-            <option>Shipped</option>
-            <option>InTransit</option>
-            <option>OutForDelivery</option>
-            <option>Delivered</option>
-          </select>
-          <input type="datetime-local" class="border rounded w-full px-2 py-1" @bind="_shippedOn" />
-          <input type="datetime-local" class="border rounded w-full px-2 py-1" @bind="_deliveredOn" />
-          <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="UpdateStatusAsync">Save</button>
-        </div>
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Today's Revenue</div>
+        <div class="text-2xl font-bold">€ @_todayRevenue.ToString("F2")</div>
+      </div>
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Orders</div>
+        <div class="text-2xl font-bold">@_countOrders</div>
+      </div>
+      <div class="rounded border p-4 bg-neutral-50">
+        <div class="text-sm text-neutral-500">Delivered</div>
+        <div class="text-2xl font-bold">@_deliveredCount</div>
       </div>
     </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4 text-sm">
+      <div class="rounded border p-3 text-neutral-700"><b>Pending</b>: @_pendingCount</div>
+      <div class="rounded border p-3 text-blue-700"><b>Shipped</b>: @_shippedCount</div>
+      <div class="rounded border p-3 text-blue-700"><b>InTransit</b>: @_inTransitCount</div>
+      <div class="rounded border p-3 text-emerald-700"><b>OutForDelivery</b>: @_ofdCount</div>
+      <div class="rounded border p-3 text-emerald-800"><b>Delivered</b>: @_deliveredCount</div>
+    </div>
+
+    <article class="mt-6 rounded border">
+      <div class="px-4 py-2 bg-neutral-100 font-semibold">Recent Orders</div>
+      <div class="p-4 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-neutral-50 text-left">
+              <th class="px-3 py-2">Created</th>
+              <th class="px-3 py-2">Reference</th>
+              <th class="px-3 py-2">Status</th>
+              <th class="px-3 py-2">Total (€)</th>
+              <th class="px-3 py-2">Tracking</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-200">
+            @if (_recentOrders.Any())
+            {
+              @foreach (var o in _recentOrders)
+              {
+                <tr>
+                  <td class="px-3 py-2">@o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                  <td class="px-3 py-2">@o.Reference</td>
+                  <td class="px-3 py-2">@o.ShippingStatus</td>
+                  <td class="px-3 py-2">@o.TotalAmount.ToString("F2")</td>
+                  <td class="px-3 py-2">
+                    @if (!string.IsNullOrWhiteSpace(o.TrackingUrl))
+                    {
+                      <a class="text-blue-700 hover:underline" href="@o.TrackingUrl" target="_blank" rel="noopener">Track</a>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(o.TrackingNumber))
+                    {
+                      <span class="text-neutral-600">@o.TrackingNumber</span>
+                    }
+                    else
+                    {
+                      <span class="text-neutral-500">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            }
+            else
+            {
+              <tr>
+                <td class="px-3 py-6 text-center text-neutral-500" colspan="5">No recent orders</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
 
     @if (_orderItems.Any())
     {
@@ -46,7 +95,7 @@
         decimal dailyTotal = group.Sum(x => x.AmountPayed);
         grandTotal += dailyTotal;
 
-        <article class="mt-4 rounded border">
+        <article class="mt-6 rounded border">
           <div class="px-4 py-2 bg-neutral-100 font-semibold">
             @group.Key.ToShortDateString() - Total: € @dailyTotal.ToString("F2")
           </div>
