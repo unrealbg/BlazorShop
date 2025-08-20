@@ -15,5 +15,19 @@ namespace BlazorShop.Domain.Entities.Payment
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
         public ICollection<OrderLine> Lines { get; set; } = new List<OrderLine>();
+
+        public string? ShippingCarrier { get; set; }
+
+        public string? TrackingNumber { get; set; }
+
+        public string? TrackingUrl { get; set; }
+
+        public string ShippingStatus { get; set; } = "PendingShipment";
+
+        public DateTime? ShippedOn { get; set; }
+
+        public DateTime? DeliveredOn { get; set; }
+
+        public DateTime? LastTrackingUpdate { get; set; }
     }
 }

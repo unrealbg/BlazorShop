@@ -9,5 +9,9 @@ namespace BlazorShop.Domain.Contracts.Payment
         Task<Order?> GetByReferenceAsync(string reference);
 
         Task<int> UpdateStatusAsync(Guid orderId, string status);
+
+        Task<List<Order>> GetByUserIdAsync(string userId);
+
+        Task<List<Order>> GetAllAsync();
     }
 }

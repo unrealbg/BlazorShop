@@ -1,0 +1,118 @@
+@page "/my-orders"
+
+<AuthorizeView>
+    <Authorized>
+        <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-6">
+            <div class="mt-6 rounded-xl bg-amber-100/60">
+                <div class="p-6">
+                    <h4 class="text-center text-xl font-bold">My Orders</h4>
+
+                    @if (_loading)
+                    {
+                        <div class="mt-6 text-center text-neutral-600">Loading...</div>
+                    }
+                    else if (_orders is null || !_orders.Any())
+                    {
+                        <div class="mt-6 text-center rounded-md bg-blue-50 text-blue-800 px-6 py-5 shadow font-semibold">
+                            No orders found.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var order in _orders)
+                        {
+                            <article class="mt-6 rounded border">
+                                <div class="px-4 py-2 bg-neutral-100 flex items-center justify-between">
+                                    <div>
+                                        <span class="font-semibold">Ref:</span> @order.Reference
+                                        <span class="ml-4 font-semibold">Status:</span> @order.Status
+                                        <span class="ml-4 font-semibold">Shipping:</span> @order.ShippingStatus
+                                    </div>
+                                    <div class="text-sm text-neutral-600">@order.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+                                </div>
+                                <div class="p-4 overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead>
+                                            <tr class="bg-neutral-50 text-left">
+                                                <th class="px-3 py-2">Product</th>
+                                                <th class="px-3 py-2">Qty</th>
+                                                <th class="px-3 py-2">Unit (ˆ)</th>
+                                                <th class="px-3 py-2">Total (ˆ)</th>
+                                                <th class="px-3 py-2">Tracking</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-neutral-200">
+                                            @foreach (var line in order.Lines)
+                                            {
+                                                <tr>
+                                                    <td class="px-3 py-2">@line.ProductName</td>
+                                                    <td class="px-3 py-2">@line.Quantity</td>
+                                                    <td class="px-3 py-2">@line.UnitPrice.ToString("F2")</td>
+                                                    <td class="px-3 py-2">@(line.LineTotal.ToString("F2"))</td>
+                                                    <td class="px-3 py-2">
+                                                        @if (!string.IsNullOrWhiteSpace(order.TrackingUrl))
+                                                        {
+                                                            <a class="text-blue-700 hover:underline" href="@order.TrackingUrl" target="_blank" rel="noopener">Track</a>
+                                                        }
+                                                        else if (!string.IsNullOrWhiteSpace(order.TrackingNumber))
+                                                        {
+                                                            <span class="text-neutral-600">@order.TrackingNumber</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-neutral-500">Pending shipment</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                    <div class="mt-2 text-right font-semibold">Total: ˆ @order.TotalAmount.ToString("F2")</div>
+                                </div>
+                            </article>
+                        }
+                    }
+                </div>
+            </div>
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <section class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 mb-6">
+            <div class="mt-16 rounded-xl bg-amber-100/60 p-6 text-center">
+                <h4 class="text-xl font-bold mb-2">Please sign in to view your orders.</h4>
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="GoToLogin">Sign in</button>
+            </div>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private IEnumerable<GetOrder> _orders = Array.Empty<GetOrder>();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = await HttpClientHelper.GetPrivateClientAsync();
+            var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
+            var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+            _orders = http is null || !http.IsSuccessStatusCode
+                ? Array.Empty<GetOrder>()
+                : await ApiCallHelper.GetServiceResponse<IEnumerable<GetOrder>>(http);
+        }
+        catch
+        {
+            _orders = Array.Empty<GetOrder>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void GoToLogin()
+    {
+        NavigationManager.NavigateTo("authentication/login/my-orders");
+    }
+}

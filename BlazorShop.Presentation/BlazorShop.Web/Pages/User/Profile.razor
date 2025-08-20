@@ -83,30 +83,61 @@
                     {
                         <div>
                             <h4 class="text-neutral-900 font-bold">My Orders</h4>
-                            @if (_orderItems != null && _orderItems.Any())
+                            @if (_orders is not null && _orders.Any())
                             {
-                                var groupedOrders = _orderItems.GroupBy(order => order.DatePurchased.Date);
-                                @foreach (var group in groupedOrders)
+                                @foreach (var order in _orders.OrderByDescending(o => o.CreatedOn))
                                 {
-                                    <div class="mb-3 rounded border">
-                                        <div class="px-4 py-2 bg-neutral-100"> <strong>Order Date:</strong> @group.Key.ToShortDateString()</div>
-                                        <div class="p-4 space-y-2">
-                                            @foreach (var order in group)
-                                            {
-                                                <ul class="list-disc list-inside">
-                                                    <li><strong>Product:</strong> @order.ProductName</li>
-                                                    <li><strong>Quantity:</strong> @order.QuantityOrdered</li>
-                                                    <li><strong>Price:</strong> €@order.AmountPayed</li>
-                                                </ul>
-                                                <hr />
-                                            }
-                                            <div class="text-right font-bold">
-                                                Total for @group.Key.ToShortDateString(): €@group.Sum(order => order.AmountPayed)
+                                    <article class="mt-4 rounded border">
+                                        <div class="px-4 py-2 bg-neutral-100 flex items-center justify-between">
+                                            <div class="space-x-3">
+                                                <span class="font-semibold">Ref:</span> <span>@order.Reference</span>
+                                                <span class="font-semibold ml-4">Date:</span> <span>@(order.CreatedOn.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</span>
+                                            </div>
+                                            <div>
+                                                <span class="@( $"inline-flex items-center px-2 py-1 rounded text-xs font-semibold {StatusBadge(order.ShippingStatus)}" )">@order.ShippingStatus</span>
                                             </div>
                                         </div>
-                                    </div>
+                                        <div class="p-4 overflow-x-auto">
+                                            <table class="min-w-full text-sm">
+                                                <thead>
+                                                    <tr class="bg-neutral-50 text-left">
+                                                        <th class="px-3 py-2">Product</th>
+                                                        <th class="px-3 py-2">Qty</th>
+                                                        <th class="px-3 py-2">Unit (€)</th>
+                                                        <th class="px-3 py-2">Total (€)</th>
+                                                        <th class="px-3 py-2">Tracking</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-neutral-200">
+                                                    @foreach (var line in order.Lines)
+                                                    {
+                                                        <tr>
+                                                            <td class="px-3 py-2">@line.ProductName</td>
+                                                            <td class="px-3 py-2">@line.Quantity</td>
+                                                            <td class="px-3 py-2">@line.UnitPrice.ToString("F2")</td>
+                                                            <td class="px-3 py-2">@(line.LineTotal.ToString("F2"))</td>
+                                                            <td class="px-3 py-2">
+                                                                @if (!string.IsNullOrWhiteSpace(order.TrackingUrl))
+                                                                {
+                                                                    <a class="text-blue-700 hover:underline" href="@order.TrackingUrl" target="_blank" rel="noopener">Track</a>
+                                                                }
+                                                                else if (!string.IsNullOrWhiteSpace(order.TrackingNumber))
+                                                                {
+                                                                    <span class="text-neutral-600">@order.TrackingNumber</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="text-neutral-500">Pending shipment</span>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                            <div class="mt-2 text-right font-semibold">Total: € @order.TotalAmount.ToString("F2")</div>
+                                        </div>
+                                    </article>
                                 }
-                                <div class="mt-3 text-right font-bold text-emerald-700">Overall Total: €@groupedOrders.Sum(group => group.Sum(order => order.AmountPayed))</div>
                             }
                             else
                             {
@@ -157,6 +188,7 @@
     private string _userEmail = string.Empty;
     private string _userName = string.Empty;
     private IEnumerable<GetOrderItem> _orderItems = new List<GetOrderItem>();
+    private IEnumerable<GetOrder> _orders = Array.Empty<GetOrder>();
 
     [CascadingParameter]
     private Task<AuthenticationState> AuthState { get; set; } = default!;
@@ -184,6 +216,32 @@
         }
 
         _orderItems = await CartService.GetCheckoutHistoryByUserId();
+
+        try
+        {
+            var client = await HttpClientHelper.GetPrivateClientAsync();
+            var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
+            var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+            _orders = http is null || !http.IsSuccessStatusCode
+                ? Array.Empty<GetOrder>()
+                : await ApiCallHelper.GetServiceResponse<IEnumerable<GetOrder>>(http);
+        }
+        catch
+        {
+            _orders = Array.Empty<GetOrder>();
+        }
+    }
+
+    private string StatusBadge(string? status)
+    {
+        return status switch
+        {
+            "Delivered" => "bg-emerald-100 text-emerald-800",
+            "OutForDelivery" => "bg-emerald-50 text-emerald-700",
+            "InTransit" => "bg-blue-50 text-blue-700",
+            "Shipped" => "bg-blue-100 text-blue-800",
+            _ => "bg-neutral-100 text-neutral-700"
+        };
     }
 
     private void SwitchTab(string tabName)

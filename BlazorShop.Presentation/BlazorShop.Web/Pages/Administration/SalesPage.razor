@@ -7,6 +7,35 @@
       <h2 class="text-2xl font-bold">Sales</h2>
     </header>
 
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="rounded border p-4">
+        <h3 class="font-semibold mb-2">Update Tracking</h3>
+        <div class="space-y-2">
+          <input class="border rounded w-full px-2 py-1" placeholder="Order ID (GUID)" @bind="_trackingOrderId" />
+          <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
+          <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
+          <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
+          <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="UpdateTrackingAsync">Save</button>
+        </div>
+      </div>
+      <div class="rounded border p-4">
+        <h3 class="font-semibold mb-2">Update Shipping Status</h3>
+        <div class="space-y-2">
+          <input class="border rounded w-full px-2 py-1" placeholder="Order ID (GUID)" @bind="_statusOrderId" />
+          <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
+            <option>PendingShipment</option>
+            <option>Shipped</option>
+            <option>InTransit</option>
+            <option>OutForDelivery</option>
+            <option>Delivered</option>
+          </select>
+          <input type="datetime-local" class="border rounded w-full px-2 py-1" @bind="_shippedOn" />
+          <input type="datetime-local" class="border rounded w-full px-2 py-1" @bind="_deliveredOn" />
+          <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="UpdateStatusAsync">Save</button>
+        </div>
+      </div>
+    </div>
+
     @if (_orderItems.Any())
     {
       var groupByDate = _orderItems.GroupBy(x => x.DatePurchased.Date).ToList();
@@ -61,3 +90,56 @@
     }
   </div>
 </section>
+
+@code {
+  private string _trackingOrderId = string.Empty;
+  private string _carrier = string.Empty;
+  private string _trackingNumber = string.Empty;
+  private string _trackingUrl = string.Empty;
+  private string _statusOrderId = string.Empty;
+  private string _shippingStatus = "PendingShipment";
+  private DateTime? _shippedOn;
+  private DateTime? _deliveredOn;
+
+  private async Task UpdateTrackingAsync()
+  {
+    if (!Guid.TryParse(_trackingOrderId, out var id))
+    {
+      ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "Invalid Order ID", "Tracking");
+      return;
+    }
+
+    var client = await HttpClientHelper.GetPrivateClientAsync();
+    var api = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{id}/tracking", Type = Constant.ApiCallType.Update, Model = new { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl } };
+    var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+    if (http.IsSuccessStatusCode)
+    {
+      ToastService.ShowToast(Shared.Toast.ToastLevel.Success, "Tracking saved", "Tracking");
+    }
+    else
+    {
+      ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "Failed to save tracking", "Tracking");
+    }
+  }
+
+  private async Task UpdateStatusAsync()
+  {
+    if (!Guid.TryParse(_statusOrderId, out var id))
+    {
+      ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "Invalid Order ID", "Shipping Status");
+      return;
+    }
+
+    var client = await HttpClientHelper.GetPrivateClientAsync();
+    var api = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{id}/shipping-status", Type = Constant.ApiCallType.Update, Model = new { ShippingStatus = _shippingStatus, ShippedOn = _shippedOn, DeliveredOn = _deliveredOn } };
+    var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+    if (http.IsSuccessStatusCode)
+    {
+      ToastService.ShowToast(Shared.Toast.ToastLevel.Success, "Shipping status saved", "Shipping Status");
+    }
+    else
+    {
+      ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "Failed to save shipping status", "Shipping Status");
+    }
+  }
+}

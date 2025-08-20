@@ -4,6 +4,7 @@
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Services.Contracts.Payment;
+    using BlazorShop.Application.Services.Payment;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Contracts.CategoryPersistence;
@@ -93,6 +94,8 @@
             services.AddScoped<IPaymentService, StripePaymentService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IOrderTrackingService, OrderTrackingService>();
+            services.AddScoped<IOrderQueryService, OrderQueryService>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 

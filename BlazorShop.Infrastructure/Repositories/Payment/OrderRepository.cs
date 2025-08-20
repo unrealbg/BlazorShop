@@ -32,5 +32,15 @@ namespace BlazorShop.Infrastructure.Repositories.Payment
             order.Status = status;
             return await _context.SaveChangesAsync();
         }
+
+        public async Task<List<Order>> GetByUserIdAsync(string userId)
+        {
+            return await _context.Orders.Include(o => o.Lines).Where(o => o.UserId == userId).OrderByDescending(o => o.CreatedOn).ToListAsync();
+        }
+
+        public async Task<List<Order>> GetAllAsync()
+        {
+            return await _context.Orders.Include(o => o.Lines).OrderByDescending(o => o.CreatedOn).ToListAsync();
+        }
     }
 }

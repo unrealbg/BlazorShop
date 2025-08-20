@@ -17,6 +17,19 @@
         private Guid? _processingMethodId = null;
         private bool _showPaymentDialog;
 
+        private bool _showBtDialog;
+        private BtInfo _btInfo = new();
+
+        private sealed class BtInfo
+        {
+            public string Iban { get; set; } = string.Empty;
+            public string Beneficiary { get; set; } = string.Empty;
+            public string BankName { get; set; } = string.Empty;
+            public string Reference { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+            public string? AdditionalInfo { get; set; }
+        }
+
         protected override async Task OnInitializedAsync()
         {
             try
@@ -161,11 +174,34 @@
                     }
                     else
                     {
-                        _showPaymentDialog = false;
-                        this.StateHasChanged();
                         var isBankTransfer = string.Equals(paymentMethod.Name, "Bank Transfer", StringComparison.OrdinalIgnoreCase);
-                        var target = isBankTransfer ? "/payment-success?bt=1" : "/payment-success";
-                        this.NavigationManager.NavigateTo(target, true);
+                        if (isBankTransfer && result.Payload.HasValue)
+                        {
+                            try
+                            {
+                                var payload = result.Payload.Value;
+                                _btInfo = new BtInfo
+                                {
+                                    Iban = payload.GetProperty("Iban").GetString() ?? string.Empty,
+                                    Beneficiary = payload.GetProperty("Beneficiary").GetString() ?? string.Empty,
+                                    BankName = payload.GetProperty("BankName").GetString() ?? string.Empty,
+                                    Reference = payload.GetProperty("Reference").GetString() ?? string.Empty,
+                                    Amount = payload.GetProperty("Amount").GetDecimal(),
+                                    AdditionalInfo = payload.TryGetProperty("AdditionalInfo", out var ai) ? ai.GetString() : null
+                                };
+                            }
+                            catch { }
+
+                            _showPaymentDialog = false;
+                            _showBtDialog = true;
+                            StateHasChanged();
+                        }
+                        else
+                        {
+                            _showPaymentDialog = false;
+                            this.StateHasChanged();
+                            this.NavigationManager.NavigateTo("/payment-success", true);
+                        }
                     }
                 }
                 else
@@ -182,6 +218,12 @@
                 _processingMethodId = null;
                 StateHasChanged();
             }
+        }
+
+        private void ConfirmBankTransfer()
+        {
+            _showBtDialog = false;
+            this.NavigationManager.NavigateTo("/payment-success?bt=1", true);
         }
 
         private void Checkout()
