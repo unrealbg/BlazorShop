@@ -51,6 +51,8 @@ namespace BlazorShop.Application.Services.Payment
                 ShippingCarrier = o.ShippingCarrier,
                 TrackingNumber = o.TrackingNumber,
                 TrackingUrl = o.TrackingUrl,
+                ShippedOn = o.ShippedOn,
+                DeliveredOn = o.DeliveredOn,
                 Lines = o.Lines.Select(l => new GetOrderLine
                 {
                     ProductId = l.ProductId,

@@ -20,6 +20,10 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
         public string? TrackingUrl { get; set; }
 
+        public DateTime? ShippedOn { get; set; }
+
+        public DateTime? DeliveredOn { get; set; }
+
         public IEnumerable<GetOrderLine> Lines { get; set; } = Array.Empty<GetOrderLine>();
     }
 }
