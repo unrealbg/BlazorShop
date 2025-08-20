@@ -31,17 +31,20 @@
             using var smtp = new SmtpClient();
             try
             {
-                await smtp.ConnectAsync(_emailSettings.SmtpServer, _emailSettings.Port, _emailSettings.UseSsl);
-                await smtp.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password);
-                await smtp.SendAsync(email);
-                await smtp.DisconnectAsync(true);
+                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await smtp.ConnectAsync(_emailSettings.SmtpServer, _emailSettings.Port, _emailSettings.UseSsl, cts.Token).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(_emailSettings.Username))
+                {
+                    await smtp.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password, cts.Token).ConfigureAwait(false);
+                }
+                await smtp.SendAsync(email, cts.Token).ConfigureAwait(false);
+                await smtp.DisconnectAsync(true, cts.Token).ConfigureAwait(false);
 
                 _logger.LogInformation($"Email sent to {toEmail}");
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error sending email to {toEmail}: {ex.Message}");
-                throw; // Или обработете грешката според нуждите
             }
         }
     }

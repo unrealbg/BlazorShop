@@ -76,5 +76,10 @@
         {
             public const string Upload = "upload/image";
         }
+
+        public static class Newsletter
+        {
+            public const string Subscribe = "newsletter/subscribe";
+        }
     }
 }

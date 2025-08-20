@@ -27,6 +27,8 @@
 
         public DbSet<OrderItem> CheckoutOrderItems { get; set; }
 
+        public DbSet<NewsletterSubscriber> NewsletterSubscribers { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -62,6 +64,11 @@
                         Name = "User",
                         NormalizedName = "USER"
                     });
+
+            // NewsletterSubscriber config
+            builder.Entity<NewsletterSubscriber>()
+                   .HasIndex(x => x.Email)
+                   .IsUnique();
         }
     }
 }
