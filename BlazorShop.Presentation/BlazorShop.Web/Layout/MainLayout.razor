@@ -1,4 +1,7 @@
-﻿@inherits LayoutComponentBase
+﻿@using BlazorShop.Web.Components.Header
+@using BlazorShop.Web.Shared.Models.Product
+@using BlazorShop.Web.Shared.Services.Contracts
+@inherits LayoutComponentBase
 
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
     <Toast />
@@ -37,9 +40,8 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             Categories
         </button>
-        <div class="flex-1 relative">
-            <input type="search" placeholder="Search products…" class="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2.5 shadow-sm focus:outline-none" />
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 select-none">✕</span>
+        <div class="flex-1 flex justify-center">
+            <SearchBarComponent Products="@_headerProducts" />
         </div>
         <div class="flex items-center gap-5 text-sm">
             <div class="flex items-center gap-2">
@@ -109,6 +111,19 @@
 @code {
     private bool IsMobileMenuOpen;
     private bool _showCategories;
+    private IEnumerable<GetProduct> _headerProducts = Enumerable.Empty<GetProduct>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _headerProducts = await ProductService.GetAllAsync();
+        }
+        catch
+        {
+            _headerProducts = Enumerable.Empty<GetProduct>();
+        }
+    }
 
     private void ToggleMobileMenu() => IsMobileMenuOpen = !IsMobileMenuOpen;
     private void CloseMobileMenu() => IsMobileMenuOpen = false;
