@@ -83,7 +83,7 @@
                     {
                         <li class="flex items-center justify-between py-2">
                             @paymentMethod.Name
-                            @if (_paying != null)
+                            @if (!string.IsNullOrWhiteSpace(_paying))
                             {
                                 <span class="text-emerald-600 mr-2">@_paying</span>
                             }
