@@ -27,16 +27,25 @@
             _environment = environment;
         }
 
+        public sealed class ImageUploadForm
+        {
+            public IFormFile? File { get; set; }
+        }
+
         /// <summary>
-        ///  Uploads an image to the server and returns its relative URL (e.g. /uploads/{file}).
+        ///  Uploads an image to the server and returns its URL.
+        ///  DEBUG: absolute URL (https://localhost:port/uploads/...)
+        ///  RELEASE: relative URL (/uploads/...).
         /// </summary>
-        /// <param name="file">Image file to upload (multipart/form-data)</param>
+        /// <param name="form">Image file to upload (multipart/form-data)</param>
         /// <returns>A message and the URL of the uploaded file.</returns>
         [HttpPost("image")]
         [Authorize(Roles = "User, Admin")]
         [RequestSizeLimit(MaxFileSizeBytes)]
-        public async Task<IActionResult> UploadFile([FromForm] IFormFile file)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadFile([FromForm] ImageUploadForm form)
         {
+            var file = form?.File;
             if (file == null || file.Length == 0)
             {
                 return this.BadRequest(new FileUploadResponse(false, "No file uploaded.", null!));
@@ -69,7 +78,12 @@
                 await file.CopyToAsync(stream);
             }
 
-            var fileUrl = $"/uploads/{uniqueName}";
+            string fileUrl;
+#if DEBUG
+            fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueName}";
+#else
+            fileUrl = $"/uploads/{uniqueName}";
+#endif
 
             return this.Ok(new FileUploadResponse(true, "File uploaded successfully.", fileUrl));
         }
