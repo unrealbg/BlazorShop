@@ -21,7 +21,7 @@ namespace BlazorShop.Web
             builder.RootComponents.Add<App>("#app");
             builder.RootComponents.Add<HeadOutlet>("head::after");
 
-            builder.Services.AddScoped<IBrowserCookieStorageService, BrowserCookieStorageService>();
+            builder.Services.AddSingleton<IBrowserCookieStorageService, BrowserCookieStorageService>();
             builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
             builder.Services.AddScoped<ITokenService, TokenService>();
             builder.Services.AddScoped<IHttpClientHelper, HttpClientHelper>();
@@ -31,12 +31,21 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<RefreshTokenHandler>();
+#if DEBUG
             builder.Services.AddHttpClient(
                 Constant.ApiClient.Name,
                 opt =>
                     {
                         opt.BaseAddress = new Uri("https://localhost:7094/api/");
                     }).AddHttpMessageHandler<RefreshTokenHandler>();
+#else
+            var apiBase = new Uri(new Uri(builder.HostEnvironment.BaseAddress), "api/");
+
+            builder.Services.AddHttpClient(
+                Constant.ApiClient.Name,
+                client => { client.BaseAddress = apiBase; }
+            ).AddHttpMessageHandler<RefreshTokenHandler>();
+#endif
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<ICartService, CartService>();
