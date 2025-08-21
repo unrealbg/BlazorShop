@@ -2,6 +2,7 @@
 {
     using BlazorShop.Application.DTOs;
 
+    using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
 
@@ -11,42 +12,66 @@
     {
         private readonly IWebHostEnvironment _environment;
 
+        private const long MaxFileSizeBytes = 5 * 1024 * 1024;
+        private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif",
+            "image/bmp"
+        };
+
         public FileUploadController(IWebHostEnvironment environment)
         {
             _environment = environment;
         }
 
         /// <summary>
-        ///  Uploads a file to the server.
+        ///  Uploads an image to the server and returns its relative URL (e.g. /uploads/{file}).
         /// </summary>
-        /// <param name="file"></param>
+        /// <param name="file">Image file to upload (multipart/form-data)</param>
         /// <returns>A message and the URL of the uploaded file.</returns>
         [HttpPost("image")]
-        public async Task<IActionResult> UploadFile(IFormFile file)
+        [Authorize(Roles = "User, Admin")]
+        [RequestSizeLimit(MaxFileSizeBytes)]
+        public async Task<IActionResult> UploadFile([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
             {
-                return this.BadRequest("No file uploaded.");
+                return this.BadRequest(new FileUploadResponse(false, "No file uploaded.", null!));
             }
 
-            var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\uploads");
-
-            if (!Directory.Exists(uploadsPath))
+            if (file.Length > MaxFileSizeBytes)
             {
-                Directory.CreateDirectory(uploadsPath);
+                return this.BadRequest(new FileUploadResponse(false, $"File too large. Max {(MaxFileSizeBytes / (1024 * 1024))}MB.", null!));
             }
 
-            var filePath = Path.Combine(uploadsPath, file.FileName);
+            if (!AllowedContentTypes.Contains(file.ContentType))
+            {
+                return this.BadRequest(new FileUploadResponse(false, "Invalid file type. Only image files are allowed.", null!));
+            }
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            var uploadsPath = Path.Combine(_environment.ContentRootPath, "uploads");
+            Directory.CreateDirectory(uploadsPath);
+
+            var ext = Path.GetExtension(file.FileName);
+            if (string.IsNullOrWhiteSpace(ext))
+            {
+                ext = ".bin";
+            }
+            var safeExt = ext.ToLowerInvariant();
+            var uniqueName = $"{Guid.NewGuid():N}{safeExt}";
+            var filePath = Path.Combine(uploadsPath, uniqueName);
+
+            await using (var stream = System.IO.File.Create(filePath))
             {
                 await file.CopyToAsync(stream);
             }
 
-            var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{file.FileName}";
+            var fileUrl = $"/uploads/{uniqueName}";
 
-            return this.Ok(
-                new FileUploadResponse { Success = true, Message = "File uploaded successfully.", Url = fileUrl });
+            return this.Ok(new FileUploadResponse(true, "File uploaded successfully.", fileUrl));
         }
     }
 }
