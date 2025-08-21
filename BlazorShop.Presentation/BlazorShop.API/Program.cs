@@ -1,5 +1,6 @@
 namespace BlazorShop.API
 {
+    using System.Net;
     using System.Text.Json.Serialization;
 
     using BlazorShop.Application;
@@ -7,7 +8,9 @@ namespace BlazorShop.API
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.HttpOverrides;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.FileProviders;
     using Microsoft.Extensions.Hosting;
 
     using Serilog;
@@ -47,20 +50,34 @@ namespace BlazorShop.API
                                         .AllowCredentials()
                                     //.WithOrigins("https://localhost:7258");
                                         .SetIsOriginAllowed(origin =>
-                                            origin.StartsWith("http://localhost") ||
+#if DEBUG 
+                                  origin.StartsWith("http://localhost") ||
                                             origin.StartsWith("https://localhost"));
+#else
+                                origin.StartsWith("http://shop.unrealbg.com") ||
+                                            origin.StartsWith("https://shop.unrealbg.com"));
+#endif
                                 });
                     });
 
             try
             {
                 var app = builder.Build();
+#if DEBUG
 
-                // Apply EF Core migrations at startup
+#else
+                app.UseForwardedHeaders(new ForwardedHeadersOptions
+                {
+                    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+                    KnownProxies = { IPAddress.Parse("10.147.18.200") },
+                    ForwardLimit = 1
+                });
+#endif
+                // Create database schema at startup (no migrations present yet)
                 using (var scope = app.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    db.Database.Migrate();
+                    db.Database.EnsureCreated();
                 }
 
                 app.UseCors();
@@ -73,7 +90,23 @@ namespace BlazorShop.API
                     app.UseSwaggerUI();
                 }
 
-                app.UseStaticFiles();
+                var uploadsPath = Path.Combine(builder.Environment.ContentRootPath, "uploads");
+                Directory.CreateDirectory(uploadsPath);
+
+                Log.Logger.Information("ContentRootPath: {ContentRoot}", builder.Environment.ContentRootPath);
+                Log.Logger.Information("Uploads path configured: {UploadsPath}", uploadsPath);
+
+                app.UseStaticFiles(new StaticFileOptions
+                {
+                    FileProvider = new PhysicalFileProvider(uploadsPath),
+                    RequestPath = "/uploads",
+                    ServeUnknownFileTypes = true,
+                    OnPrepareResponse = ctx =>
+                        {
+                            ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+                        }
+                });
+
 
                 app.UseInfrastructure();
 
