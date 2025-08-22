@@ -1,0 +1,46 @@
+name: Feature Request (v1)
+description: Propose a new feature for BlazorShop (WASM, .NET 9)
+title: "[Feature]: "
+labels:
+  - feature
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the feature.
+      placeholder: e.g., Add authentication with roles (User/Admin) and route guards
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve / value
+      description: What user problem does this feature solve? What is the value?
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Pages/components/APIs involved; include data model changes if any.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bullet list of conditions required to close the issue.
+      placeholder: |
+        - Route-guarded Admin pages
+        - JWT auth with refresh
+        - Persisted session across reloads
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size estimate
+      options:
+        - S
+        - M
+        - L
+        - XL
+    validations:
+      required: true
