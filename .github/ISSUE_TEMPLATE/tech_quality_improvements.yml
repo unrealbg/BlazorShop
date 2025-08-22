@@ -1,0 +1,56 @@
+name: Tech & Quality Improvement
+description: Create an improvement issue (performance, security, DX, architecture) for the Blazor WebAssembly app
+title: "[Improvement]: "
+labels:
+  - enhancement
+  - blazor
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: What area does this improvement target?
+      options:
+        - Performance (WASM, AOT, lazy load)
+        - Security (CSP, headers, secrets)
+        - DX / Tooling (CI/CD, tests)
+        - Architecture (state, interop)
+        - Observability (OTEL)
+        - UI/UX (Tailwind, accessibility)
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the improvement.
+      placeholder: e.g., Enable WASM AOT publish and Brotli to reduce initial payload and improve first load
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Additional context, related routes/components, links, screenshots.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bullet list of conditions required to close the issue.
+      placeholder: |
+        - Separate publish profile with AOT
+        - Brotli compression enabled for static assets
+        - Measurable first-load improvement
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size estimate
+      options:
+        - XS
+        - S
+        - M
+        - L
+    validations:
+      required: true
