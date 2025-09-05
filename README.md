@@ -138,7 +138,106 @@ Default dev URLs (may vary by environment):
 - CORS allows localhost HTTP/HTTPS origins
 
 ## Screenshots
-*(Screenshots table unchanged, already correct)*
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/20.png" width="150" alt="Sign Up screen"/><br>
+      <small>Sign Up</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/19.png" width="150" alt="Sign In screen"/><br>
+      <small>Sign In</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/21.png" width="150" alt="Subscribe to newsletter"/><br>
+      <small>Subscribe to Newsletter</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/1.png" width="150" alt="Home page"/><br>
+      <small>Home</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/2.png" width="150" alt="Profile page"/><br>
+      <small>Profile</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/3.png" width="150" alt="Orders list"/><br>
+      <small>Orders</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/4.png" width="150" alt="Cart page"/><br>
+      <small>Cart</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/5.png" width="150" alt="Product quick view modal"/><br>
+      <small>Product Quick View</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/6.png" width="150" alt="Latest products section"/><br>
+      <small>Latest Products</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/7.png" width="150" alt="Choose payment method dialog"/><br>
+      <small>Choose Payment Method</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/8.png" width="150" alt="Bank transfer instructions"/><br>
+      <small>Bank Transfer Instructions</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/9.png" width="150" alt="Stripe checkout page"/><br>
+      <small>Stripe Checkout</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/10.png" width="150" alt="Admin dashboard"/><br>
+      <small>Admin Dashboard</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/11.png" width="150" alt="Manage products"/><br>
+      <small>Manage Products</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/15.png" width="150" alt="Manage orders"/><br>
+      <small>Manage Orders</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/12.png" width="150" alt="Manage categories"/><br>
+      <small>Manage Categories</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/13.png" width="150" alt="Add product form"/><br>
+      <small>Add Product</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/14.png" width="150" alt="Add variants modal"/><br>
+      <small>Add Variants</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/16.png" width="150" alt="Edit tracking modal"/><br>
+      <small>Edit Tracking</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/18.png" width="150" alt="Browse by category menu"/><br>
+      <small>Browse by Category</small>
+    </td>
+    <td align="center">
+      <img src="https://www.unrealbg.com/blazorshop/17.png" width="150" alt="Search suggestions"/><br>
+      <small>Search Suggestions</small>
+    </td>
+  </tr>
+</table>
 
 ## Contributing
 1. Fork the repository.
