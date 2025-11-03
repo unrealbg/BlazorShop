@@ -19,10 +19,10 @@ namespace BlazorShop.Infrastructure.Data
 
             var configuration = builder.Build();
             var connectionString = configuration.GetConnectionString("DefaultConnection")
-                                   ?? "Server=(localdb)\\mssqllocaldb;Database=BlazorShopDb;Trusted_Connection=True;TrustServerCertificate=True";
+                                   ?? "Host=localhost;Port=5432;Database=blazorshop;Username=postgres;Password=postgres";
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            optionsBuilder.UseSqlServer(connectionString);
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new AppDbContext(optionsBuilder.Options);
         }
