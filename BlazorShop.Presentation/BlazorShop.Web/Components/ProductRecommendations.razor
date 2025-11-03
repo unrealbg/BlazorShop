@@ -1,0 +1,87 @@
+@if (_recommendations != null && _recommendations.Any())
+{
+	<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-6">
+		<div class="bg-white/80 rounded-xl shadow p-6">
+			<h3 class="text-xl font-bold text-neutral-900 mb-4">You Might Also Like</h3>
+
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+				@foreach (var product in _recommendations)
+				{
+					<article class="group relative overflow-hidden rounded-lg border border-neutral-200 bg-white hover:shadow-lg transition-shadow cursor-pointer" @onclick="() => NavigateToProduct(product.Id)">
+						<div class="aspect-square overflow-hidden bg-neutral-100">
+							@if (!string.IsNullOrEmpty(product.Image))
+							{
+								<img src="@product.Image" alt="@product.Name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+							}
+							else
+							{
+								<div class="w-full h-full flex items-center justify-center text-neutral-400">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+									</svg>
+								</div>
+							}
+						</div>
+
+						<div class="p-3">
+							<h4 class="font-semibold text-sm text-neutral-900 truncate mb-1">@product.Name</h4>
+
+							@if (!string.IsNullOrEmpty(product.CategoryName))
+							{
+								<p class="text-xs text-neutral-500 mb-2">@product.CategoryName</p>
+							}
+
+							<div class="flex items-center justify-between">
+								<span class="text-lg font-bold text-emerald-600">ˆ @product.Price.ToString("F2")</span>
+								<button class="text-xs px-2 py-1 rounded bg-neutral-900 text-white hover:bg-neutral-800 transition-colors" @onclick:stopPropagation="true" @onclick="() => QuickView(product.Id)">
+									Quick View
+								</button>
+							</div>
+						</div>
+					</article>
+				}
+			</div>
+		</div>
+	</section>
+}
+
+@code {
+	private IEnumerable<GetProductRecommendation>? _recommendations;
+
+	[Parameter]
+	public Guid ProductId { get; set; }
+
+	[Parameter]
+	public EventCallback<Guid> OnProductClick { get; set; }
+
+	[Inject]
+	private IProductRecommendationService RecommendationService { get; set; } = default!;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (ProductId != Guid.Empty)
+		{
+			try
+			{
+				_recommendations = await RecommendationService.GetRecommendationsAsync(ProductId);
+			}
+			catch
+			{
+				_recommendations = null;
+			}
+		}
+	}
+
+	private void NavigateToProduct(Guid productId)
+	{
+		NavigationManager.NavigateTo($"/product/{productId}", forceLoad: true);
+	}
+
+	private async Task QuickView(Guid productId)
+	{
+		if (OnProductClick.HasDelegate)
+		{
+			await OnProductClick.InvokeAsync(productId);
+		}
+	}
+}

@@ -1,6 +1,7 @@
 ﻿namespace BlazorShop.Application
 {
     using BlazorShop.Application.Mapping;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services;
     using BlazorShop.Application.Services.Authentication;
     using BlazorShop.Application.Services.Contracts;
@@ -13,16 +14,20 @@
     using FluentValidation;
     using FluentValidation.AspNetCore;
 
+    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
 
-    public static class DependencyInjection 
+    public static class DependencyInjection
     {
-        public static IServiceCollection AddApplication(this IServiceCollection services)
+        public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddAutoMapper(typeof(MappingConfig));
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<IProductVariantService, ProductVariantService>();
+            services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
+
+            services.Configure<RecommendationOptions>(configuration.GetSection(RecommendationOptions.SectionName));
 
             services.AddFluentValidationAutoValidation();
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
