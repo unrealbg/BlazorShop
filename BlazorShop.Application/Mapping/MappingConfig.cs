@@ -25,6 +25,9 @@
             this.CreateMap<Product, GetProduct>()
                 .ForMember(dest => dest.Variants, opt => opt.MapFrom(src => src.Variants));
 
+            this.CreateMap<Product, GetProductRecommendation>()
+                .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null));
+
             this.CreateMap<CreateProductVariant, ProductVariant>();
             this.CreateMap<UpdateProductVariant, ProductVariant>();
             this.CreateMap<ProductVariant, GetProductVariant>();
