@@ -12,6 +12,11 @@
             public const string Variants = "product"; // base for product-specific variant routes
         }
 
+        public static class ProductRecommendation
+        {
+            public const string Get = "productrecommendation";
+        }
+
         public static class Category
         {
             public const string GetAll = "category/all";
