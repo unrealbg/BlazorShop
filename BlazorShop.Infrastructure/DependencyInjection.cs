@@ -18,7 +18,7 @@
     using BlazorShop.Infrastructure.Repositories.Payment;
     using BlazorShop.Infrastructure.Services;
 
-    using EntityFramework.Exceptions.SqlServer;
+    using EntityFramework.Exceptions.PostgreSQL;
 
     using Microsoft.AspNetCore.Authentication.JwtBearer;
     using Microsoft.AspNetCore.Builder;
@@ -35,12 +35,12 @@
         {
             services.AddDbContext<AppDbContext>(
                 opt => opt
-                    .UseSqlServer(
+                    .UseNpgsql(
                         config.GetConnectionString("DefaultConnection"),
-                        sqlOptions =>
+                        npgsqlOptions =>
                             {
-                                sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
-                                sqlOptions.EnableRetryOnFailure();
+                                npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                                npgsqlOptions.EnableRetryOnFailure();
                             })
                     .UseExceptionProcessor()
                     .ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning))
@@ -100,6 +100,12 @@
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 
             services.AddScoped<ICart, CartRepository>();
+
+            // Product recommendations
+            services.AddScoped<IProductRecommendationRepository, ProductRecommendationRepository>();
+
+            // Add memory cache for recommendations
+            services.AddMemoryCache();
 
             Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
 
