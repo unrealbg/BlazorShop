@@ -1,6 +1,5 @@
 namespace BlazorShop.API
 {
-    using System.Net;
     using System.Text.Json.Serialization;
 
     using BlazorShop.Application;
@@ -8,8 +7,6 @@ namespace BlazorShop.API
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.AspNetCore.Builder;
-    using Microsoft.AspNetCore.HttpOverrides;
-    using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.FileProviders;
     using Microsoft.Extensions.Hosting;
 
@@ -38,7 +35,7 @@ namespace BlazorShop.API
             builder.AddServiceDefaults();
 
             builder.Services.AddInfrastructure(builder.Configuration);
-            builder.Services.AddApplication();
+            builder.Services.AddApplication(builder.Configuration);
             builder.Services.AddCors(
                 co =>
                     {
@@ -54,8 +51,8 @@ namespace BlazorShop.API
                                   origin.StartsWith("http://localhost") ||
                                             origin.StartsWith("https://localhost"));
 #else
-                                origin.StartsWith("http://shop.unrealbg.com") ||
-                                            origin.StartsWith("https://shop.unrealbg.com"));
+                                origin.StartsWith("http://shop.mydomain.com") ||
+                                            origin.StartsWith("https://shop.mydomain.com"));
 #endif
                                 });
                     });
@@ -69,7 +66,7 @@ namespace BlazorShop.API
                 app.UseForwardedHeaders(new ForwardedHeadersOptions
                 {
                     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-                    KnownProxies = { IPAddress.Parse("10.147.18.200") },
+                    KnownProxies = { IPAddress.Parse("1.1.1.200") },
                     ForwardLimit = 1
                 });
 #endif
@@ -106,7 +103,6 @@ namespace BlazorShop.API
                             ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
                         }
                 });
-
 
                 app.UseInfrastructure();
 
