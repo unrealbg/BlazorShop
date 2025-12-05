@@ -88,5 +88,11 @@
         {
             public const string Subscribe = "newsletter/subscribe";
         }
+
+        public static class Metrics
+        {
+            public const string Sales = "metrics/sales";
+            public const string Traffic = "metrics/traffic";
+        }
     }
 }

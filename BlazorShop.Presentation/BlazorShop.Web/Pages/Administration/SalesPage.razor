@@ -30,12 +30,65 @@
       </div>
     </div>
 
-    <article class="mt-6 rounded border">
-      <div class="px-4 py-2 bg-neutral-100 font-semibold">Revenue (last 14 days)</div>
-      <div class="p-4" style="height: 220px;">
-        <canvas id="revChart"></canvas>
+    <section class="mt-6 rounded border bg-white/90 shadow-sm">
+      <div class="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div class="text-sm text-neutral-500">Sales &amp; Traffic</div>
+          <div class="text-lg font-semibold">@GetMetricsRangeLabel()</div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <div class="flex gap-1">
+            @foreach (var range in new[] { 7, 30, 90 })
+            {
+              var active = IsQuickRangeSelected(range);
+              <button class="px-3 py-1 rounded border @(active ? "bg-neutral-900 text-white" : "bg-white text-neutral-800")" disabled="@_metricsLoading" @onclick="async () => await ApplyQuickRangeAsync(range)">@range d</button>
+            }
+          </div>
+          <input type="date" class="px-2 py-1 rounded border" value="@_metricsFrom.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, true)" disabled="@_metricsLoading" />
+          <span>→</span>
+          <input type="date" class="px-2 py-1 rounded border" value="@_metricsTo.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, false)" disabled="@_metricsLoading" />
+          <select class="px-2 py-1 rounded border" value="@_metricsGranularity" @onchange="async e => await OnGranularityChangedAsync(e)" disabled="@_metricsLoading">
+            <option value="day">Daily</option>
+            <option value="week">Weekly</option>
+            <option value="month">Monthly</option>
+          </select>
+        </div>
       </div>
-    </article>
+      <div class="p-4">
+        @if (_metricsLoading)
+        {
+          <div class="text-sm text-neutral-500">Loading metrics…</div>
+        }
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <article class="rounded border bg-neutral-50 p-4">
+            <div class="flex items-center justify-between text-sm text-neutral-500">
+              <span>Sales</span>
+              <span class="uppercase tracking-wide">@_salesSeries?.Granularity</span>
+            </div>
+            <div class="text-2xl font-bold mt-2">€@(_salesSeries?.Total.ToString("F2") ?? "0.00")</div>
+            <div class="text-xs text-neutral-500">Prev: €@(_salesSeries?.PreviousTotal.ToString("F2") ?? "0.00")
+              <span class="ml-1 font-semibold @(GetTrendClass(_salesSeries?.TrendPercentage ?? 0))">@FormatTrend(_salesSeries?.TrendPercentage ?? 0)</span>
+            </div>
+            <div class="mt-4" style="height: 220px;">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </article>
+          <article class="rounded border bg-neutral-50 p-4">
+            <div class="flex items-center justify-between text-sm text-neutral-500">
+              <span>Traffic</span>
+              <span class="uppercase tracking-wide">@_trafficSeries?.Granularity</span>
+            </div>
+            <div class="text-2xl font-bold mt-2">@(_trafficSeries?.Total.ToString("N0") ?? "0") visits</div>
+            <div class="text-xs text-neutral-500">Prev: @(_trafficSeries?.PreviousTotal.ToString("N0") ?? "0")
+              <span class="ml-1 font-semibold @(GetTrendClass(_trafficSeries?.TrendPercentage ?? 0))">@FormatTrend(_trafficSeries?.TrendPercentage ?? 0)</span>
+            </div>
+            <div class="mt-4" style="height: 220px;">
+              <canvas id="trafficChart"></canvas>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4 text-sm">
       <div class="rounded border p-3 text-neutral-700"><b>Pending</b>: @_pendingCount</div>

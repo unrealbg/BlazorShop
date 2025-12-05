@@ -8,6 +8,7 @@
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Contracts.CategoryPersistence;
+    using BlazorShop.Domain.Contracts.Newsletters;
     using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Data;
@@ -15,6 +16,7 @@
     using BlazorShop.Infrastructure.Repositories;
     using BlazorShop.Infrastructure.Repositories.Authentication;
     using BlazorShop.Infrastructure.Repositories.CategoryPersistence;
+    using BlazorShop.Infrastructure.Repositories.Newsletters;
     using BlazorShop.Infrastructure.Repositories.Payment;
     using BlazorShop.Infrastructure.Services;
 
@@ -96,6 +98,7 @@
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<IOrderTrackingService, OrderTrackingService>();
             services.AddScoped<IOrderQueryService, OrderQueryService>();
+            services.AddScoped<INewsletterSubscriberRepository, NewsletterSubscriberRepository>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 
