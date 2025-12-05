@@ -3,9 +3,12 @@
     using System;
     using System.Linq;
     using System.Collections.Generic;
+    using System.Globalization;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
+    using BlazorShop.Web.Shared.Models.Analytics;
+    using BlazorShop.Web.Shared.Services.Contracts;
     using Microsoft.AspNetCore.Components;
     using Microsoft.JSInterop;
 
@@ -32,6 +35,13 @@
 
         private List<(string Name, int Quantity, decimal Revenue)> _topProducts = new();
 
+        private MetricsSeriesModel? _salesSeries;
+        private MetricsSeriesModel? _trafficSeries;
+        private bool _metricsLoading;
+        private string _metricsGranularity = "day";
+        private DateTime _metricsFrom = DateTime.UtcNow.Date.AddDays(-13);
+        private DateTime _metricsTo = DateTime.UtcNow.Date;
+
         private bool _showEdit; 
         private GetOrder? _editOrder;
         private string _carrier = string.Empty;
@@ -40,6 +50,7 @@
         private string _shippingStatus = "PendingShipment";
 
         [Inject] private IJSRuntime JS { get; set; } = default!;
+        [Inject] private IMetricsClient MetricsClient { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
         {
@@ -60,7 +71,7 @@
             ComputeStats();
             ApplyFilters();
             BuildTopProducts();
-            await RenderRevenueChartAsync();
+            await LoadMetricsAsync();
         }
 
         private void ComputeStats()
@@ -163,22 +174,193 @@
             }
         }
 
-        private async Task RenderRevenueChartAsync()
+        private async Task LoadMetricsAsync()
         {
+            _metricsLoading = true;
+            StateHasChanged();
+
             try
             {
-                var start = DateTime.UtcNow.Date.AddDays(-13);
-                var labels = Enumerable.Range(0, 14)
-                    .Select(i => start.AddDays(i))
-                    .Select(d => d.ToString("MM-dd"))
-                    .ToArray();
-                var values = Enumerable.Range(0, 14)
-                    .Select(i => start.AddDays(i))
-                    .Select(d => _orders.Where(o => o.CreatedOn.Date == d).Sum(o => o.TotalAmount))
-                    .ToArray();
-                await JS.InvokeVoidAsync("blz.renderLineChart", "revChart", labels, values);
+                var filter = new MetricsFilterModel
+                {
+                    From = _metricsFrom,
+                    To = _metricsTo,
+                    Granularity = _metricsGranularity
+                };
+
+                var salesTask = MetricsClient.GetSalesAsync(filter);
+                var trafficTask = MetricsClient.GetTrafficAsync(filter);
+                await Task.WhenAll(salesTask, trafficTask);
+
+                _salesSeries = salesTask.Result;
+                _trafficSeries = trafficTask.Result;
+
+                if (_salesSeries is null || _trafficSeries is null)
+                {
+                    _salesSeries = null;
+                    _trafficSeries = null;
+                    ToastService.ShowErrorToast("Failed to load analytics data.");
+                    return;
+                }
+
+                await RenderChartsAsync();
             }
-            catch { }
+            catch
+            {
+                ToastService.ShowErrorToast("Failed to load analytics data.");
+            }
+            finally
+            {
+                _metricsLoading = false;
+                StateHasChanged();
+            }
+        }
+
+        private async Task RenderChartsAsync()
+        {
+            if (_salesSeries is not null)
+            {
+                var labels = BuildLabels(_salesSeries);
+                var values = _salesSeries.Points.Select(p => p.Value).ToArray();
+                await JS.InvokeVoidAsync(
+                    "blz.renderLineChart",
+                    "salesChart",
+                    labels,
+                    values,
+                    new
+                    {
+                        label = "Revenue (€)",
+                        color = "#0ea5e9",
+                        backgroundColor = "rgba(14,165,233,0.15)"
+                    });
+            }
+
+            if (_trafficSeries is not null)
+            {
+                var labels = BuildLabels(_trafficSeries);
+                var values = _trafficSeries.Points.Select(p => p.Value).ToArray();
+                await JS.InvokeVoidAsync(
+                    "blz.renderLineChart",
+                    "trafficChart",
+                    labels,
+                    values,
+                    new
+                    {
+                        label = "Traffic (sign-ups)",
+                        color = "#a855f7",
+                        backgroundColor = "rgba(168,85,247,0.15)"
+                    });
+            }
+        }
+
+        private static string[] BuildLabels(MetricsSeriesModel series)
+        {
+            return series.Points
+                .Select(point => FormatLabel(point.PeriodStart, series.Granularity))
+                .ToArray();
+        }
+
+        private static string FormatLabel(DateTime timestamp, string? granularity)
+        {
+            var token = granularity?.ToLowerInvariant();
+            return token switch
+            {
+                "week" => $"W{ISOWeek.GetWeekOfYear(timestamp)}",
+                "month" => timestamp.ToString("MMM yyyy", CultureInfo.InvariantCulture),
+                _ => timestamp.ToString("dd MMM", CultureInfo.InvariantCulture)
+            };
+        }
+
+        private async Task ApplyQuickRangeAsync(int days)
+        {
+            if (days <= 0)
+            {
+                return;
+            }
+
+            _metricsTo = DateTime.UtcNow.Date;
+            _metricsFrom = _metricsTo.AddDays(-(days - 1));
+            await LoadMetricsAsync();
+        }
+
+        private async Task OnMetricsDateChangedAsync(ChangeEventArgs args, bool isStart)
+        {
+            if (!DateTime.TryParse(args.Value?.ToString(), out var parsed))
+            {
+                return;
+            }
+
+            var normalized = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
+
+            if (isStart)
+            {
+                _metricsFrom = normalized;
+            }
+            else
+            {
+                _metricsTo = normalized;
+            }
+
+            if (_metricsFrom > _metricsTo)
+            {
+                ToastService.ShowErrorToast("Invalid date range.");
+                return;
+            }
+
+            await LoadMetricsAsync();
+        }
+
+        private async Task OnGranularityChangedAsync(ChangeEventArgs args)
+        {
+            var value = args.Value?.ToString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            _metricsGranularity = value;
+            await LoadMetricsAsync();
+        }
+
+        private string GetMetricsRangeLabel()
+        {
+            return $"{_metricsFrom.ToLocalTime():dd MMM} - {_metricsTo.ToLocalTime():dd MMM}";
+        }
+
+        private static string FormatTrend(decimal value)
+        {
+            if (value > 0)
+            {
+                return $"+{value:F1}%";
+            }
+
+            if (value < 0)
+            {
+                return $"{value:F1}%";
+            }
+
+            return "0%";
+        }
+
+        private static string GetTrendClass(decimal value)
+        {
+            if (value > 0)
+            {
+                return "text-emerald-600";
+            }
+
+            if (value < 0)
+            {
+                return "text-rose-600";
+            }
+
+            return "text-neutral-600";
+        }
+
+        private bool IsQuickRangeSelected(int days)
+        {
+            var span = (_metricsTo.Date - _metricsFrom.Date).TotalDays + 1;
+            return Math.Abs(span - days) < 0.1;
         }
 
         private async Task ExportCsvAsync()
