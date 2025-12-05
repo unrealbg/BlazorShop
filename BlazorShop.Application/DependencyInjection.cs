@@ -25,6 +25,7 @@
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<IProductVariantService, ProductVariantService>();
             services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
+            services.AddScoped<IMetricsService, MetricsService>();
 
             services.Configure<RecommendationOptions>(configuration.GetSection(RecommendationOptions.SectionName));
 
