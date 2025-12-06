@@ -58,9 +58,9 @@
                                         {
                                             <tr>
                                                 <td class="px-3 py-2 align-top">@product.Id</td>
-                                                <td class="px-3 py-2 align-top"><img src="@product.Image" alt="@product.Name" class="h-12 w-12 object-cover rounded" /></td>
-                                                <td class="px-3 py-2 align-top">@product.Name</td>
-                                                <td class="px-3 py-2 align-top">@product.Description</td>
+                                                <td class="px-3 py-2 align-top"><img src="@(product.Image ?? string.Empty)" alt="@(product.Name ?? "Product image")" class="h-12 w-12 object-cover rounded" /></td>
+                                                <td class="px-3 py-2 align-top">@(product.Name ?? string.Empty)</td>
+                                                <td class="px-3 py-2 align-top">@(product.Description ?? string.Empty)</td>
                                                 <td class="px-3 py-2 align-top">@product.Price</td>
                                                 <td class="px-3 py-2 align-top">@product.Quantity</td>
                                                 <td class="px-3 py-2 align-top">@product.CreatedOn</td>
@@ -136,7 +136,7 @@
                     <label for="category" class="block text-xs text-neutral-600 mb-1">Category</label>
                     <InputSelect id="category" class="w-full border rounded px-3 py-2" @bind-Value="_product.CategoryId">
                         <option value="" selected>-- Select a Category --</option>
-                        @foreach (var category in _categories)
+                        @foreach (var category in _categories ?? Array.Empty<GetCategory>())
                         {
                             <option value="@category.Id">@category.Name</option>
                         }
@@ -286,7 +286,7 @@
                         <label for="edit-category" class="block text-xs text-neutral-600 mb-1">Category</label>
                         <InputSelect id="edit-category" class="w-full border rounded px-3 py-2" @bind-Value="_editProduct.CategoryId">
                             <option value="" selected>-- Select a Category --</option>
-                            @foreach (var category in _categories)
+                            @foreach (var category in _categories ?? Array.Empty<GetCategory>())
                             {
                                 <option value="@category.Id">@category.Name</option>
                             }

@@ -11,30 +11,36 @@
         {
             try
             {
-                if (apiCall.Client == null)
-                {
-                    throw new ArgumentNullException(nameof(apiCall.Client), "HttpClient cannot be null");
-                }
+                var client = apiCall.Client ?? throw new ArgumentNullException(nameof(apiCall.Client), "HttpClient cannot be null");
                 if (string.IsNullOrWhiteSpace(apiCall.Route))
                 {
                     throw new ArgumentException("Route cannot be null or empty", nameof(apiCall.Route));
                 }
 
-                switch (apiCall.Type.ToLower())
+                var route = apiCall.Route;
+
+                if (string.IsNullOrWhiteSpace(apiCall.Type))
+                {
+                    throw new ArgumentException("API call type is required.", nameof(apiCall.Type));
+                }
+
+                var callType = apiCall.Type.ToLowerInvariant();
+
+                switch (callType)
                 {
                     case "post":
                         if (apiCall.Model is HttpContent content)
                         {
-                            return await apiCall.Client!.PostAsync(apiCall.Route, content);
+                            return await client.PostAsync(route, content);
                         }
-                        return await apiCall.Client!.PostAsJsonAsync(apiCall.Route, (TModel)apiCall.Model!);
+                        return await client.PostAsJsonAsync(route, (TModel)apiCall.Model!);
                     case "update":
-                        return await apiCall.Client.PutAsJsonAsync(apiCall.Route, (TModel)apiCall.Model!);
+                        return await client.PutAsJsonAsync(route, (TModel)apiCall.Model!);
                     case "delete":
-                        return await apiCall.Client.DeleteAsync($"{apiCall.Route}/{apiCall.Id}");
+                        return await client.DeleteAsync($"{route}/{apiCall.Id}");
                     case "get":
                         string idRoute = apiCall.Id != null ? $"/{apiCall.Id}" : string.Empty;
-                        return await apiCall.Client.GetAsync($"{apiCall.Route}{idRoute}");
+                        return await client.GetAsync($"{route}{idRoute}");
                     default:
                         throw new InvalidOperationException("Invalid API call type");
                 }

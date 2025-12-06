@@ -19,7 +19,7 @@
 
         public void ClearToasts()
         {
-            OnShow?.Invoke(this, new ToastEventArgs(default, null, null, default, default, false, 0));
+            OnShow?.Invoke(this, new ToastEventArgs(default, string.Empty, string.Empty, default, default, false, 0));
         }
 
         public void ShowWarningToast(string message, string heading = "Warning", int duration = 5000)

@@ -453,7 +453,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             _tokenManagerMock
                 .Setup(t => t.GetUserIdByRefreshTokenAsync(refreshToken))
-                .ReturnsAsync((string)null);
+                .ReturnsAsync((string)null!);
 
             // Act
             var result = await _authenticationService.ReviveToken(refreshToken);
@@ -497,7 +497,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             _userManagerMock
                 .Setup(u => u.GetUserByIdAsync(It.IsAny<string>()))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser)null!);
 
             // Act
             var result = await _authenticationService.ChangePassword(changePasswordDto, "invalid-user-id");
@@ -613,7 +613,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             _userManagerMock
                 .Setup(u => u.GetUserByIdAsync(userId))
-                .ReturnsAsync((AppUser)null);
+                .ReturnsAsync((AppUser)null!);
 
             // Act
             var result = await _authenticationService.ConfirmEmail(userId, token);

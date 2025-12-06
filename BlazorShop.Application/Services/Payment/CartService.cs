@@ -167,7 +167,12 @@
 
             foreach (var customerId in groupByCustomerId)
             {
-                var customerDetails = await _userManager.GetUserByIdAsync(customerId.Key!);
+                if (string.IsNullOrWhiteSpace(customerId.Key))
+                {
+                    continue;
+                }
+
+                var customerDetails = await _userManager.GetUserByIdAsync(customerId.Key);
 
                 foreach (var item in customerId)
                 {
@@ -178,7 +183,7 @@
                         CustomerName = customerDetails?.UserName,
                         CustomerEmail = customerDetails?.Email,
                         ProductName = product?.Name,
-                        AmountPayed = item.Quantity * product!.Price,
+                        AmountPayed = item.Quantity * (product?.Price ?? 0),
                         QuantityOrdered = item.Quantity,
                         DatePurchased = item.CreatedOn,
                         TrackingNumber = null,
@@ -209,15 +214,18 @@
                 .Select(ci => products
                     .FirstOrDefault(p => p.Id == ci.ProductId))
                 .Where(p => p != null)
+                .Cast<Product>()
                 .ToList();
 
             var totalAmount = carts
                 .Where(ci => cartProducts.Any(p => p.Id == ci.ProductId))
-                .Sum(ci => ci.Quantity * cartProducts
-                    .First(p => p.Id == ci.ProductId)!
-                    .Price);
+                .Sum(ci =>
+                {
+                    var product = cartProducts.FirstOrDefault(p => p.Id == ci.ProductId);
+                    return ci.Quantity * (product?.Price ?? 0);
+                });
 
-            return (cartProducts!, totalAmount);
+            return (cartProducts, totalAmount);
         }
 
         public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId(string userId)

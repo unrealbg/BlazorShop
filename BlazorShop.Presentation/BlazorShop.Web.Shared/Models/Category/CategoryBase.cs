@@ -5,6 +5,6 @@
     public class CategoryBase
     {
         [Required(ErrorMessage = "The Category Name field is required.")]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }

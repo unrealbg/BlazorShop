@@ -41,12 +41,18 @@
         {
             try
             {
-                string token = await _cookieStorage.GetAsync(key);
-                return token != null ? token.Split("--")[position] : null!;
+                var token = await _cookieStorage.GetAsync(key);
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    return string.Empty;
+                }
+
+                var parts = token.Split("--", StringSplitOptions.RemoveEmptyEntries);
+                return parts.Length > position ? parts[position] : string.Empty;
             }
             catch
             {
-                return null!;
+                return string.Empty;
             }
         }
     }

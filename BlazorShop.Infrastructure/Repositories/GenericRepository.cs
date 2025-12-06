@@ -50,7 +50,7 @@
             return await _ctx.Set<TEntity>().AsNoTracking().ToListAsync();
         }
 
-        public async Task<TEntity> GetByIdAsync(Guid id)
+        public async Task<TEntity?> GetByIdAsync(Guid id)
         {
             if (typeof(TEntity) == typeof(Product))
             {
@@ -58,7 +58,7 @@
                     .AsNoTracking()
                     .Include(p => p.Variants)
                     .FirstOrDefaultAsync(p => p.Id == id);
-                return (product as TEntity)!;
+                return product as TEntity;
             }
 
             return await _ctx.Set<TEntity>().FindAsync(id);

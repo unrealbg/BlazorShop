@@ -73,7 +73,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
 
             this._apiCallHelperMock
                 .Setup(a => a.ApiCallTypeCall<CreateUser>(It.IsAny<ApiCall>()))
-                .ReturnsAsync((HttpResponseMessage)null);
+                .ReturnsAsync((HttpResponseMessage)null!);
 
             this._apiCallHelperMock
                 .Setup(a => a.ConnectionError())
@@ -154,7 +154,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
 
             _apiCallHelperMock
                 .Setup(a => a.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>()))
-                .ReturnsAsync((HttpResponseMessage)null);
+                .ReturnsAsync((HttpResponseMessage)null!);
 
             // Act
             var result = await _authenticationService.LoginUser(user);
@@ -193,7 +193,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             var client = new HttpClient();
 
             _httpClientHelperMock.Setup(x => x.GetPrivateClientAsync()).ReturnsAsync(client);
-            _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync((HttpResponseMessage)null);
+            _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync((HttpResponseMessage)null!);
 
             // Act
             var result = await _authenticationService.LoginUser(user);
@@ -306,7 +306,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             // Arrange
             var refreshToken = "refreshToken";
             var httpClient = new HttpClient();
-            HttpResponseMessage apiCallResult = null;
+            HttpResponseMessage apiCallResult = null!;
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
             this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);

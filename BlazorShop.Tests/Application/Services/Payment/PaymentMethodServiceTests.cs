@@ -82,23 +82,19 @@ namespace BlazorShop.Tests.Application.Services.Payment
         }
 
         [Fact]
-        public async Task GetPaymentMethodsAsync_ShouldReturnEmptyList_WhenMethodsIsNull()
+        public async Task GetPaymentMethodsAsync_ShouldReturnEmptyList_WhenRepositoryReturnsNull()
         {
             // Arrange
-            IEnumerable<PaymentMethod> paymentMethods = null;
-            IEnumerable<GetPaymentMethod> mappedMethods = null;
             _paymentMethodMock
                 .Setup(pm => pm.GetPaymentMethodsAsync())
-                .ReturnsAsync(paymentMethods);
-            _mapperMock
-                .Setup(m => m.Map<IEnumerable<GetPaymentMethod>>(paymentMethods))
-                .Returns(mappedMethods);
+                .ReturnsAsync((IEnumerable<PaymentMethod>)null!);
 
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            {
-                await _paymentMethodService.GetPaymentMethodsAsync();
-            });
+            // Act
+            var result = await _paymentMethodService.GetPaymentMethodsAsync();
+
+            // Assert
+            Assert.Empty(result);
+            _mapperMock.Verify(m => m.Map<IEnumerable<GetPaymentMethod>>(It.IsAny<IEnumerable<PaymentMethod>>()), Times.Never);
         }
     }
 }

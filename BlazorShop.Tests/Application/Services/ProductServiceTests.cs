@@ -110,7 +110,7 @@
             // Arrange
             var productId = Guid.NewGuid();
             this._mockProductRepository.Setup(repo => repo.GetByIdAsync(productId))
-                .ReturnsAsync((Product)null);
+                .ReturnsAsync((Product?)null);
 
             // Act
             var result = await this._productService.GetByIdAsync(productId);
