@@ -38,7 +38,7 @@ namespace BlazorShop.Application.Services.Payment
         private async Task<Dictionary<Guid, string>> BuildProductNameMapAsync()
         {
             var all = await _products.GetAllAsync();
-            return all.ToDictionary(p => p.Id, p => p.Name);
+            return all.ToDictionary(p => p.Id, p => p.Name ?? string.Empty);
         }
 
         private async Task<IEnumerable<GetOrder>> MapWithUsersAsync(IEnumerable<Order> orders, IDictionary<Guid, string> nameMap)

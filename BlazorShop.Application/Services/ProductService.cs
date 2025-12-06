@@ -28,7 +28,7 @@
             return result.Any() ? mappedData : [];
         }
 
-        public async Task<GetProduct> GetByIdAsync(Guid id)
+        public async Task<GetProduct?> GetByIdAsync(Guid id)
         {
             var result = await _productRepository.GetByIdAsync(id);
             return result != null ? _mapper.Map<GetProduct>(result) : null;

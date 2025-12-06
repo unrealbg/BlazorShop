@@ -21,7 +21,7 @@
         {
             var methods = await this._paymentMethod.GetPaymentMethodsAsync();
 
-            if (!methods.Any())
+            if (methods == null || !methods.Any())
             {
                 return [];
             }

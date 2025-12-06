@@ -150,7 +150,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .ReturnsAsync(new HttpClient());
             this._apiCallHelperMock
                 .Setup(x => x.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
-                .ReturnsAsync((HttpResponseMessage)null);
+                .ReturnsAsync((HttpResponseMessage)null!);
 
             // Act
             var result = await this._cartService.GetOrderItemsAsync();
@@ -218,7 +218,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             // Arrange
             _apiCallHelperMock
                 .Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
-                .ReturnsAsync((HttpResponseMessage)null);
+                .ReturnsAsync((HttpResponseMessage)null!);
 
             // Act
             var result = await _cartService.GetCheckoutHistoryByUserId();

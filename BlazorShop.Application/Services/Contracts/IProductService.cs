@@ -7,7 +7,7 @@
     {
         Task<IEnumerable<GetProduct>> GetAllAsync();
 
-        Task<GetProduct> GetByIdAsync(Guid id);
+        Task<GetProduct?> GetByIdAsync(Guid id);
 
         Task<ServiceResponse> AddAsync(CreateProduct product);
 

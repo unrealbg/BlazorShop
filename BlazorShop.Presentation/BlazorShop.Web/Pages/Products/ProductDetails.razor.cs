@@ -44,15 +44,20 @@
                     return;
                 }
 
+                var variant = Product.Variants.FirstOrDefault(x => x.Id == _selectedVariantId);
+                if (variant is null)
+                {
+                    return;
+                }
+
                 if (OnAddToCartVariant.HasDelegate)
                 {
-                    var v = Product.Variants.First(x => x.Id == _selectedVariantId);
                     var payload = new ProcessCart
                     {
                         ProductId = Product.Id,
-                        VariantId = v.Id,
-                        SizeValue = v.SizeValue,
-                        UnitPrice = v.Price ?? Product.Price,
+                        VariantId = variant.Id,
+                        SizeValue = variant.SizeValue,
+                        UnitPrice = variant.Price ?? Product.Price,
                         Quantity = 1
                     };
                     await OnAddToCartVariant.InvokeAsync(payload);
@@ -62,7 +67,7 @@
                     await this.OnAddToCart.InvokeAsync(this.Product.Id);
                 }
             }
-            else if (this.OnAddToCart.HasDelegate)
+            else if (this.OnAddToCart.HasDelegate && Product != null)
             {
                 await this.OnAddToCart.InvokeAsync(this.Product.Id);
             }

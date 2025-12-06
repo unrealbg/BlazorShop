@@ -59,6 +59,11 @@
                 return validationResult;
             }
 
+            if (string.IsNullOrWhiteSpace(user.Email))
+            {
+                return new ServiceResponse { Message = "Email is required." };
+            }
+
             var mappedUser = _mapper.Map<AppUser>(user);
             mappedUser.UserName = user.Email;
             mappedUser.PasswordHash = user.Password;
@@ -85,13 +90,25 @@
             }
 
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
+            if (currentUser == null)
+            {
+                return new ServiceResponse { Message = "Unable to load the newly created user." };
+            }
+
             var users = await _userManager.GetAllUsersAsync();
 
-            bool assignedResult = await _roleManager.AddUserToRoleAsync(currentUser!, users.Count() > 1 ? "User" : "Admin");
+            bool assignedResult = await _roleManager.AddUserToRoleAsync(currentUser, users.Count() > 1 ? "User" : "Admin");
 
             if (!assignedResult)
             {
-                var removeUserResult = await _userManager.RemoveUserByEmail(currentUser!.Email!);
+                if (string.IsNullOrWhiteSpace(currentUser.Email))
+                {
+                    _logger.LogError(new InvalidOperationException("Cannot remove user after failed role assignment because email is missing."),
+                        "Cannot remove user after failed role assignment because email is missing.");
+                    return new ServiceResponse { Message = "Error occurred in creating account." };
+                }
+
+                var removeUserResult = await _userManager.RemoveUserByEmail(currentUser.Email);
 
                 if (removeUserResult <= 0)
                 {
@@ -112,7 +129,7 @@
 
             if (!validationResult.Success)
             {
-                return new LoginResponse { Message = validationResult.Message };
+                return new LoginResponse { Message = validationResult.Message ?? "Validation failed." };
             }
 
             var mappedUser = _mapper.Map<AppUser>(user);
@@ -126,14 +143,22 @@
             }
 
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
+            if (currentUser == null)
+            {
+                return new LoginResponse { Message = "Invalid credentials." };
+            }
 
-            if (!currentUser!.EmailConfirmed)
+            if (!currentUser.EmailConfirmed)
             {
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
                 var confirmationLink = $"https://localhost:7258/confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}";
 
-                await this.SendConfirmationEmail(currentUser.Email,
+                var pendingEmail = currentUser.Email;
+                if (!string.IsNullOrWhiteSpace(pendingEmail))
+                {
+                    await this.SendConfirmationEmail(pendingEmail,
                     $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+                }
 
                 _logger.LogWarning($"User with unconfirmed email tried to log in. Email: {currentUser.Email}, UserId: {currentUser.Id}");
 
@@ -145,7 +170,13 @@
             }
 
 
-            var claims = await _userManager.GetUserClaimsAsync(currentUser!.Email!);
+            var confirmedEmail = currentUser.Email;
+            if (string.IsNullOrWhiteSpace(confirmedEmail))
+            {
+                return new LoginResponse { Message = "Email not available for user." };
+            }
+
+            var claims = await _userManager.GetUserClaimsAsync(confirmedEmail);
 
             var accessToken = _tokenManager.GenerateAccessToken(claims);
             var refreshToken = _tokenManager.GetReFreshToken();
@@ -185,7 +216,12 @@
             }
 
             var currentUser = await _userManager.GetUserByIdAsync(userId);
-            var claims = await _userManager.GetUserClaimsAsync(currentUser!.Email!);
+            if (currentUser == null || string.IsNullOrWhiteSpace(currentUser.Email))
+            {
+                return new LoginResponse { Message = "Invalid token." };
+            }
+
+            var claims = await _userManager.GetUserClaimsAsync(currentUser.Email);
             var newAccessToken = _tokenManager.GenerateAccessToken(claims);
             var newRefreshToken = _tokenManager.GetReFreshToken();
             //var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(userId, newRefreshToken);
