@@ -1,6 +1,7 @@
 namespace BlazorShop.Web
 {
     using BlazorShop.Web.Authentication.Providers;
+    using BlazorShop.Web.Interop;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.CookieStorage;
     using BlazorShop.Web.Shared.CookieStorage.Contracts;
@@ -56,6 +57,7 @@ namespace BlazorShop.Web
             builder.Services.AddSingleton<IToastService, ToastService>();
             builder.Services.AddScoped<INewsletterService, NewsletterService>();
             builder.Services.AddScoped<IMetricsClient, MetricsClient>();
+            builder.Services.AddScoped<IAppJsInterop, AppJsInterop>();
 
             await builder.Build().RunAsync();
         }
