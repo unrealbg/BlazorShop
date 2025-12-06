@@ -20,7 +20,10 @@ export function downloadFile(fileName, content, contentType) {
       type: contentType || "text/plain;charset=utf-8",
     });
 
-    if (window.navigator && typeof window.navigator.msSaveOrOpenBlob === "function") {
+    if (
+      window.navigator &&
+      typeof window.navigator.msSaveOrOpenBlob === "function"
+    ) {
       window.navigator.msSaveOrOpenBlob(blob, fileName ?? "download.txt");
       return;
     }
