@@ -2,7 +2,7 @@
 @layout AdminLayout
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
-  <div class="rounded-xl bg-white/80 shadow p-6" style="min-height: 600px; overflow: auto">
+  <div class="rounded-xl bg-white/80 shadow p-6 admin-panel">
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <h2 class="text-2xl font-bold">Orders by Customer</h2>
       <div class="flex items-center gap-2">
@@ -35,7 +35,7 @@
               </div>
               <div class="text-right shrink-0">
                 <div class="text-sm">Orders: <b>@g.Count()</b></div>
-                <div class="text-sm">Total: <b>ˆ @g.Sum(x => x.TotalAmount).ToString("F2")</b></div>
+                <div class="text-sm">Total: <b>ï¿½ @g.Sum(x => x.TotalAmount).ToString("F2")</b></div>
               </div>
             </button>
 
@@ -69,8 +69,8 @@
                           <tr class="bg-neutral-50 text-left">
                             <th class="px-2 py-1">Product</th>
                             <th class="px-2 py-1">Qty</th>
-                            <th class="px-2 py-1">Unit (ˆ)</th>
-                            <th class="px-2 py-1">Total (ˆ)</th>
+                            <th class="px-2 py-1">Unit (ï¿½)</th>
+                            <th class="px-2 py-1">Total (ï¿½)</th>
                             <th class="px-2 py-1">Tracking</th>
                           </tr>
                         </thead>
@@ -108,7 +108,7 @@
                           }
                         </tbody>
                       </table>
-                      <div class="mt-2 text-right text-sm font-semibold">Order Total: ˆ @o.TotalAmount.ToString("F2")</div>
+                      <div class="mt-2 text-right text-sm font-semibold">Order Total: ï¿½ @o.TotalAmount.ToString("F2")</div>
                       <div class="text-right text-xs text-neutral-600">
                         @if (o.ShippedOn.HasValue) {<span class="mr-3">Shipped: @o.ShippedOn.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>}
                         @if (o.DeliveredOn.HasValue) {<span>Delivered: @o.DeliveredOn.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>}

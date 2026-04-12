@@ -1,10 +1,8 @@
 ﻿<table class="table @Styles.GetTableFormat(TableFormat) @CssClass">
-    <thead class="@Styles.GetBackgroundColor(HeaderBackground) @Styles.GetTextColor(HeaderTextColor)"
-           style="@Styles.GetFont(HeaderFont); font-size:@HeaderFontSize;">
+    <thead class="@($"{Styles.GetBackgroundColor(HeaderBackground)} {Styles.GetTextColor(HeaderTextColor)} {Styles.GetFontClass(HeaderFont)} {Styles.GetFontSizeClass(HeaderFontSize)}".Trim())">
     @HeaderTemplate
     </thead>
-    <tbody class="@Styles.GetBackgroundColor(ContentBackground) @Styles.GetTextColor(ContentTextColor)"
-           style="@Styles.GetFont(ContentFont); font-size:@ContentFontSize;">
+    <tbody class="@($"{Styles.GetBackgroundColor(ContentBackground)} {Styles.GetTextColor(ContentTextColor)} {Styles.GetFontClass(ContentFont)} {Styles.GetFontSizeClass(ContentFontSize)}".Trim())">
     @ContentTemplate
     </tbody>
     <tfoot>

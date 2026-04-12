@@ -1,98 +1,69 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
-
-<head>
+  <head>
     <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://images.unsplash.com https://localhost:7094; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' https://localhost:7094 https://localhost:7095 wss://localhost:7094 wss://localhost:7095 http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BlazorShop</title>
     <base href="/" />
 
-    <!-- Tailwind (built locally) -->
+    <!-- Tailwind + fonts (hosted locally) -->
+    <link href="css/fonts.css" rel="stylesheet" />
     <link href="css/site.css" rel="stylesheet" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
     <!-- Font Awesome for toast icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha512-SfZ6P35JQDsGxv3rSx1x4Q0x1G2m4GvYB1x0xXzj5vQGxZB9e4Nf1n5T0k9r7E5J+9a5mTQq1O1T1p5x5i5yFw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+      integrity="sha512-SfTiTlX6kk+qitfevl/7LibUOeJWlt9rbyDn92a1DqWOw9vWG2MFoays0sgObmWazO5BQPiFucnnEAjpAB+/Sw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
 
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="images/favicon.png">
+    <link rel="shortcut icon" type="image/x-icon" href="images/favicon.png" />
     <link href="BlazorShop.Web.styles.css" rel="stylesheet" />
 
     <link href="css/input.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-    <script>
-        window.blz = window.blz || {};
-        window.blz.downloadFile = function (fileName, content, contentType) {
-            try {
-                const blob = new Blob([content], { type: contentType || 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = fileName || 'download.txt';
-                document.body.appendChild(a); a.click();
-                document.body.removeChild(a); URL.revokeObjectURL(url);
-            } catch { /* noop */ }
-        };
-        window.blz._charts = {};
-        window.blz.renderLineChart = function (canvasId, labels, values) {
-            if (!window.Chart) return;
-            const el = document.getElementById(canvasId);
-            if (!el) return;
-            const ctx = el.getContext('2d');
-            if (window.blz._charts[canvasId]) {
-                window.blz._charts[canvasId].destroy();
-            }
-            window.blz._charts[canvasId] = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Revenue (€)',
-                        data: values,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16,185,129,0.15)',
-                        tension: 0.3,
-                        fill: true,
-                        pointRadius: 2
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } },
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        };
-    </script>
-</head>
+    <script type="module" src="js/app.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+      integrity="sha384-JUh163oCRItcbPme8pYnROHQMC6fNKTBWtRG3I3I0erJkzNgL7uxKlNwcrcFKeqF"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+  </head>
 
-<body class="site-bg">
+  <body class="site-bg">
     <div id="app">
-        <div class="loader_main">
-            <div class="spinner" aria-label="Loading"></div>
-            <div class="loading-progress-text"></div>
-        </div>
+      <div class="loader_main">
+        <div class="spinner" aria-label="Loading"></div>
+        <div class="loading-progress-text"></div>
+      </div>
     </div>
 
     <div id="blazor-error-ui" class="error-popup">
-        <div class="error-content">
-            <div class="error-message">
-                <span class="error-icon">⚠️</span>
-                <div>
-                    <div class="error-text">An unexpected error occurred</div>
-                    <div class="error-subtext" style="font-size: 0.9rem; color: #444; margin-top: 2px;">Sorry for the inconvenience. Please try again. If the problem persists, reload the page.</div>
-                </div>
+      <div class="error-content">
+        <div class="error-message">
+          <span class="error-icon">⚠️</span>
+          <div>
+            <div class="error-text">An unexpected error occurred</div>
+            <div class="error-subtext">
+              Sorry for the inconvenience. Please try again. If the problem
+              persists, reload the page.
             </div>
-            <div class="error-actions">
-                <a href="#" class="reload reload-btn">Try again</a>
-                <a class="dismiss" title="Close">🗙</a>
-            </div>
+          </div>
         </div>
+        <div class="error-actions">
+          <a href="#" class="reload reload-btn">Try again</a>
+          <a class="dismiss" title="Close">🗙</a>
+        </div>
+      </div>
     </div>
 
     <script src="_framework/blazor.webassembly.js"></script>
-</body>
-
+  </body>
 </html>

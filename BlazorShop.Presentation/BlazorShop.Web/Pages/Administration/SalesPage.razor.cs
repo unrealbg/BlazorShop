@@ -4,15 +4,16 @@
     using System.Linq;
     using System.Collections.Generic;
     using System.Globalization;
+    using System.Threading.Tasks;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Analytics;
     using BlazorShop.Web.Shared.Services.Contracts;
+    using BlazorShop.Web.Interop;
     using Microsoft.AspNetCore.Components;
-    using Microsoft.JSInterop;
 
-    public partial class SalesPage : ComponentBase
+    public partial class SalesPage : ComponentBase, IAsyncDisposable
     {
         private List<GetOrder> _orders = new();
         private List<GetOrder> _recentOrders = new();
@@ -49,7 +50,7 @@
         private string _trackingUrl = string.Empty;
         private string _shippingStatus = "PendingShipment";
 
-        [Inject] private IJSRuntime JS { get; set; } = default!;
+        [Inject] private IAppJsInterop JsInterop { get; set; } = default!;
         [Inject] private IMetricsClient MetricsClient { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
@@ -222,34 +223,36 @@
             {
                 var labels = BuildLabels(_salesSeries);
                 var values = _salesSeries.Points.Select(p => p.Value).ToArray();
-                await JS.InvokeVoidAsync(
-                    "blz.renderLineChart",
+                await JsInterop.RenderLineChartAsync(
                     "salesChart",
                     labels,
                     values,
-                    new
-                    {
-                        label = "Revenue (€)",
-                        color = "#0ea5e9",
-                        backgroundColor = "rgba(14,165,233,0.15)"
-                    });
+                    new ChartSeriesOptions(
+                        "Revenue (€)",
+                        "#0ea5e9",
+                        "rgba(14,165,233,0.15)",
+                        Tension: 0.3,
+                        BorderWidth: 2,
+                        PointRadius: 2,
+                        Fill: true));
             }
 
             if (_trafficSeries is not null)
             {
                 var labels = BuildLabels(_trafficSeries);
                 var values = _trafficSeries.Points.Select(p => p.Value).ToArray();
-                await JS.InvokeVoidAsync(
-                    "blz.renderLineChart",
+                await JsInterop.RenderLineChartAsync(
                     "trafficChart",
                     labels,
                     values,
-                    new
-                    {
-                        label = "Traffic (sign-ups)",
-                        color = "#a855f7",
-                        backgroundColor = "rgba(168,85,247,0.15)"
-                    });
+                    new ChartSeriesOptions(
+                        "Traffic (sign-ups)",
+                        "#a855f7",
+                        "rgba(168,85,247,0.15)",
+                        Tension: 0.3,
+                        BorderWidth: 2,
+                        PointRadius: 2,
+                        Fill: true));
             }
         }
 
@@ -373,7 +376,18 @@
                 o.TotalAmount.ToString("F2"),
                 Escape(!string.IsNullOrWhiteSpace(o.TrackingUrl) ? o.TrackingUrl! : o.TrackingNumber ?? "")));
             var csv = string.Join("\n", new[] { header }.Concat(lines));
-            await JS.InvokeVoidAsync("blz.downloadFile", $"orders_{DateTime.UtcNow:yyyyMMddHHmm}.csv", csv, "text/csv;charset=utf-8");
+            await JsInterop.DownloadFileAsync($"orders_{DateTime.UtcNow:yyyyMMddHHmm}.csv", csv, "text/csv;charset=utf-8");
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (JsInterop is null)
+            {
+                return;
+            }
+
+            await JsInterop.DisposeChartAsync("salesChart");
+            await JsInterop.DisposeChartAsync("trafficChart");
         }
 
         private static string Escape(string? s)

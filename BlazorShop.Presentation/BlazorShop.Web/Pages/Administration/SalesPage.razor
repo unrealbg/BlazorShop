@@ -2,7 +2,7 @@
 @layout AdminLayout
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
-  <div class="rounded-xl bg-white/80 shadow p-6" style="min-height: 600px; overflow: auto">
+  <div class="rounded-xl bg-white/80 shadow p-6 admin-panel">
     <header class="text-center">
       <h2 class="text-2xl font-bold">Admin Dashboard</h2>
     </header>
@@ -69,7 +69,7 @@
             <div class="text-xs text-neutral-500">Prev: €@(_salesSeries?.PreviousTotal.ToString("F2") ?? "0.00")
               <span class="ml-1 font-semibold @(GetTrendClass(_salesSeries?.TrendPercentage ?? 0))">@FormatTrend(_salesSeries?.TrendPercentage ?? 0)</span>
             </div>
-            <div class="mt-4" style="height: 220px;">
+            <div class="mt-4 chart-block">
               <canvas id="salesChart"></canvas>
             </div>
           </article>
@@ -82,7 +82,7 @@
             <div class="text-xs text-neutral-500">Prev: @(_trafficSeries?.PreviousTotal.ToString("N0") ?? "0")
               <span class="ml-1 font-semibold @(GetTrendClass(_trafficSeries?.TrendPercentage ?? 0))">@FormatTrend(_trafficSeries?.TrendPercentage ?? 0)</span>
             </div>
-            <div class="mt-4" style="height: 220px;">
+            <div class="mt-4 chart-block">
               <canvas id="trafficChart"></canvas>
             </div>
           </article>
