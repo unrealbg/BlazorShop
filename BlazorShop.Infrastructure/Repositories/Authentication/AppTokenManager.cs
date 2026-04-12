@@ -57,11 +57,19 @@
         {
             var result = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.Token == refreshToken);
 
-            return result!.UserId!;
+            return result?.UserId ?? string.Empty;
         }
 
         public async Task<int> AddRefreshTokenAsync(string userId, string refreshToken)
         {
+            var existingToken = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.UserId == userId);
+
+            if (existingToken is not null)
+            {
+                existingToken.Token = refreshToken;
+                return await _context.SaveChangesAsync();
+            }
+
             _context.RefreshTokens.Add(new RefreshToken
             {
                 UserId = userId,
@@ -73,7 +81,7 @@
 
         public async Task<int> UpdateRefreshTokenAsync(string userId, string refreshToken)
         {
-            var user = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.Token == refreshToken);
+            var user = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.UserId == userId);
 
             if (user is null)
             {

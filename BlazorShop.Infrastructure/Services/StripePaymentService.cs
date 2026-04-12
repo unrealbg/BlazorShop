@@ -2,13 +2,23 @@
 {
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Entities;
+
+    using Microsoft.Extensions.Options;
 
     using Stripe.Checkout;
 
     public class StripePaymentService : IPaymentService
     {
+        private readonly ClientAppOptions _clientAppOptions;
+
+        public StripePaymentService(IOptions<ClientAppOptions>? clientAppOptions = null)
+        {
+            _clientAppOptions = clientAppOptions?.Value ?? new ClientAppOptions();
+        }
+
         public async Task<ServiceResponse> Pay(decimal totalAmount, IEnumerable<Product> cartProducts, IEnumerable<ProcessCart> carts)
         {
             try
@@ -41,8 +51,8 @@
                     PaymentMethodTypes = ["card"],
                     LineItems = lineItems,
                     Mode = "payment",
-                    SuccessUrl = "https://localhost:7258/payment-success",
-                    CancelUrl = "https://localhost:7258/payment-cancel",
+                    SuccessUrl = this.BuildClientUrl("payment-success"),
+                    CancelUrl = this.BuildClientUrl("payment-cancel"),
                 };
 
                 var service = new SessionService();
@@ -54,6 +64,18 @@
             {
                 return new ServiceResponse(false, ex.Message);
             }
+        }
+
+        private string BuildClientUrl(string path)
+        {
+            var baseUrl = _clientAppOptions.BaseUrl;
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                baseUrl = "https://localhost:7258";
+            }
+
+            return $"{baseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
         }
     }
 }

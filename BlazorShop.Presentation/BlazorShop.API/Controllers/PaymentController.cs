@@ -1,7 +1,10 @@
 ﻿namespace BlazorShop.API.Controllers
 {
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
+
+    using Microsoft.Extensions.Options;
 
     using Microsoft.AspNetCore.Mvc;
 
@@ -11,11 +14,16 @@
     {
         private readonly IPaymentMethodService _paymentMethodService;
         private readonly IPayPalPaymentService _payPalPaymentService;
+        private readonly ClientAppOptions _clientAppOptions;
 
-        public PaymentController(IPaymentMethodService paymentMethodService, IPayPalPaymentService payPalPaymentService)
+        public PaymentController(
+            IPaymentMethodService paymentMethodService,
+            IPayPalPaymentService payPalPaymentService,
+            IOptions<ClientAppOptions>? clientAppOptions = null)
         {
             _paymentMethodService = paymentMethodService;
             _payPalPaymentService = payPalPaymentService;
+            _clientAppOptions = clientAppOptions?.Value ?? new ClientAppOptions();
         }
 
         /// <summary>
@@ -39,7 +47,19 @@
             var ok = await _payPalPaymentService.CaptureAsync(token);
             if (!ok) return BadRequest("Capture failed");
 
-            return Redirect("https://localhost:7258/payment-success");
+            return Redirect(this.BuildClientUrl("payment-success"));
+        }
+
+        private string BuildClientUrl(string path)
+        {
+            var baseUrl = _clientAppOptions.BaseUrl;
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                baseUrl = "https://localhost:7258";
+            }
+
+            return $"{baseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
         }
     }
 }
