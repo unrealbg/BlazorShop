@@ -1,7 +1,6 @@
 ﻿namespace BlazorShop.API.Controllers
 {
     using System.Security.Claims;
-    using System.Web;
 
     using BlazorShop.Application.DTOs.UserIdentity;
     using BlazorShop.Application.Services.Contracts.Authentication;
@@ -49,11 +48,10 @@
         /// </summary>
         /// <param name="refreshToken">The refresh token </param>
         /// <returns>The result of the refresh </returns>
-        [HttpGet("refreshToken/{refreshToken}")]
-        public async Task<IActionResult> RefreshToken(string refreshToken)
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken([FromBody] string refreshToken)
         {
-            var encodedRefreshToken = HttpUtility.UrlDecode(refreshToken);
-            var result = await _authenticationService.ReviveToken(encodedRefreshToken);
+            var result = await _authenticationService.ReviveToken(refreshToken);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 

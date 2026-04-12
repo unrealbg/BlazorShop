@@ -7,6 +7,7 @@ namespace BlazorShop.API
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.AspNetCore.Builder;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.FileProviders;
     using Microsoft.Extensions.Hosting;
 
@@ -74,7 +75,15 @@ namespace BlazorShop.API
                 using (var scope = app.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    db.Database.EnsureCreated();
+
+                    if (db.Database.GetMigrations().Any())
+                    {
+                        db.Database.Migrate();
+                    }
+                    else
+                    {
+                        db.Database.EnsureCreated();
+                    }
                 }
 
                 app.UseCors();
@@ -112,6 +121,7 @@ namespace BlazorShop.API
                 app.UseAuthorization();
 
                 app.MapControllers();
+                app.MapDefaultEndpoints();
 
                 Log.Logger.Information("Application Started");
 

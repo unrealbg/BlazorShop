@@ -32,7 +32,7 @@
             public const string Type = "Bearer";
             public const string Register = "authentication/create";
             public const string Login = "authentication/login";
-            public const string ReviveToke = "authentication/refreshToken";
+            public const string ReviveToke = "authentication/refresh-token";
             public const string ChangePassword = "authentication/change-password";
             public const string ConfirmEmail = "authentication/confirm-email";
             public const string UpdateProfile = "authentication/update-profile";

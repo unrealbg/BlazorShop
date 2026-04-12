@@ -12,7 +12,6 @@
     using BlazorShop.Application.Validations.Authentication;
 
     using FluentValidation;
-    using FluentValidation.AspNetCore;
 
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
@@ -21,15 +20,15 @@
     {
         public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddAutoMapper(typeof(MappingConfig));
+            services.AddAutoMapper(cfg => cfg.AddProfile<MappingConfig>());
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<IProductVariantService, ProductVariantService>();
             services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
 
             services.Configure<RecommendationOptions>(configuration.GetSection(RecommendationOptions.SectionName));
+            services.Configure<ClientAppOptions>(configuration.GetSection(ClientAppOptions.SectionName));
 
-            services.AddFluentValidationAutoValidation();
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
             services.AddScoped<IValidationService, ValidationService>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();

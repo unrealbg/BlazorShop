@@ -411,6 +411,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _userManagerMock.Setup(u => u.GetUserClaimsAsync(appUser.Email)).ReturnsAsync(claims);
             _tokenManagerMock.Setup(t => t.GenerateAccessToken(claims)).Returns(newAccessToken);
             _tokenManagerMock.Setup(t => t.GetReFreshToken()).Returns(newRefreshToken);
+            _tokenManagerMock.Setup(t => t.UpdateRefreshTokenAsync(userId, newRefreshToken)).ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.ReviveToken(refreshToken);

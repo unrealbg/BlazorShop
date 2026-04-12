@@ -286,7 +286,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             };
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
-            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
+            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<string>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
             this._apiCallHelperMock.Setup(a => a.GetServiceResponse<LoginResponse>(apiCallResult)).ReturnsAsync(loginResponse);
 
             // Act
@@ -309,7 +309,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             HttpResponseMessage apiCallResult = null!;
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
-            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
+            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<string>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
             this._apiCallHelperMock.Setup(a => a.ConnectionError()).Returns(new ServiceResponse { Success = false, Message = "Connection error" });
 
             // Act

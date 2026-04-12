@@ -4,6 +4,7 @@
 
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.UserIdentity;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Authentication;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Validations;
@@ -12,6 +13,8 @@
     using BlazorShop.Domain.Entities.Identity;
 
     using FluentValidation;
+
+    using Microsoft.Extensions.Options;
 
     public class AuthenticationService : IAuthenticationService
     {
@@ -25,6 +28,7 @@
         private readonly IValidator<ChangePassword> _changePasswordValidator;
         private readonly IValidationService _validationService;
         private readonly IEmailService _emailService;
+        private readonly ClientAppOptions _clientAppOptions;
 
         public AuthenticationService(
             IAppTokenManager tokenManager,
@@ -36,7 +40,8 @@
             IValidator<LoginUser> loginUserValidator,
             IValidationService validationService,
             IValidator<ChangePassword> changePasswordValidator,
-            IEmailService emailService)
+            IEmailService emailService,
+            IOptions<ClientAppOptions>? clientAppOptions = null)
         {
             _tokenManager = tokenManager;
             _userManager = userManager;
@@ -48,6 +53,7 @@
             _validationService = validationService;
             _changePasswordValidator = changePasswordValidator;
             _emailService = emailService;
+            _clientAppOptions = clientAppOptions?.Value ?? new ClientAppOptions();
         }
 
         public async Task<ServiceResponse> CreateUser(CreateUser user)
@@ -78,7 +84,7 @@
             try
             {
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(mappedUser);
-                var confirmationLink = $"https://localhost:7258/confirm-email?userId={mappedUser.Id}&token={Uri.EscapeDataString(token)}";
+                var confirmationLink = this.BuildClientUrl($"confirm-email?userId={mappedUser.Id}&token={Uri.EscapeDataString(token)}");
 
                 await this.SendConfirmationEmail(user.Email,
                     $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
@@ -151,7 +157,7 @@
             if (!currentUser.EmailConfirmed)
             {
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
-                var confirmationLink = $"https://localhost:7258/confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}";
+                var confirmationLink = this.BuildClientUrl($"confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}");
 
                 var pendingEmail = currentUser.Email;
                 if (!string.IsNullOrWhiteSpace(pendingEmail))
@@ -181,14 +187,9 @@
             var accessToken = _tokenManager.GenerateAccessToken(claims);
             var refreshToken = _tokenManager.GetReFreshToken();
 
-            var saveTokenResult = 0;
-            var isRefreshTokenValid = await _tokenManager.ValidateRefreshTokenAsync(refreshToken);
+            var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(currentUser.Id, refreshToken);
 
-            if (isRefreshTokenValid)
-            {
-                saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(currentUser.Id, refreshToken);
-            }
-            else
+            if (saveTokenResult <= 0)
             {
                 saveTokenResult = await _tokenManager.AddRefreshTokenAsync(currentUser.Id, refreshToken);
             }
@@ -224,9 +225,17 @@
             var claims = await _userManager.GetUserClaimsAsync(currentUser.Email);
             var newAccessToken = _tokenManager.GenerateAccessToken(claims);
             var newRefreshToken = _tokenManager.GetReFreshToken();
-            //var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(userId, newRefreshToken);
 
-            return new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
+            var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(userId, newRefreshToken);
+
+            if (saveTokenResult <= 0)
+            {
+                saveTokenResult = await _tokenManager.AddRefreshTokenAsync(userId, newRefreshToken);
+            }
+
+            return saveTokenResult <= 0
+                ? new LoginResponse { Message = "Error occurred in login." }
+                : new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
         }
 
         public async Task<ServiceResponse> ChangePassword(ChangePassword changePasswordDto, string userId)
@@ -299,6 +308,18 @@
             return ok
                 ? new ServiceResponse(true, "Profile updated successfully.")
                 : new ServiceResponse(false, "Failed to update profile.");
+        }
+
+        private string BuildClientUrl(string pathAndQuery)
+        {
+            var baseUrl = _clientAppOptions.BaseUrl;
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                baseUrl = "https://localhost:7258";
+            }
+
+            return $"{baseUrl.TrimEnd('/')}/{pathAndQuery.TrimStart('/')}";
         }
     }
 }

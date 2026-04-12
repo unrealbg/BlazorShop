@@ -91,13 +91,12 @@
             var currentApiCall = new ApiCall
             {
                 Route = Constant.Authentication.ReviveToke,
-                Type = Constant.ApiCallType.Get,
+                Type = Constant.ApiCallType.Post,
                 Client = client,
-                Model = null!,
-                Id = HttpUtility.UrlEncode(refreshToken),
+                Model = refreshToken,
             };
 
-            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+            var result = await _apiCallHelper.ApiCallTypeCall<string>(currentApiCall);
 
             return result is null || !result.IsSuccessStatusCode
                        ? new LoginResponse(Message: this._apiCallHelper.ConnectionError().Message)

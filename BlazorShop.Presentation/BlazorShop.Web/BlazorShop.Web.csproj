@@ -23,10 +23,18 @@
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 
+  <!-- Restore npm dependencies only when package inputs change -->
+  <Target Name="RestoreNodeModules"
+          BeforeTargets="Build"
+          Inputs="$(MSBuildProjectDirectory)\package.json;$(MSBuildProjectDirectory)\package-lock.json"
+          Outputs="$(MSBuildProjectDirectory)\node_modules\.package-lock.json">
+    <Message Text="Restoring npm packages..." Importance="high" />
+    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
   <!-- Tailwind build on publish/build -->
-  <Target Name="TailwindBuild" BeforeTargets="Build">
+  <Target Name="TailwindBuild" BeforeTargets="Build" DependsOnTargets="RestoreNodeModules">
     <Message Text="Running Tailwind build..." Importance="high" />
-    <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
     <Exec Command="npm run tailwind:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
