@@ -41,7 +41,7 @@
             IValidationService validationService,
             IValidator<ChangePassword> changePasswordValidator,
             IEmailService emailService,
-            IOptions<ClientAppOptions>? clientAppOptions = null)
+            IOptions<ClientAppOptions> clientAppOptions)
         {
             _tokenManager = tokenManager;
             _userManager = userManager;
@@ -53,7 +53,7 @@
             _validationService = validationService;
             _changePasswordValidator = changePasswordValidator;
             _emailService = emailService;
-            _clientAppOptions = clientAppOptions?.Value ?? new ClientAppOptions();
+            _clientAppOptions = clientAppOptions.Value;
         }
 
         public async Task<ServiceResponse> CreateUser(CreateUser user)
@@ -312,14 +312,7 @@
 
         private string BuildClientUrl(string pathAndQuery)
         {
-            var baseUrl = _clientAppOptions.BaseUrl;
-
-            if (string.IsNullOrWhiteSpace(baseUrl))
-            {
-                baseUrl = "https://localhost:7258";
-            }
-
-            return $"{baseUrl.TrimEnd('/')}/{pathAndQuery.TrimStart('/')}";
+            return $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{pathAndQuery.TrimStart('/')}";
         }
     }
 }

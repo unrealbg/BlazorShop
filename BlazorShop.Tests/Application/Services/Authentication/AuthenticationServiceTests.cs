@@ -6,6 +6,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.UserIdentity;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Authentication;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Validations;
@@ -14,6 +15,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
     using BlazorShop.Domain.Entities.Identity;
 
     using FluentValidation;
+
+    using Microsoft.Extensions.Options;
 
     using Moq;
 
@@ -56,7 +59,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 _loginUserValidatorMock.Object,
                 _validationServiceMock.Object,
                 _changePasswordValidatorMock.Object,
-                _emailServiceMock.Object);
+                _emailServiceMock.Object,
+                Options.Create(new ClientAppOptions { BaseUrl = "https://localhost:7258" }));
         }
 
         [Fact]

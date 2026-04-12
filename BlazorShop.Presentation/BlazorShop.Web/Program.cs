@@ -1,5 +1,7 @@
 namespace BlazorShop.Web
 {
+    using System.Net;
+
     using BlazorShop.Web.Authentication.Providers;
     using BlazorShop.Web.Interop;
     using BlazorShop.Web.Shared;
@@ -22,6 +24,8 @@ namespace BlazorShop.Web
             builder.RootComponents.Add<App>("#app");
             builder.RootComponents.Add<HeadOutlet>("head::after");
 
+            var apiBaseAddress = await ResolveApiBaseAddressAsync(builder);
+
             builder.Services.AddSingleton<IBrowserCookieStorageService, BrowserCookieStorageService>();
             builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
             builder.Services.AddScoped<ITokenService, TokenService>();
@@ -32,21 +36,10 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<RefreshTokenHandler>();
-#if DEBUG
             builder.Services.AddHttpClient(
                 Constant.ApiClient.Name,
-                opt =>
-                    {
-                        opt.BaseAddress = new Uri("https://localhost:7094/api/");
-                    }).AddHttpMessageHandler<RefreshTokenHandler>();
-#else
-            var apiBase = new Uri(new Uri(builder.HostEnvironment.BaseAddress), "api/");
-
-            builder.Services.AddHttpClient(
-                Constant.ApiClient.Name,
-                client => { client.BaseAddress = apiBase; }
+                client => { client.BaseAddress = apiBaseAddress; }
             ).AddHttpMessageHandler<RefreshTokenHandler>();
-#endif
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<ICartService, CartService>();
@@ -60,6 +53,57 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IAppJsInterop, AppJsInterop>();
 
             await builder.Build().RunAsync();
+        }
+
+        private static async Task<Uri> ResolveApiBaseAddressAsync(WebAssemblyHostBuilder builder)
+        {
+            var relativeApiBaseAddress = new Uri(new Uri(builder.HostEnvironment.BaseAddress), "api/");
+
+            if (await IsRelativeApiAvailableAsync(relativeApiBaseAddress))
+            {
+                return relativeApiBaseAddress;
+            }
+
+            var configuredBaseAddress = builder.Configuration["Api:DirectBaseUrl"];
+            if (!string.IsNullOrWhiteSpace(configuredBaseAddress) &&
+                Uri.TryCreate(configuredBaseAddress, UriKind.Absolute, out var configuredUri))
+            {
+                return configuredUri;
+            }
+
+            return relativeApiBaseAddress;
+        }
+
+        private static async Task<bool> IsRelativeApiAvailableAsync(Uri relativeApiBaseAddress)
+        {
+            using var httpClient = new HttpClient();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+            try
+            {
+                using var response = await httpClient.GetAsync(new Uri(relativeApiBaseAddress, "swagger/v1/swagger.json"), cts.Token);
+                var mediaType = response.Content.Headers.ContentType?.MediaType;
+
+                if (string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                if (response.IsSuccessStatusCode || response.StatusCode != HttpStatusCode.NotFound)
+                {
+                    return true;
+                }
+
+                return !string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase);
+            }
+            catch (HttpRequestException)
+            {
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
         }
     }
 }

@@ -71,19 +71,10 @@ namespace BlazorShop.API
                     ForwardLimit = 1
                 });
 #endif
-                // Create database schema at startup (no migrations present yet)
                 using (var scope = app.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-                    if (db.Database.GetMigrations().Any())
-                    {
-                        db.Database.Migrate();
-                    }
-                    else
-                    {
-                        db.Database.EnsureCreated();
-                    }
+                    db.Database.Migrate();
                 }
 
                 app.UseCors();

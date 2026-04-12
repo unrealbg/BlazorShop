@@ -19,11 +19,11 @@
         public PaymentController(
             IPaymentMethodService paymentMethodService,
             IPayPalPaymentService payPalPaymentService,
-            IOptions<ClientAppOptions>? clientAppOptions = null)
+            IOptions<ClientAppOptions> clientAppOptions)
         {
             _paymentMethodService = paymentMethodService;
             _payPalPaymentService = payPalPaymentService;
-            _clientAppOptions = clientAppOptions?.Value ?? new ClientAppOptions();
+            _clientAppOptions = clientAppOptions.Value;
         }
 
         /// <summary>
@@ -52,14 +52,7 @@
 
         private string BuildClientUrl(string path)
         {
-            var baseUrl = _clientAppOptions.BaseUrl;
-
-            if (string.IsNullOrWhiteSpace(baseUrl))
-            {
-                baseUrl = "https://localhost:7258";
-            }
-
-            return $"{baseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+            return $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
         }
     }
 }
