@@ -12,15 +12,36 @@
         public static string GetTextColor(TextColors color) => string.Empty;
         public static string GetTableFormat(TableFormats format) => string.Empty;
 
-        public static string GetFont(FontStyles font) =>
+        public static string GetFontClass(FontStyles font) =>
             font switch
             {
-                FontStyles.Arial => "font-family: Arial;",
-                FontStyles.Calibri => "font-family: Calibri;",
-                FontStyles.TimesNewRoman => "font-family: 'Times New Roman';",
-                FontStyles.ComicSans => "font-family: 'Comic Sans MS';",
-                FontStyles.Georgia => "font-family: Georgia;",
+                FontStyles.Arial => "font-arial",
+                FontStyles.Calibri => "font-calibri",
+                FontStyles.TimesNewRoman => "font-times",
+                FontStyles.ComicSans => "font-comic",
+                FontStyles.Georgia => "font-georgia",
                 _ => string.Empty
             };
+
+        public static string GetFontSizeClass(string? fontSize)
+        {
+            if (string.IsNullOrWhiteSpace(fontSize))
+            {
+                return string.Empty;
+            }
+
+            return fontSize.Trim().ToLowerInvariant() switch
+            {
+                "12px" => "font-size-12",
+                "13px" => "font-size-13",
+                "14px" => "font-size-14",
+                "15px" => "font-size-15",
+                "16px" => "font-size-16",
+                "18px" => "font-size-18",
+                "20px" => "font-size-20",
+                "24px" => "font-size-24",
+                _ => string.Empty,
+            };
+        }
     }
 }

@@ -2,18 +2,17 @@
 <html lang="en" class="scroll-smooth">
   <head>
     <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://images.unsplash.com https://localhost:7094; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' https://localhost:7094 https://localhost:7095 wss://localhost:7094 wss://localhost:7095 http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BlazorShop</title>
     <base href="/" />
 
-    <!-- Tailwind (built locally) -->
+    <!-- Tailwind + fonts (hosted locally) -->
+    <link href="css/fonts.css" rel="stylesheet" />
     <link href="css/site.css" rel="stylesheet" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
 
     <!-- Font Awesome for toast icons -->
     <link
@@ -29,9 +28,12 @@
     <link href="BlazorShop.Web.styles.css" rel="stylesheet" />
 
     <link href="css/input.css" rel="stylesheet" />
+    <script type="module" src="js/app.js"></script>
     <script
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+      integrity="sha384-JUh163oCRItcbPme8pYnROHQMC6fNKTBWtRG3I3I0erJkzNgL7uxKlNwcrcFKeqF"
       crossorigin="anonymous"
+      referrerpolicy="no-referrer"
     ></script>
   </head>
 
@@ -49,10 +51,7 @@
           <span class="error-icon">⚠️</span>
           <div>
             <div class="error-text">An unexpected error occurred</div>
-            <div
-              class="error-subtext"
-              style="font-size: 0.9rem; color: #444; margin-top: 2px"
-            >
+            <div class="error-subtext">
               Sorry for the inconvenience. Please try again. If the problem
               persists, reload the page.
             </div>
