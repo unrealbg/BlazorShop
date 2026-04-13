@@ -48,6 +48,22 @@
                    .HasForeignKey(v => v.ProductId)
                    .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<IdentityUserLogin<string>>()
+                .Property(login => login.LoginProvider)
+                .HasMaxLength(128);
+
+            builder.Entity<IdentityUserLogin<string>>()
+                .Property(login => login.ProviderKey)
+                .HasMaxLength(128);
+
+            builder.Entity<IdentityUserToken<string>>()
+                .Property(token => token.LoginProvider)
+                .HasMaxLength(128);
+
+            builder.Entity<IdentityUserToken<string>>()
+                .Property(token => token.Name)
+                .HasMaxLength(128);
+
             builder.Entity<PaymentMethod>().HasData(
                 new PaymentMethod
                 {
@@ -74,12 +90,14 @@
                 new IdentityRole
                     {
                         Id = "93f5cdac-43de-4895-8426-2048c228e76d",
+                        ConcurrencyStamp = "02d86d56-8e63-4d2e-92f8-81b154ba0532",
                         Name = "Admin",
                         NormalizedName = "ADMIN"
                     },
                 new IdentityRole
                     {
                         Id = "b7af6842-02fa-4af4-8f61-ae04a49644a2",
+                        ConcurrencyStamp = "75e8afa8-8df5-4431-a220-ac56b1fd0cda",
                         Name = "User",
                         NormalizedName = "USER"
                     });

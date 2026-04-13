@@ -20,13 +20,10 @@
     using BlazorShop.Infrastructure.Repositories.Payment;
     using BlazorShop.Infrastructure.Services;
 
-    using EntityFramework.Exceptions.PostgreSQL;
-
     using Microsoft.AspNetCore.Authentication.JwtBearer;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
-    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.IdentityModel.Tokens;
@@ -44,8 +41,6 @@
                                 npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
                                 npgsqlOptions.EnableRetryOnFailure();
                             })
-                    .UseExceptionProcessor()
-                    .ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning))
             );
 
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));

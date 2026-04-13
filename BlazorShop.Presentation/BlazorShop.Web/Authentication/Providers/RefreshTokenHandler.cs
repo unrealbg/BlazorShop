@@ -1,6 +1,7 @@
 ﻿namespace BlazorShop.Web.Authentication.Providers
 {
     using System.Net;
+    using System.Net.Http.Headers;
 
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Helper.Contracts;
@@ -12,13 +13,11 @@
         private static readonly HttpRequestOptionsKey<bool> RetriedKey = new("X-Refresh-Retried");
 
         private readonly ITokenService _tokenService;
-        private readonly IHttpClientHelper _httpClientHelper;
         private readonly IAuthenticationService _authenticationService;
 
-        public RefreshTokenHandler(ITokenService tokenService, IHttpClientHelper httpClientHelper, IAuthenticationService authenticationService)
+        public RefreshTokenHandler(ITokenService tokenService, IAuthenticationService authenticationService)
         {
             this._tokenService = tokenService;
-            this._httpClientHelper = httpClientHelper;
             this._authenticationService = authenticationService;
         }
 
@@ -39,11 +38,10 @@
                     var loginResponse = await this.MakeApiCall(refreshToken);
                     if (loginResponse is not null)
                     {
-                        await this._httpClientHelper.GetPrivateClientAsync();
-
                         if (request.Method == HttpMethod.Get || request.Content is null)
                         {
                             request.Options.Set(RetriedKey, true);
+                            request.Headers.Authorization = new AuthenticationHeaderValue(Constant.Authentication.Type, loginResponse.Token);
                             response.Dispose();
                             return await base.SendAsync(request, cancellationToken);
                         }

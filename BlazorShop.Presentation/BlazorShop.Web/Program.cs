@@ -1,9 +1,9 @@
 namespace BlazorShop.Web
 {
-    using System.Net;
-
     using BlazorShop.Web.Authentication.Providers;
     using BlazorShop.Web.Interop;
+    using BlazorShop.Web.Services;
+    using BlazorShop.Web.Services.Contracts;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.CookieStorage;
     using BlazorShop.Web.Shared.CookieStorage.Contracts;
@@ -37,7 +37,11 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<RefreshTokenHandler>();
             builder.Services.AddHttpClient(
-                Constant.ApiClient.Name,
+                Constant.ApiClient.PublicName,
+                client => { client.BaseAddress = apiBaseAddress; }
+            );
+            builder.Services.AddHttpClient(
+                Constant.ApiClient.PrivateName,
                 client => { client.BaseAddress = apiBaseAddress; }
             ).AddHttpMessageHandler<RefreshTokenHandler>();
             builder.Services.AddCascadingAuthenticationState();
@@ -51,6 +55,7 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<INewsletterService, NewsletterService>();
             builder.Services.AddScoped<IMetricsClient, MetricsClient>();
             builder.Services.AddScoped<IAppJsInterop, AppJsInterop>();
+            builder.Services.AddScoped<IQueryFailureNotifier, QueryFailureNotifier>();
 
             await builder.Build().RunAsync();
         }
@@ -84,17 +89,12 @@ namespace BlazorShop.Web
                 using var response = await httpClient.GetAsync(new Uri(relativeApiBaseAddress, "swagger/v1/swagger.json"), cts.Token);
                 var mediaType = response.Content.Headers.ContentType?.MediaType;
 
-                if (string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase))
+                if (!response.IsSuccessStatusCode)
                 {
                     return false;
                 }
 
-                if (response.IsSuccessStatusCode || response.StatusCode != HttpStatusCode.NotFound)
-                {
-                    return true;
-                }
-
-                return !string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase);
+                return IsJsonMediaType(mediaType);
             }
             catch (HttpRequestException)
             {
@@ -104,6 +104,17 @@ namespace BlazorShop.Web
             {
                 return false;
             }
+        }
+
+        private static bool IsJsonMediaType(string? mediaType)
+        {
+            if (string.IsNullOrWhiteSpace(mediaType))
+            {
+                return false;
+            }
+
+            return string.Equals(mediaType, "application/json", StringComparison.OrdinalIgnoreCase)
+                   || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

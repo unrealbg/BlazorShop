@@ -23,7 +23,14 @@ namespace BlazorShop.Infrastructure.Data
                                    ?? "Host=localhost;Port=5432;Database=blazorshop;Username=postgres;Password=change-me";
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder
+                .UseNpgsql(
+                    connectionString,
+                    npgsqlOptions =>
+                    {
+                        npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                        npgsqlOptions.EnableRetryOnFailure();
+                    });
 
             return new AppDbContext(optionsBuilder.Options);
         }

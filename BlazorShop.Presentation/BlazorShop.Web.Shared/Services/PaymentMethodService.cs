@@ -16,7 +16,7 @@
             _apiCallHelper = apiCallHelper;
         }
 
-        public async Task<IEnumerable<GetPaymentMethod>> GetPaymentMethods()
+        public async Task<QueryResult<IEnumerable<GetPaymentMethod>>> GetPaymentMethods()
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -29,10 +29,9 @@
                                      };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetPaymentMethod>>(result)
-                       : [];
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetPaymentMethod>>(
+                result,
+                "We couldn't load payment methods right now. Please try again.");
         }
     }
 }

@@ -1,7 +1,5 @@
 ﻿namespace BlazorShop.Web.Shared.Services
 {
-    using System.Net;
-
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
@@ -19,7 +17,7 @@
             _apiCallHelper = apiCall;
         }
 
-        public async Task<IEnumerable<GetCategory>> GetAllAsync()
+        public async Task<QueryResult<IEnumerable<GetCategory>>> GetAllAsync()
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -32,13 +30,12 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetCategory>>(result)
-                       : [];
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetCategory>>(
+                result,
+                "We couldn't load categories right now. Please try again.");
         }
 
-        public async Task<GetCategory> GetByIdAsync(Guid id)
+        public async Task<QueryResult<GetCategory>> GetByIdAsync(Guid id)
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -51,10 +48,9 @@
 
             currentApiCall.ToString(id);
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                       ? await this._apiCallHelper.GetServiceResponse<GetCategory>(result)
-                       : null!;
+            return await _apiCallHelper.GetQueryResult<GetCategory>(
+                result,
+                "We couldn't load this category right now. Please try again.");
         }
 
         public async Task<ServiceResponse> AddAsync(CreateCategory category)
@@ -113,7 +109,7 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
-        public async Task<IEnumerable<GetProduct>> GetProductsByCategoryAsync(Guid id)
+        public async Task<QueryResult<IEnumerable<GetProduct>>> GetProductsByCategoryAsync(Guid id)
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -126,10 +122,9 @@
 
             currentApiCall.ToString(id);
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                       ? await this._apiCallHelper.GetServiceResponse<IEnumerable<GetProduct>>(result)
-                       : [];
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetProduct>>(
+                result,
+                "We couldn't load products for this category right now. Please try again.");
         }
     }
 }

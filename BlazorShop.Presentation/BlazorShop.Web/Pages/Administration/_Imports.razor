@@ -15,6 +15,7 @@
 @using BlazorShop.Web.Components.FormControls
 @using BlazorShop.Web.Authentication.Providers
 @using BlazorShop.Web.Layout
+@using BlazorShop.Web.Services.Contracts
 @using BlazorShop.Web.Shared
 @using BlazorShop.Web.Shared.Helper.Contracts
 @using BlazorShop.Web.Shared.Services.Contracts
@@ -30,4 +31,5 @@
 @inject NavigationManager NavigationManager
 @inject ICartService CartService
 @inject IToastService ToastService
+@inject IQueryFailureNotifier QueryFailureNotifier
 @attribute [Authorize(Roles = Constant.Administration.AdminRole)]

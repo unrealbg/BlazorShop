@@ -32,23 +32,32 @@
 
         protected override async Task OnInitializedAsync()
         {
-            try
+            var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
+            if (!string.IsNullOrEmpty(cartJson))
             {
-                var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
-                if (!string.IsNullOrEmpty(cartJson))
-                {
-                    _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
-                }
-
-                _products = await this.ProductService.GetAllAsync();
-                this.GetCart();
-
-                _paymentMethods = await this.PaymentMethodService.GetPaymentMethods();
+                _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
             }
-            catch
+
+            var productsResult = await this.ProductService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Cart"))
             {
-                this.NavigationManager.NavigateTo($"authentication/login/{Constant.Cart.Name}");
+                _products = [];
             }
+            else
+            {
+                _products = productsResult.Data ?? [];
+            }
+
+            this.GetCart();
+
+            var paymentMethodsResult = await this.PaymentMethodService.GetPaymentMethods();
+            if (this.QueryFailureNotifier.TryNotifyFailure(paymentMethodsResult, "Checkout"))
+            {
+                _paymentMethods = [];
+                return;
+            }
+
+            _paymentMethods = paymentMethodsResult.Data ?? [];
         }
 
         private void GetCart()

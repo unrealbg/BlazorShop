@@ -16,7 +16,7 @@ namespace BlazorShop.Web.Shared.Services
             _apiCallHelper = apiCallHelper;
         }
 
-        public async Task<IEnumerable<GetProductRecommendation>> GetRecommendationsAsync(Guid productId)
+        public async Task<QueryResult<IEnumerable<GetProductRecommendation>>> GetRecommendationsAsync(Guid productId)
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -28,10 +28,9 @@ namespace BlazorShop.Web.Shared.Services
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                 ? await _apiCallHelper.GetServiceResponse<IEnumerable<GetProductRecommendation>>(result)
-              : [];
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetProductRecommendation>>(
+                result,
+                "We couldn't load recommendations right now. Please try again.");
         }
     }
 }

@@ -132,13 +132,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            _headerProducts = await ProductService.GetAllAsync();
-        }
-        catch
+        var headerProductsResult = await ProductService.GetAllAsync();
+        if (QueryFailureNotifier.TryNotifyFailure(headerProductsResult, "Products"))
         {
             _headerProducts = Enumerable.Empty<GetProduct>();
+        }
+        else
+        {
+            _headerProducts = headerProductsResult.Data ?? Enumerable.Empty<GetProduct>();
         }
 
         await LoadCartCountAsync();

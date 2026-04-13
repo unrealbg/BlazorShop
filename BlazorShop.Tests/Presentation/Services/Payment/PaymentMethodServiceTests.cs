@@ -52,19 +52,20 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .ReturnsAsync(httpResponseMessage);
 
             this._apiCallHelperMock
-                .Setup(a => a.GetServiceResponse<IEnumerable<GetPaymentMethod>>(httpResponseMessage))
-                .ReturnsAsync(expectedPaymentMethods);
+                .Setup(a => a.GetQueryResult<IEnumerable<GetPaymentMethod>>(httpResponseMessage, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetPaymentMethod>>.Succeeded(expectedPaymentMethods));
 
             // Act
             var result = await this._paymentMethodService.GetPaymentMethods();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(expectedPaymentMethods, result);
+            Assert.True(result.Success);
+            Assert.Equal(expectedPaymentMethods, result.Data);
         }
 
         [Fact]
-        public async Task GetPaymentMethods_ReturnsEmptyList_WhenApiCallIsUnsuccessful()
+        public async Task GetPaymentMethods_ReturnsFailureResult_WhenApiCallIsUnsuccessful()
         {
             // Arrange
             var httpResponseMessage = new HttpResponseMessage(HttpStatusCode.BadRequest);
@@ -78,12 +79,17 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
                 .ReturnsAsync(httpResponseMessage);
 
+            this._apiCallHelperMock
+                .Setup(a => a.GetQueryResult<IEnumerable<GetPaymentMethod>>(httpResponseMessage, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetPaymentMethod>>.Failed("Failed to load payment methods"));
+
             // Act
             var result = await this._paymentMethodService.GetPaymentMethods();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.False(result.Success);
+            Assert.Null(result.Data);
         }
     }
 }

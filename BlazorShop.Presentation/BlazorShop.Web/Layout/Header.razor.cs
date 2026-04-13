@@ -9,14 +9,14 @@
 
         protected override async Task OnInitializedAsync()
         {
-            try
+            var productsResult = await this.ProductService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
             {
-                this.Products = await this.ProductService.GetAllAsync();
+                this.Products = [];
+                return;
             }
-            catch
-            {
-                // handle error
-            }
+
+            this.Products = productsResult.Data ?? [];
         }
 
         private void ToggleCategories() => _showCategories = !_showCategories;

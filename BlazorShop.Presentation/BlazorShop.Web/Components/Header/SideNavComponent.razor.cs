@@ -10,14 +10,14 @@
 
         protected override async Task OnInitializedAsync()
         {
-            try
+            var categoriesResult = await this.CategoryService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(categoriesResult, "Categories"))
             {
-                this._categories = await this.CategoryService.GetAllAsync();
+                this._categories = [];
+                return;
             }
-            catch
-            {
-                this.ToastService.ShowErrorToast("An error occurred while loading categories.");
-            }
+
+            this._categories = categoriesResult.Data ?? [];
         }
 
         private void OpenNav()

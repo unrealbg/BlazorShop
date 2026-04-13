@@ -9,8 +9,8 @@
 
         Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems);
 
-        Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync();
+        Task<QueryResult<IEnumerable<GetOrderItem>>> GetOrderItemsAsync();
 
-        Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId();
+        Task<QueryResult<IEnumerable<GetOrderItem>>> GetCheckoutHistoryByUserId();
     }
 }

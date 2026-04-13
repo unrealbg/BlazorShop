@@ -22,14 +22,14 @@
 
         private async Task GetCategories()
         {
-            try
+            var categoriesResult = await this.CategoryService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(categoriesResult, "Categories"))
             {
-                _categories = await this.CategoryService.GetAllAsync();
+                _categories = [];
+                return;
             }
-            catch
-            {
-                this.ToastService.ShowToast(ToastLevel.Error, "Failed to load categories.", "Error", ToastIcon.Error);
-            }
+
+            _categories = categoriesResult.Data ?? [];
         }
 
         private void AddCategory()
