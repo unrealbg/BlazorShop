@@ -45,19 +45,14 @@
                 _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? new List<ProcessCart>();
             }
 
-            try
+            var productsResult = await this.ProductService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
             {
-                _products = await this.ProductService.GetAllAsync();
+                _products = [];
+                return;
             }
-            catch
-            {
-                this.ToastService.ShowToast(
-                    ToastLevel.Error,
-                    "An error occurred while loading products",
-                    "Error",
-                    ToastIcon.Error,
-                    ToastPosition.BottomRight);
-            }
+
+            _products = productsResult.Data ?? [];
 
             if (_products.Any())
             {
@@ -146,7 +141,14 @@
                 _isAddingToCart = true;
 
                 var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
-                var product = await this.ProductService.GetByIdAsync(productId);
+                var productResult = await this.ProductService.GetByIdAsync(productId);
+                if (this.QueryFailureNotifier.TryNotifyFailure(productResult, "Cart", ToastPosition.BottomRight) ||
+                    productResult.Data is null)
+                {
+                    return;
+                }
+
+                var product = productResult.Data;
                 var productName = product.Name;
 
                 if (getCart == null)
@@ -190,7 +192,8 @@
                 getCart.Quantity += payload.Quantity;
             }
 
-            var name = (await this.ProductService.GetByIdAsync(payload.ProductId)).Name;
+            var productResult = await this.ProductService.GetByIdAsync(payload.ProductId);
+            var name = productResult.Data?.Name ?? "Product";
             this.ToastService.ShowToast(
                 ToastLevel.Success,
                 $"[{name}] size {payload.SizeValue} added to cart",

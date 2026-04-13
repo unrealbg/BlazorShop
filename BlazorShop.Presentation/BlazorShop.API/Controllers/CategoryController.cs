@@ -27,7 +27,7 @@
         public async Task<ActionResult<IEnumerable<GetCategory>>> GetAll()
         {
             var categories = await _categoryService.GetAllAsync();
-            return categories.Any() ? this.Ok(categories) : this.NotFound();
+            return this.Ok(categories);
         }
 
         /// <summary>
@@ -90,7 +90,7 @@
         public async Task<ActionResult<IEnumerable<GetProduct>>> GetProductsByCategory(Guid categoryId)
         {
             var results = await _categoryService.GetProductsByCategoryAsync(categoryId);
-            return results.Any() ? this.Ok(results) : this.NotFound();
+            return this.Ok(results);
         }
     }
 }

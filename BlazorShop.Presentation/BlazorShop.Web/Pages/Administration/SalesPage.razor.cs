@@ -55,18 +55,20 @@
 
         protected override async Task OnInitializedAsync()
         {
-            try
-            {
-                var client = await this.HttpClientHelper.GetPrivateClientAsync();
-                var api = new ApiCall { Client = client, Route = Constant.Cart.GetAllOrders, Type = Constant.ApiCallType.Get };
-                var http = await this.ApiCallHelper.ApiCallTypeCall<object>(api);
-                _orders = http is null || !http.IsSuccessStatusCode
-                    ? new()
-                    : (await this.ApiCallHelper.GetServiceResponse<IEnumerable<GetOrder>>(http)).ToList();
-            }
-            catch
+            var client = await this.HttpClientHelper.GetPrivateClientAsync();
+            var api = new ApiCall { Client = client, Route = Constant.Cart.GetAllOrders, Type = Constant.ApiCallType.Get };
+            var http = await this.ApiCallHelper.ApiCallTypeCall<object>(api);
+            var ordersResult = await this.ApiCallHelper.GetQueryResult<IEnumerable<GetOrder>>(
+                http,
+                "We couldn't load orders right now. Please try again.");
+
+            if (this.QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders"))
             {
                 _orders = new();
+            }
+            else
+            {
+                _orders = (ordersResult.Data ?? []).ToList();
             }
 
             ComputeStats();

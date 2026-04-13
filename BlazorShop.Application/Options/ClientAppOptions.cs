@@ -4,6 +4,6 @@ namespace BlazorShop.Application.Options
     {
         public const string SectionName = "ClientApp";
 
-        public string BaseUrl { get; set; } = "https://localhost:7258";
+        public string BaseUrl { get; set; } = string.Empty;
     }
 }

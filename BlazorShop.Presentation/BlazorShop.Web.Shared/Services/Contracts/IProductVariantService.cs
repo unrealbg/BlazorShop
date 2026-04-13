@@ -5,7 +5,7 @@ namespace BlazorShop.Web.Shared.Services.Contracts
 
     public interface IProductVariantService
     {
-        Task<IEnumerable<GetProductVariant>> GetByProductIdAsync(Guid productId);
+        Task<QueryResult<IEnumerable<GetProductVariant>>> GetByProductIdAsync(Guid productId);
 
         Task<ServiceResponse> AddAsync(Guid productId, CreateOrUpdateProductVariant variant);
 

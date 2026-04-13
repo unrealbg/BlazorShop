@@ -110,19 +110,20 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .Setup(x => x.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
                 .ReturnsAsync(httpResponse);
             this._apiCallHelperMock
-                .Setup(x => x.GetServiceResponse<IEnumerable<GetOrderItem>>(httpResponse))
-                .ReturnsAsync(orderItems);
+                .Setup(x => x.GetQueryResult<IEnumerable<GetOrderItem>>(httpResponse, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetOrderItem>>.Succeeded(orderItems));
 
             // Act
             var result = await this._cartService.GetOrderItemsAsync();
 
             // Assert
             Assert.NotNull(result);
-            Assert.NotEmpty(result);
+            Assert.True(result.Success);
+            Assert.NotEmpty(result.Data!);
         }
 
         [Fact]
-        public async Task GetOrderItemsAsync_Returns_EmptyList()
+        public async Task GetOrderItemsAsync_Returns_FailureResult_WhenApiCallFails()
         {
             // Arrange
             var httpResponse = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
@@ -133,16 +134,21 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .Setup(x => x.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
                 .ReturnsAsync(httpResponse);
 
+            this._apiCallHelperMock
+                .Setup(x => x.GetQueryResult<IEnumerable<GetOrderItem>>(httpResponse, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetOrderItem>>.Failed("Failed to load order items"));
+
             // Act
             var result = await this._cartService.GetOrderItemsAsync();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.False(result.Success);
+            Assert.Null(result.Data);
         }
 
         [Fact]
-        public async Task GetOrderItemsAsync_Returns_EmptyList_WhenApiCallResultIsNull()
+        public async Task GetOrderItemsAsync_Returns_FailureResult_WhenApiCallResultIsNull()
         {
             // Arrange
             this._httpClientHelperMock
@@ -152,12 +158,17 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .Setup(x => x.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
                 .ReturnsAsync((HttpResponseMessage)null!);
 
+            this._apiCallHelperMock
+                .Setup(x => x.GetQueryResult<IEnumerable<GetOrderItem>>(null!, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetOrderItem>>.Failed("Failed to load order items"));
+
             // Act
             var result = await this._cartService.GetOrderItemsAsync();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.False(result.Success);
+            Assert.Null(result.Data);
         }
 
         [Fact]
@@ -183,20 +194,21 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .ReturnsAsync(apiCallResult);
 
             _apiCallHelperMock
-                .Setup(a => a.GetServiceResponse<IEnumerable<GetOrderItem>>(apiCallResult))
-                .ReturnsAsync(expectedOrderItems);
+                .Setup(a => a.GetQueryResult<IEnumerable<GetOrderItem>>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetOrderItem>>.Succeeded(expectedOrderItems));
 
             // Act
             var result = await _cartService.GetCheckoutHistoryByUserId();
 
             // Assert
             Assert.NotNull(result);
-            Assert.NotEmpty(result);
-            Assert.Equal(expectedOrderItems, result);
+            Assert.True(result.Success);
+            Assert.NotEmpty(result.Data!);
+            Assert.Equal(expectedOrderItems, result.Data);
         }
 
         [Fact]
-        public async Task GetCheckoutHistoryByUserId_ShouldReturnEmptyList_WhenApiCallIsNotSuccessful()
+        public async Task GetCheckoutHistoryByUserId_ShouldReturnFailureResult_WhenApiCallIsNotSuccessful()
         {
             // Arrange
             var apiCallResult = new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
@@ -204,28 +216,38 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
                 .ReturnsAsync(apiCallResult);
 
+            _apiCallHelperMock
+                .Setup(a => a.GetQueryResult<IEnumerable<GetOrderItem>>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetOrderItem>>.Failed("Failed to load order history"));
+
             // Act
             var result = await _cartService.GetCheckoutHistoryByUserId();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.False(result.Success);
+            Assert.Null(result.Data);
         }
 
         [Fact]
-        public async Task GetCheckoutHistoryByUserId_ShouldReturnEmptyList_WhenApiCallResultIsNull()
+        public async Task GetCheckoutHistoryByUserId_ShouldReturnFailureResult_WhenApiCallResultIsNull()
         {
             // Arrange
             _apiCallHelperMock
                 .Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
                 .ReturnsAsync((HttpResponseMessage)null!);
 
+            _apiCallHelperMock
+                .Setup(a => a.GetQueryResult<IEnumerable<GetOrderItem>>(null!, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetOrderItem>>.Failed("Failed to load order history"));
+
             // Act
             var result = await _cartService.GetCheckoutHistoryByUserId();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Empty(result);
+            Assert.False(result.Success);
+            Assert.Null(result.Data);
         }
     }
 }

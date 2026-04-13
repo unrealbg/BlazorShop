@@ -54,7 +54,7 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
-        public async Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync()
+        public async Task<QueryResult<IEnumerable<GetOrderItem>>> GetOrderItemsAsync()
         {
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
@@ -67,13 +67,12 @@
                                      };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result is null || !result.IsSuccessStatusCode
-                       ? []
-                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result);
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetOrderItem>>(
+                result,
+                "We couldn't load order items right now. Please try again.");
         }
 
-        public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId()
+        public async Task<QueryResult<IEnumerable<GetOrderItem>>> GetCheckoutHistoryByUserId()
         {
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
@@ -85,9 +84,9 @@
                 Id = null!
             };
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result is null || !result.IsSuccessStatusCode
-                       ? []
-                       : await this._apiCallHelper.GetServiceResponse<IEnumerable<GetOrderItem>>(result);
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetOrderItem>>(
+                result,
+                "We couldn't load your order history right now. Please try again.");
         }
     }
 }

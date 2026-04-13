@@ -33,6 +33,7 @@
             if (string.IsNullOrEmpty(this.CategoryId))
             {
                 this.NavigationManager.NavigateTo("/");
+                return;
             }
 
             var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
@@ -42,8 +43,25 @@
                 _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? new List<ProcessCart>();
             }
 
-            this.SelectedCategory = await this.CategoryService.GetByIdAsync(Guid.Parse(this.CategoryId));
-            _productsByCategory = await this.CategoryService.GetProductsByCategoryAsync(Guid.Parse(this.CategoryId));
+            var categoryId = Guid.Parse(this.CategoryId);
+            var categoryResult = await this.CategoryService.GetByIdAsync(categoryId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(categoryResult, "Categories") || categoryResult.Data is null)
+            {
+                this.SelectedCategory = new();
+                _productsByCategory = [];
+                return;
+            }
+
+            this.SelectedCategory = categoryResult.Data;
+
+            var productsResult = await this.CategoryService.GetProductsByCategoryAsync(categoryId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
+            {
+                _productsByCategory = [];
+                return;
+            }
+
+            _productsByCategory = productsResult.Data ?? [];
         }
 
         private async Task HandleAddToCart(GetProduct product)
@@ -66,7 +84,14 @@
                 _isAddingToCart = true;
 
                 var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
-                var product = await this.ProductService.GetByIdAsync(productId);
+                var productResult = await this.ProductService.GetByIdAsync(productId);
+                if (this.QueryFailureNotifier.TryNotifyFailure(productResult, "Cart", ToastPosition.BottomRight) ||
+                    productResult.Data is null)
+                {
+                    return;
+                }
+
+                var product = productResult.Data;
                 var productName = product.Name;
 
                 if (getCart == null)
@@ -110,7 +135,8 @@
                 getCart.Quantity += payload.Quantity;
             }
 
-            var name = (await this.ProductService.GetByIdAsync(payload.ProductId)).Name;
+            var productResult = await this.ProductService.GetByIdAsync(payload.ProductId);
+            var name = productResult.Data?.Name ?? "Product";
             this.ToastService.ShowToast(
                 ToastLevel.Success,
                 $"Product {name} (size {payload.SizeValue}) added to cart",

@@ -24,6 +24,7 @@
 @using BlazorShop.Web.Pages.Errors
 @using BlazorShop.Web.Pages.Products
 @using BlazorShop.Web.Pages.Payments
+@using BlazorShop.Web.Services.Contracts
 @using BlazorShop.Web.Layout
 @using BlazorShop.Web.Shared
 @using BlazorShop.Web.Shared.Helper.Contracts
@@ -47,5 +48,6 @@
 @inject IPaymentMethodService PaymentMethodService
 @inject ICartService CartService
 @inject IToastService ToastService
+@inject IQueryFailureNotifier QueryFailureNotifier
 @inject IHttpClientHelper HttpClientHelper
 @inject IApiCallHelper ApiCallHelper

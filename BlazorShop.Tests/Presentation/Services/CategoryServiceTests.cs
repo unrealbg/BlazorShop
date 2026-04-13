@@ -53,15 +53,16 @@ namespace BlazorShop.Tests.Presentation.Services
             };
 
             _apiCallHelperMock
-                .Setup(helper => helper.GetServiceResponse<IEnumerable<GetCategory>>(apiCallResult))
-                .ReturnsAsync(categories);
+                .Setup(helper => helper.GetQueryResult<IEnumerable<GetCategory>>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetCategory>>.Succeeded(categories));
 
             // Act
             var result = await _categoryService.GetAllAsync();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(categories, result);
+            Assert.True(result.Success);
+            Assert.Equal(categories, result.Data);
         }
 
         [Fact]
@@ -84,15 +85,16 @@ namespace BlazorShop.Tests.Presentation.Services
             };
 
             _apiCallHelperMock
-                .Setup(helper => helper.GetServiceResponse<GetCategory>(apiCallResult))
-                .ReturnsAsync(category);
+                .Setup(helper => helper.GetQueryResult<GetCategory>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<GetCategory>.Succeeded(category));
 
             // Act
             var result = await _categoryService.GetByIdAsync(category.Id);
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(category, result);
+            Assert.True(result.Success);
+            Assert.Equal(category, result.Data);
         }
 
         [Fact]
@@ -210,8 +212,8 @@ namespace BlazorShop.Tests.Presentation.Services
             };
 
             _apiCallHelperMock
-                .Setup(helper => helper.GetServiceResponse<IEnumerable<GetProduct>>(apiCallResult))
-                .ReturnsAsync(products);
+                .Setup(helper => helper.GetQueryResult<IEnumerable<GetProduct>>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetProduct>>.Succeeded(products));
 
             var categoryId = Guid.NewGuid();
 
@@ -220,7 +222,8 @@ namespace BlazorShop.Tests.Presentation.Services
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(products, result);
+            Assert.True(result.Success);
+            Assert.Equal(products, result.Data);
         }
     }
 }

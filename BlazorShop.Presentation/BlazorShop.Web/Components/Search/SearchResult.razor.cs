@@ -27,9 +27,17 @@
             if (string.IsNullOrEmpty(this.Filter))
             {
                 this.NavigationManager.NavigateTo("/");
+                return;
             }
 
-            var products = await this.ProductService.GetAllAsync();
+            var productsResult = await this.ProductService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Search"))
+            {
+                this._searchedProducts = [];
+                return;
+            }
+
+            var products = productsResult.Data ?? [];
 
             if (products.Any())
             {
@@ -62,7 +70,14 @@
                 _isAddingToCart = true;
 
                 var getCart = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
-                var product = await ProductService.GetByIdAsync(productId);
+                var productResult = await ProductService.GetByIdAsync(productId);
+                if (this.QueryFailureNotifier.TryNotifyFailure(productResult, "Cart", ToastPosition.BottomRight) ||
+                    productResult.Data is null)
+                {
+                    return;
+                }
+
+                var product = productResult.Data;
                 var productName = product.Name;
 
                 if (getCart == null)

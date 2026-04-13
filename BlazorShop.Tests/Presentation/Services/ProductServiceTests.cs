@@ -54,15 +54,16 @@ namespace BlazorShop.Tests.Presentation.Services
             };
 
             this._apiCallHelperMock
-                .Setup(helper => helper.GetServiceResponse<IEnumerable<GetProduct>>(apiCallResult))
-                .ReturnsAsync(products);
+                .Setup(helper => helper.GetQueryResult<IEnumerable<GetProduct>>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<IEnumerable<GetProduct>>.Succeeded(products));
 
             // Act
             var result = await this._productService.GetAllAsync();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(products, result);
+            Assert.True(result.Success);
+            Assert.Equal(products, result.Data);
         }
 
         [Fact]
@@ -88,15 +89,16 @@ namespace BlazorShop.Tests.Presentation.Services
             };
 
             this._apiCallHelperMock
-                .Setup(helper => helper.GetServiceResponse<GetProduct>(apiCallResult))
-                .ReturnsAsync(product);
+                .Setup(helper => helper.GetQueryResult<GetProduct>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<GetProduct>.Succeeded(product));
 
             // Act
             var result = await this._productService.GetByIdAsync(product.Id);
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(product, result);
+            Assert.True(result.Success);
+            Assert.Equal(product, result.Data);
         }
 
         [Fact]

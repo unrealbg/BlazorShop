@@ -4,7 +4,6 @@
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Services.Contracts;
-    using System.Net;
 
     public class ProductService : IProductService
     {
@@ -17,7 +16,7 @@
             _apiCallHelper = apiCallHelper;
         }
 
-        public async Task<IEnumerable<GetProduct>> GetAllAsync()
+        public async Task<QueryResult<IEnumerable<GetProduct>>> GetAllAsync()
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -30,13 +29,12 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                       ? await _apiCallHelper.GetServiceResponse<IEnumerable<GetProduct>>(result)
-                       : [];
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetProduct>>(
+                result,
+                "We couldn't load products right now. Please try again.");
         }
 
-        public async Task<GetProduct> GetByIdAsync(Guid id)
+        public async Task<QueryResult<GetProduct>> GetByIdAsync(Guid id)
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -49,10 +47,9 @@
 
             currentApiCall.ToString(id);
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-
-            return result.IsSuccessStatusCode
-                       ? await _apiCallHelper.GetServiceResponse<GetProduct>(result)
-                       : null!;
+            return await _apiCallHelper.GetQueryResult<GetProduct>(
+                result,
+                "We couldn't load this product right now. Please try again.");
         }
 
         public async Task<ServiceResponse> AddAsync(CreateProduct product)

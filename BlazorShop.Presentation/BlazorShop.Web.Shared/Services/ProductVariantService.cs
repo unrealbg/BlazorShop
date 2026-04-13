@@ -16,7 +16,7 @@ namespace BlazorShop.Web.Shared.Services
             _apiCallHelper = apiCallHelper;
         }
 
-        public async Task<IEnumerable<GetProductVariant>> GetByProductIdAsync(Guid productId)
+        public async Task<QueryResult<IEnumerable<GetProductVariant>>> GetByProductIdAsync(Guid productId)
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -27,9 +27,9 @@ namespace BlazorShop.Web.Shared.Services
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return result.IsSuccessStatusCode
-                ? await _apiCallHelper.GetServiceResponse<IEnumerable<GetProductVariant>>(result)
-                : Array.Empty<GetProductVariant>();
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetProductVariant>>(
+                result,
+                "We couldn't load product variants right now. Please try again.");
         }
 
         public async Task<ServiceResponse> AddAsync(Guid productId, CreateOrUpdateProductVariant variant)

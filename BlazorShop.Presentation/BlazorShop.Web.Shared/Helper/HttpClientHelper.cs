@@ -18,12 +18,12 @@
 
         public HttpClient GetPublicClient()
         {
-            return _clientFactory.CreateClient(Constant.ApiClient.Name);
+            return _clientFactory.CreateClient(Constant.ApiClient.PublicName);
         }
 
         public async Task<HttpClient> GetPrivateClientAsync()
         {
-            var client = _clientFactory.CreateClient(Constant.ApiClient.Name);
+            var client = _clientFactory.CreateClient(Constant.ApiClient.PrivateName);
             string token = await _tokenService.GetJwtTokenAsync(Constant.Cookie.Name);
 
             if (string.IsNullOrEmpty(token))

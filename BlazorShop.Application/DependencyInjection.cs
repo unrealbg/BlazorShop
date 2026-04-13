@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.Application
 {
+    using System;
+
     using BlazorShop.Application.Mapping;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services;
@@ -27,7 +29,15 @@
             services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
 
             services.Configure<RecommendationOptions>(configuration.GetSection(RecommendationOptions.SectionName));
-            services.Configure<ClientAppOptions>(configuration.GetSection(ClientAppOptions.SectionName));
+            services.AddOptions<ClientAppOptions>()
+                .Bind(configuration.GetSection(ClientAppOptions.SectionName))
+                .Validate(
+                    options => !string.IsNullOrWhiteSpace(options.BaseUrl),
+                    $"{ClientAppOptions.SectionName}:BaseUrl is required.")
+                .Validate(
+                    options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
+                    $"{ClientAppOptions.SectionName}:BaseUrl must be an absolute URL.")
+                .ValidateOnStart();
 
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
             services.AddScoped<IValidationService, ValidationService>();

@@ -55,7 +55,8 @@
 
         public static class ApiClient
         {
-            public const string Name = "Blazor-Client";
+            public const string PublicName = "Blazor-Client-Public";
+            public const string PrivateName = "Blazor-Client-Private";
         }
 
         public static class Payment

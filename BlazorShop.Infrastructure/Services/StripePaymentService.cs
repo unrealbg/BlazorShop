@@ -14,9 +14,9 @@
     {
         private readonly ClientAppOptions _clientAppOptions;
 
-        public StripePaymentService(IOptions<ClientAppOptions>? clientAppOptions = null)
+        public StripePaymentService(IOptions<ClientAppOptions> clientAppOptions)
         {
-            _clientAppOptions = clientAppOptions?.Value ?? new ClientAppOptions();
+            _clientAppOptions = clientAppOptions.Value;
         }
 
         public async Task<ServiceResponse> Pay(decimal totalAmount, IEnumerable<Product> cartProducts, IEnumerable<ProcessCart> carts)
@@ -68,14 +68,7 @@
 
         private string BuildClientUrl(string path)
         {
-            var baseUrl = _clientAppOptions.BaseUrl;
-
-            if (string.IsNullOrWhiteSpace(baseUrl))
-            {
-                baseUrl = "https://localhost:7258";
-            }
-
-            return $"{baseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+            return $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
         }
     }
 }

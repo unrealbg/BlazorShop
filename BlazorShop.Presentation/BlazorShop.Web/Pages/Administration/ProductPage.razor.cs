@@ -42,14 +42,30 @@
 
         protected override async Task OnInitializedAsync()
         {
-            this._categories = await this.CategoryService.GetAllAsync();
+            var categoriesResult = await this.CategoryService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(categoriesResult, "Categories"))
+            {
+                this._categories = [];
+            }
+            else
+            {
+                this._categories = categoriesResult.Data ?? [];
+            }
+
             await this.GetProducts();
             foreach (var c in _categories) _expandedCats.Add(c.Id);
         }
 
         private async Task GetProducts()
         {
-            _products = await this.ProductService.GetAllAsync();
+            var productsResult = await this.ProductService.GetAllAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
+            {
+                _products = [];
+                return;
+            }
+
+            _products = productsResult.Data ?? [];
         }
 
         private void ToggleCat(Guid id)
@@ -84,7 +100,14 @@
 
         private async Task LoadVariantsAsync(Guid productId)
         {
-            _variants = (await this.ProductVariantService.GetByProductIdAsync(productId)).ToList();
+            var variantsResult = await this.ProductVariantService.GetByProductIdAsync(productId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(variantsResult, "Variants"))
+            {
+                _variants = [];
+                return;
+            }
+
+            _variants = (variantsResult.Data ?? []).ToList();
             _variantForm = new CreateOrUpdateProductVariant
             {
                 ProductId = productId,
@@ -230,8 +253,14 @@
             this.ShowToast(response, "Add-Variant");
             if (response.Success)
             {
-                var list = await this.ProductVariantService.GetByProductIdAsync(_newProductId);
-                _newVariants = list.ToList();
+                var variantsResult = await this.ProductVariantService.GetByProductIdAsync(_newProductId);
+                if (this.QueryFailureNotifier.TryNotifyFailure(variantsResult, "Variants"))
+                {
+                    _newVariants = [];
+                    return;
+                }
+
+                _newVariants = (variantsResult.Data ?? []).ToList();
                 _newVariantForm = new CreateOrUpdateProductVariant { ProductId = _newProductId, SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
             }
         }

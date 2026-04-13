@@ -274,20 +274,30 @@
             _userName = _userEmail;
         }
 
-        _orderItems = await CartService.GetCheckoutHistoryByUserId();
-
-        try
+        var orderItemsResult = await CartService.GetCheckoutHistoryByUserId();
+        if (QueryFailureNotifier.TryNotifyFailure(orderItemsResult, "Orders"))
         {
-            var client = await HttpClientHelper.GetPrivateClientAsync();
-            var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
-            var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
-            _orders = http is null || !http.IsSuccessStatusCode
-                ? Array.Empty<GetOrder>()
-                : await ApiCallHelper.GetServiceResponse<IEnumerable<GetOrder>>(http);
+            _orderItems = Array.Empty<GetOrderItem>();
         }
-        catch
+        else
+        {
+            _orderItems = orderItemsResult.Data ?? Array.Empty<GetOrderItem>();
+        }
+
+        var client = await HttpClientHelper.GetPrivateClientAsync();
+        var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
+        var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+        var ordersResult = await ApiCallHelper.GetQueryResult<IEnumerable<GetOrder>>(
+            http,
+            "We couldn't load your orders right now. Please try again.");
+
+        if (QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders"))
         {
             _orders = Array.Empty<GetOrder>();
+        }
+        else
+        {
+            _orders = ordersResult.Data ?? Array.Empty<GetOrder>();
         }
 
         ApplyFilter();

@@ -25,7 +25,7 @@
         public async Task<ActionResult<IEnumerable<GetProduct>>> GetAll()
         {
             var data = await _productService.GetAllAsync();
-            return data.Any() ? Ok(data) : NotFound();
+            return Ok(data);
         }
 
         /// <summary>

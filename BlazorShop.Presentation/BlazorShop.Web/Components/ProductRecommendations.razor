@@ -32,7 +32,7 @@
 							}
 
 							<div class="flex items-center justify-between">
-								<span class="text-lg font-bold text-emerald-600">ˆ @product.Price.ToString("F2")</span>
+								<span class="text-lg font-bold text-emerald-600">ï¿½ @product.Price.ToString("F2")</span>
 								<button class="text-xs px-2 py-1 rounded bg-neutral-900 text-white hover:bg-neutral-800 transition-colors" @onclick:stopPropagation="true" @onclick="() => QuickView(product.Id)">
 									Quick View
 								</button>
@@ -61,14 +61,14 @@
 	{
 		if (ProductId != Guid.Empty)
 		{
-			try
-			{
-				_recommendations = await RecommendationService.GetRecommendationsAsync(ProductId);
-			}
-			catch
+			var recommendationsResult = await RecommendationService.GetRecommendationsAsync(ProductId);
+			if (QueryFailureNotifier.TryNotifyFailure(recommendationsResult, "Recommendations"))
 			{
 				_recommendations = null;
+				return;
 			}
+
+			_recommendations = recommendationsResult.Data;
 		}
 	}
 
