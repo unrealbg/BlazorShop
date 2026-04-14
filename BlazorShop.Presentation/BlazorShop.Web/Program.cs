@@ -5,6 +5,8 @@ namespace BlazorShop.Web
     using BlazorShop.Web.Services;
     using BlazorShop.Web.Services.Contracts;
     using BlazorShop.Web.Shared;
+    using BlazorShop.Web.Shared.BrowserStorage;
+    using BlazorShop.Web.Shared.BrowserStorage.Contracts;
     using BlazorShop.Web.Shared.CookieStorage;
     using BlazorShop.Web.Shared.CookieStorage.Contracts;
     using BlazorShop.Web.Shared.Helper;
@@ -27,6 +29,7 @@ namespace BlazorShop.Web
             var apiBaseAddress = await ResolveApiBaseAddressAsync(builder);
 
             builder.Services.AddSingleton<IBrowserCookieStorageService, BrowserCookieStorageService>();
+            builder.Services.AddSingleton<IBrowserSessionStorageService, BrowserSessionStorageService>();
             builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
             builder.Services.AddScoped<ITokenService, TokenService>();
             builder.Services.AddScoped<IHttpClientHelper, HttpClientHelper>();
@@ -35,11 +38,12 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
+            builder.Services.AddScoped<BrowserCredentialsHandler>();
             builder.Services.AddScoped<RefreshTokenHandler>();
             builder.Services.AddHttpClient(
                 Constant.ApiClient.PublicName,
                 client => { client.BaseAddress = apiBaseAddress; }
-            );
+            ).AddHttpMessageHandler<BrowserCredentialsHandler>();
             builder.Services.AddHttpClient(
                 Constant.ApiClient.PrivateName,
                 client => { client.BaseAddress = apiBaseAddress; }

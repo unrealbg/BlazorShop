@@ -32,19 +32,15 @@
 
             if (!request.Options.TryGetValue(RetriedKey, out var retried) || !retried)
             {
-                var refreshToken = await _tokenService.GetJwtTokenAsync(Constant.Cookie.Name);
-                if (!string.IsNullOrEmpty(refreshToken))
+                var loginResponse = await this.MakeApiCall();
+                if (loginResponse is not null)
                 {
-                    var loginResponse = await this.MakeApiCall(refreshToken);
-                    if (loginResponse is not null)
+                    if (request.Method == HttpMethod.Get || request.Content is null)
                     {
-                        if (request.Method == HttpMethod.Get || request.Content is null)
-                        {
-                            request.Options.Set(RetriedKey, true);
-                            request.Headers.Authorization = new AuthenticationHeaderValue(Constant.Authentication.Type, loginResponse.Token);
-                            response.Dispose();
-                            return await base.SendAsync(request, cancellationToken);
-                        }
+                        request.Options.Set(RetriedKey, true);
+                        request.Headers.Authorization = new AuthenticationHeaderValue(Constant.Authentication.Type, loginResponse.Token);
+                        response.Dispose();
+                        return await base.SendAsync(request, cancellationToken);
                     }
                 }
             }
@@ -52,23 +48,18 @@
             return response;
         }
 
-        private async Task<LoginResponse?> MakeApiCall(string refreshToken)
+        private async Task<LoginResponse?> MakeApiCall()
         {
-            var result = await _authenticationService.ReviveToken(refreshToken);
+            var result = await _authenticationService.ReviveToken();
 
-            if (result.Success)
+            if (result.Success && !string.IsNullOrWhiteSpace(result.Token))
             {
-                var cookieValue = _tokenService.FromToken(result.Token, result.RefreshToken);
-                await _tokenService.RemoveCookie(Constant.Cookie.Name);
-                await _tokenService.SetCookie(
-                    Constant.Cookie.Name,
-                    cookieValue,
-                    Constant.Cookie.Days,
-                    Constant.Cookie.Path);
+                await _tokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
 
                 return result;
             }
 
+            await _tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
             return null;
         }
     }

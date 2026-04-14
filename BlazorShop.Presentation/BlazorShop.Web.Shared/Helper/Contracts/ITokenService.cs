@@ -4,12 +4,8 @@
     {
         Task<string> GetJwtTokenAsync(string key);
 
-        Task<string> GetRefreshTokenAsync(string key);
+        Task StoreJwtTokenAsync(string key, string value);
 
-        string FromToken(string jwtToken, string refreshToken);
-
-        Task SetCookie(string key, string value, int days, string path);
-
-        Task RemoveCookie(string key);
+        Task RemoveJwtTokenAsync(string key);
     }
 }

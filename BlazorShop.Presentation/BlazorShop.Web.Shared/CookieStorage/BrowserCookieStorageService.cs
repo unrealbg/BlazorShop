@@ -1,4 +1,4 @@
-﻿namespace BlazorShop.Web.Shared.CookieStorage
+namespace BlazorShop.Web.Shared.CookieStorage
 {
     using System;
     using System.Threading.Tasks;
@@ -36,7 +36,7 @@
         {
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new ArgumentException("Cookie name cannot be null, empty, or whitespace.", nameof(name));
+                throw new ArgumentException("Cookie name is required to get a cookie.", nameof(name));
             }
 
             return await _jsModuleHandler.InvokeAsync<string?>("getCookie", name);
@@ -46,7 +46,7 @@
         {
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new ArgumentException("Cookie name cannot be null, empty, or whitespace.", nameof(name));
+                throw new ArgumentException("Cookie name is required to remove a cookie.", nameof(name));
             }
 
             await _jsModuleHandler.InvokeVoidAsync("removeCookie", name);

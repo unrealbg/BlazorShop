@@ -470,6 +470,22 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
+        public async Task Logout_RemovesRefreshToken_WhenTokenIsPresent()
+        {
+            var refreshToken = "refresh-token";
+
+            _tokenManagerMock
+                .Setup(tokenManager => tokenManager.RemoveRefreshTokenAsync(refreshToken))
+                .ReturnsAsync(1);
+
+            var result = await _authenticationService.Logout(refreshToken);
+
+            Assert.True(result.Success);
+            Assert.Equal("Logged out successfully.", result.Message);
+            _tokenManagerMock.Verify(tokenManager => tokenManager.RemoveRefreshTokenAsync(refreshToken), Times.Once);
+        }
+
+        [Fact]
         public async Task ChangePassword_ShouldReturnSuccess_WhenPasswordIsChanged()
         {
             // Arrange

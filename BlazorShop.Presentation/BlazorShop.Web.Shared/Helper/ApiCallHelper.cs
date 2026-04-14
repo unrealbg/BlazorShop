@@ -44,6 +44,8 @@
                 {
                     "post" => apiCall.Model is HttpContent content
                         ? await client.PostAsync(route, content)
+                        : apiCall.Model is null
+                            ? await client.PostAsync(route, content: null)
                         : await client.PostAsJsonAsync(route, (TModel)apiCall.Model!),
                     "update" => await client.PutAsJsonAsync(route, (TModel)apiCall.Model!),
                     "delete" => await client.DeleteAsync($"{route}/{apiCall.Id}"),

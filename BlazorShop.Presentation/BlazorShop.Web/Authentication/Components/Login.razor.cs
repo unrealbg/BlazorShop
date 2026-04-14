@@ -33,12 +33,7 @@
                 return;
             }
 
-            string cookieValue = this.TokenService.FromToken(result.Token, result.RefreshToken);
-            await this.TokenService.SetCookie(
-                Constant.Cookie.Name,
-                cookieValue,
-                Constant.Cookie.Days,
-                Constant.Cookie.Path);
+            await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
 
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
 

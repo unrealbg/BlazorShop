@@ -33,6 +33,7 @@
             public const string Register = "authentication/create";
             public const string Login = "authentication/login";
             public const string ReviveToke = "authentication/refresh-token";
+            public const string Logout = "authentication/logout";
             public const string ChangePassword = "authentication/change-password";
             public const string ConfirmEmail = "authentication/confirm-email";
             public const string UpdateProfile = "authentication/update-profile";
@@ -46,11 +47,9 @@
             public const string Update = "update";
         }
 
-        public static class Cookie
+        public static class TokenStorage
         {
-            public const string Name = "token";
-            public const string Path = "/";
-            public const int Days = 1;
+            public const string Key = "token";
         }
 
         public static class ApiClient

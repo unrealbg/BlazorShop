@@ -4,7 +4,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await TokenService.RemoveCookie(Constant.Cookie.Name);
+        await AuthenticationService.Logout();
+        await TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
         NavigationManager.NavigateTo("/", true);
     }
 }
