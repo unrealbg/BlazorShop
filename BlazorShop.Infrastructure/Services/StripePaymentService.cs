@@ -6,17 +6,25 @@
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Entities;
 
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     using Stripe.Checkout;
 
     public class StripePaymentService : IPaymentService
     {
+        private readonly IStripeCheckoutSessionService _checkoutSessionService;
         private readonly ClientAppOptions _clientAppOptions;
+        private readonly ILogger<StripePaymentService> _logger;
 
-        public StripePaymentService(IOptions<ClientAppOptions> clientAppOptions)
+        public StripePaymentService(
+            IStripeCheckoutSessionService checkoutSessionService,
+            IOptions<ClientAppOptions> clientAppOptions,
+            ILogger<StripePaymentService> logger)
         {
+            _checkoutSessionService = checkoutSessionService;
             _clientAppOptions = clientAppOptions.Value;
+            _logger = logger;
         }
 
         public async Task<ServiceResponse> Pay(decimal totalAmount, IEnumerable<Product> cartProducts, IEnumerable<ProcessCart> carts)
@@ -55,14 +63,14 @@
                     CancelUrl = this.BuildClientUrl("payment-cancel"),
                 };
 
-                var service = new SessionService();
-                var session = await service.CreateAsync(opt);
+                var session = await _checkoutSessionService.CreateAsync(opt);
 
                 return new ServiceResponse(true, session.Url);
             }
             catch (Exception ex)
             {
-                return new ServiceResponse(false, ex.Message);
+                _logger.LogError(ex, "Failed to create Stripe checkout session.");
+                return new ServiceResponse(false, "Unable to initialize the card payment session. Please try again later.");
             }
         }
 

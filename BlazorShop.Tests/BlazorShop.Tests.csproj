@@ -28,6 +28,7 @@
     <ProjectReference Include="..\BlazorShop.AppHost\BlazorShop.AppHost.csproj" />
     <ProjectReference Include="..\BlazorShop.Application\BlazorShop.Application.csproj" />
     <ProjectReference Include="..\BlazorShop.Infrastructure\BlazorShop.Infrastructure.csproj" />
+    <ProjectReference Include="..\BlazorShop.Presentation\BlazorShop.API\BlazorShop.API.csproj" />
     <ProjectReference Include="..\BlazorShop.Presentation\BlazorShop.Web.Shared\BlazorShop.Web.Shared.csproj" />
   </ItemGroup>
 

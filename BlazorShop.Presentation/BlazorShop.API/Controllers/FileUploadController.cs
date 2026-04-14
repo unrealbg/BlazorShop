@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.API.Controllers
 {
+    using BlazorShop.API.Validation;
     using BlazorShop.Application.DTOs;
 
     using Microsoft.AspNetCore.Authorization;
@@ -13,13 +14,13 @@
         private readonly IWebHostEnvironment _environment;
 
         private const long MaxFileSizeBytes = 5 * 1024 * 1024;
-        private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly Dictionary<string, string> AllowedExtensionsByContentType = new(StringComparer.OrdinalIgnoreCase)
         {
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "image/gif",
-            "image/bmp"
+            ["image/jpeg"] = ".jpg",
+            ["image/png"] = ".png",
+            ["image/webp"] = ".webp",
+            ["image/gif"] = ".gif",
+            ["image/bmp"] = ".bmp"
         };
 
         public FileUploadController(IWebHostEnvironment environment)
@@ -56,26 +57,29 @@
                 return this.BadRequest(new FileUploadResponse(false, $"File too large. Max {(MaxFileSizeBytes / (1024 * 1024))}MB.", null!));
             }
 
-            if (!AllowedContentTypes.Contains(file.ContentType))
+            if (!AllowedExtensionsByContentType.TryGetValue(file.ContentType, out var safeExt))
             {
                 return this.BadRequest(new FileUploadResponse(false, "Invalid file type. Only image files are allowed.", null!));
+            }
+
+            await using (var validationStream = file.OpenReadStream())
+            {
+                var isValidImage = await ImageFileSignatureValidator.IsValidAsync(validationStream, file.ContentType, HttpContext.RequestAborted);
+                if (!isValidImage)
+                {
+                    return this.BadRequest(new FileUploadResponse(false, "Invalid image content. The uploaded file does not match its declared type.", null!));
+                }
             }
 
             var uploadsPath = Path.Combine(_environment.ContentRootPath, "uploads");
             Directory.CreateDirectory(uploadsPath);
 
-            var ext = Path.GetExtension(file.FileName);
-            if (string.IsNullOrWhiteSpace(ext))
-            {
-                ext = ".bin";
-            }
-            var safeExt = ext.ToLowerInvariant();
             var uniqueName = $"{Guid.NewGuid():N}{safeExt}";
             var filePath = Path.Combine(uploadsPath, uniqueName);
 
             await using (var stream = System.IO.File.Create(filePath))
             {
-                await file.CopyToAsync(stream);
+                await file.CopyToAsync(stream, HttpContext.RequestAborted);
             }
 
             string fileUrl;

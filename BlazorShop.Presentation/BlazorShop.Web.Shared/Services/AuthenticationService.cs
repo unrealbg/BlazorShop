@@ -47,7 +47,7 @@
 
         public async Task<LoginResponse> LoginUser(LoginUser user)
         {
-            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
             {
                 Route = Constant.Authentication.Login,
@@ -85,7 +85,7 @@
             return await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
         }
 
-        public async Task<LoginResponse> ReviveToken(string refreshToken)
+        public async Task<LoginResponse> ReviveToken()
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -93,15 +93,31 @@
                 Route = Constant.Authentication.ReviveToke,
                 Type = Constant.ApiCallType.Post,
                 Client = client,
-                Model = refreshToken,
             };
 
-            var result = await _apiCallHelper.ApiCallTypeCall<string>(currentApiCall);
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
 
             return result is null || !result.IsSuccessStatusCode
                        ? new LoginResponse(Message: this._apiCallHelper.ConnectionError().Message)
                        : await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
 
+        }
+
+        public async Task<ServiceResponse> Logout()
+        {
+            var client = _httpClientHelper.GetPublicClient();
+            var currentApiCall = new ApiCall
+            {
+                Route = Constant.Authentication.Logout,
+                Type = Constant.ApiCallType.Post,
+                Client = client,
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+
+            return result is null || !result.IsSuccessStatusCode
+                ? _apiCallHelper.ConnectionError()
+                : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
         public async Task<ServiceResponse> ChangePassword(PasswordChangeModel changePasswordDto)

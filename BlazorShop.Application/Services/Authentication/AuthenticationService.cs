@@ -238,6 +238,17 @@
                 : new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
         }
 
+        public async Task<ServiceResponse> Logout(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return new ServiceResponse(true, "Logged out successfully.");
+            }
+
+            await _tokenManager.RemoveRefreshTokenAsync(refreshToken);
+            return new ServiceResponse(true, "Logged out successfully.");
+        }
+
         public async Task<ServiceResponse> ChangePassword(ChangePassword changePasswordDto, string userId)
         {
             var user = await _userManager.GetUserByIdAsync(userId);

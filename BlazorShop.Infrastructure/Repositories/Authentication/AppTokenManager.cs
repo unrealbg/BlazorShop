@@ -93,6 +93,19 @@
             return await _context.SaveChangesAsync();
         }
 
+        public async Task<int> RemoveRefreshTokenAsync(string refreshToken)
+        {
+            var user = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.Token == refreshToken);
+
+            if (user is null)
+            {
+                return 0;
+            }
+
+            _context.RefreshTokens.Remove(user);
+            return await _context.SaveChangesAsync();
+        }
+
         public string GenerateAccessToken(List<Claim> claims)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:Key"]!));

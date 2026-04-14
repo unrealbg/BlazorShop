@@ -69,7 +69,44 @@ namespace BlazorShop.Tests.Presentation.Helper
             Assert.Equal(HttpStatusCode.InternalServerError, result.StatusCode);
         }
 
+        [Fact]
+        public async Task ApiCallTypeCall_SendsPostWithoutBody_WhenModelIsNull()
+        {
+            var helper = new ApiCallHelper();
+            var handler = new RecordingHttpMessageHandler();
+            var client = new HttpClient(handler)
+            {
+                BaseAddress = new Uri("https://localhost:7094/api/")
+            };
+
+            var apiCall = new ApiCall
+            {
+                Client = client,
+                Route = "authentication/refresh-token",
+                Type = Constant.ApiCallType.Post
+            };
+
+            var response = await helper.ApiCallTypeCall<Unit>(apiCall);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotNull(handler.Request);
+            Assert.Equal(HttpMethod.Post, handler.Request!.Method);
+            Assert.Equal(new Uri("https://localhost:7094/api/authentication/refresh-token"), handler.Request.RequestUri);
+            Assert.Null(handler.Request.Content);
+        }
+
         private sealed record MessagePayload(string Message);
+
+        private sealed class RecordingHttpMessageHandler : HttpMessageHandler
+        {
+            public HttpRequestMessage? Request { get; private set; }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Request = request;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            }
+        }
 
         private sealed class ThrowingHttpMessageHandler : HttpMessageHandler
         {

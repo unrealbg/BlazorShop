@@ -24,7 +24,7 @@
         public async Task<HttpClient> GetPrivateClientAsync()
         {
             var client = _clientFactory.CreateClient(Constant.ApiClient.PrivateName);
-            string token = await _tokenService.GetJwtTokenAsync(Constant.Cookie.Name);
+            string token = await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key);
 
             if (string.IsNullOrEmpty(token))
             {

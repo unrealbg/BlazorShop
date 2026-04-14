@@ -88,6 +88,7 @@
             services.AddScoped<IAppRoleManager, AppRoleManager>();
 
             services.AddScoped<IPaymentMethod, PaymentMethodRepository>();
+            services.AddScoped<IStripeCheckoutSessionService, StripeCheckoutSessionService>();
             services.AddScoped<IPaymentService, StripePaymentService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();

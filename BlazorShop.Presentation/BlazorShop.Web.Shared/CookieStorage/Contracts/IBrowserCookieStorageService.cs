@@ -1,4 +1,4 @@
-﻿namespace BlazorShop.Web.Shared.CookieStorage.Contracts
+namespace BlazorShop.Web.Shared.CookieStorage.Contracts
 {
     public interface IBrowserCookieStorageService
     {

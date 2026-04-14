@@ -99,11 +99,10 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             {
                 Success = true,
                 Message = "Login successful",
-                Token = "token",
-                RefreshToken = "refreshToken"
+                Token = "token"
             };
 
-            this._httpClientHelperMock.Setup(h => h.GetPrivateClientAsync()).ReturnsAsync(httpClient);
+            this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
             this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
             this._apiCallHelperMock.Setup(a => a.GetServiceResponse<LoginResponse>(apiCallResult)).ReturnsAsync(loginResponse);
 
@@ -115,7 +114,6 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             Assert.True(result.Success);
             Assert.Equal("Login successful", result.Message);
             Assert.Equal("token", result.Token);
-            Assert.Equal("refreshToken", result.RefreshToken);
         }
 
         [Fact]
@@ -130,7 +128,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             };
             var errorResponse = new LoginResponse { Success = false, Message = "Invalid credentials." };
 
-            this._httpClientHelperMock.Setup(h => h.GetPrivateClientAsync()).ReturnsAsync(httpClient);
+            this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
             this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
 
             // Act
@@ -149,8 +147,8 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             var user = new LoginUser { Email = "john@example.com", Password = "Password123" };
 
             _httpClientHelperMock
-                .Setup(h => h.GetPrivateClientAsync())
-                .ReturnsAsync(new HttpClient());
+                .Setup(h => h.GetPublicClient())
+                .Returns(new HttpClient());
 
             _apiCallHelperMock
                 .Setup(a => a.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>()))
@@ -174,7 +172,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
             var expectedResponse = new LoginResponse { Token = "token" };
 
-            _httpClientHelperMock.Setup(x => x.GetPrivateClientAsync()).ReturnsAsync(client);
+            _httpClientHelperMock.Setup(x => x.GetPublicClient()).Returns(client);
             _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync(httpResponse);
             _apiCallHelperMock.Setup(x => x.GetServiceResponse<LoginResponse>(httpResponse)).ReturnsAsync(expectedResponse);
 
@@ -192,7 +190,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             var user = new LoginUser { Email = "test@example.com", Password = "password" };
             var client = new HttpClient();
 
-            _httpClientHelperMock.Setup(x => x.GetPrivateClientAsync()).ReturnsAsync(client);
+            _httpClientHelperMock.Setup(x => x.GetPublicClient()).Returns(client);
             _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync((HttpResponseMessage)null!);
 
             // Act
@@ -215,7 +213,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
                 Content = JsonContent.Create(errorResponse)
             };
 
-            _httpClientHelperMock.Setup(x => x.GetPrivateClientAsync()).ReturnsAsync(client);
+            _httpClientHelperMock.Setup(x => x.GetPublicClient()).Returns(client);
             _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync(httpResponse);
 
             // Act
@@ -237,7 +235,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
                 Content = new StringContent(responseContent)
             };
 
-            _httpClientHelperMock.Setup(x => x.GetPrivateClientAsync()).ReturnsAsync(client);
+            _httpClientHelperMock.Setup(x => x.GetPublicClient()).Returns(client);
             _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync(httpResponse);
 
             // Simulate exception during ReadFromJsonAsync
@@ -259,7 +257,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             var client = new HttpClient();
             var httpResponse = new HttpResponseMessage(HttpStatusCode.BadRequest);
 
-            _httpClientHelperMock.Setup(x => x.GetPrivateClientAsync()).ReturnsAsync(client);
+            _httpClientHelperMock.Setup(x => x.GetPublicClient()).Returns(client);
             _apiCallHelperMock.Setup(x => x.ApiCallTypeCall<LoginUser>(It.IsAny<ApiCall>())).ReturnsAsync(httpResponse);
 
             // Act
@@ -274,51 +272,64 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
         public async Task ReviveToken_ReturnsLoginResponse_WhenApiCallIsSuccessful()
         {
             // Arrange
-            var refreshToken = "refreshToken";
             var httpClient = new HttpClient();
             var apiCallResult = new HttpResponseMessage(HttpStatusCode.OK);
             var loginResponse = new LoginResponse
             {
                 Success = true,
                 Message = "Token revived",
-                Token = "newToken",
-                RefreshToken = "newRefreshToken"
+                Token = "newToken"
             };
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
-            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<string>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
+            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
             this._apiCallHelperMock.Setup(a => a.GetServiceResponse<LoginResponse>(apiCallResult)).ReturnsAsync(loginResponse);
 
             // Act
-            var result = await this._authenticationService.ReviveToken(refreshToken);
+            var result = await this._authenticationService.ReviveToken();
 
             // Assert
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("Token revived", result.Message);
             Assert.Equal("newToken", result.Token);
-            Assert.Equal("newRefreshToken", result.RefreshToken);
         }
 
         [Fact]
         public async Task ReviveToken_ReturnsErrorResponse_WhenApiCallFails()
         {
             // Arrange
-            var refreshToken = "refreshToken";
             var httpClient = new HttpClient();
             HttpResponseMessage apiCallResult = null!;
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
-            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<string>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
+            this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
             this._apiCallHelperMock.Setup(a => a.ConnectionError()).Returns(new ServiceResponse { Success = false, Message = "Connection error" });
 
             // Act
-            var result = await this._authenticationService.ReviveToken(refreshToken);
+            var result = await this._authenticationService.ReviveToken();
 
             // Assert
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Connection error", result.Message);
+        }
+
+        [Fact]
+        public async Task Logout_ReturnsServiceResponse_WhenApiCallIsSuccessful()
+        {
+            var httpClient = new HttpClient();
+            var apiCallResult = new HttpResponseMessage(HttpStatusCode.OK);
+            var serviceResponse = new ServiceResponse { Success = true, Message = "Logged out successfully." };
+
+            _httpClientHelperMock.Setup(helper => helper.GetPublicClient()).Returns(httpClient);
+            _apiCallHelperMock.Setup(helper => helper.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
+            _apiCallHelperMock.Setup(helper => helper.GetServiceResponse<ServiceResponse>(apiCallResult)).ReturnsAsync(serviceResponse);
+
+            var result = await _authenticationService.Logout();
+
+            Assert.True(result.Success);
+            Assert.Equal("Logged out successfully.", result.Message);
         }
 
         [Fact]

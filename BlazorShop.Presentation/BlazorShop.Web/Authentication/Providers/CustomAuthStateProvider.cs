@@ -23,7 +23,7 @@
         {
             try
             {
-                var jwt = await _tokenService.GetJwtTokenAsync(Constant.Cookie.Name);
+                var jwt = await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key);
 
                 if (string.IsNullOrEmpty(jwt))
                 {

@@ -19,6 +19,7 @@ namespace BlazorShop.API
     using Microsoft.AspNetCore.Diagnostics.HealthChecks;
     using Microsoft.AspNetCore.HttpOverrides;
     using Microsoft.AspNetCore.RateLimiting;
+    using Microsoft.AspNetCore.StaticFiles;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Diagnostics.HealthChecks;
     using Microsoft.Extensions.FileProviders;
@@ -74,6 +75,10 @@ namespace BlazorShop.API
                         && options.RateLimiting.WindowSeconds > 0
                         && options.RateLimiting.QueueLimit >= 0,
                     $"{ApiRuntimeOptions.SectionName}:RateLimiting values must be positive.")
+                .Validate(
+                    options => !string.IsNullOrWhiteSpace(options.Security.RefreshTokenCookieName)
+                        && IsValidSameSiteMode(options.Security.RefreshTokenCookieSameSite),
+                    $"{ApiRuntimeOptions.SectionName}:Security refresh token cookie settings are invalid.")
                 .ValidateOnStart();
 
             builder.Services.AddControllers().AddJsonOptions(opt =>
@@ -143,6 +148,16 @@ namespace BlazorShop.API
                     DevelopmentCatalogSeeder.SeedAsync(dbContext).GetAwaiter().GetResult();
                 }
 
+                if (!app.Environment.IsDevelopment() && runtimeOptions.Security.EnableHsts)
+                {
+                    app.UseHsts();
+                }
+
+                if (runtimeOptions.Security.EnableHttpsRedirection)
+                {
+                    app.UseHttpsRedirection();
+                }
+
                 app.UseCors(ClientCorsPolicyName);
 
                 if (runtimeOptions.RateLimiting.Enabled)
@@ -165,20 +180,9 @@ namespace BlazorShop.API
                 Log.Logger.Information("ContentRootPath: {ContentRoot}", builder.Environment.ContentRootPath);
                 Log.Logger.Information("Uploads path configured: {UploadsPath}", uploadsPath);
 
-                app.UseStaticFiles(new StaticFileOptions
-                {
-                    FileProvider = new PhysicalFileProvider(uploadsPath),
-                    RequestPath = "/uploads",
-                    ServeUnknownFileTypes = true,
-                    OnPrepareResponse = ctx =>
-                        {
-                            ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
-                        }
-                });
+                app.UseStaticFiles(CreateUploadsStaticFileOptions(uploadsPath));
 
                 app.UseInfrastructure();
-
-                app.UseHttpsRedirection();
 
                 app.UseAuthentication();
                 app.UseAuthorization();
@@ -320,6 +324,39 @@ namespace BlazorShop.API
             Log.Logger.Information(
                 "Forwarded headers enabled: {Enabled}",
                 !app.Environment.IsDevelopment() && runtimeOptions.ForwardedHeaders.Enabled);
+            Log.Logger.Information(
+                "HSTS enabled: {Enabled}",
+                !app.Environment.IsDevelopment() && runtimeOptions.Security.EnableHsts);
+            Log.Logger.Information(
+                "HTTPS redirection enabled: {Enabled}",
+                runtimeOptions.Security.EnableHttpsRedirection);
+            Log.Logger.Information(
+                "Refresh token cookie same-site mode: {SameSiteMode}",
+                runtimeOptions.Security.RefreshTokenCookieSameSite);
+        }
+
+        private static StaticFileOptions CreateUploadsStaticFileOptions(string uploadsPath)
+        {
+            var contentTypeProvider = new FileExtensionContentTypeProvider();
+            contentTypeProvider.Mappings.Clear();
+            contentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+            contentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
+            contentTypeProvider.Mappings[".png"] = "image/png";
+            contentTypeProvider.Mappings[".webp"] = "image/webp";
+            contentTypeProvider.Mappings[".gif"] = "image/gif";
+            contentTypeProvider.Mappings[".bmp"] = "image/bmp";
+
+            return new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(uploadsPath),
+                RequestPath = "/uploads",
+                ContentTypeProvider = contentTypeProvider,
+                OnPrepareResponse = ctx =>
+                {
+                    ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+                    ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                }
+            };
         }
 
         private static HashSet<string> ResolveAllowedCorsOrigins(ApiRuntimeOptions runtimeOptions, IConfiguration configuration)
@@ -407,6 +444,11 @@ namespace BlazorShop.API
         private static bool IsValidPath(string path)
         {
             return !string.IsNullOrWhiteSpace(path) && path.StartsWith('/');
+        }
+
+        private static bool IsValidSameSiteMode(string sameSiteMode)
+        {
+            return Enum.TryParse<SameSiteMode>(sameSiteMode, ignoreCase: true, out _);
         }
     }
 }

@@ -9,7 +9,9 @@
 
         Task<LoginResponse> LoginUser(LoginUser user);
 
-        Task<LoginResponse> ReviveToken(string refreshToken);
+        Task<LoginResponse> ReviveToken();
+
+        Task<ServiceResponse> Logout();
 
         Task<ServiceResponse> ChangePassword(PasswordChangeModel changePasswordDto);
 

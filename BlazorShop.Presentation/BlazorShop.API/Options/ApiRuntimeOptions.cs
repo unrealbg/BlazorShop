@@ -10,6 +10,8 @@ namespace BlazorShop.API.Options
 
         public ApiHealthEndpointOptions Health { get; set; } = new();
 
+        public ApiSecurityOptions Security { get; set; } = new();
+
         public PublicApiRateLimitingOptions RateLimiting { get; set; } = new();
     }
 
@@ -31,11 +33,22 @@ namespace BlazorShop.API.Options
 
     public sealed class ApiHealthEndpointOptions
     {
-        public bool ExposeInProduction { get; set; } = true;
+        public bool ExposeInProduction { get; set; }
 
         public string ReadyPath { get; set; } = "/health";
 
         public string LivePath { get; set; } = "/alive";
+    }
+
+    public sealed class ApiSecurityOptions
+    {
+        public bool EnableHsts { get; set; } = true;
+
+        public bool EnableHttpsRedirection { get; set; } = true;
+
+        public string RefreshTokenCookieName { get; set; } = "__Host-blazorshop-refresh";
+
+        public string RefreshTokenCookieSameSite { get; set; } = "Strict";
     }
 
     public sealed class PublicApiRateLimitingOptions
