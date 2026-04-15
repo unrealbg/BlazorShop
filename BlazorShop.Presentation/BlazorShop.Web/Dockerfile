@@ -5,7 +5,18 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj BlazorShop.Presentation/BlazorShop.Web/
+COPY BlazorShop.Presentation/BlazorShop.Web.Shared/BlazorShop.Web.Shared.csproj BlazorShop.Presentation/BlazorShop.Web.Shared/
+
+RUN dotnet restore BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj
+
+COPY BlazorShop.Presentation/BlazorShop.Web/package.json BlazorShop.Presentation/BlazorShop.Web/package.json
+COPY BlazorShop.Presentation/BlazorShop.Web/package-lock.json BlazorShop.Presentation/BlazorShop.Web/package-lock.json
+
+RUN npm ci --prefix BlazorShop.Presentation/BlazorShop.Web
+
+COPY BlazorShop.Presentation/BlazorShop.Web.Shared/ BlazorShop.Presentation/BlazorShop.Web.Shared/
+COPY BlazorShop.Presentation/BlazorShop.Web/ BlazorShop.Presentation/BlazorShop.Web/
 
 RUN dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj \
     --configuration Release \

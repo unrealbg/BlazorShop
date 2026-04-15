@@ -26,7 +26,7 @@
                                                  {
                                                      Question = "What payment methods do you accept?",
                                                      Answer =
-                                                         "We accept all major credit cards, PayPal, and bank transfers."
+                                                         "We accept all major credit cards, cash on delivery, and bank transfers."
                                                  },
                                              new FaqItem
                                                  {

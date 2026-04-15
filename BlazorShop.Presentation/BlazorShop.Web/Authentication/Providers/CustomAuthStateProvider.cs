@@ -12,7 +12,7 @@
     {
         private readonly ITokenService _tokenService;
 
-        private ClaimsPrincipal _anonymous = new(new ClaimsIdentity());
+        private readonly ClaimsPrincipal _anonymous = new(new ClaimsIdentity());
 
         public CustomAuthStateProvider(ITokenService tokenService)
         {
@@ -21,29 +21,23 @@
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            try
+            var jwt = await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key);
+
+            if (string.IsNullOrWhiteSpace(jwt))
             {
-                var jwt = await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key);
-
-                if (string.IsNullOrEmpty(jwt))
-                {
-                    return await Task.FromResult(new AuthenticationState(_anonymous));
-                }
-
-                var claims = GetClaims(jwt);
-
-                if (!claims.Any())
-                {
-                    return await Task.FromResult(new AuthenticationState(_anonymous));
-                }
-
-                var claimPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwtAuth"));
-                return await Task.FromResult(new AuthenticationState(claimPrincipal));
+                return new AuthenticationState(_anonymous);
             }
-            catch
+
+            var claims = TryGetValidClaims(jwt);
+
+            if (claims == null)
             {
-                return await Task.FromResult(new AuthenticationState(_anonymous));
+                await _tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
+                return new AuthenticationState(_anonymous);
             }
+
+            var claimPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, "jwtAuth"));
+            return new AuthenticationState(claimPrincipal);
         }
 
         public void NotifyAuthenticationState()
@@ -51,11 +45,34 @@
             this.NotifyAuthenticationStateChanged(this.GetAuthenticationStateAsync());
         }
 
-        private static IEnumerable<Claim> GetClaims(string jwt)
+        private static IReadOnlyList<Claim>? TryGetValidClaims(string jwt)
         {
             var handler = new JwtSecurityTokenHandler();
+
+            if (!handler.CanReadToken(jwt))
+            {
+                return null;
+            }
+
             var token = handler.ReadJwtToken(jwt);
-            return token.Claims.ToList();
+            var claims = token.Claims.ToList();
+
+            if (claims.Count == 0)
+            {
+                return null;
+            }
+
+            var expirationClaim = claims
+                .FirstOrDefault(claim => claim.Type == JwtRegisteredClaimNames.Exp || claim.Type == "exp")?
+                .Value;
+
+            if (!long.TryParse(expirationClaim, out var expirationSeconds))
+            {
+                return null;
+            }
+
+            var expiresAtUtc = DateTimeOffset.FromUnixTimeSeconds(expirationSeconds);
+            return expiresAtUtc <= DateTimeOffset.UtcNow ? null : claims;
         }
     }
 }

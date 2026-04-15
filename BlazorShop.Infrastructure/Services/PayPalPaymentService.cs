@@ -9,13 +9,12 @@ namespace BlazorShop.Infrastructure.Services
     {
         public Task<ServiceResponse> Pay(decimal totalAmount, IEnumerable<Product> cartProducts, IEnumerable<ProcessCart> carts)
         {
-            var url = "https://www.paypal.com/checkoutnow?token=demo-token";
-            return Task.FromResult(new ServiceResponse(true, url));
+            return Task.FromResult(new ServiceResponse(false, "PayPal payments are not currently available."));
         }
 
         public Task<bool> CaptureAsync(string orderId)
         {
-            return Task.FromResult(true);
+            return Task.FromResult(false);
         }
     }
 }

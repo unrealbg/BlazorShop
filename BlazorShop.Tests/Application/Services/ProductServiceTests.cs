@@ -13,6 +13,7 @@
 
     public class ProductServiceTests
     {
+        private readonly Mock<IProductReadRepository> _mockProductReadRepository;
         private readonly Mock<IGenericRepository<Product>> _mockProductRepository;
         private readonly Mock<IMapper> _mockMapper;
         private readonly ProductService _productService;
@@ -20,11 +21,15 @@
         public ProductServiceTests()
         {
             // Moq init
+            this._mockProductReadRepository = new Mock<IProductReadRepository>();
             this._mockProductRepository = new Mock<IGenericRepository<Product>>();
             this._mockMapper = new Mock<IMapper>();
 
             // Create service
-            this._productService = new ProductService(this._mockProductRepository.Object, this._mockMapper.Object);
+            this._productService = new ProductService(
+                this._mockProductReadRepository.Object,
+                this._mockProductRepository.Object,
+                this._mockMapper.Object);
         }
 
         [Fact]
@@ -44,8 +49,8 @@
             };
 
             // Moq config
-            this._mockProductRepository.Setup(repo => repo.GetAllAsync())
-                                  .ReturnsAsync(products);
+            this._mockProductReadRepository.Setup(repo => repo.GetCatalogProductsAsync())
+                                       .ReturnsAsync(products);
 
             this._mockMapper.Setup(mapper => mapper.Map<IEnumerable<GetProduct>>(products))
                        .Returns(mappedProducts);
@@ -56,7 +61,7 @@
             // Assert
             Assert.NotNull(result);
             Assert.Equal(mappedProducts, result);
-            this._mockProductRepository.Verify(repo => repo.GetAllAsync(), Times.Once);
+            this._mockProductReadRepository.Verify(repo => repo.GetCatalogProductsAsync(), Times.Once);
             this._mockMapper.Verify(mapper => mapper.Map<IEnumerable<GetProduct>>(products), Times.Once);
         }
 
@@ -66,8 +71,8 @@
             // Arrange
             var products = new List<Product>();
 
-            this._mockProductRepository.Setup(repo => repo.GetAllAsync())
-                                  .ReturnsAsync(products);
+            this._mockProductReadRepository.Setup(repo => repo.GetCatalogProductsAsync())
+                                       .ReturnsAsync(products);
 
             this._mockMapper.Setup(mapper => mapper.Map<IEnumerable<GetProduct>>(products))
                        .Returns(new List<GetProduct>());
@@ -78,7 +83,7 @@
             // Assert
             Assert.NotNull(result);
             Assert.Empty(result);
-            this._mockProductRepository.Verify(repo => repo.GetAllAsync(), Times.Once);
+            this._mockProductReadRepository.Verify(repo => repo.GetCatalogProductsAsync(), Times.Once);
             this._mockMapper.Verify(mapper => mapper.Map<IEnumerable<GetProduct>>(products), Times.Once);
         }
 
@@ -89,8 +94,8 @@
             var productId = Guid.NewGuid();
             var product = new Product { Id = productId, Name = "Product1" };
             var mappedProduct = new GetProduct { Id = productId, Name = "Product1" };
-            this._mockProductRepository.Setup(repo => repo.GetByIdAsync(productId))
-                                  .ReturnsAsync(product);
+            this._mockProductReadRepository.Setup(repo => repo.GetProductDetailsByIdAsync(productId))
+                                       .ReturnsAsync(product);
             this._mockMapper.Setup(mapper => mapper.Map<GetProduct>(product))
                        .Returns(mappedProduct);
 
@@ -100,7 +105,7 @@
             // Assert
             Assert.NotNull(result);
             Assert.Equal(mappedProduct, result);
-            this._mockProductRepository.Verify(repo => repo.GetByIdAsync(productId), Times.Once);
+            this._mockProductReadRepository.Verify(repo => repo.GetProductDetailsByIdAsync(productId), Times.Once);
             this._mockMapper.Verify(mapper => mapper.Map<GetProduct>(product), Times.Once);
         }
 
@@ -109,7 +114,7 @@
         {
             // Arrange
             var productId = Guid.NewGuid();
-            this._mockProductRepository.Setup(repo => repo.GetByIdAsync(productId))
+            this._mockProductReadRepository.Setup(repo => repo.GetProductDetailsByIdAsync(productId))
                 .ReturnsAsync((Product?)null);
 
             // Act
@@ -117,7 +122,7 @@
 
             // Assert
             Assert.Null(result);
-            this._mockProductRepository.Verify(repo => repo.GetByIdAsync(productId), Times.Once);
+            this._mockProductReadRepository.Verify(repo => repo.GetProductDetailsByIdAsync(productId), Times.Once);
             this._mockMapper.Verify(mapper => mapper.Map<GetProduct>(It.IsAny<Product>()), Times.Never);
         }
 

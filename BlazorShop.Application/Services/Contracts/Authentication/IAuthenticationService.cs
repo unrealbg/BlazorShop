@@ -7,11 +7,11 @@
     {
         Task<ServiceResponse> CreateUser(CreateUser user);
 
-        Task<LoginResponse> LoginUser(LoginUser user);
+        Task<LoginResponse> LoginUser(LoginUser user, string? ipAddress = null, string? userAgent = null);
 
-        Task<LoginResponse> ReviveToken(string refreshToken);
+        Task<LoginResponse> ReviveToken(string refreshToken, string? ipAddress = null, string? userAgent = null);
 
-        Task<ServiceResponse> Logout(string refreshToken);
+        Task<ServiceResponse> Logout(string refreshToken, string? ipAddress = null);
 
         Task<ServiceResponse> ChangePassword(ChangePassword changePasswordDto, string userId);
 

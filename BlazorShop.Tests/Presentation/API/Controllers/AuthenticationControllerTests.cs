@@ -21,7 +21,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         {
             var authenticationService = new Mock<IAuthenticationService>();
             authenticationService
-                .Setup(service => service.LoginUser(It.IsAny<LoginUser>()))
+                .Setup(service => service.LoginUser(It.IsAny<LoginUser>(), It.IsAny<string?>(), It.IsAny<string?>()))
                 .ReturnsAsync(new LoginResponse
                 {
                     Success = true,
@@ -45,6 +45,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             Assert.Contains("httponly", setCookieHeader, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("secure", setCookieHeader, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("samesite=strict", setCookieHeader, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("max-age=1209600", setCookieHeader, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
@@ -52,7 +53,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         {
             var authenticationService = new Mock<IAuthenticationService>();
             authenticationService
-                .Setup(service => service.ReviveToken("stale-refresh-token"))
+                .Setup(service => service.ReviveToken("stale-refresh-token", It.IsAny<string?>(), It.IsAny<string?>()))
                 .ReturnsAsync(new LoginResponse
                 {
                     Success = true,
@@ -81,7 +82,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         {
             var authenticationService = new Mock<IAuthenticationService>();
             authenticationService
-                .Setup(service => service.ReviveToken("stale-refresh-token"))
+                .Setup(service => service.ReviveToken("stale-refresh-token", It.IsAny<string?>(), It.IsAny<string?>()))
                 .ReturnsAsync(new LoginResponse { Message = "Invalid token." });
 
             var controller = CreateController(authenticationService.Object);
@@ -104,7 +105,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         {
             var authenticationService = new Mock<IAuthenticationService>();
             authenticationService
-                .Setup(service => service.Logout("stale-refresh-token"))
+                .Setup(service => service.Logout("stale-refresh-token", It.IsAny<string?>()))
                 .ReturnsAsync(new ServiceResponse(true, "Logged out successfully."));
 
             var controller = CreateController(authenticationService.Object);
@@ -120,7 +121,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             Assert.Equal("Logged out successfully.", response.Message);
             Assert.Contains("__Host-blazorshop-refresh=", setCookieHeader, StringComparison.Ordinal);
             Assert.Contains("expires=thu, 01 jan 1970", setCookieHeader, StringComparison.OrdinalIgnoreCase);
-            authenticationService.Verify(service => service.Logout("stale-refresh-token"), Times.Once);
+            authenticationService.Verify(service => service.Logout("stale-refresh-token", It.IsAny<string?>()), Times.Once);
         }
 
         private static AuthenticationController CreateController(IAuthenticationService authenticationService)

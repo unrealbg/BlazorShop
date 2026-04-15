@@ -12,13 +12,19 @@
     public class AppUserManager : IAppUserManager
     {
         private readonly UserManager<AppUser> _userManager;
+        private readonly SignInManager<AppUser> _signInManager;
         private readonly IAppRoleManager _roleManager;
         private readonly AppDbContext _context;
 
-        public AppUserManager(IAppRoleManager roleManager, UserManager<AppUser> userManager, AppDbContext context)
+        public AppUserManager(
+            IAppRoleManager roleManager,
+            UserManager<AppUser> userManager,
+            SignInManager<AppUser> signInManager,
+            AppDbContext context)
         {
             _roleManager = roleManager;
             _userManager = userManager;
+            _signInManager = signInManager;
             _context = context;
         }
 
@@ -36,24 +42,24 @@
             return result.Succeeded;
         }
 
-        public async Task<bool> LoginUserAsync(AppUser user)
+        public async Task<UserLoginResult> LoginUserAsync(AppUser user)
         {
             var currentUser = await GetUserByEmailAsync(user.Email!);
 
             if (currentUser == null)
             {
-                return false;
+                return new UserLoginResult(false);
             }
 
             string? roleName = await _roleManager.GetUserRoleAsync(user.Email!);
 
             if (string.IsNullOrEmpty(roleName))
             {
-                return false;
+                return new UserLoginResult(false);
             }
 
-            var result = await _userManager.CheckPasswordAsync(currentUser!, user.PasswordHash!);
-            return result;
+            var result = await _signInManager.CheckPasswordSignInAsync(currentUser, user.PasswordHash!, lockoutOnFailure: true);
+            return new UserLoginResult(result.Succeeded, result.IsLockedOut);
         }
 
         public async Task<AppUser?> GetUserByEmailAsync(string email)

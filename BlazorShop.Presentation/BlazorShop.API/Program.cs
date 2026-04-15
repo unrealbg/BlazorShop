@@ -31,6 +31,7 @@ namespace BlazorShop.API
     {
         private const string ClientCorsPolicyName = "ClientOrigins";
         private const string PublicApiRateLimitPolicyName = "PublicApi";
+        private const string AuthApiRateLimitPolicyName = "AuthApi";
 
         public static void Main(string[] args)
         {
@@ -73,11 +74,15 @@ namespace BlazorShop.API
                 .Validate(
                     options => options.RateLimiting.PermitLimit > 0
                         && options.RateLimiting.WindowSeconds > 0
-                        && options.RateLimiting.QueueLimit >= 0,
+                        && options.RateLimiting.QueueLimit >= 0
+                        && options.RateLimiting.Auth.PermitLimit > 0
+                        && options.RateLimiting.Auth.WindowSeconds > 0
+                        && options.RateLimiting.Auth.QueueLimit >= 0,
                     $"{ApiRuntimeOptions.SectionName}:RateLimiting values must be positive.")
                 .Validate(
                     options => !string.IsNullOrWhiteSpace(options.Security.RefreshTokenCookieName)
-                        && IsValidSameSiteMode(options.Security.RefreshTokenCookieSameSite),
+                        && IsValidSameSiteMode(options.Security.RefreshTokenCookieSameSite)
+                        && options.Security.RefreshTokenLifetimeDays > 0,
                     $"{ApiRuntimeOptions.SectionName}:Security refresh token cookie settings are invalid.")
                 .ValidateOnStart();
 
@@ -233,23 +238,8 @@ namespace BlazorShop.API
                     cancellationToken);
             };
 
-            options.AddPolicy(
-                PublicApiRateLimitPolicyName,
-                httpContext =>
-                {
-                    var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-                    return RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: clientIp,
-                        factory: _ => new FixedWindowRateLimiterOptions
-                        {
-                            PermitLimit = rateLimitOptions.PermitLimit,
-                            Window = TimeSpan.FromSeconds(rateLimitOptions.WindowSeconds),
-                            QueueLimit = rateLimitOptions.QueueLimit,
-                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                            AutoReplenishment = true,
-                        });
-                });
+            options.AddPolicy(PublicApiRateLimitPolicyName, httpContext => CreateIpRateLimitPartition(httpContext, rateLimitOptions.PermitLimit, rateLimitOptions.WindowSeconds, rateLimitOptions.QueueLimit));
+            options.AddPolicy(AuthApiRateLimitPolicyName, httpContext => CreateIpRateLimitPartition(httpContext, rateLimitOptions.Auth.PermitLimit, rateLimitOptions.Auth.WindowSeconds, rateLimitOptions.Auth.QueueLimit));
         }
 
         private static void ApplyPublicApiRateLimiting(ControllerActionEndpointConventionBuilder controllerEndpoints)
@@ -258,11 +248,29 @@ namespace BlazorShop.API
                 endpointBuilder =>
                 {
                     var hasAuthorization = endpointBuilder.Metadata.OfType<IAuthorizeData>().Any();
+                    var hasExplicitRateLimiting = endpointBuilder.Metadata.OfType<EnableRateLimitingAttribute>().Any()
+                        || endpointBuilder.Metadata.OfType<DisableRateLimitingAttribute>().Any();
 
-                    if (!hasAuthorization)
+                    if (!hasAuthorization && !hasExplicitRateLimiting)
                     {
                         endpointBuilder.Metadata.Add(new EnableRateLimitingAttribute(PublicApiRateLimitPolicyName));
                     }
+                });
+        }
+
+        private static RateLimitPartition<string> CreateIpRateLimitPartition(HttpContext httpContext, int permitLimit, int windowSeconds, int queueLimit)
+        {
+            var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: clientIp,
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = permitLimit,
+                    Window = TimeSpan.FromSeconds(windowSeconds),
+                    QueueLimit = queueLimit,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    AutoReplenishment = true,
                 });
         }
 
@@ -317,6 +325,11 @@ namespace BlazorShop.API
                 runtimeOptions.RateLimiting.PermitLimit,
                 runtimeOptions.RateLimiting.WindowSeconds);
             Log.Logger.Information(
+                "Auth API rate limiting enabled: {Enabled} (limit: {PermitLimit} requests / {WindowSeconds}s)",
+                runtimeOptions.RateLimiting.Enabled,
+                runtimeOptions.RateLimiting.Auth.PermitLimit,
+                runtimeOptions.RateLimiting.Auth.WindowSeconds);
+            Log.Logger.Information(
                 "Health endpoints exposed: {Exposed}, ready path: {ReadyPath}, live path: {LivePath}",
                 app.Environment.IsDevelopment() || runtimeOptions.Health.ExposeInProduction,
                 runtimeOptions.Health.ReadyPath,
@@ -333,6 +346,9 @@ namespace BlazorShop.API
             Log.Logger.Information(
                 "Refresh token cookie same-site mode: {SameSiteMode}",
                 runtimeOptions.Security.RefreshTokenCookieSameSite);
+            Log.Logger.Information(
+                "Refresh token lifetime: {RefreshTokenLifetimeDays} days",
+                runtimeOptions.Security.RefreshTokenLifetimeDays);
         }
 
         private static StaticFileOptions CreateUploadsStaticFileOptions(string uploadsPath)

@@ -14,7 +14,7 @@ namespace BlazorShop.Application.Services
     public class ProductRecommendationService : IProductRecommendationService
     {
         private readonly IProductRecommendationRepository _recommendationRepository;
-        private readonly IGenericRepository<Domain.Entities.Product> _productRepository;
+        private readonly IProductReadRepository _productReadRepository;
         private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
         private readonly IAppLogger<ProductRecommendationService> _logger;
@@ -24,14 +24,14 @@ namespace BlazorShop.Application.Services
 
         public ProductRecommendationService(
             IProductRecommendationRepository recommendationRepository,
-            IGenericRepository<Domain.Entities.Product> productRepository,
+            IProductReadRepository productReadRepository,
             IMapper mapper,
             IMemoryCache cache,
             IAppLogger<ProductRecommendationService> logger,
             IOptions<RecommendationOptions> options)
         {
             _recommendationRepository = recommendationRepository;
-            _productRepository = productRepository;
+            _productReadRepository = productReadRepository;
             _mapper = mapper;
             _cache = cache;
             _logger = logger;
@@ -58,7 +58,7 @@ namespace BlazorShop.Application.Services
 
                 _logger.LogInformation($"Cache miss, fetching recommendations for product {productId}");
 
-                var product = await _productRepository.GetByIdAsync(productId);
+                var product = await _productReadRepository.GetProductDetailsByIdAsync(productId);
                 if (product == null)
                 {
                     _logger.LogWarning($"Product {productId} not found");

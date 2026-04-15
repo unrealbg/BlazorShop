@@ -35,8 +35,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var paymentMethods = new List<PaymentMethod>
             {
                 new PaymentMethod { Id = Guid.NewGuid(), Name = "Credit Card" },
+                new PaymentMethod { Id = Guid.NewGuid(), Name = "Cash on Delivery" },
                 new PaymentMethod { Id = Guid.NewGuid(), Name = "PayPal" }
             };
+            var supportedMethods = paymentMethods.Where(paymentMethod => paymentMethod.Name != "PayPal").ToList();
             var mappedMethods = new List<GetPaymentMethod>
             {
                 new GetPaymentMethod { Id = paymentMethods[0].Id, Name = paymentMethods[0].Name },
@@ -47,7 +49,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 .Setup(pm => pm.GetPaymentMethodsAsync())
                 .ReturnsAsync(paymentMethods);
             _mapperMock
-                .Setup(m => m.Map<IEnumerable<GetPaymentMethod>>(paymentMethods))
+                .Setup(m => m.Map<IEnumerable<GetPaymentMethod>>(supportedMethods))
                 .Returns(mappedMethods);
 
             // Act
@@ -57,7 +59,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.NotNull(result);
             Assert.Equal(2, result.Count());
             Assert.Contains(result, pm => pm.Name == "Credit Card");
-            Assert.Contains(result, pm => pm.Name == "PayPal");
+            Assert.Contains(result, pm => pm.Name == "Cash on Delivery");
+            Assert.DoesNotContain(result, pm => pm.Name == "PayPal");
         }
 
         [Fact]

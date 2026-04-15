@@ -9,6 +9,7 @@
 
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.RateLimiting;
     using Microsoft.Extensions.Options;
 
     [Route("api/[controller]")]
@@ -30,6 +31,7 @@
         /// <param name="user">The user object </param>
         /// <returns>The result of the creation </returns>
         [HttpPost("create")]
+        [EnableRateLimiting("AuthApi")]
         public async Task<IActionResult> CreateUser(CreateUser user)
         {
             var result = await _authenticationService.CreateUser(user);
@@ -42,10 +44,11 @@
         /// <param name="user">The user object </param>
         /// <returns>The result of the login </returns>
         [HttpPost("login")]
+        [EnableRateLimiting("AuthApi")]
         [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> LoginUser(LoginUser user)
         {
-            var result = await _authenticationService.LoginUser(user);
+            var result = await _authenticationService.LoginUser(user, GetClientIpAddress(), GetUserAgent());
 
             if (!result.Success)
             {
@@ -66,6 +69,7 @@
         /// </summary>
         /// <returns>The result of the refresh </returns>
         [HttpPost("refresh-token")]
+        [EnableRateLimiting("AuthApi")]
         [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> RefreshToken()
         {
@@ -76,7 +80,7 @@
                 return this.BadRequest(new LoginResponse { Message = "Invalid token." });
             }
 
-            var result = await _authenticationService.ReviveToken(refreshToken);
+            var result = await _authenticationService.ReviveToken(refreshToken, GetClientIpAddress(), GetUserAgent());
 
             if (!result.Success)
             {
@@ -99,11 +103,12 @@
         /// </summary>
         /// <returns>The result of the logout operation.</returns>
         [HttpPost("logout")]
+        [EnableRateLimiting("AuthApi")]
         [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> Logout()
         {
             Request.Cookies.TryGetValue(GetRefreshTokenCookieName(), out var refreshToken);
-            var result = await _authenticationService.Logout(refreshToken ?? string.Empty);
+            var result = await _authenticationService.Logout(refreshToken ?? string.Empty, GetClientIpAddress());
 
             DeleteRefreshTokenCookie();
             return this.Ok(result);
@@ -190,7 +195,8 @@
                 Secure = true,
                 SameSite = GetRefreshTokenCookieSameSiteMode(),
                 IsEssential = true,
-                Path = "/"
+                Path = "/",
+                MaxAge = TimeSpan.FromDays(GetRefreshTokenLifetimeDays())
             };
         }
 
@@ -206,6 +212,23 @@
             return Enum.TryParse<SameSiteMode>(_runtimeOptions.Security.RefreshTokenCookieSameSite, ignoreCase: true, out var sameSiteMode)
                 ? sameSiteMode
                 : SameSiteMode.Strict;
+        }
+
+        private int GetRefreshTokenLifetimeDays()
+        {
+            return _runtimeOptions.Security.RefreshTokenLifetimeDays > 0
+                ? _runtimeOptions.Security.RefreshTokenLifetimeDays
+                : 14;
+        }
+
+        private string? GetClientIpAddress()
+        {
+            return HttpContext.Connection.RemoteIpAddress?.ToString();
+        }
+
+        private string? GetUserAgent()
+        {
+            return Request.Headers.UserAgent.ToString();
         }
 
         private static LoginResponse SanitizeLoginResponse(LoginResponse response)

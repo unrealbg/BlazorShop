@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
+
+      - name: Restore
+        run: dotnet restore BlazorShop.sln
+
+      - name: Build
+        run: dotnet build BlazorShop.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Validate production compose config
+        env:
+          BLAZORSHOP_DB_PASSWORD: ci-db-password
+          BLAZORSHOP_JWT_KEY: ci-jwt-signing-key-which-is-long-enough
+          BLAZORSHOP_STRIPE_SECRET_KEY: sk_test_placeholder
+          BLAZORSHOP_EMAIL_USERNAME: ci@example.com
+          BLAZORSHOP_EMAIL_PASSWORD: ci-email-password
+          BLAZORSHOP_PUBLIC_BASE_URL: https://shop.example.com
+        run: docker compose -f compose.production.yml config
+
+      - name: Build API container image
+        run: docker build -f BlazorShop.Presentation/BlazorShop.API/Dockerfile -t blazorshop-api:ci .
+
+      - name: Build Web container image
+        run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .

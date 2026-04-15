@@ -129,7 +129,7 @@
             return new ServiceResponse { Success = true, Message = "User created successfully." };
         }
 
-        public async Task<LoginResponse> LoginUser(LoginUser user)
+        public async Task<LoginResponse> LoginUser(LoginUser user, string? ipAddress = null, string? userAgent = null)
         {
             var validationResult = await _validationService.ValidateAsync(user, _loginUserValidator);
 
@@ -143,9 +143,11 @@
 
             var loginResult = await _userManager.LoginUserAsync(mappedUser);
 
-            if (!loginResult)
+            if (!loginResult.Success)
             {
-                return new LoginResponse { Message = "Invalid credentials." };
+                return loginResult.IsLockedOut
+                    ? new LoginResponse { Message = "Account is temporarily locked. Please try again later." }
+                    : new LoginResponse { Message = "Invalid credentials." };
             }
 
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
@@ -187,12 +189,8 @@
             var accessToken = _tokenManager.GenerateAccessToken(claims);
             var refreshToken = _tokenManager.GetReFreshToken();
 
-            var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(currentUser.Id, refreshToken);
-
-            if (saveTokenResult <= 0)
-            {
-                saveTokenResult = await _tokenManager.AddRefreshTokenAsync(currentUser.Id, refreshToken);
-            }
+            var refreshTokenEntry = _tokenManager.CreateRefreshToken(currentUser.Id, refreshToken, ipAddress, userAgent);
+            var saveTokenResult = await _tokenManager.AddRefreshTokenAsync(refreshTokenEntry);
 
             return saveTokenResult <= 0
                 ? new LoginResponse { Message = "Error occurred in login." }
@@ -200,23 +198,31 @@
 
         }
 
-        public async Task<LoginResponse> ReviveToken(string refreshToken)
+        public async Task<LoginResponse> ReviveToken(string refreshToken, string? ipAddress = null, string? userAgent = null)
         {
-            var validateTokenResult = await _tokenManager.ValidateRefreshTokenAsync(refreshToken);
+            var storedRefreshToken = await _tokenManager.GetRefreshTokenAsync(refreshToken);
 
-            if (!validateTokenResult)
+            if (storedRefreshToken is null)
             {
                 return new LoginResponse { Message = "Invalid token." };
             }
 
-            var userId = await _tokenManager.GetUserIdByRefreshTokenAsync(refreshToken);
-
-            if (string.IsNullOrEmpty(userId))
+            if (!_tokenManager.IsRefreshTokenActive(storedRefreshToken))
             {
+                if (storedRefreshToken.RevokedAtUtc is null && storedRefreshToken.ExpiresAtUtc <= DateTime.UtcNow)
+                {
+                    await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress);
+                }
+
+                if (storedRefreshToken.RevokedAtUtc is not null && !string.IsNullOrWhiteSpace(storedRefreshToken.ReplacedByTokenHash))
+                {
+                    await _tokenManager.RevokeRefreshTokenFamilyAsync(refreshToken, ipAddress);
+                }
+
                 return new LoginResponse { Message = "Invalid token." };
             }
 
-            var currentUser = await _userManager.GetUserByIdAsync(userId);
+            var currentUser = await _userManager.GetUserByIdAsync(storedRefreshToken.UserId);
             if (currentUser == null || string.IsNullOrWhiteSpace(currentUser.Email))
             {
                 return new LoginResponse { Message = "Invalid token." };
@@ -226,26 +232,33 @@
             var newAccessToken = _tokenManager.GenerateAccessToken(claims);
             var newRefreshToken = _tokenManager.GetReFreshToken();
 
-            var saveTokenResult = await _tokenManager.UpdateRefreshTokenAsync(userId, newRefreshToken);
+            var newRefreshTokenEntry = _tokenManager.CreateRefreshToken(currentUser.Id, newRefreshToken, ipAddress, userAgent);
+            var saveTokenResult = await _tokenManager.AddRefreshTokenAsync(newRefreshTokenEntry);
 
             if (saveTokenResult <= 0)
             {
-                saveTokenResult = await _tokenManager.AddRefreshTokenAsync(userId, newRefreshToken);
+                return new LoginResponse { Message = "Error occurred in login." };
             }
 
-            return saveTokenResult <= 0
-                ? new LoginResponse { Message = "Error occurred in login." }
-                : new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
+            var revokeTokenResult = await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress, newRefreshToken);
+
+            if (revokeTokenResult <= 0)
+            {
+                await _tokenManager.RevokeRefreshTokenAsync(newRefreshToken, ipAddress);
+                return new LoginResponse { Message = "Error occurred in login." };
+            }
+
+            return new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
         }
 
-        public async Task<ServiceResponse> Logout(string refreshToken)
+        public async Task<ServiceResponse> Logout(string refreshToken, string? ipAddress = null)
         {
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
                 return new ServiceResponse(true, "Logged out successfully.");
             }
 
-            await _tokenManager.RemoveRefreshTokenAsync(refreshToken);
+            await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress);
             return new ServiceResponse(true, "Logged out successfully.");
         }
 

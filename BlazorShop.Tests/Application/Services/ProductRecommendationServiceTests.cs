@@ -24,7 +24,7 @@ namespace BlazorShop.Tests.Application.Services
     public class ProductRecommendationServiceTests
     {
         private readonly Mock<IProductRecommendationRepository> _mockRecommendationRepo;
-        private readonly Mock<IGenericRepository<Product>> _mockProductRepo;
+      private readonly Mock<IProductReadRepository> _mockProductReadRepo;
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IMemoryCache> _mockCache;
         private readonly Mock<IAppLogger<ProductRecommendationService>> _mockLogger;
@@ -34,7 +34,7 @@ namespace BlazorShop.Tests.Application.Services
         public ProductRecommendationServiceTests()
         {
             _mockRecommendationRepo = new Mock<IProductRecommendationRepository>();
-            _mockProductRepo = new Mock<IGenericRepository<Product>>();
+          _mockProductReadRepo = new Mock<IProductReadRepository>();
             _mockMapper = new Mock<IMapper>();
             _mockCache = new Mock<IMemoryCache>();
             _mockLogger = new Mock<IAppLogger<ProductRecommendationService>>();
@@ -50,7 +50,7 @@ namespace BlazorShop.Tests.Application.Services
 
             _service = new ProductRecommendationService(
                 _mockRecommendationRepo.Object,
-                _mockProductRepo.Object,
+              _mockProductReadRepo.Object,
                 _mockMapper.Object,
                 _mockCache.Object,
                 _mockLogger.Object,
@@ -63,7 +63,7 @@ namespace BlazorShop.Tests.Application.Services
             // This test verifies that the service can be created
             // Full integration tests would require more setup
             Assert.NotNull(_mockRecommendationRepo);
-            Assert.NotNull(_mockProductRepo);
+            Assert.NotNull(_mockProductReadRepo);
             Assert.NotNull(_mockMapper);
             Assert.NotNull(_mockCache);
             Assert.NotNull(_mockLogger);
@@ -99,8 +99,8 @@ namespace BlazorShop.Tests.Application.Services
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue))
              .Returns(false);
 
-            _mockProductRepo.Setup(x => x.GetByIdAsync(productId))
-       .ReturnsAsync(product);
+            _mockProductReadRepo.Setup(x => x.GetProductDetailsByIdAsync(productId))
+              .ReturnsAsync(product);
 
             _mockRecommendationRepo.Setup(x => x.GetFrequentlyBoughtTogetherAsync(productId, 6))
       .ReturnsAsync(relatedProducts);
@@ -119,7 +119,7 @@ namespace BlazorShop.Tests.Application.Services
             Assert.NotNull(result);
             Assert.Equal(2, result.Count());
             Assert.Equal("Product 1", result.First().Name);
-            _mockProductRepo.Verify(x => x.GetByIdAsync(productId), Times.Once);
+            _mockProductReadRepo.Verify(x => x.GetProductDetailsByIdAsync(productId), Times.Once);
             _mockRecommendationRepo.Verify(x => x.GetFrequentlyBoughtTogetherAsync(productId, 6), Times.Once);
             _mockLogger.Verify(x => x.LogInformation(It.IsAny<string>()), Times.AtLeastOnce);
         }
@@ -133,7 +133,7 @@ namespace BlazorShop.Tests.Application.Services
           // Assert
            Assert.NotNull(result);
          Assert.Empty(result);
-         _mockProductRepo.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+         _mockProductReadRepo.Verify(x => x.GetProductDetailsByIdAsync(It.IsAny<Guid>()), Times.Never);
            _mockLogger.Verify(x => x.LogWarning("Invalid product ID provided"), Times.Once);
         }
 
@@ -146,8 +146,8 @@ namespace BlazorShop.Tests.Application.Services
     _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue))
     .Returns(false);
 
-        _mockProductRepo.Setup(x => x.GetByIdAsync(productId))
-    .ReturnsAsync((Product)null!);
+        _mockProductReadRepo.Setup(x => x.GetProductDetailsByIdAsync(productId))
+          .ReturnsAsync((Product)null!);
 
       // Act
     var result = await _service.GetRecommendationsForProductAsync(productId);
@@ -155,7 +155,7 @@ namespace BlazorShop.Tests.Application.Services
     // Assert
        Assert.NotNull(result);
 Assert.Empty(result);
-     _mockProductRepo.Verify(x => x.GetByIdAsync(productId), Times.Once);
+     _mockProductReadRepo.Verify(x => x.GetProductDetailsByIdAsync(productId), Times.Once);
       _mockLogger.Verify(x => x.LogWarning(It.Is<string>(s => s.Contains("not found"))), Times.Once);
         }
 
@@ -180,7 +180,7 @@ Assert.Empty(result);
         Assert.NotNull(result);
        Assert.Single(result);
          Assert.Equal("Cached Product", result.First().Name);
-  _mockProductRepo.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+  _mockProductReadRepo.Verify(x => x.GetProductDetailsByIdAsync(It.IsAny<Guid>()), Times.Never);
         _mockLogger.Verify(x => x.LogInformation(It.Is<string>(s => s.Contains("cached"))), Times.Once);
     }
 
@@ -204,8 +204,8 @@ Assert.Empty(result);
  _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue))
   .Returns(false);
 
-     _mockProductRepo.Setup(x => x.GetByIdAsync(productId))
-          .ReturnsAsync(product);
+    _mockProductReadRepo.Setup(x => x.GetProductDetailsByIdAsync(productId))
+      .ReturnsAsync(product);
 
             _mockRecommendationRepo.Setup(x => x.GetFrequentlyBoughtTogetherAsync(productId, 6))
     .ReturnsAsync(new List<Product>());
@@ -240,7 +240,7 @@ _mockCache.Setup(x => x.CreateEntry(It.IsAny<object>()))
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue))
         .Returns(false);
 
-         _mockProductRepo.Setup(x => x.GetByIdAsync(productId))
+         _mockProductReadRepo.Setup(x => x.GetProductDetailsByIdAsync(productId))
              .ThrowsAsync(new Exception("Database error"));
 
       // Act
@@ -272,8 +272,8 @@ var result = await _service.GetRecommendationsForProductAsync(productId);
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue))
   .Returns(false);
 
-          _mockProductRepo.Setup(x => x.GetByIdAsync(productId))
-   .ReturnsAsync(product);
+             _mockProductReadRepo.Setup(x => x.GetProductDetailsByIdAsync(productId))
+           .ReturnsAsync(product);
 
         _mockRecommendationRepo.Setup(x => x.GetFrequentlyBoughtTogetherAsync(productId, 6))
          .ReturnsAsync(relatedProducts);
@@ -307,7 +307,7 @@ _mockLogger.Verify(x => x.LogInformation(It.Is<string>(s => s.Contains("Cached")
 
           var service = new ProductRecommendationService(
                 _mockRecommendationRepo.Object,
-      _mockProductRepo.Object,
+          _mockProductReadRepo.Object,
            _mockMapper.Object,
        _mockCache.Object,
             _mockLogger.Object,
@@ -329,7 +329,7 @@ _mockLogger.Verify(x => x.LogInformation(It.Is<string>(s => s.Contains("Cached")
             _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue))
    .Returns(false);
 
-            _mockProductRepo.Setup(x => x.GetByIdAsync(productId))
+                 _mockProductReadRepo.Setup(x => x.GetProductDetailsByIdAsync(productId))
      .ReturnsAsync(product);
 
             _mockRecommendationRepo.Setup(x => x.GetRelatedProductsByCategoryAsync(productId, categoryId, 6))
