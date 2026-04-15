@@ -27,7 +27,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
     {
         private readonly Mock<ICart> _cartMock;
         private readonly Mock<IMapper> _mapperMock;
-        private readonly Mock<IGenericRepository<Product>> _productRepositoryMock;
+        private readonly Mock<IProductReadRepository> _productReadRepositoryMock;
         private readonly Mock<IPaymentMethodService> _paymentMethodServiceMock;
         private readonly Mock<IPaymentService> _paymentServiceMock;
         private readonly Mock<IPayPalPaymentService> _paypalServiceMock;
@@ -41,7 +41,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
         {
             _cartMock = new Mock<ICart>();
             _mapperMock = new Mock<IMapper>();
-            _productRepositoryMock = new Mock<IGenericRepository<Product>>();
+            _productReadRepositoryMock = new Mock<IProductReadRepository>();
             _paymentMethodServiceMock = new Mock<IPaymentMethodService>();
             _paymentServiceMock = new Mock<IPaymentService>();
             _paypalServiceMock = new Mock<IPayPalPaymentService>();
@@ -54,7 +54,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _cartService = new CartService(
                 _cartMock.Object,
                 _mapperMock.Object,
-                _productRepositoryMock.Object,
+                _productReadRepositoryMock.Object,
                 _paymentMethodServiceMock.Object,
                 _paymentServiceMock.Object,
                 _paypalServiceMock.Object,
@@ -140,9 +140,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 }
             };
             var totalAmount = 10m;
-            _productRepositoryMock
-                .Setup(r => r.GetAllAsync())
-                .ReturnsAsync(products);
+            _productReadRepositoryMock
+                .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(products.ToDictionary(product => product.Id));
             _paymentMethodServiceMock
                 .Setup(s => s.GetPaymentMethodsAsync())
                 .ReturnsAsync(new List<GetPaymentMethod>
@@ -225,9 +225,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _cartMock
                 .Setup(c => c.GetAllCheckoutHistory())
                 .ReturnsAsync(history);
-            _productRepositoryMock
-                .Setup(r => r.GetAllAsync())
-                .ReturnsAsync(products);
+            _productReadRepositoryMock
+                .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(products.ToDictionary(product => product.Id));
             _userManagerMock
                 .Setup(u => u.GetUserByIdAsync("user123"))
                 .ReturnsAsync(user);
@@ -299,9 +299,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 .Setup(cart => cart.GetCheckoutHistoryByUserId(userId))
                 .ReturnsAsync(history);
 
-            _productRepositoryMock
-                .Setup(repo => repo.GetAllAsync())
-                .ReturnsAsync(products);
+            _productReadRepositoryMock
+                .Setup(repo => repo.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(products.ToDictionary(product => product.Id));
 
             _userManagerMock
                 .Setup(manager => manager.GetUserByIdAsync(userId))

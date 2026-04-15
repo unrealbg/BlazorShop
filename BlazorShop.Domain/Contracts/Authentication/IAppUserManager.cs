@@ -8,7 +8,7 @@
     {
         Task<bool> CreateUserAsync(AppUser user);
 
-        Task<bool> LoginUserAsync(AppUser user);
+        Task<UserLoginResult> LoginUserAsync(AppUser user);
 
         Task<AppUser?> GetUserByEmailAsync(string email);
 

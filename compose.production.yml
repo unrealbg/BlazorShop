@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: blazorshop
+      POSTGRES_USER: blazorshop
+      POSTGRES_PASSWORD: ${BLAZORSHOP_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blazorshop -d blazorshop"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - blazorshop-postgres-data:/var/lib/postgresql/data
+    networks:
+      - blazorshop
+
+  api:
+    build:
+      context: .
+      dockerfile: BlazorShop.Presentation/BlazorShop.API/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=blazorshop;Username=blazorshop;Password=${BLAZORSHOP_DB_PASSWORD}
+      Jwt__Key: ${BLAZORSHOP_JWT_KEY}
+      Jwt__Issuer: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
+      Jwt__Audience: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
+      ClientApp__BaseUrl: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
+      Stripe__SecretKey: ${BLAZORSHOP_STRIPE_SECRET_KEY}
+      EmailSettings__Username: ${BLAZORSHOP_EMAIL_USERNAME}
+      EmailSettings__Password: ${BLAZORSHOP_EMAIL_PASSWORD}
+      Runtime__Cors__AllowedOrigins__0: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
+      Runtime__ForwardedHeaders__Enabled: true
+      Runtime__ForwardedHeaders__KnownProxies__0: 172.30.0.10
+      Runtime__Health__ExposeInProduction: false
+      Runtime__Security__EnableHsts: false
+      Runtime__Security__EnableHttpsRedirection: false
+      Runtime__Security__RefreshTokenLifetimeDays: 14
+      Runtime__RateLimiting__Auth__PermitLimit: 5
+      Runtime__RateLimiting__Auth__WindowSeconds: 60
+      Runtime__RateLimiting__Auth__QueueLimit: 0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - blazorshop-uploads-data:/app/uploads
+    networks:
+      - blazorshop
+
+  web:
+    build:
+      context: .
+      dockerfile: BlazorShop.Presentation/BlazorShop.Web/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    networks:
+      blazorshop:
+        ipv4_address: 172.30.0.10
+
+volumes:
+  blazorshop-postgres-data:
+  blazorshop-uploads-data:
+
+networks:
+  blazorshop:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -44,6 +44,7 @@
             );
 
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            services.AddScoped<IProductReadRepository, ProductReadRepository>();
             services.AddScoped(typeof(IAppLogger<>), typeof(LoggerAdapter<>));
 
             services.AddDefaultIdentity<AppUser>(
@@ -51,6 +52,9 @@
                     {
                         opt.SignIn.RequireConfirmedEmail = true;
                         opt.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
+                        opt.Lockout.AllowedForNewUsers = true;
+                        opt.Lockout.MaxFailedAccessAttempts = 5;
+                        opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
                         opt.Password.RequireDigit = true;
                         opt.Password.RequireNonAlphanumeric = true;
                         opt.Password.RequiredLength = 8;

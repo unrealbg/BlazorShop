@@ -16,7 +16,7 @@
     {
         private readonly ICart _cart;
         private readonly IMapper _mapper;
-        private readonly IGenericRepository<Product> _productRepository;
+        private readonly IProductReadRepository _productReadRepository;
         private readonly IPaymentMethodService _paymentMethodService;
         private readonly IPaymentService _paymentService; // Stripe/Card
         private readonly IPayPalPaymentService _payPalPaymentService; // PayPal
@@ -27,7 +27,7 @@
 
         public CartService(ICart cart,
                            IMapper mapper,
-                           IGenericRepository<Product> productRepository,
+                           IProductReadRepository productReadRepository,
                            IPaymentMethodService paymentMethodService,
                            IPaymentService paymentService,
                            IPayPalPaymentService payPalPaymentService,
@@ -38,7 +38,7 @@
         {
             _cart = cart;
             _mapper = mapper;
-            _productRepository = productRepository;
+            _productReadRepository = productReadRepository;
             _paymentMethodService = paymentMethodService;
             _paymentService = paymentService;
             _payPalPaymentService = payPalPaymentService;
@@ -154,7 +154,7 @@
 
         public async Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync()
         {
-            var history = await _cart.GetAllCheckoutHistory();
+            var history = (await _cart.GetAllCheckoutHistory())?.ToList();
 
             if (history == null)
             {
@@ -162,7 +162,7 @@
             }
 
             var groupByCustomerId = history.GroupBy(x => x.UserId).ToList();
-            var products = await _productRepository.GetAllAsync();
+            var products = await _productReadRepository.GetProductsByIdsAsync(history.Select(item => item.ProductId));
             var orderItems = new List<GetOrderItem>();
 
             foreach (var customerId in groupByCustomerId)
@@ -176,7 +176,7 @@
 
                 foreach (var item in customerId)
                 {
-                    var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+                    products.TryGetValue(item.ProductId, out var product);
 
                     orderItems.Add(new GetOrderItem
                     {
@@ -198,46 +198,40 @@
 
         private async Task<(IEnumerable<Product>, decimal)> GetCartTotalAmount(IEnumerable<ProcessCart> carts)
         {
-            if (!carts.Any())
+            var cartList = carts.ToList();
+
+            if (cartList.Count == 0)
             {
                 return ([], 0);
             }
 
-            var products = await _productRepository.GetAllAsync();
+            var productLookup = await _productReadRepository.GetProductsByIdsAsync(cartList.Select(item => item.ProductId));
 
-            if (!products.Any())
+            if (productLookup.Count == 0)
             {
                 return ([], 0);
             }
 
-            var cartProducts = carts
-                .Select(ci => products
-                    .FirstOrDefault(p => p.Id == ci.ProductId))
-                .Where(p => p != null)
-                .Cast<Product>()
-                .ToList();
+            var cartProducts = productLookup.Values.ToList();
 
-            var totalAmount = carts
-                .Where(ci => cartProducts.Any(p => p.Id == ci.ProductId))
-                .Sum(ci =>
-                {
-                    var product = cartProducts.FirstOrDefault(p => p.Id == ci.ProductId);
-                    return ci.Quantity * (product?.Price ?? 0);
-                });
+            var totalAmount = cartList.Sum(item =>
+                productLookup.TryGetValue(item.ProductId, out var product)
+                    ? item.Quantity * product.Price
+                    : 0);
 
             return (cartProducts, totalAmount);
         }
 
         public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId(string userId)
         {
-            var history = await _cart.GetCheckoutHistoryByUserId(userId);
+            var history = (await _cart.GetCheckoutHistoryByUserId(userId))?.ToList();
 
             if (history == null || !history.Any())
             {
                 return new List<GetOrderItem>();
             }
 
-            var products = await _productRepository.GetAllAsync();
+            var products = await _productReadRepository.GetProductsByIdsAsync(history.Select(item => item.ProductId));
 
             var orderItems = new List<GetOrderItem>();
 
@@ -245,7 +239,7 @@
 
             foreach (var item in history)
             {
-                var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+                products.TryGetValue(item.ProductId, out var product);
 
                 orderItems.Add(new GetOrderItem
                                    {

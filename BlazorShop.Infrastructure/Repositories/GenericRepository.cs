@@ -1,11 +1,9 @@
 ﻿namespace BlazorShop.Infrastructure.Repositories
 {
-    using BlazorShop.Application.Exceptions;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.EntityFrameworkCore;
-    using BlazorShop.Domain.Entities;
 
     public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEntity : class
     {
@@ -38,29 +36,11 @@
 
         public async Task<IEnumerable<TEntity>> GetAllAsync()
         {
-            if (typeof(TEntity) == typeof(Product))
-            {
-                var products = await _ctx.Set<Product>()
-                    .AsNoTracking()
-                    .Include(p => p.Variants)
-                    .ToListAsync();
-                return (IEnumerable<TEntity>)products;
-            }
-
             return await _ctx.Set<TEntity>().AsNoTracking().ToListAsync();
         }
 
         public async Task<TEntity?> GetByIdAsync(Guid id)
         {
-            if (typeof(TEntity) == typeof(Product))
-            {
-                var product = await _ctx.Set<Product>()
-                    .AsNoTracking()
-                    .Include(p => p.Variants)
-                    .FirstOrDefaultAsync(p => p.Id == id);
-                return product as TEntity;
-            }
-
             return await _ctx.Set<TEntity>().FindAsync(id);
         }
 

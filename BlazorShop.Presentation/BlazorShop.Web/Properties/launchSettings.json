@@ -11,11 +11,29 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "http-no-browser-debug": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5209",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "applicationUrl": "https://localhost:7258",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https-no-browser-debug": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
       "applicationUrl": "https://localhost:7258",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"

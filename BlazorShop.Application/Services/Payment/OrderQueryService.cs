@@ -11,10 +11,10 @@ namespace BlazorShop.Application.Services.Payment
     public class OrderQueryService : IOrderQueryService
     {
         private readonly IOrderRepository _orders;
-        private readonly IGenericRepository<Product> _products;
+        private readonly IProductReadRepository _products;
         private readonly IAppUserManager _users;
 
-        public OrderQueryService(IOrderRepository orders, IGenericRepository<Product> products, IAppUserManager users)
+        public OrderQueryService(IOrderRepository orders, IProductReadRepository products, IAppUserManager users)
         {
             _orders = orders;
             _products = products;
@@ -23,22 +23,24 @@ namespace BlazorShop.Application.Services.Payment
 
         public async Task<IEnumerable<GetOrder>> GetOrdersForUserAsync(string userId)
         {
-            var list = await _orders.GetByUserIdAsync(userId);
-            var map = await BuildProductNameMapAsync();
+            var list = (await _orders.GetByUserIdAsync(userId)).ToList();
+            var map = await BuildProductNameMapAsync(list);
             return await MapWithUsersAsync(list, map);
         }
 
         public async Task<IEnumerable<GetOrder>> GetAllAsync()
         {
-            var list = await _orders.GetAllAsync();
-            var map = await BuildProductNameMapAsync();
+            var list = (await _orders.GetAllAsync()).ToList();
+            var map = await BuildProductNameMapAsync(list);
             return await MapWithUsersAsync(list, map);
         }
 
-        private async Task<Dictionary<Guid, string>> BuildProductNameMapAsync()
+        private async Task<Dictionary<Guid, string>> BuildProductNameMapAsync(IEnumerable<Order> orders)
         {
-            var all = await _products.GetAllAsync();
-            return all.ToDictionary(p => p.Id, p => p.Name ?? string.Empty);
+            var products = await _products.GetProductsByIdsAsync(
+                orders.SelectMany(order => order.Lines).Select(line => line.ProductId));
+
+            return products.ToDictionary(entry => entry.Key, entry => entry.Value.Name ?? string.Empty);
         }
 
         private async Task<IEnumerable<GetOrder>> MapWithUsersAsync(IEnumerable<Order> orders, IDictionary<Guid, string> nameMap)

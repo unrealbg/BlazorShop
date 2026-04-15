@@ -37,6 +37,9 @@
         {
             base.OnModelCreating(builder);
 
+            builder.Entity<Product>()
+                .HasIndex(p => new { p.CategoryId, p.CreatedOn });
+
             // ProductVariant configuration
             builder.Entity<ProductVariant>()
                    .HasIndex(v => new { v.ProductId, v.SizeScale, v.SizeValue })
@@ -64,16 +67,44 @@
                 .Property(token => token.Name)
                 .HasMaxLength(128);
 
+            builder.Entity<RefreshToken>()
+                .Property(token => token.TokenHash)
+                .HasMaxLength(64);
+
+            builder.Entity<RefreshToken>()
+                .Property(token => token.ReplacedByTokenHash)
+                .HasMaxLength(64);
+
+            builder.Entity<RefreshToken>()
+                .Property(token => token.CreatedByIp)
+                .HasMaxLength(64);
+
+            builder.Entity<RefreshToken>()
+                .Property(token => token.RevokedByIp)
+                .HasMaxLength(64);
+
+            builder.Entity<RefreshToken>()
+                .Property(token => token.UserAgent)
+                .HasMaxLength(512);
+
+            builder.Entity<RefreshToken>()
+                .HasIndex(token => token.TokenHash)
+                .IsUnique();
+
+            builder.Entity<RefreshToken>()
+                .HasIndex(token => new { token.UserId, token.RevokedAtUtc });
+
+            builder.Entity<RefreshToken>()
+                .HasOne<AppUser>()
+                .WithMany()
+                .HasForeignKey(token => token.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.Entity<PaymentMethod>().HasData(
                 new PaymentMethod
                 {
                     Id = Guid.Parse("3604fc1d-cd6a-46ad-ace4-9b5f8e03f43b"),
                     Name = "Credit Card",
-                },
-                new PaymentMethod
-                {
-                    Id = Guid.Parse("a3bb23e6-6a7c-4b7d-9c73-7d5f2bc2f7b1"),
-                    Name = "PayPal",
                 },
                 new PaymentMethod
                 {
@@ -106,6 +137,16 @@
             builder.Entity<NewsletterSubscriber>()
                    .HasIndex(x => x.Email)
                    .IsUnique();
+
+            builder.Entity<Order>()
+                .HasIndex(o => o.Reference)
+                .IsUnique();
+
+            builder.Entity<Order>()
+                .HasIndex(o => new { o.UserId, o.CreatedOn });
+
+            builder.Entity<Order>()
+                .HasIndex(o => o.CreatedOn);
 
             builder.Entity<Order>()
                 .HasMany(o => o.Lines)

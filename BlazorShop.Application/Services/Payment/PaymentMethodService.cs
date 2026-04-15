@@ -8,6 +8,8 @@
 
     public class PaymentMethodService : IPaymentMethodService
     {
+        private static readonly string[] DisabledPaymentMethodNames = ["PayPal"];
+
         private readonly IPaymentMethod _paymentMethod;
         private readonly IMapper _mapper;
 
@@ -26,7 +28,16 @@
                 return [];
             }
 
-            return this._mapper.Map<IEnumerable<GetPaymentMethod>>(methods);
+            var supportedMethods = methods
+                .Where(method => !DisabledPaymentMethodNames.Contains(method.Name, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            if (supportedMethods.Count == 0)
+            {
+                return [];
+            }
+
+            return this._mapper.Map<IEnumerable<GetPaymentMethod>>(supportedMethods);
         }
     }
 }

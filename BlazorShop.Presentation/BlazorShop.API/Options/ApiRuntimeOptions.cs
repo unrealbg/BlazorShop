@@ -49,6 +49,8 @@ namespace BlazorShop.API.Options
         public string RefreshTokenCookieName { get; set; } = "__Host-blazorshop-refresh";
 
         public string RefreshTokenCookieSameSite { get; set; } = "Strict";
+
+        public int RefreshTokenLifetimeDays { get; set; } = 14;
     }
 
     public sealed class PublicApiRateLimitingOptions
@@ -56,6 +58,17 @@ namespace BlazorShop.API.Options
         public bool Enabled { get; set; } = true;
 
         public int PermitLimit { get; set; } = 60;
+
+        public int WindowSeconds { get; set; } = 60;
+
+        public int QueueLimit { get; set; }
+
+        public AuthEndpointRateLimitingOptions Auth { get; set; } = new();
+    }
+
+    public sealed class AuthEndpointRateLimitingOptions
+    {
+        public int PermitLimit { get; set; } = 5;
 
         public int WindowSeconds { get; set; } = 60;
 

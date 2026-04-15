@@ -15,7 +15,9 @@
         private readonly ITokenService _tokenService;
         private readonly IAuthenticationService _authenticationService;
 
-        public RefreshTokenHandler(ITokenService tokenService, IAuthenticationService authenticationService)
+        public RefreshTokenHandler(
+            ITokenService tokenService,
+            IAuthenticationService authenticationService)
         {
             this._tokenService = tokenService;
             this._authenticationService = authenticationService;

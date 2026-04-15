@@ -10,18 +10,20 @@
 
     public class ProductService : IProductService
     {
+        private readonly IProductReadRepository _productReadRepository;
         private readonly IGenericRepository<Product> _productRepository;
         private readonly IMapper _mapper;
 
-        public ProductService(IGenericRepository<Product> productRepository, IMapper mapper)
+        public ProductService(IProductReadRepository productReadRepository, IGenericRepository<Product> productRepository, IMapper mapper)
         {
+            _productReadRepository = productReadRepository;
             _productRepository = productRepository;
             _mapper = mapper;
         }
 
         public async Task<IEnumerable<GetProduct>> GetAllAsync()
         {
-            var result = await _productRepository.GetAllAsync();
+            var result = await _productReadRepository.GetCatalogProductsAsync();
 
             var mappedData = _mapper.Map<IEnumerable<GetProduct>>(result);
 
@@ -30,7 +32,7 @@
 
         public async Task<GetProduct?> GetByIdAsync(Guid id)
         {
-            var result = await _productRepository.GetByIdAsync(id);
+            var result = await _productReadRepository.GetProductDetailsByIdAsync(id);
             return result != null ? _mapper.Map<GetProduct>(result) : null;
         }
 

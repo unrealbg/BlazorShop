@@ -272,6 +272,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             var claims = new List<Claim> { new Claim(ClaimTypes.Name, "Test User") };
             var accessToken = "accessToken";
             var refreshToken = "refreshToken";
+            var storedRefreshToken = new RefreshToken { UserId = appUser.Id, TokenHash = "hashed-token" };
 
             _validationServiceMock
                 .Setup(v => v.ValidateAsync(loginUser, this._loginUserValidatorMock.Object))
@@ -283,7 +284,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             _userManagerMock
                 .Setup(u => u.LoginUserAsync(appUser))
-                .ReturnsAsync(true);
+                .ReturnsAsync(new UserLoginResult(true));
 
             _userManagerMock
                 .Setup(u => u.GetUserByEmailAsync(loginUser.Email))
@@ -302,11 +303,11 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .Returns(refreshToken);
 
             _tokenManagerMock
-                .Setup(t => t.ValidateRefreshTokenAsync(refreshToken))
-                .ReturnsAsync(true);
+                .Setup(t => t.CreateRefreshToken(appUser.Id, refreshToken, null, null))
+                .Returns(storedRefreshToken);
 
             _tokenManagerMock
-                .Setup(t => t.UpdateRefreshTokenAsync(appUser.Id, refreshToken))
+                .Setup(t => t.AddRefreshTokenAsync(storedRefreshToken))
                 .ReturnsAsync(1);
 
             // Act
@@ -356,7 +357,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
 
             _userManagerMock
                 .Setup(u => u.LoginUserAsync(It.IsAny<AppUser>()))
-                .ReturnsAsync(false);
+                .ReturnsAsync(new UserLoginResult(false));
 
             // Act
             var result = await _authenticationService.LoginUser(user);
@@ -368,7 +369,35 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task LoginUser_AddsNewRefreshToken_WhenTokenIsInvalid()
+        public async Task LoginUser_ReturnsError_WhenAccountIsLockedOut()
+        {
+            // Arrange
+            var user = new LoginUser { Email = "test@example.com", Password = "Password123" };
+            var appUser = new AppUser { Id = "userId", Email = user.Email, EmailConfirmed = true };
+
+            _validationServiceMock
+                .Setup(v => v.ValidateAsync(user, _loginUserValidatorMock.Object))
+                .ReturnsAsync(new ServiceResponse { Success = true });
+
+            _mapperMock
+                .Setup(m => m.Map<AppUser>(It.IsAny<LoginUser>()))
+                .Returns(appUser);
+
+            _userManagerMock
+                .Setup(u => u.LoginUserAsync(It.IsAny<AppUser>()))
+                .ReturnsAsync(new UserLoginResult(false, true));
+
+            // Act
+            var result = await _authenticationService.LoginUser(user);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.False(result.Success);
+            Assert.Equal("Account is temporarily locked. Please try again later.", result.Message);
+        }
+
+        [Fact]
+        public async Task LoginUser_ReturnsError_WhenEmailIsNotConfirmed()
         {
             // Arrange
             var user = new LoginUser { Email = "test@example.com", Password = "Password123" };
@@ -382,12 +411,9 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .Setup(m => m.Map<AppUser>(It.IsAny<LoginUser>()))
                 .Returns(appUser);
 
-            _userManagerMock.Setup(u => u.LoginUserAsync(It.IsAny<AppUser>())).ReturnsAsync(true);
+            _userManagerMock.Setup(u => u.LoginUserAsync(It.IsAny<AppUser>())).ReturnsAsync(new UserLoginResult(true));
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(user.Email)).ReturnsAsync(appUser);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(It.IsAny<AppUser>())).ReturnsAsync("valid_token");
-
-            _tokenManagerMock.Setup(t => t.ValidateRefreshTokenAsync(It.IsAny<string>())).ReturnsAsync(false);
-            _tokenManagerMock.Setup(t => t.AddRefreshTokenAsync(appUser.Id, It.IsAny<string>())).ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.LoginUser(user);
@@ -404,18 +430,28 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             // Arrange
             var refreshToken = "refreshToken";
             var userId = "userId";
+            var storedRefreshToken = new RefreshToken
+            {
+                UserId = userId,
+                TokenHash = "stale-hash",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
+            };
             var appUser = new AppUser { Id = userId, Email = "test@example.com" };
             var claims = new List<Claim>();
             var newAccessToken = "newAccessToken";
             var newRefreshToken = "newRefreshToken";
+            var replacementRefreshToken = new RefreshToken { UserId = userId, TokenHash = "replacement-hash" };
 
-            _tokenManagerMock.Setup(t => t.ValidateRefreshTokenAsync(refreshToken)).ReturnsAsync(true);
-            _tokenManagerMock.Setup(t => t.GetUserIdByRefreshTokenAsync(refreshToken)).ReturnsAsync(userId);
+            _tokenManagerMock.Setup(t => t.GetRefreshTokenAsync(refreshToken)).ReturnsAsync(storedRefreshToken);
+            _tokenManagerMock.Setup(t => t.IsRefreshTokenActive(storedRefreshToken)).Returns(true);
             _userManagerMock.Setup(u => u.GetUserByIdAsync(userId)).ReturnsAsync(appUser);
             _userManagerMock.Setup(u => u.GetUserClaimsAsync(appUser.Email)).ReturnsAsync(claims);
             _tokenManagerMock.Setup(t => t.GenerateAccessToken(claims)).Returns(newAccessToken);
             _tokenManagerMock.Setup(t => t.GetReFreshToken()).Returns(newRefreshToken);
-            _tokenManagerMock.Setup(t => t.UpdateRefreshTokenAsync(userId, newRefreshToken)).ReturnsAsync(1);
+            _tokenManagerMock.Setup(t => t.CreateRefreshToken(userId, newRefreshToken, null, null)).Returns(replacementRefreshToken);
+            _tokenManagerMock.Setup(t => t.AddRefreshTokenAsync(replacementRefreshToken)).ReturnsAsync(1);
+            _tokenManagerMock.Setup(t => t.RevokeRefreshTokenAsync(refreshToken, null, newRefreshToken)).ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.ReviveToken(refreshToken);
@@ -425,6 +461,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             Assert.Equal("Token revived successfully.", result.Message);
             Assert.Equal(newAccessToken, result.Token);
             Assert.Equal(newRefreshToken, result.RefreshToken);
+            _tokenManagerMock.Verify(t => t.RevokeRefreshTokenAsync(refreshToken, null, newRefreshToken), Times.Once);
         }
 
         [Fact]
@@ -434,8 +471,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             var invalidToken = "invalid_refresh_token";
 
             _tokenManagerMock
-                .Setup(t => t.ValidateRefreshTokenAsync(invalidToken))
-                .ReturnsAsync(false);
+                .Setup(t => t.GetRefreshTokenAsync(invalidToken))
+                .ReturnsAsync((RefreshToken?)null);
 
             // Act
             var result = await _authenticationService.ReviveToken(invalidToken);
@@ -447,18 +484,26 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task ReviveToken_ReturnsError_WhenUserIdIsNullOrEmpty()
+        public async Task ReviveToken_ReturnsError_WhenTokenIsExpired()
         {
             // Arrange
-            var refreshToken = "invalid_refresh_token";
+            var refreshToken = "expired_refresh_token";
+            var storedRefreshToken = new RefreshToken
+            {
+                UserId = "userId",
+                TokenHash = "expired-hash",
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1)
+            };
 
             _tokenManagerMock
-                .Setup(t => t.ValidateRefreshTokenAsync(refreshToken))
-                .ReturnsAsync(true);
-
+                .Setup(t => t.GetRefreshTokenAsync(refreshToken))
+                .ReturnsAsync(storedRefreshToken);
             _tokenManagerMock
-                .Setup(t => t.GetUserIdByRefreshTokenAsync(refreshToken))
-                .ReturnsAsync((string)null!);
+                .Setup(t => t.IsRefreshTokenActive(storedRefreshToken))
+                .Returns(false);
+            _tokenManagerMock
+                .Setup(t => t.RevokeRefreshTokenAsync(refreshToken, null, null))
+                .ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.ReviveToken(refreshToken);
@@ -470,19 +515,53 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task Logout_RemovesRefreshToken_WhenTokenIsPresent()
+        public async Task ReviveToken_ReturnsError_WhenTokenHasAlreadyBeenRotated()
+        {
+            // Arrange
+            var refreshToken = "rotated_refresh_token";
+            var storedRefreshToken = new RefreshToken
+            {
+                UserId = "userId",
+                TokenHash = "rotated-hash",
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+                RevokedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+                ReplacedByTokenHash = "replacement-hash"
+            };
+
+            _tokenManagerMock
+                .Setup(t => t.GetRefreshTokenAsync(refreshToken))
+                .ReturnsAsync(storedRefreshToken);
+            _tokenManagerMock
+                .Setup(t => t.IsRefreshTokenActive(storedRefreshToken))
+                .Returns(false);
+            _tokenManagerMock
+                .Setup(t => t.RevokeRefreshTokenFamilyAsync(refreshToken, null))
+                .ReturnsAsync(1);
+
+            // Act
+            var result = await _authenticationService.ReviveToken(refreshToken);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.False(result.Success);
+            Assert.Equal("Invalid token.", result.Message);
+            _tokenManagerMock.Verify(t => t.RevokeRefreshTokenFamilyAsync(refreshToken, null), Times.Once);
+        }
+
+        [Fact]
+        public async Task Logout_RevokesRefreshToken_WhenTokenIsPresent()
         {
             var refreshToken = "refresh-token";
 
             _tokenManagerMock
-                .Setup(tokenManager => tokenManager.RemoveRefreshTokenAsync(refreshToken))
+                .Setup(tokenManager => tokenManager.RevokeRefreshTokenAsync(refreshToken, null, null))
                 .ReturnsAsync(1);
 
             var result = await _authenticationService.Logout(refreshToken);
 
             Assert.True(result.Success);
             Assert.Equal("Logged out successfully.", result.Message);
-            _tokenManagerMock.Verify(tokenManager => tokenManager.RemoveRefreshTokenAsync(refreshToken), Times.Once);
+            _tokenManagerMock.Verify(tokenManager => tokenManager.RevokeRefreshTokenAsync(refreshToken, null, null), Times.Once);
         }
 
         [Fact]

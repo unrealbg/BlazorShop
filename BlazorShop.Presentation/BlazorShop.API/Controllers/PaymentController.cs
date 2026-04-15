@@ -38,14 +38,14 @@
         }
 
         /// <summary>
-        /// PayPal capture redirect destination (stub implementation)
+        /// PayPal capture redirect destination.
         /// </summary>
         [HttpGet("paypal/capture")]
         public async Task<IActionResult> CapturePayPal([FromQuery] string token)
         {
             if (string.IsNullOrWhiteSpace(token)) return BadRequest("Missing token");
             var ok = await _payPalPaymentService.CaptureAsync(token);
-            if (!ok) return BadRequest("Capture failed");
+            if (!ok) return Redirect(this.BuildClientUrl("payment-cancel"));
 
             return Redirect(this.BuildClientUrl("payment-success"));
         }

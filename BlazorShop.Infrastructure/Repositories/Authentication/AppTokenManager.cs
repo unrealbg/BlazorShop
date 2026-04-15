@@ -16,6 +16,8 @@
 
     public class AppTokenManager : IAppTokenManager
     {
+        private const int RefreshTokenLifetimeDaysDefault = 14;
+
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
 
@@ -38,6 +40,21 @@
             return WebUtility.UrlEncode(token);
         }
 
+        public RefreshToken CreateRefreshToken(string userId, string refreshToken, string? createdByIp = null, string? userAgent = null)
+        {
+            var createdAtUtc = DateTime.UtcNow;
+
+            return new RefreshToken
+            {
+                UserId = userId,
+                TokenHash = HashRefreshToken(refreshToken),
+                CreatedAtUtc = createdAtUtc,
+                ExpiresAtUtc = createdAtUtc.AddDays(GetRefreshTokenLifetimeDays()),
+                CreatedByIp = createdByIp,
+                UserAgent = userAgent,
+            };
+        }
+
         public List<Claim> GetUserClaimsFromToken(string token)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -46,64 +63,95 @@
             return jwtToken is not null ? jwtToken.Claims.ToList() : [];
         }
 
+        public async Task<RefreshToken?> GetRefreshTokenAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                return null;
+            }
+
+            var refreshTokenHash = HashRefreshToken(refreshToken);
+            return await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.TokenHash == refreshTokenHash);
+        }
+
         public async Task<bool> ValidateRefreshTokenAsync(string refreshToken)
         {
-            var user = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.Token == refreshToken);
-
-            return user is not null;
+            var storedRefreshToken = await GetRefreshTokenAsync(refreshToken);
+            return storedRefreshToken is not null && IsRefreshTokenActive(storedRefreshToken);
         }
 
-        public async Task<string> GetUserIdByRefreshTokenAsync(string refreshToken)
+        public bool IsRefreshTokenActive(RefreshToken refreshToken)
         {
-            var result = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.Token == refreshToken);
-
-            return result?.UserId ?? string.Empty;
+            return refreshToken.RevokedAtUtc is null && refreshToken.ExpiresAtUtc > DateTime.UtcNow;
         }
 
-        public async Task<int> AddRefreshTokenAsync(string userId, string refreshToken)
+        public async Task<int> AddRefreshTokenAsync(RefreshToken refreshToken)
         {
-            var existingToken = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.UserId == userId);
-
-            if (existingToken is not null)
-            {
-                existingToken.Token = refreshToken;
-                return await _context.SaveChangesAsync();
-            }
-
-            _context.RefreshTokens.Add(new RefreshToken
-            {
-                UserId = userId,
-                Token = refreshToken,
-            });
+            _context.RefreshTokens.Add(refreshToken);
 
             return await _context.SaveChangesAsync();
         }
 
-        public async Task<int> UpdateRefreshTokenAsync(string userId, string refreshToken)
+        public async Task<int> RevokeRefreshTokenAsync(string refreshToken, string? revokedByIp = null, string? replacedByRefreshToken = null)
         {
-            var user = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.UserId == userId);
+            var storedRefreshToken = await GetRefreshTokenAsync(refreshToken);
 
-            if (user is null)
-            {
-                return -1;
-            }
-
-            user.Token = refreshToken;
-
-            return await _context.SaveChangesAsync();
-        }
-
-        public async Task<int> RemoveRefreshTokenAsync(string refreshToken)
-        {
-            var user = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.Token == refreshToken);
-
-            if (user is null)
+            if (storedRefreshToken is null)
             {
                 return 0;
             }
 
-            _context.RefreshTokens.Remove(user);
-            return await _context.SaveChangesAsync();
+            var hasChanges = false;
+
+            if (storedRefreshToken.RevokedAtUtc is null)
+            {
+                storedRefreshToken.RevokedAtUtc = DateTime.UtcNow;
+                storedRefreshToken.RevokedByIp = revokedByIp;
+                hasChanges = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(replacedByRefreshToken)
+                && string.IsNullOrWhiteSpace(storedRefreshToken.ReplacedByTokenHash))
+            {
+                storedRefreshToken.ReplacedByTokenHash = HashRefreshToken(replacedByRefreshToken);
+                hasChanges = true;
+            }
+
+            return hasChanges ? await _context.SaveChangesAsync() : 0;
+        }
+
+        public async Task<int> RevokeRefreshTokenFamilyAsync(string refreshToken, string? revokedByIp = null)
+        {
+            var storedRefreshToken = await GetRefreshTokenAsync(refreshToken);
+
+            if (storedRefreshToken is null || string.IsNullOrWhiteSpace(storedRefreshToken.ReplacedByTokenHash))
+            {
+                return 0;
+            }
+
+            var revokedCount = 0;
+            var nextTokenHash = storedRefreshToken.ReplacedByTokenHash;
+
+            while (!string.IsNullOrWhiteSpace(nextTokenHash))
+            {
+                var descendantRefreshToken = await _context.RefreshTokens.FirstOrDefaultAsync(_ => _.TokenHash == nextTokenHash);
+
+                if (descendantRefreshToken is null)
+                {
+                    break;
+                }
+
+                if (descendantRefreshToken.RevokedAtUtc is null)
+                {
+                    descendantRefreshToken.RevokedAtUtc = DateTime.UtcNow;
+                    descendantRefreshToken.RevokedByIp = revokedByIp;
+                    revokedCount++;
+                }
+
+                nextTokenHash = descendantRefreshToken.ReplacedByTokenHash;
+            }
+
+            return revokedCount > 0 ? await _context.SaveChangesAsync() : 0;
         }
 
         public string GenerateAccessToken(List<Claim> claims)
@@ -119,6 +167,19 @@
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private int GetRefreshTokenLifetimeDays()
+        {
+            return int.TryParse(_config["Runtime:Security:RefreshTokenLifetimeDays"], out var configuredDays)
+                && configuredDays > 0
+                    ? configuredDays
+                    : RefreshTokenLifetimeDaysDefault;
+        }
+
+        private static string HashRefreshToken(string refreshToken)
+        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
         }
     }
 }
