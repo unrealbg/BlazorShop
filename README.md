@@ -1,8 +1,8 @@
 # BlazorShop
 
-[![.NET](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/dotnet.yml)
+[![CI](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml)
 
-BlazorShop is an open-source e-commerce application built with Blazor WebAssembly and ASP.NET Core (.NET 9). It follows a clean, layered architecture and provides a ready-to-extend foundation for real online stores.
+BlazorShop is an open-source e-commerce application built with Blazor WebAssembly and ASP.NET Core (.NET 10). It follows a clean, layered architecture and provides a ready-to-extend foundation for real online stores.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -37,7 +37,7 @@ BlazorShop delivers a modern, responsive shopping experience with a Blazor WebAs
   - Product search/typeahead UI
 - Cart & Checkout
   - Persistent cart (cookie), quantity updates, totals
-  - Multiple payment methods: Stripe (card), PayPal, Cash on Delivery, Bank Transfer
+  - Multiple payment methods: Stripe (card), Cash on Delivery, Bank Transfer
   - Bank transfer instructions via email with order reference
 - Orders & Tracking
   - Save checkout history; admin order list
@@ -47,28 +47,28 @@ BlazorShop delivers a modern, responsive shopping experience with a Blazor WebAs
 - Admin Area
   - Manage categories, products, variants, orders, and shipping
 - Developer Experience
-  - OpenAPI/Swagger, Serilog logging, unit tests
+  - OpenAPI/Swagger, Serilog logging, unit tests, GitHub Actions CI
   - Modern UI (Tailwind-style classes), toast notifications, Chart.js
 
 ## Technologies Used
-- .NET 9, ASP.NET Core Web API
+- .NET 10, ASP.NET Core Web API
 - Blazor WebAssembly (client)
-- Entity Framework Core 9 + SQL Server
+- Entity Framework Core 10 + PostgreSQL
 - ASP.NET Core Identity (email confirmation enabled)
 - AutoMapper, FluentValidation
 - Serilog
-- Stripe & PayPal integrations
+- Stripe integration
 - Swashbuckle (Swagger/OpenAPI)
 - xUnit, Moq (tests)
 - Microsoft Aspire AppHost (local orchestrator)
 
 ## Requirements
-- .NET 9 SDK or later
-- SQL Server (LocalDB or full instance)
+- .NET 10 SDK or later
+- Docker Desktop or another compatible container runtime (recommended for `BlazorShop.AppHost` and `compose.production.yml`)
+- PostgreSQL if you run the API outside the AppHost-provisioned database
 - Modern browser (WebAssembly capable)
 - Optional: API keys and SMTP for payments/emails
   - Stripe Secret Key
-  - PayPal settings (if applicable)
   - SMTP credentials
 
 ## Getting Started
@@ -120,7 +120,7 @@ Default dev URLs (may vary by environment):
 5) Tests
 
    ```bash
-   dotnet test
+    dotnet test BlazorShop.sln -c Release
    ```
 
 ## Project Structure
@@ -135,7 +135,8 @@ Default dev URLs (may vary by environment):
 
 ## API & Docs
 - Swagger UI available when API runs in Development at `/swagger`
-- CORS allows localhost HTTP/HTTPS origins
+- CORS is configuration-driven; localhost origins work out of the box in Development
+- Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, and `compose.production.yml`
 
 ## Screenshots
 <table>

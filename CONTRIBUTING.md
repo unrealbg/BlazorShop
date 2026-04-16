@@ -16,10 +16,10 @@ If you have an idea to improve BlazorShop, we would love to hear it! Please subm
 
 1. Fork the repository on GitHub.
 2. Clone your fork to your local machine.
-3. Create a new branch from `master` (e.g., `feature/my-new-feature`).
+3. Create a new branch from the current default branch (for example, `feature/my-new-feature`).
 4. Make your changes and commit them with clear and concise commit messages.
 5. Push your branch to your fork on GitHub.
-6. Create a Pull Request from your branch to `master`.
+6. Create a Pull Request from your branch to the repository's default branch.
 
 ### Code Style
 
@@ -32,16 +32,16 @@ If you have an idea to improve BlazorShop, we would love to hear it! Please subm
 To run the tests, you can use the following commands:
 
 ```sh
-  dotnet test
+dotnet test BlazorShop.sln -c Release
 ```
 
 ### Documentation
 If you make changes to the code, please update the documentation accordingly.
 
 ### Community
-Feel free to join our community and ask questions on our Discussion Board.
+If you have a question about the project, open a GitHub issue or a repository discussion if discussions are enabled.
 
 ### Code of Conduct
-This project and everyone participating in it is governed by the BlazorShop Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to contact@example.com.
+This project and everyone participating in it is governed by the BlazorShop Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to conduct@unrealbg.com.
 
 Thank you for contributing!

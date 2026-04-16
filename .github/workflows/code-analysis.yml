@@ -2,9 +2,9 @@ name: Code Analysis
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main", "master" ]
 
 jobs:
   analyze:
@@ -28,7 +28,3 @@ jobs:
     # Build and analyze code with StyleCop
     - name: Analyze Code with StyleCop
       run: dotnet build --no-restore -warnaserror
-
-    # Run Unit Tests (optional, but recommended)
-    - name: Run Unit Tests
-      run: dotnet test --no-build --verbosity normal

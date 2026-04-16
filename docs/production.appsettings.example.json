@@ -1,0 +1,62 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "<set-in-secret-store-or-env>"
+  },
+  "Jwt": {
+    "Key": "<set-in-secret-store-or-env>",
+    "Issuer": "https://api.shop.example.com",
+    "Audience": "https://api.shop.example.com"
+  },
+  "ClientApp": {
+    "BaseUrl": "https://shop.example.com"
+  },
+  "Stripe": {
+    "SecretKey": "<set-in-secret-store-or-env>"
+  },
+  "EmailSettings": {
+    "From": "<required-sender-address>",
+    "DisplayName": "BlazorShop",
+    "SmtpServer": "<required-smtp-host>",
+    "Port": 587,
+    "UseSsl": true,
+    "Username": "<required-smtp-username>",
+    "Password": "<required-smtp-password>"
+  },
+  "Runtime": {
+    "Cors": {
+      "AllowedOrigins": [
+        "https://shop.example.com",
+        "https://admin.shop.example.com"
+      ]
+    },
+    "ForwardedHeaders": {
+      "Enabled": true,
+      "KnownProxies": ["10.0.0.10"],
+      "KnownNetworks": [],
+      "ForwardLimit": 1
+    },
+    "Health": {
+      "ExposeInProduction": false,
+      "ReadyPath": "/health",
+      "LivePath": "/alive"
+    },
+    "Security": {
+      "EnableHsts": true,
+      "EnableHttpsRedirection": true,
+      "RefreshTokenCookieName": "__Host-blazorshop-refresh",
+      "RefreshTokenCookieSameSite": "Strict",
+      "RefreshTokenLifetimeDays": 14
+    },
+    "RateLimiting": {
+      "Enabled": true,
+      "PermitLimit": 60,
+      "WindowSeconds": 60,
+      "QueueLimit": 0,
+      "Auth": {
+        "PermitLimit": 5,
+        "WindowSeconds": 60,
+        "QueueLimit": 0
+      }
+    }
+  }
+}
