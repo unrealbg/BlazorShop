@@ -14,13 +14,16 @@
 
         private readonly ITokenService _tokenService;
         private readonly IAuthenticationService _authenticationService;
+        private readonly IAuthenticationStateNotifier _authenticationStateNotifier;
 
         public RefreshTokenHandler(
             ITokenService tokenService,
-            IAuthenticationService authenticationService)
+            IAuthenticationService authenticationService,
+            IAuthenticationStateNotifier authenticationStateNotifier)
         {
             this._tokenService = tokenService;
             this._authenticationService = authenticationService;
+            this._authenticationStateNotifier = authenticationStateNotifier;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -57,11 +60,13 @@
             if (result.Success && !string.IsNullOrWhiteSpace(result.Token))
             {
                 await _tokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
+                _authenticationStateNotifier.NotifyAuthenticationState();
 
                 return result;
             }
 
             await _tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
+            _authenticationStateNotifier.NotifyAuthenticationState();
             return null;
         }
     }

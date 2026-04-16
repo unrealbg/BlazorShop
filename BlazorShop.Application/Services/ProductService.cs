@@ -30,6 +30,20 @@
             return result.Any() ? mappedData : [];
         }
 
+        public async Task<PagedResult<GetCatalogProduct>> GetCatalogPageAsync(ProductCatalogQuery query)
+        {
+            var result = await _productReadRepository.GetCatalogPageAsync(query);
+            var mappedItems = _mapper.Map<IReadOnlyList<GetCatalogProduct>>(result.Items);
+
+            return new PagedResult<GetCatalogProduct>
+            {
+                Items = mappedItems,
+                PageNumber = result.PageNumber,
+                PageSize = result.PageSize,
+                TotalCount = result.TotalCount,
+            };
+        }
+
         public async Task<GetProduct?> GetByIdAsync(Guid id)
         {
             var result = await _productReadRepository.GetProductDetailsByIdAsync(id);

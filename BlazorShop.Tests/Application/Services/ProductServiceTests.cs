@@ -126,6 +126,64 @@
             this._mockMapper.Verify(mapper => mapper.Map<GetProduct>(It.IsAny<Product>()), Times.Never);
         }
 
+        [Fact]
+        public async Task GetCatalogPageAsync_WhenCatalogItemsExist_ShouldReturnMappedPage()
+        {
+            var query = new ProductCatalogQuery { PageNumber = 1, PageSize = 2, SortBy = ProductCatalogSortBy.Newest };
+            var catalogItems = new List<CatalogProductReadModel>
+            {
+                new CatalogProductReadModel
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Catalog Product 1",
+                    Description = "Description 1",
+                    Price = 20m,
+                    Image = "/img/1.png",
+                    CategoryId = Guid.NewGuid(),
+                    CreatedOn = DateTime.UtcNow,
+                    HasVariants = true,
+                },
+                new CatalogProductReadModel
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Catalog Product 2",
+                    Description = "Description 2",
+                    Price = 30m,
+                    Image = "/img/2.png",
+                    CategoryId = Guid.NewGuid(),
+                    CreatedOn = DateTime.UtcNow.AddDays(-1),
+                    HasVariants = false,
+                }
+            };
+            var pagedCatalog = new PagedResult<CatalogProductReadModel>
+            {
+                Items = catalogItems,
+                PageNumber = 1,
+                PageSize = 2,
+                TotalCount = 5,
+            };
+            var mappedItems = new List<GetCatalogProduct>
+            {
+                new GetCatalogProduct { Id = catalogItems[0].Id, Name = "Catalog Product 1", HasVariants = true },
+                new GetCatalogProduct { Id = catalogItems[1].Id, Name = "Catalog Product 2", HasVariants = false },
+            };
+
+            this._mockProductReadRepository
+                .Setup(repo => repo.GetCatalogPageAsync(query))
+                .ReturnsAsync(pagedCatalog);
+            this._mockMapper
+                .Setup(mapper => mapper.Map<IReadOnlyList<GetCatalogProduct>>(catalogItems))
+                .Returns(mappedItems);
+
+            var result = await this._productService.GetCatalogPageAsync(query);
+
+            Assert.Equal(5, result.TotalCount);
+            Assert.Equal(2, result.Items.Count);
+            Assert.Equal(mappedItems, result.Items);
+            this._mockProductReadRepository.Verify(repo => repo.GetCatalogPageAsync(query), Times.Once);
+            this._mockMapper.Verify(mapper => mapper.Map<IReadOnlyList<GetCatalogProduct>>(catalogItems), Times.Once);
+        }
+
 
         [Fact]
         public async Task AddAsync_WhenProductIsAdded_ShouldReturnSuccessResponse()

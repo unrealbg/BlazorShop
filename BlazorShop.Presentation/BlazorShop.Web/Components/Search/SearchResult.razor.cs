@@ -11,7 +11,7 @@
 
     public partial class SearchResult : IAsyncDisposable
     {
-        private IEnumerable<GetProduct> _searchedProducts = [];
+        private IEnumerable<GetCatalogProduct> _searchedProducts = [];
         private List<ProcessCart> _myCarts = new();
         private bool _isAddingToCart = false;
 
@@ -30,29 +30,42 @@
                 return;
             }
 
-            var productsResult = await this.ProductService.GetAllAsync();
+            var productsResult = await this.ProductService.GetCatalogPageAsync(new ProductCatalogQuery
+            {
+                PageNumber = 1,
+                PageSize = 60,
+                SearchTerm = this.Filter,
+                SortBy = ProductCatalogSortBy.NameAscending,
+            });
             if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Search"))
             {
                 this._searchedProducts = [];
                 return;
             }
 
-            var products = productsResult.Data ?? [];
-
-            if (products.Any())
-            {
-                var searchWords = this.Filter.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-                this._searchedProducts = products.Where(
-                        x => searchWords.Any(word => x.Name!.Contains(word, StringComparison.OrdinalIgnoreCase))
-                             || searchWords.Any(word => x.Description!.Contains(word, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
-            }
+            this._searchedProducts = productsResult.Data?.Items ?? [];
         }
 
-        private void ShowDetails(GetProduct product)
+        private async Task HandleAddToCart(GetCatalogProduct product)
         {
-            SelectedProduct = product;
+            if (product.HasVariants)
+            {
+                await ShowDetailsAsync(product.Id);
+                return;
+            }
+
+            await AddItemToCart(product.Id);
+        }
+
+        private async Task ShowDetailsAsync(Guid productId)
+        {
+            var productResult = await this.ProductService.GetByIdAsync(productId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(productResult, "Product details") || productResult.Data is null)
+            {
+                return;
+            }
+
+            SelectedProduct = productResult.Data;
             _showModal = true;
         }
 

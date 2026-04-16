@@ -1,4 +1,7 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.202-noble
+ARG NGINX_IMAGE=nginx:1.27.5-alpine3.21
+
+FROM ${DOTNET_SDK_IMAGE} AS build
 WORKDIR /src
 
 RUN apt-get update \
@@ -23,7 +26,7 @@ RUN dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj 
     --output /app/publish \
     /p:UseAppHost=false
 
-FROM nginx:1.27-alpine AS final
+FROM ${NGINX_IMAGE} AS final
 
 COPY BlazorShop.Presentation/BlazorShop.Web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html

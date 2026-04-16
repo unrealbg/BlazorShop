@@ -7,6 +7,8 @@
     {
         Task<QueryResult<IEnumerable<GetProduct>>> GetAllAsync();
 
+        Task<QueryResult<PagedResult<GetCatalogProduct>>> GetCatalogPageAsync(ProductCatalogQuery query);
+
         Task<QueryResult<GetProduct>> GetByIdAsync(Guid id);
 
         Task<ServiceResponse> AddAsync(CreateProduct product);

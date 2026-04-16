@@ -5,6 +5,7 @@
         public static class Product
         {
             public const string GetAll = "product/all";
+            public const string GetCatalog = "product/catalog";
             public const string Get = "product/single";
             public const string Add = "product/add";
             public const string Update = "product/update";

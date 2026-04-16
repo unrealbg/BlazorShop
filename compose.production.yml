@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.13-alpine3.23
     environment:
       POSTGRES_DB: blazorshop
       POSTGRES_USER: blazorshop
@@ -27,11 +27,17 @@ services:
       Jwt__Audience: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
       ClientApp__BaseUrl: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
       Stripe__SecretKey: ${BLAZORSHOP_STRIPE_SECRET_KEY}
-      EmailSettings__Username: ${BLAZORSHOP_EMAIL_USERNAME}
-      EmailSettings__Password: ${BLAZORSHOP_EMAIL_PASSWORD}
+      EmailSettings__From: "${BLAZORSHOP_EMAIL_FROM:?BLAZORSHOP_EMAIL_FROM is required}"
+      EmailSettings__DisplayName: ${BLAZORSHOP_EMAIL_DISPLAY_NAME:-BlazorShop}
+      EmailSettings__SmtpServer: "${BLAZORSHOP_EMAIL_SMTP_SERVER:?BLAZORSHOP_EMAIL_SMTP_SERVER is required}"
+      EmailSettings__Port: ${BLAZORSHOP_EMAIL_SMTP_PORT:-587}
+      EmailSettings__UseSsl: ${BLAZORSHOP_EMAIL_USE_SSL:-true}
+      EmailSettings__Username: "${BLAZORSHOP_EMAIL_USERNAME:?BLAZORSHOP_EMAIL_USERNAME is required}"
+      EmailSettings__Password: "${BLAZORSHOP_EMAIL_PASSWORD:?BLAZORSHOP_EMAIL_PASSWORD is required}"
       Runtime__Cors__AllowedOrigins__0: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
       Runtime__ForwardedHeaders__Enabled: true
       Runtime__ForwardedHeaders__KnownProxies__0: 172.30.0.10
+      Runtime__ForwardedHeaders__ForwardLimit: 1
       Runtime__Health__ExposeInProduction: false
       Runtime__Security__EnableHsts: false
       Runtime__Security__EnableHttpsRedirection: false

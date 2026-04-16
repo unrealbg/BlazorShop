@@ -1,4 +1,7 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.202-noble
+ARG DOTNET_ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.6-noble
+
+FROM ${DOTNET_SDK_IMAGE} AS build
 WORKDIR /src
 
 COPY BlazorShop.Presentation/BlazorShop.API/BlazorShop.API.csproj BlazorShop.Presentation/BlazorShop.API/
@@ -20,7 +23,7 @@ RUN dotnet publish BlazorShop.Presentation/BlazorShop.API/BlazorShop.API.csproj 
     --output /app/publish \
     /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM ${DOTNET_ASPNET_IMAGE} AS final
 WORKDIR /app
 
 COPY --from=build /app/publish .

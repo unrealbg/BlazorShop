@@ -11,7 +11,7 @@
 
     public partial class TodaysDeals : IAsyncDisposable
     {
-        private IEnumerable<GetProduct> _todaysDeals = [];
+        private IEnumerable<GetCatalogProduct> _todaysDeals = [];
         private List<ProcessCart> _myCarts = new();
         private bool _isAddingToCart = false;
         private bool _showModal = false;
@@ -21,14 +21,19 @@
 
         protected override async Task OnInitializedAsync()
         {
-            var allResult = await this.ProductService.GetAllAsync();
+            var allResult = await this.ProductService.GetCatalogPageAsync(new ProductCatalogQuery
+            {
+                PageNumber = 1,
+                PageSize = 100,
+                SortBy = ProductCatalogSortBy.Newest,
+            });
             if (this.QueryFailureNotifier.TryNotifyFailure(allResult, "Products"))
             {
                 _todaysDeals = [];
             }
             else
             {
-                _todaysDeals = (allResult.Data ?? []).ToList();
+                _todaysDeals = allResult.Data?.Items ?? [];
             }
 
             var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
@@ -38,11 +43,11 @@
             }
         }
 
-        private async Task HandleAddToCart(GetProduct product)
+        private async Task HandleAddToCart(GetCatalogProduct product)
         {
-            if (product.Variants?.Any() == true)
+            if (product.HasVariants)
             {
-                ShowDetails(product);
+                await ShowDetailsAsync(product.Id);
                 return;
             }
 
@@ -126,9 +131,15 @@
             await this.CookieStorageService.SetAsync(Constant.Cart.Name, JsonSerializer.Serialize(_myCarts), 30);
         }
 
-        private void ShowDetails(GetProduct product)
+        private async Task ShowDetailsAsync(Guid productId)
         {
-            this.SelectedProduct = product;
+            var productResult = await this.ProductService.GetByIdAsync(productId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(productResult, "Product details") || productResult.Data is null)
+            {
+                return;
+            }
+
+            this.SelectedProduct = productResult.Data;
             _showModal = true;
         }
 

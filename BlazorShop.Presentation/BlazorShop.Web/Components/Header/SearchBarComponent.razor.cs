@@ -1,44 +1,73 @@
 ﻿namespace BlazorShop.Web.Components.Header
 {
-    using System.Linq;
     using BlazorShop.Web.Shared.Models.Product;
+
     using Microsoft.AspNetCore.Components;
     using Microsoft.AspNetCore.Components.Web;
 
     public partial class SearchBarComponent
     {
-        [Parameter]
-        public IEnumerable<GetProduct> Products { get; set; } = Enumerable.Empty<GetProduct>();
-
         private string _query = string.Empty;
-        private List<GetProduct> _matches = new();
+        private List<GetCatalogProduct> _matches = new();
         private bool _isOpen;
         private int _activeIndex = -1;
+        private CancellationTokenSource? _searchCts;
 
-        private void OnInput(ChangeEventArgs e)
+        private async Task OnInput(ChangeEventArgs e)
         {
             _query = e.Value?.ToString() ?? string.Empty;
-            Filter();
-            _isOpen = _matches.Count > 0;
+            await FilterAsync();
         }
 
-        private void Filter()
+        private async Task FilterAsync()
         {
-            if (string.IsNullOrWhiteSpace(_query))
+            _searchCts?.Cancel();
+            _searchCts?.Dispose();
+            _searchCts = new CancellationTokenSource();
+
+            if (string.IsNullOrWhiteSpace(_query) || _query.Trim().Length < 2)
             {
                 _matches.Clear();
                 _activeIndex = -1;
+                _isOpen = false;
                 return;
             }
 
+            var token = _searchCts.Token;
             var q = _query.Trim();
-            _matches = Products
-                .Where(x => (x.Name?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false)
-                         || (x.Description?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false))
-                .Take(8)
-                .ToList();
 
-            _activeIndex = _matches.Count > 0 ? 0 : -1;
+            try
+            {
+                await Task.Delay(150, token);
+
+                var result = await this.ProductService.GetCatalogPageAsync(new ProductCatalogQuery
+                {
+                    PageNumber = 1,
+                    PageSize = 8,
+                    SearchTerm = q,
+                    SortBy = ProductCatalogSortBy.NameAscending,
+                });
+
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                _matches = result.Success
+                    ? (result.Data?.Items ?? []).ToList()
+                    : [];
+                _activeIndex = _matches.Count > 0 ? 0 : -1;
+                _isOpen = _matches.Count > 0;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch
+            {
+                _matches.Clear();
+                _activeIndex = -1;
+                _isOpen = false;
+            }
         }
 
         private async Task OnBlur()
