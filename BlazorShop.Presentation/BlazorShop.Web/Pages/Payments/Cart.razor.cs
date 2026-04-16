@@ -3,9 +3,9 @@
     using System.Text.Json;
 
     using BlazorShop.Web.Shared;
+    using BlazorShop.Web.Shared.Models.Notifications;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
-    using BlazorShop.Web.Shared.Toast;
     using Microsoft.AspNetCore.Components;
 
     public partial class Cart
@@ -142,7 +142,7 @@
             }
             catch
             {
-                this.ToastService.ShowToast(ToastLevel.Error, "Invalid quantity", "Cart", ToastIcon.Error);
+                this.NotificationService.NotifyError("Invalid quantity", "Cart", NotificationKind.Order, addToInbox: false);
             }
             finally
             {
@@ -177,7 +177,7 @@
                 _selectedProducts.Remove(product);
             }
 
-            this.ToastService.ShowToast(ToastLevel.Warning, "Product removed from cart", "Cart", ToastIcon.Warning);
+            this.NotificationService.NotifyWarning("Product removed from cart", "Cart", NotificationKind.Order, addToInbox: false);
 
             await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
             await this.SaveCart(_myCarts);
@@ -251,12 +251,12 @@
                 }
                 else
                 {
-                    this.ToastService.ShowToast(ToastLevel.Error, result.Message ?? "Payment processing failed.", "Checkout", ToastIcon.Error);
+                    this.NotificationService.NotifyError(result.Message ?? "Payment processing failed.", "Checkout", NotificationKind.Payment);
                 }
             }
             catch
             {
-                this.ToastService.ShowToast(ToastLevel.Error, "Payment processing failed.", "Checkout", ToastIcon.Error);
+                this.NotificationService.NotifyError("Payment processing failed.", "Checkout", NotificationKind.Payment);
             }
             finally
             {

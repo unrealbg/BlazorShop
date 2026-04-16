@@ -2,6 +2,7 @@
 {
     using System.Text.Json;
 
+    using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Category;
     using BlazorShop.Web.Shared.Models.Payment;
@@ -97,23 +98,12 @@
                 if (getCart == null)
                 {
                     _myCarts.Add(new ProcessCart { ProductId = productId, Quantity = 1, UnitPrice = product.Price });
-
-                    this.ToastService.ShowToast(
-                        ToastLevel.Success,
-                        $"Product {productName} added to cart",
-                        "Cart",
-                        ToastIcon.Success,
-                        ToastPosition.BottomRight);
+                    this.NotificationService.NotifyCartItemAdded(productName, ToastPosition.BottomRight);
                 }
                 else
                 {
                     getCart.Quantity++;
-                    this.ToastService.ShowToast(
-                        ToastLevel.Info,
-                        $"Increased quantity of {productName}",
-                        "Cart",
-                        ToastIcon.Info,
-                        ToastPosition.BottomRight);
+                    this.NotificationService.NotifyCartQuantityIncreased(productName, ToastPosition.BottomRight);
                 }
             }
             finally
@@ -137,12 +127,7 @@
 
             var productResult = await this.ProductService.GetByIdAsync(payload.ProductId);
             var name = productResult.Data?.Name ?? "Product";
-            this.ToastService.ShowToast(
-                ToastLevel.Success,
-                $"Product {name} (size {payload.SizeValue}) added to cart",
-                "Cart",
-                ToastIcon.Success,
-                ToastPosition.BottomRight);
+            this.NotificationService.NotifyCartVariantAdded(name, payload.SizeValue, ToastPosition.BottomRight);
 
             await PersistCartAsync();
         }

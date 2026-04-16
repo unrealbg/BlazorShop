@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Web.Components.Search
 {
+    using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Toast;
@@ -101,13 +102,12 @@
                                          Quantity = 1,
                                          UnitPrice = product.Price
                                      });
-
-                    ToastService.ShowToast(ToastLevel.Success, $"Product {productName} added to cart", "Cart", ToastIcon.Success, ToastPosition.BottomRight);
+                    NotificationService.NotifyCartItemAdded(productName, ToastPosition.BottomRight);
                 }
                 else
                 {
                     getCart.Quantity++;
-                    ToastService.ShowToast(ToastLevel.Info, $"Increased quantity of {productName}", "Cart", ToastIcon.Info, ToastPosition.BottomRight);
+                    NotificationService.NotifyCartQuantityIncreased(productName, ToastPosition.BottomRight);
                 }
             }
             finally

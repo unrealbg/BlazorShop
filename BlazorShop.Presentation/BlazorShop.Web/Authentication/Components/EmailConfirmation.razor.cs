@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.Web.Authentication.Components
 {
+    using BlazorShop.Web.Shared.Models.Notifications;
+
     public partial class EmailConfirmation
     {
         private string? _message;
@@ -31,12 +33,12 @@
             {
                 _message = "Your email has been confirmed successfully.";
                 _isSuccess = true;
-                this.ToastService.ShowSuccessToast("Email confirmed successfully.");
+                this.NotificationService.NotifySuccess("Email confirmed successfully.", "Email confirmation", NotificationKind.Authentication);
             }
             else
             {
                 _message = $"Failed to confirm email: {response.Message}";
-                this.ToastService.ShowErrorToast($"Failed to confirm email: {response.Message}");
+                this.NotificationService.NotifyError($"Failed to confirm email: {response.Message}", "Email confirmation", NotificationKind.Authentication);
             }
 
             _isLoading = false;

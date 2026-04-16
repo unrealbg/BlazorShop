@@ -3,6 +3,7 @@
     using System.ComponentModel.DataAnnotations;
 
     using BlazorShop.Web.Shared.Models.Authentication;
+    using BlazorShop.Web.Shared.Models.Notifications;
 
     public partial class Register
     {
@@ -19,18 +20,20 @@
 
                 if (response.Success)
                 {
-                    this.ToastService.ShowSuccessToast("Registration successful.");
-                    this.ToastService.ShowInfoToast("Please check your email to confirm your account.");
+                    this.NotificationService.NotifySuccess(
+                        "Registration successful. Please check your email to confirm your account.",
+                        "Registration",
+                        NotificationKind.Authentication);
                     this.NavigationManager.NavigateTo("/authentication/login");
                 }
                 else
                 {
-                    this.ToastService.ShowErrorToast($"Registration failed: {response.Message}");
+                    this.NotificationService.NotifyError($"Registration failed: {response.Message}", "Registration", NotificationKind.Authentication);
                 }
             }
             catch (Exception ex)
             {
-                this.ToastService.ShowErrorToast($"An error occurred: {ex.Message}");
+                this.NotificationService.NotifyError($"An error occurred: {ex.Message}", "Registration", NotificationKind.Authentication);
             }
             finally
             {

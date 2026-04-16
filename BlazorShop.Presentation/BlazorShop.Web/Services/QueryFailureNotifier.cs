@@ -2,6 +2,7 @@ namespace BlazorShop.Web.Services
 {
     using BlazorShop.Web.Services.Contracts;
     using BlazorShop.Web.Shared.Models;
+    using BlazorShop.Web.Shared.Models.Notifications;
     using BlazorShop.Web.Shared.Services.Contracts;
     using BlazorShop.Web.Shared.Toast;
 
@@ -9,12 +10,12 @@ namespace BlazorShop.Web.Services
     {
         private static readonly TimeSpan NotificationCooldown = TimeSpan.FromSeconds(5);
 
-        private readonly IToastService _toastService;
+        private readonly INotificationService _notificationService;
         private DateTimeOffset _lastNotificationAtUtc = DateTimeOffset.MinValue;
 
-        public QueryFailureNotifier(IToastService toastService)
+        public QueryFailureNotifier(INotificationService notificationService)
         {
-            _toastService = toastService;
+            _notificationService = notificationService;
         }
 
         public bool TryNotifyFailure<T>(QueryResult<T> result, string heading = "Error", ToastPosition position = ToastPosition.TopRight)
@@ -32,12 +33,15 @@ namespace BlazorShop.Web.Services
 
             _lastNotificationAtUtc = now;
 
-            _toastService.ShowToast(
-                ToastLevel.Error,
-                result.Message,
-                heading,
-                ToastIcon.Error,
-                position);
+            _notificationService.Notify(new NotificationRequest
+            {
+                Level = ToastLevel.Error,
+                Kind = NotificationKind.General,
+                Heading = heading,
+                Message = result.Message,
+                IconClass = ToastIcon.Error,
+                Position = position,
+            });
 
             return true;
         }

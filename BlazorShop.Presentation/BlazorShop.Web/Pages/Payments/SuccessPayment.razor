@@ -22,10 +22,13 @@
     public Task<AuthenticationState>? UserAuthState { get; set; }
 
     [Parameter]
+    [SupplyParameterFromQuery(Name = "bt")]
     public int? Bt { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        var isBankTransfer = Bt.GetValueOrDefault() == 1;
+
         try
         {
             if (UserAuthState is null)
@@ -45,7 +48,7 @@
 
                     if (!string.IsNullOrEmpty(userId) && list.Any())
                     {
-                        if (Bt.GetValueOrDefault() != 1)
+                        if (!isBankTransfer)
                         {
                             var arc = list.Select(x => new CreateOrderItem
                             {
@@ -54,7 +57,32 @@
                                 UserId = userId
                             });
 
-                            await CartService.SaveCheckoutHistory(arc);
+                            var historyResult = await CartService.SaveCheckoutHistory(arc);
+
+                            if (historyResult.Success)
+                            {
+                                NotificationService.NotifySuccess(
+                                    "Your order was placed successfully.",
+                                    "Order placed",
+                                    NotificationKind.Order,
+                                    link: "/my-orders");
+                            }
+                            else
+                            {
+                                NotificationService.NotifyWarning(
+                                    "Your payment completed, but we could not refresh your order history right now.",
+                                    "Order update",
+                                    NotificationKind.Order,
+                                    link: "/my-orders");
+                            }
+                        }
+                        else
+                        {
+                            NotificationService.NotifyInfo(
+                                "Your order has been placed. Complete the bank transfer using the checkout instructions.",
+                                "Payment pending",
+                                NotificationKind.Payment,
+                                link: "/my-orders");
                         }
 
                         await CookieStorageService.RemoveAsync(Constant.Cart.Name);
@@ -64,7 +92,11 @@
         }
         catch
         {
-            // ignored
+            NotificationService.NotifyWarning(
+                "Your payment was processed, but we could not update the local order state completely.",
+                "Order update",
+                NotificationKind.Order,
+                link: "/my-orders");
         }
     }
 }
