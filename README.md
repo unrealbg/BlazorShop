@@ -120,7 +120,7 @@ Default dev URLs (may vary by environment):
 5) Tests
 
    ```bash
-  dotnet test BlazorShop.sln -c Release
+    dotnet test BlazorShop.sln -c Release
    ```
 
 ## Project Structure
