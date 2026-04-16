@@ -57,6 +57,7 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IProductVariantService, ProductVariantService>();
             builder.Services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
             builder.Services.AddSingleton<IToastService, ToastService>();
+            builder.Services.AddSingleton<INotificationService, NotificationService>();
             builder.Services.AddScoped<INewsletterService, NewsletterService>();
             builder.Services.AddScoped<IMetricsClient, MetricsClient>();
             builder.Services.AddScoped<IAppJsInterop, AppJsInterop>();

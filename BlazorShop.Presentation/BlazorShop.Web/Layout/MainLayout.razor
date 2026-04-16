@@ -52,6 +52,15 @@
                     }
                 </a>
             </div>
+            <div class="relative inline-flex items-center gap-2">
+                <a href="/notifications" class="relative inline-block" aria-label="Notifications">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>
+                    @if (NotificationService.UnreadCount > 0)
+                    {
+                        <span class="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-sky-600 text-white text-[10px] font-bold h-5 min-w-5 px-1 z-20">@(NotificationService.UnreadCount > 99 ? "99+" : NotificationService.UnreadCount)</span>
+                    }
+                </a>
+            </div>
             <div class="relative">
                 <details class="group" @ref="_mainAccountDetails">
                     <summary class="list-none inline-flex items-center gap-2 cursor-pointer select-none" aria-label="Account">
@@ -128,6 +137,11 @@
     private DotNetObjectReference<MainLayout>? _selfRef;
     private ElementReference _mainAccountDetails;
 
+    protected override void OnInitialized()
+    {
+        NotificationService.OnChange += HandleNotificationsChanged;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCartCountAsync();
@@ -190,8 +204,15 @@
     private void ToggleCategories() => _showCategories = !_showCategories;
     private void CloseCategories() => _showCategories = false;
 
+    private void HandleNotificationsChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     public async ValueTask DisposeAsync()
     {
+        NotificationService.OnChange -= HandleNotificationsChanged;
+
         try
         {
             if (_cartModule is not null)

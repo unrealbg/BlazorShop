@@ -3,7 +3,7 @@
     using BlazorShop.Web.Authentication.Providers;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Authentication;
-    using BlazorShop.Web.Shared.Toast;
+    using BlazorShop.Web.Shared.Models.Notifications;
 
     using Microsoft.AspNetCore.Components;
 
@@ -29,7 +29,7 @@
             {
                 _message = result.Message;
                 _alertType = "danger";
-                this.ToastService.ShowToast(ToastLevel.Error, result.Message, "Error", ToastIcon.Error);
+                this.NotificationService.NotifyError(result.Message, "Login failed", NotificationKind.Authentication);
                 return;
             }
 
@@ -37,7 +37,12 @@
 
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
 
-            this.NavigationManager.NavigateTo(this.Route == null ? "/" : this.Route, true);
+            var targetRoute = string.IsNullOrWhiteSpace(this.Route) ? "/" : this.Route;
+            var inboxLink = targetRoute.StartsWith('/') ? targetRoute : $"/{targetRoute}";
+            var successMessage = string.IsNullOrWhiteSpace(result.Message) ? "You have signed in successfully." : result.Message;
+
+            this.NotificationService.NotifySuccess(successMessage, "Signed in", NotificationKind.Authentication, link: inboxLink);
+            this.NavigationManager.NavigateTo(targetRoute);
         }
     }
 }

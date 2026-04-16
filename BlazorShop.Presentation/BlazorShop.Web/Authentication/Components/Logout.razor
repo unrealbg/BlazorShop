@@ -5,9 +5,27 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await AuthenticationService.Logout();
+        var response = await AuthenticationService.Logout();
         await TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
         AuthenticationStateNotifier.NotifyAuthenticationState();
-        NavigationManager.NavigateTo("/", true);
+
+        if (response.Success)
+        {
+            var message = string.IsNullOrWhiteSpace(response.Message)
+                ? "You have been signed out successfully."
+                : response.Message;
+
+            NotificationService.NotifySuccess(message, "Signed out", NotificationKind.Authentication, link: "/");
+        }
+        else
+        {
+            NotificationService.NotifyWarning(
+                "You were signed out locally, but we could not confirm the server logout request.",
+                "Logout",
+                NotificationKind.Authentication,
+                link: "/");
+        }
+
+        NavigationManager.NavigateTo("/");
     }
 }

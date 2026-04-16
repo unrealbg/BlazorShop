@@ -1,0 +1,118 @@
+@page "/notifications"
+@implements IDisposable
+
+<PageTitle>Notifications</PageTitle>
+
+<div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-6">
+    <div class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+        <div class="flex flex-col gap-3 border-b border-neutral-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-xl font-semibold text-neutral-900">Notifications</h1>
+                <p class="text-sm text-neutral-500">Recent in-app updates for sign-in, orders, payments, and important app events.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button class="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        @onclick="MarkAllAsRead"
+                        disabled="@(!HasUnread)">
+                    Mark all as read
+                </button>
+                <button class="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        @onclick="ClearInbox"
+                        disabled="@(!NotificationsFeed.Any())">
+                    Clear inbox
+                </button>
+            </div>
+        </div>
+
+        @if (!NotificationsFeed.Any())
+        {
+            <div class="px-5 py-10 text-center">
+                <p class="text-base font-medium text-neutral-800">No notifications yet.</p>
+                <p class="mt-1 text-sm text-neutral-500">Toast and inbox notifications will appear here as you use the app.</p>
+            </div>
+        }
+        else
+        {
+            <div class="divide-y divide-neutral-200">
+                @foreach (var notification in NotificationsFeed)
+                {
+                    <article class="@GetNotificationClasses(notification)">
+                        <div class="flex items-start gap-3">
+                            <span class="mt-1 inline-flex h-2.5 w-2.5 shrink-0 rounded-full @GetLevelDotClass(notification.Level)"></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="font-semibold text-neutral-900">@notification.Heading</h2>
+                                        <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">@notification.Kind</span>
+                                        @if (!notification.IsRead)
+                                        {
+                                            <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700">New</span>
+                                        }
+                                    </div>
+                                    <time class="text-xs text-neutral-500">@notification.CreatedAtUtc.ToLocalTime().ToString("g")</time>
+                                </div>
+
+                                <p class="mt-2 text-sm leading-6 text-neutral-700">@notification.Message</p>
+
+                                @if (!string.IsNullOrWhiteSpace(notification.Link))
+                                {
+                                    <a class="mt-3 inline-flex text-sm font-medium text-sky-700 hover:text-sky-800" href="@notification.Link">Open</a>
+                                }
+                            </div>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<AppNotification> NotificationsFeed => NotificationService.Notifications;
+
+    private bool HasUnread => NotificationsFeed.Any(x => !x.IsRead);
+
+    protected override void OnInitialized()
+    {
+        NotificationService.OnChange += HandleNotificationsChanged;
+        NotificationService.MarkAllAsRead();
+    }
+
+    private void HandleNotificationsChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void MarkAllAsRead()
+    {
+        NotificationService.MarkAllAsRead();
+    }
+
+    private void ClearInbox()
+    {
+        NotificationService.ClearInbox();
+    }
+
+    private static string GetNotificationClasses(AppNotification notification)
+    {
+        return notification.IsRead
+            ? "px-5 py-4 bg-white"
+            : "px-5 py-4 bg-sky-50/40";
+    }
+
+    private static string GetLevelDotClass(BlazorShop.Web.Shared.Toast.ToastLevel level)
+    {
+        return level switch
+        {
+            BlazorShop.Web.Shared.Toast.ToastLevel.Success => "bg-emerald-500",
+            BlazorShop.Web.Shared.Toast.ToastLevel.Warning => "bg-amber-500",
+            BlazorShop.Web.Shared.Toast.ToastLevel.Error => "bg-red-600",
+            _ => "bg-sky-500",
+        };
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnChange -= HandleNotificationsChanged;
+    }
+}

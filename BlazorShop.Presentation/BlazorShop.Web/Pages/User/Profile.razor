@@ -347,12 +347,20 @@
 
         if (response.Success)
         {
-            ToastService.ShowSuccessToast("Password changed successfully.");
+            NotificationService.NotifySuccess(
+                string.IsNullOrWhiteSpace(response.Message) ? "Password changed successfully." : response.Message,
+                "Password updated",
+                NotificationKind.Authentication,
+                link: "/profile");
             _changePasswordModel = new ();
         }
         else
         {
-            ToastService.ShowErrorToast(response.Message);
+            NotificationService.NotifyError(
+                string.IsNullOrWhiteSpace(response.Message) ? "Unable to change password." : response.Message,
+                "Password update failed",
+                NotificationKind.Authentication,
+                link: "/profile");
         }
     }
 
@@ -361,14 +369,22 @@
         var response = await AuthenticationService.UpdateProfile(_updateProfile);
         if (response.Success)
         {
-            ToastService.ShowSuccessToast("Profile updated.");
+            NotificationService.NotifySuccess(
+                "Profile updated.",
+                "Profile",
+                NotificationKind.Authentication,
+                link: "/profile");
             _userEmail = _updateProfile.Email;
             _userName = _updateProfile.FullName;
             ActiveTab = "profile";
         }
         else
         {
-            ToastService.ShowErrorToast(response.Message);
+            NotificationService.NotifyError(
+                string.IsNullOrWhiteSpace(response.Message) ? "Unable to update profile." : response.Message,
+                "Profile update failed",
+                NotificationKind.Authentication,
+                link: "/profile");
         }
     }
 

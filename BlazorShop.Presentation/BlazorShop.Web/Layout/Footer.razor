@@ -53,7 +53,11 @@
   {
     if (string.IsNullOrWhiteSpace(_email) || !_email.Contains('@'))
     {
-        ToastService.ShowErrorToast("Please enter a valid email address.");
+      NotificationService.NotifyError(
+        "Please enter a valid email address.",
+        "Newsletter",
+        NotificationKind.Promotion,
+        addToInbox: false);
         return;
     }
 
@@ -64,16 +68,28 @@
         if (result.Success)
         {
             _email = string.Empty;
-            ToastService.ShowSuccessToast("Thanks for subscribing!");
+          NotificationService.NotifySuccess(
+            "Thanks for subscribing!",
+            "Newsletter",
+            NotificationKind.Promotion,
+            addToInbox: false);
         }
         else
         {
-            ToastService.ShowErrorToast(result.Message ?? "Subscription failed.");
+          NotificationService.NotifyError(
+            result.Message ?? "Subscription failed.",
+            "Newsletter",
+            NotificationKind.Promotion,
+            addToInbox: false);
         }
     }
     catch
     {
-        ToastService.ShowErrorToast("Subscription failed. Please try again later.");
+        NotificationService.NotifyError(
+          "Subscription failed. Please try again later.",
+          "Newsletter",
+          NotificationKind.Promotion,
+          addToInbox: false);
     }
     finally
     {
