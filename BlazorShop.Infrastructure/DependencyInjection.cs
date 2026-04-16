@@ -11,6 +11,7 @@
     using BlazorShop.Domain.Contracts.Newsletters;
     using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Domain.Entities.Identity;
+    using BlazorShop.Infrastructure.Configuration;
     using BlazorShop.Infrastructure.Data;
     using BlazorShop.Infrastructure.ExceptionsMiddleware;
     using BlazorShop.Infrastructure.Repositories;
@@ -26,6 +27,7 @@
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Options;
     using Microsoft.IdentityModel.Tokens;
 
     public static class DependencyInjection
@@ -112,7 +114,10 @@
 
             Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
 
-            services.Configure<EmailSettings>(config.GetSection("EmailSettings"));
+            services.AddSingleton<IValidateOptions<EmailSettings>, EmailSettingsOptionsValidator>();
+            services.AddOptions<EmailSettings>()
+                .Bind(config.GetSection("EmailSettings"))
+                .ValidateOnStart();
             services.Configure<BankTransferSettings>(config.GetSection("BankTransfer"));
             services.AddTransient<IEmailService, EmailService>();
 

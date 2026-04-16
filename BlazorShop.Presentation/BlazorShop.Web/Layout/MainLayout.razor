@@ -40,7 +40,7 @@
             Categories
         </button>
         <div class="flex-1 flex justify-center">
-            <SearchBarComponent Products="@_headerProducts" />
+            <SearchBarComponent />
         </div>
         <div class="flex items-center gap-5 text-sm">
             <div class="relative inline-flex items-center gap-2">
@@ -122,8 +122,6 @@
 @code {
     private bool IsMobileMenuOpen;
     private bool _showCategories;
-    private IEnumerable<GetProduct> _headerProducts = Enumerable.Empty<GetProduct>();
-
     private int _cartCount;
     [Inject] private IJSRuntime Js { get; set; } = default!;
     private IJSObjectReference? _cartModule;
@@ -132,16 +130,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var headerProductsResult = await ProductService.GetAllAsync();
-        if (QueryFailureNotifier.TryNotifyFailure(headerProductsResult, "Products"))
-        {
-            _headerProducts = Enumerable.Empty<GetProduct>();
-        }
-        else
-        {
-            _headerProducts = headerProductsResult.Data ?? Enumerable.Empty<GetProduct>();
-        }
-
         await LoadCartCountAsync();
     }
 

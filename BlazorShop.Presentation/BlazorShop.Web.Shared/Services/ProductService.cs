@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.Web.Shared.Services
 {
+    using System.Globalization;
+
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Product;
@@ -32,6 +34,22 @@
             return await _apiCallHelper.GetQueryResult<IEnumerable<GetProduct>>(
                 result,
                 "We couldn't load products right now. Please try again.");
+        }
+
+        public async Task<QueryResult<PagedResult<GetCatalogProduct>>> GetCatalogPageAsync(ProductCatalogQuery query)
+        {
+            var client = _httpClientHelper.GetPublicClient();
+            var currentApiCall = new ApiCall
+            {
+                Route = BuildCatalogRoute(query),
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+            return await _apiCallHelper.GetQueryResult<PagedResult<GetCatalogProduct>>(
+                result,
+                "We couldn't load the product catalog right now. Please try again.");
         }
 
         public async Task<QueryResult<GetProduct>> GetByIdAsync(Guid id)
@@ -106,6 +124,33 @@
             return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+        }
+
+        private static string BuildCatalogRoute(ProductCatalogQuery query)
+        {
+            var parameters = new List<string>
+            {
+                $"pageNumber={Math.Max(1, query.PageNumber)}",
+                $"pageSize={Math.Max(1, query.PageSize)}",
+                $"sortBy={Uri.EscapeDataString(query.SortBy.ToString())}",
+            };
+
+            if (query.CategoryId.HasValue && query.CategoryId.Value != Guid.Empty)
+            {
+                parameters.Add($"categoryId={query.CategoryId.Value}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+            {
+                parameters.Add($"searchTerm={Uri.EscapeDataString(query.SearchTerm.Trim())}");
+            }
+
+            if (query.CreatedAfterUtc.HasValue)
+            {
+                parameters.Add($"createdAfterUtc={Uri.EscapeDataString(query.CreatedAfterUtc.Value.ToString("O", CultureInfo.InvariantCulture))}");
+            }
+
+            return $"{Constant.Product.GetCatalog}?{string.Join("&", parameters)}";
         }
     }
 }

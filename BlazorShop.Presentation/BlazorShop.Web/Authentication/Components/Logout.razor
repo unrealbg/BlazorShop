@@ -1,4 +1,5 @@
 ﻿@page "/authentication/logout"
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticationStateNotifier AuthenticationStateNotifier
 
 @code {
 
@@ -6,6 +7,7 @@
     {
         await AuthenticationService.Logout();
         await TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
+        AuthenticationStateNotifier.NotifyAuthenticationState();
         NavigationManager.NavigateTo("/", true);
     }
 }

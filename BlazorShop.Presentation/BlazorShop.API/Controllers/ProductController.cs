@@ -2,6 +2,7 @@
 {
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Domain.Contracts;
 
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
@@ -25,6 +26,18 @@
         public async Task<ActionResult<IEnumerable<GetProduct>>> GetAll()
         {
             var data = await _productService.GetAllAsync();
+            return Ok(data);
+        }
+
+        /// <summary>
+        /// Get a paged product catalog for list pages.
+        /// </summary>
+        /// <param name="query">Catalog paging, filtering and sorting options.</param>
+        /// <returns>Paged catalog items.</returns>
+        [HttpGet("catalog")]
+        public async Task<ActionResult<PagedResult<GetCatalogProduct>>> GetCatalog([FromQuery] ProductCatalogQuery query)
+        {
+            var data = await _productService.GetCatalogPageAsync(query);
             return Ok(data);
         }
 

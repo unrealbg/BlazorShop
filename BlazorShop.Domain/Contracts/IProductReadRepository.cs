@@ -6,6 +6,8 @@ namespace BlazorShop.Domain.Contracts
     {
         Task<IEnumerable<Product>> GetCatalogProductsAsync();
 
+        Task<PagedResult<CatalogProductReadModel>> GetCatalogPageAsync(ProductCatalogQuery query);
+
         Task<Product?> GetProductDetailsByIdAsync(Guid id);
 
         Task<IReadOnlyDictionary<Guid, Product>> GetProductsByIdsAsync(IEnumerable<Guid> productIds);

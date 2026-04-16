@@ -38,6 +38,7 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
+            builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
             builder.Services.AddScoped<BrowserCredentialsHandler>();
             builder.Services.AddScoped<RefreshTokenHandler>();
             builder.Services.AddHttpClient(

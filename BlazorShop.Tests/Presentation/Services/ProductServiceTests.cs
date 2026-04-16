@@ -102,6 +102,56 @@ namespace BlazorShop.Tests.Presentation.Services
         }
 
         [Fact]
+        public async Task GetCatalogPageAsync_ShouldReturnPagedCatalog_WhenApiCallIsSuccessful()
+        {
+            var client = new HttpClient();
+            this._httpClientHelperMock.Setup(helper => helper.GetPublicClient()).Returns(client);
+
+            var apiCallResult = new HttpResponseMessage(HttpStatusCode.OK);
+            this._apiCallHelperMock
+                .Setup(helper => helper.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>()))
+                .ReturnsAsync(apiCallResult);
+
+            var catalogPage = new PagedResult<GetCatalogProduct>
+            {
+                Items =
+                [
+                    new GetCatalogProduct
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Catalog Product",
+                        Description = "Description",
+                        Price = 25m,
+                        Image = "/img/catalog.png",
+                        CreatedOn = DateTime.UtcNow,
+                        CategoryId = Guid.NewGuid(),
+                        HasVariants = true,
+                    }
+                ],
+                PageNumber = 1,
+                PageSize = 8,
+                TotalCount = 1,
+            };
+
+            this._apiCallHelperMock
+                .Setup(helper => helper.GetQueryResult<PagedResult<GetCatalogProduct>>(apiCallResult, It.IsAny<string>()))
+                .ReturnsAsync(QueryResult<PagedResult<GetCatalogProduct>>.Succeeded(catalogPage));
+
+            var result = await this._productService.GetCatalogPageAsync(new ProductCatalogQuery
+            {
+                PageNumber = 1,
+                PageSize = 8,
+                SearchTerm = "Catalog",
+                SortBy = ProductCatalogSortBy.NameAscending,
+            });
+
+            Assert.True(result.Success);
+            Assert.NotNull(result.Data);
+            Assert.Single(result.Data!.Items);
+            Assert.Equal("Catalog Product", result.Data.Items[0].Name);
+        }
+
+        [Fact]
         public async Task AddAsync_ShouldReturnServiceResponse_WhenApiCallIsSuccessful()
         {
             // Arrange

@@ -38,15 +38,7 @@
                 _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
             }
 
-            var productsResult = await this.ProductService.GetAllAsync();
-            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Cart"))
-            {
-                _products = [];
-            }
-            else
-            {
-                _products = productsResult.Data ?? [];
-            }
+            await this.LoadCartProductsAsync();
 
             this.GetCart();
 
@@ -75,6 +67,35 @@
             }
 
             _selectedProducts = _selectedProducts.OrderBy(x => x.Name).ToList();
+        }
+
+        private async Task LoadCartProductsAsync()
+        {
+            var uniqueProductIds = _myCarts
+                .Select(cart => cart.ProductId)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToArray();
+
+            if (uniqueProductIds.Length == 0)
+            {
+                _products = [];
+                return;
+            }
+
+            var productTasks = uniqueProductIds.Select(id => this.ProductService.GetByIdAsync(id));
+            var productResults = await Task.WhenAll(productTasks);
+            var successfulProducts = new List<GetProduct>();
+
+            foreach (var productResult in productResults)
+            {
+                if (productResult.Success && productResult.Data is not null)
+                {
+                    successfulProducts.Add(productResult.Data);
+                }
+            }
+
+            _products = successfulProducts;
         }
 
         private int GetProductQuantity(Guid productId)

@@ -12,9 +12,7 @@
 
     public partial class LatestProducts : IAsyncDisposable
     {
-        private IEnumerable<GetProduct> _products = [];
-
-        private readonly List<GetProduct> _latestProducts = new();
+        private readonly List<GetCatalogProduct> _latestProducts = new();
 
         private List<ProcessCart> _myCarts = [];
 
@@ -26,7 +24,7 @@
         private const int PageSize = 3;
         private int _currentPage = 0;
         private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)_latestProducts.Count / PageSize));
-        private IEnumerable<GetProduct> CurrentPageItems => _latestProducts.Skip(_currentPage * PageSize).Take(PageSize);
+        private IEnumerable<GetCatalogProduct> CurrentPageItems => _latestProducts.Skip(_currentPage * PageSize).Take(PageSize);
 
         private PeriodicTimer? _autoTimer;
         private Task? _autoSlideTask;
@@ -45,18 +43,23 @@
                 _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? new List<ProcessCart>();
             }
 
-            var productsResult = await this.ProductService.GetAllAsync();
+            var productsResult = await this.ProductService.GetCatalogPageAsync(new ProductCatalogQuery
+            {
+                PageNumber = 1,
+                PageSize = 12,
+                SortBy = ProductCatalogSortBy.Newest,
+            });
             if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
             {
-                _products = [];
+                _latestProducts.Clear();
                 return;
             }
 
-            _products = productsResult.Data ?? [];
+            var products = productsResult.Data?.Items ?? [];
 
-            if (_products.Any())
+            if (products.Any())
             {
-                foreach (var p in _products.OrderByDescending(p => p.CreatedOn).Take(12))
+                foreach (var p in products)
                 {
                     _latestProducts.Add(p);
                 }
@@ -121,11 +124,11 @@
             }
         }
 
-        private async Task HandleAddToCart(GetProduct product)
+        private async Task HandleAddToCart(GetCatalogProduct product)
         {
-            if (product.Variants?.Any() == true)
+            if (product.HasVariants)
             {
-                ShowDetails(product);
+                await ShowDetailsAsync(product.Id);
                 return;
             }
 
@@ -209,9 +212,15 @@
             await this.CookieStorageService.SetAsync(Constant.Cart.Name, JsonSerializer.Serialize(_myCarts), 30);
         }
 
-        private void ShowDetails(GetProduct product)
+        private async Task ShowDetailsAsync(Guid productId)
         {
-            this.SelectedProduct = product;
+            var productResult = await this.ProductService.GetByIdAsync(productId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(productResult, "Product details") || productResult.Data is null)
+            {
+                return;
+            }
+
+            this.SelectedProduct = productResult.Data;
             _showModal = true;
         }
 
