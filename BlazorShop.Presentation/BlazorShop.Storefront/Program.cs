@@ -1,5 +1,6 @@
 using System.IO;
 
+using BlazorShop.Application.Diagnostics;
 using BlazorShop.Application.Services;
 using BlazorShop.Application.Services.Contracts;
 using BlazorShop.Storefront.Options;
@@ -46,21 +47,54 @@ app.UseAntiforgery();
 app.MapDefaultEndpoints();
 app.MapGet(StorefrontRoutes.Robots, async (HttpContext httpContext, IStorefrontRobotsService robotsService, CancellationToken cancellationToken) =>
 {
-    StorefrontResponseHeaders.ApplyRobotsDocument(httpContext.Response);
-    var content = await robotsService.GenerateAsync(cancellationToken);
-    return Results.Text(content, "text/plain; charset=utf-8");
+    try
+    {
+        var content = await robotsService.GenerateAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            SeoRuntimeLogger.PublicDiscoveryRobotsFailure(app.Logger, StorefrontRoutes.Robots, "empty_document");
+            StorefrontResponseHeaders.ApplyServiceUnavailable(httpContext);
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        StorefrontResponseHeaders.ApplyRobotsDocument(httpContext.Response);
+        return Results.Text(content, "text/plain; charset=utf-8");
+    }
+    catch (Exception exception)
+    {
+        SeoRuntimeLogger.PublicDiscoveryRobotsFailure(app.Logger, exception, StorefrontRoutes.Robots, "generation_exception");
+        StorefrontResponseHeaders.ApplyServiceUnavailable(httpContext);
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
 });
 app.MapGet(StorefrontRoutes.Sitemap, async (HttpContext httpContext, IStorefrontSitemapService sitemapService, CancellationToken cancellationToken) =>
 {
-    var result = await sitemapService.GenerateAsync(cancellationToken);
-    if (result.IsServiceUnavailable || string.IsNullOrWhiteSpace(result.Content))
+    try
     {
+        var result = await sitemapService.GenerateAsync(cancellationToken);
+        if (result.IsServiceUnavailable)
+        {
+            SeoRuntimeLogger.PublicDiscoverySitemapFailure(app.Logger, StorefrontRoutes.Sitemap, "upstream_service_unavailable");
+            StorefrontResponseHeaders.ApplySitemapUnavailable(httpContext.Response);
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        if (string.IsNullOrWhiteSpace(result.Content))
+        {
+            SeoRuntimeLogger.PublicDiscoverySitemapFailure(app.Logger, StorefrontRoutes.Sitemap, "empty_document");
+            StorefrontResponseHeaders.ApplySitemapUnavailable(httpContext.Response);
+            return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
+
+        StorefrontResponseHeaders.ApplySitemapDocument(httpContext.Response);
+        return Results.Text(result.Content, "application/xml; charset=utf-8");
+    }
+    catch (Exception exception)
+    {
+        SeoRuntimeLogger.PublicDiscoverySitemapFailure(app.Logger, exception, StorefrontRoutes.Sitemap, "generation_exception");
         StorefrontResponseHeaders.ApplySitemapUnavailable(httpContext.Response);
         return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
-
-    StorefrontResponseHeaders.ApplySitemapDocument(httpContext.Response);
-    return Results.Text(result.Content, "application/xml; charset=utf-8");
 });
 app.MapRazorComponents<App>();
 

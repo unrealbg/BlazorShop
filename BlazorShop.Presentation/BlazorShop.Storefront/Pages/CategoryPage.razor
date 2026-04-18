@@ -1,7 +1,9 @@
 @page "/category/{Slug}"
+@using BlazorShop.Application.Diagnostics
 @inject StorefrontApiClient ApiClient
 @inject IStorefrontSeoComposer SeoComposer
 @inject IStorefrontStructuredDataComposer StructuredDataComposer
+@inject ILogger<CategoryPage> Logger
 
 <SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
@@ -65,6 +67,7 @@ else if (_categoryPage is not null)
 
     protected override async Task OnParametersSetAsync()
     {
+        var routePath = StorefrontRoutes.Category(Slug);
         var categoryPageResult = await ApiClient.GetPublishedCategoryBySlugAsync(Slug);
 
         if (categoryPageResult.IsServiceUnavailable)
@@ -75,10 +78,11 @@ else if (_categoryPage is not null)
             _breadcrumbs = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            SeoRuntimeLogger.PublicCategoryServiceUnavailable(Logger, routePath, Slug);
 
             _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
                 "Category temporarily unavailable",
-                StorefrontRoutes.Category(Slug),
+                routePath,
                 "The storefront is running, but the catalog API is not reachable right now.");
             return;
         }
@@ -92,16 +96,18 @@ else if (_categoryPage is not null)
             _breadcrumbs = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             StorefrontResponseHeaders.ApplyNotFound(HttpContext);
+            SeoRuntimeLogger.PublicCategoryNotFound(Logger, routePath, Slug);
 
             _metadata = await SeoComposer.ComposeNotFoundPageAsync(
                 "Category not found",
-                StorefrontRoutes.Category(Slug),
+                routePath,
                 "We couldn't find a published category for this address.");
             return;
         }
 
         _isNotFound = false;
         _isServiceUnavailable = false;
+        SeoRuntimeLogger.PublicCategoryResolved(Logger, routePath, Slug, _categoryPage.Category.Id);
         _breadcrumbs =
         [
             new StorefrontBreadcrumbItem("Home", StorefrontRoutes.Home),

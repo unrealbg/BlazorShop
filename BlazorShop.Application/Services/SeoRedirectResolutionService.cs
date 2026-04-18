@@ -1,18 +1,23 @@
 namespace BlazorShop.Application.Services
 {
+    using BlazorShop.Application.Diagnostics;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Domain.Contracts.Seo;
+
+    using Microsoft.Extensions.Logging;
 
     public class SeoRedirectResolutionService : ISeoRedirectResolutionService
     {
         private const int MaxRedirectHops = 10;
 
         private readonly ISeoRedirectRepository _seoRedirectRepository;
+        private readonly ILogger<SeoRedirectResolutionService> _logger;
 
-        public SeoRedirectResolutionService(ISeoRedirectRepository seoRedirectRepository)
+        public SeoRedirectResolutionService(ISeoRedirectRepository seoRedirectRepository, ILogger<SeoRedirectResolutionService> logger)
         {
             _seoRedirectRepository = seoRedirectRepository;
+            _logger = logger;
         }
 
         public async Task<SeoRedirectResolutionDto?> ResolvePublicPathAsync(string? path)
@@ -31,6 +36,7 @@ namespace BlazorShop.Application.Services
             {
                 if (!visitedPaths.Add(currentPath))
                 {
+                    SeoRuntimeLogger.PublicRedirectLoopBlocked(_logger, normalizedPath!, currentPath, hop + 1);
                     return null;
                 }
 
@@ -49,6 +55,7 @@ namespace BlazorShop.Application.Services
                 if (!SeoRedirectPathUtility.IsRootRelativePath(redirect.NewPath)
                     || SeoRedirectPathUtility.PathsEqual(currentPath, redirect.NewPath))
                 {
+                    SeoRuntimeLogger.PublicRedirectInvalidTargetBlocked(_logger, normalizedPath!, redirect.NewPath ?? string.Empty, redirect.StatusCode);
                     return null;
                 }
 
@@ -56,6 +63,7 @@ namespace BlazorShop.Application.Services
                 currentPath = redirect.NewPath!;
             }
 
+            SeoRuntimeLogger.PublicRedirectChainBlocked(_logger, normalizedPath!, MaxRedirectHops);
             return null;
         }
     }

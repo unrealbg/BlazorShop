@@ -1,7 +1,9 @@
 @page "/product/{Slug}"
+@using BlazorShop.Application.Diagnostics
 @inject StorefrontApiClient ApiClient
 @inject IStorefrontSeoComposer SeoComposer
 @inject IStorefrontStructuredDataComposer StructuredDataComposer
+@inject ILogger<ProductPage> Logger
 
 <SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
@@ -142,6 +144,7 @@ else if (_product is not null)
 
     protected override async Task OnParametersSetAsync()
     {
+        var routePath = StorefrontRoutes.Product(Slug);
         var productResult = await ApiClient.GetPublishedProductBySlugAsync(Slug);
 
         if (productResult.IsServiceUnavailable)
@@ -153,10 +156,11 @@ else if (_product is not null)
             _relatedProducts = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            SeoRuntimeLogger.PublicProductServiceUnavailable(Logger, routePath, Slug);
 
             _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
                 "Product temporarily unavailable",
-                StorefrontRoutes.Product(Slug),
+                routePath,
                 "The storefront is running, but the catalog API is not reachable right now.");
             return;
         }
@@ -171,16 +175,18 @@ else if (_product is not null)
             _relatedProducts = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             StorefrontResponseHeaders.ApplyNotFound(HttpContext);
+            SeoRuntimeLogger.PublicProductNotFound(Logger, routePath, Slug);
 
             _metadata = await SeoComposer.ComposeNotFoundPageAsync(
                 "Product not found",
-                StorefrontRoutes.Product(Slug),
+                routePath,
                 "We couldn't find a published product for this address.");
             return;
         }
 
         _isNotFound = false;
         _isServiceUnavailable = false;
+        SeoRuntimeLogger.PublicProductResolved(Logger, routePath, Slug, _product.Id);
         _breadcrumbs = BuildBreadcrumbs(_product);
 
         var metadataTask = SeoComposer.ComposeProductPageAsync(_product);

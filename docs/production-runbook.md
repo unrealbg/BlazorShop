@@ -184,6 +184,37 @@ Current pinned images in this repository:
 - Web build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
 - Web runtime image: `nginx:1.27.5-alpine3.21`
 
+## Storefront SEO Runtime Signals
+
+The SSR storefront now emits structured SEO runtime events for high-signal public-route outcomes only. Watch the event name field in application logs for these values:
+
+- `public.product.resolved`
+- `public.product.not_found`
+- `public.product.service_unavailable`
+- `public.category.resolved`
+- `public.category.not_found`
+- `public.category.service_unavailable`
+- `public.redirect.resolved`
+- `public.redirect.loop_blocked`
+- `public.redirect.chain_blocked`
+- `public.redirect.invalid_target_blocked`
+- `public.discovery.sitemap_failure`
+- `public.discovery.robots_failure`
+
+Treat these as likely SEO regression signals:
+
+- repeated `public.product.service_unavailable` or `public.category.service_unavailable`: published catalog routes are unstable or the API is degraded
+- spikes in `public.product.not_found` or `public.category.not_found`: broken internal links, bad redirects, missing published content, or stale indexed URLs
+- any `public.redirect.loop_blocked`, `public.redirect.chain_blocked`, or `public.redirect.invalid_target_blocked`: redirect data needs immediate review before crawlers get trapped or lose canonical consolidation
+- any `public.discovery.sitemap_failure` or `public.discovery.robots_failure`: discovery documents are unhealthy and crawl/indexation can regress quickly
+
+First inspection steps:
+
+1. Check whether the failures cluster on one slug, one category, or all published routes.
+2. Check the API and storefront deployment health at the same timestamp.
+3. For redirect anomalies, inspect the active redirect records for the logged source and target paths.
+4. For discovery failures, fetch `/sitemap.xml` and `/robots.txt` directly from the public origin and confirm the current response status, cache headers, and body.
+
 ## Pre-release Verification
 
 Run this checklist before promoting a release candidate.
