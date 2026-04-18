@@ -22,6 +22,7 @@ builder.Services.AddScoped<IStorefrontPublicUrlResolver, StorefrontPublicUrlReso
 builder.Services.AddScoped<IStorefrontRobotsService, StorefrontRobotsService>();
 builder.Services.AddScoped<IStorefrontSeoSettingsProvider, StorefrontSeoSettingsProvider>();
 builder.Services.AddScoped<IStorefrontSeoComposer, StorefrontSeoComposer>();
+builder.Services.AddScoped<IStorefrontStructuredDataComposer, StorefrontStructuredDataComposer>();
 builder.Services.AddScoped<IStorefrontSitemapService, StorefrontSitemapService>();
 builder.Services.AddHttpClient<StorefrontApiClient>((serviceProvider, client) =>
 {

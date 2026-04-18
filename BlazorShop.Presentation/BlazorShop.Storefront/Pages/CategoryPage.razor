@@ -1,8 +1,9 @@
 @page "/category/{Slug}"
 @inject StorefrontApiClient ApiClient
 @inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-<SeoHead Metadata="_metadata" />
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 @if (_isServiceUnavailable)
 {
@@ -48,6 +49,7 @@ else if (_categoryPage is not null)
     private bool _isNotFound;
     private bool _isServiceUnavailable;
     private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
 
     [Parameter]
     public string Slug { get; set; } = string.Empty;
@@ -64,6 +66,7 @@ else if (_categoryPage is not null)
             _categoryPage = null;
             _isNotFound = false;
             _isServiceUnavailable = true;
+            _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
@@ -82,6 +85,7 @@ else if (_categoryPage is not null)
         {
             _isNotFound = true;
             _isServiceUnavailable = false;
+            _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -97,5 +101,6 @@ else if (_categoryPage is not null)
         _isNotFound = false;
         _isServiceUnavailable = false;
         _metadata = await SeoComposer.ComposeCategoryPageAsync(_categoryPage.Category);
+        _structuredData = await StructuredDataComposer.ComposeCategoryPageAsync(_categoryPage.Category);
     }
 }

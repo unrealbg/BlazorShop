@@ -1,8 +1,9 @@
 @page "/product/{Slug}"
 @inject StorefrontApiClient ApiClient
 @inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-<SeoHead Metadata="_metadata" />
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 @if (_isServiceUnavailable)
 {
@@ -78,6 +79,7 @@ else if (_product is not null)
     private bool _isNotFound;
     private bool _isServiceUnavailable;
     private GetProduct? _product;
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
 
     [Parameter]
     public string Slug { get; set; } = string.Empty;
@@ -94,6 +96,7 @@ else if (_product is not null)
             _product = null;
             _isNotFound = false;
             _isServiceUnavailable = true;
+            _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
@@ -112,6 +115,7 @@ else if (_product is not null)
         {
             _isNotFound = true;
             _isServiceUnavailable = false;
+            _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
@@ -127,6 +131,7 @@ else if (_product is not null)
         _isNotFound = false;
         _isServiceUnavailable = false;
         _metadata = await SeoComposer.ComposeProductPageAsync(_product);
+        _structuredData = await StructuredDataComposer.ComposeProductPageAsync(_product);
     }
 
     private static string ScaleLabel(int scale)

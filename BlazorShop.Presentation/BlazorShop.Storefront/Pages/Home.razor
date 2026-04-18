@@ -1,9 +1,9 @@
 @page "/"
 @inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-<StaticPageSeo Title="Shop Home"
-               RelativePath="@StorefrontRoutes.Home"
-               Description="Discover published products, featured categories, and route-based SEO-ready pages across the BlazorShop storefront." />
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 <HeroBanner />
 
@@ -60,12 +60,19 @@ else
     private IReadOnlyList<GetCategory> _categories = [];
     private bool _isServiceUnavailable;
     private IReadOnlyList<GetCatalogProduct> _latestProducts = [];
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
 
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "Shop Home",
+            StorefrontRoutes.Home,
+            "Discover published products, featured categories, and route-based SEO-ready pages across the BlazorShop storefront.");
+        var structuredDataTask = StructuredDataComposer.ComposeHomePageAsync();
         var categoriesTask = ApiClient.GetPublishedCategoriesAsync();
         var latestProductsTask = ApiClient.GetPublishedCatalogPageAsync(new ProductCatalogQuery
         {
@@ -74,7 +81,9 @@ else
             SortBy = ProductCatalogSortBy.Newest,
         });
 
-        await Task.WhenAll(categoriesTask, latestProductsTask);
+        await Task.WhenAll(metadataTask, structuredDataTask, categoriesTask, latestProductsTask);
+
+        _metadata = await metadataTask;
 
         var categoriesResult = await categoriesTask;
         var latestProductsResult = await latestProductsTask;
@@ -82,6 +91,7 @@ else
         if (categoriesResult.IsServiceUnavailable || latestProductsResult.IsServiceUnavailable)
         {
             _isServiceUnavailable = true;
+            _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
@@ -92,5 +102,6 @@ else
 
         _categories = categoriesResult.Value ?? [];
         _latestProducts = latestProductsResult.Value?.Items ?? [];
+        _structuredData = await structuredDataTask;
     }
 }

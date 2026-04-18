@@ -1,12 +1,11 @@
 @inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-@if (_metadata is not null)
-{
-    <SeoHead Metadata="_metadata" />
-}
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 @code {
-    private SeoMetadataDto? _metadata;
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
 
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
@@ -17,8 +16,27 @@
     [Parameter, EditorRequired]
     public string Description { get; set; } = string.Empty;
 
+    [Parameter]
+    public StorefrontStructuredDataPageKind StructuredDataPageKind { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<StorefrontFaqStructuredDataItem> FaqEntries { get; set; } = Array.Empty<StorefrontFaqStructuredDataItem>();
+
+    [Parameter]
+    public bool StructuredDataEnabled { get; set; } = true;
+
     protected override async Task OnParametersSetAsync()
     {
         _metadata = await SeoComposer.ComposeStaticPageAsync(Title, RelativePath, Description);
+        _structuredData = !StructuredDataEnabled
+            ? StorefrontStructuredDataDocument.Empty
+            : StructuredDataPageKind switch
+        {
+            StorefrontStructuredDataPageKind.Home => await StructuredDataComposer.ComposeHomePageAsync(),
+            StorefrontStructuredDataPageKind.WebPage => await StructuredDataComposer.ComposeWebPageAsync(Title, RelativePath, Description),
+            StorefrontStructuredDataPageKind.CollectionPage => await StructuredDataComposer.ComposeCollectionPageAsync(Title, RelativePath, Description),
+            StorefrontStructuredDataPageKind.FaqPage => await StructuredDataComposer.ComposeFaqPageAsync(Title, RelativePath, Description, FaqEntries),
+            _ => StorefrontStructuredDataDocument.Empty,
+        };
     }
 }

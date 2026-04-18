@@ -1,9 +1,9 @@
 @page "/todays-deals"
 @inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-<StaticPageSeo Title="Today's Deals"
-               RelativePath="@StorefrontRoutes.TodaysDeals"
-               Description="Explore published BlazorShop catalog entries curated as current featured deals." />
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
     <div class="flex items-end justify-between gap-4">
@@ -29,12 +29,22 @@
 @code {
     private bool _isServiceUnavailable;
     private IReadOnlyList<GetCatalogProduct> _products = [];
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
 
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "Today's Deals",
+            StorefrontRoutes.TodaysDeals,
+            "Explore published BlazorShop catalog entries curated as current featured deals.");
+        var structuredDataTask = StructuredDataComposer.ComposeCollectionPageAsync(
+            "Today's Deals",
+            StorefrontRoutes.TodaysDeals,
+            "Explore published BlazorShop catalog entries curated as current featured deals.");
         var result = await ApiClient.GetPublishedCatalogPageAsync(new ProductCatalogQuery
         {
             PageNumber = 1,
@@ -42,9 +52,12 @@
             SortBy = ProductCatalogSortBy.Newest,
         });
 
+        _metadata = await metadataTask;
+
         if (result.IsServiceUnavailable)
         {
             _isServiceUnavailable = true;
+            _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
                 HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
@@ -54,5 +67,6 @@
         }
 
         _products = result.Value?.Items ?? [];
+        _structuredData = await structuredDataTask;
     }
 }

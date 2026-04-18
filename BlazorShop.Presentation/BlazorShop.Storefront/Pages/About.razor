@@ -1,8 +1,8 @@
 @page "/about-us"
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-<StaticPageSeo Title="About Us"
-               RelativePath="@StorefrontRoutes.About"
-               Description="Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience." />
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 <section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
     <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
@@ -26,3 +26,25 @@
         </div>
     </div>
 </section>
+
+@code {
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "About Us",
+            StorefrontRoutes.About,
+            "Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience.");
+        var structuredDataTask = StructuredDataComposer.ComposeWebPageAsync(
+            "About Us",
+            StorefrontRoutes.About,
+            "Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience.");
+
+        await Task.WhenAll(metadataTask, structuredDataTask);
+
+        _metadata = await metadataTask;
+        _structuredData = await structuredDataTask;
+    }
+}

@@ -35,9 +35,14 @@
     }
 
     <meta name="robots" content="@(Metadata.RobotsIndex ? "index" : "noindex"),@(Metadata.RobotsFollow ? "follow" : "nofollow")" />
+
+    <JsonLdScript Document="StructuredData" />
 </HeadContent>
 
 @code {
     [Parameter, EditorRequired]
     public SeoMetadataDto Metadata { get; set; } = new();
+
+    [Parameter]
+    public StorefrontStructuredDataDocument? StructuredData { get; set; }
 }

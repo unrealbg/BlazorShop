@@ -1,8 +1,8 @@
 @page "/terms"
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
 
-<StaticPageSeo Title="Terms & Conditions"
-               RelativePath="@StorefrontRoutes.Terms"
-               Description="Read the current BlazorShop storefront terms, account responsibilities, and purchase conditions." />
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
 <section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
     <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8 space-y-6 text-sm leading-7 text-neutral-700">
@@ -20,3 +20,25 @@
         </div>
     </div>
 </section>
+
+@code {
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "Terms & Conditions",
+            StorefrontRoutes.Terms,
+            "Read the current BlazorShop storefront terms, account responsibilities, and purchase conditions.");
+        var structuredDataTask = StructuredDataComposer.ComposeWebPageAsync(
+            "Terms & Conditions",
+            StorefrontRoutes.Terms,
+            "Read the current BlazorShop storefront terms, account responsibilities, and purchase conditions.");
+
+        await Task.WhenAll(metadataTask, structuredDataTask);
+
+        _metadata = await metadataTask;
+        _structuredData = await structuredDataTask;
+    }
+}
