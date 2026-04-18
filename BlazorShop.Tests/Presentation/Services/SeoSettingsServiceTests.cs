@@ -30,7 +30,7 @@ namespace BlazorShop.Tests.Presentation.Services
         public async Task GetAsync_ShouldReturnSettings_WhenApiCallIsSuccessful()
         {
             var client = new HttpClient();
-            _httpClientHelperMock.Setup(helper => helper.GetPrivateClientAsync()).ReturnsAsync(client);
+            _httpClientHelperMock.Setup(helper => helper.GetPublicClient()).Returns(client);
 
             var apiCallResult = new HttpResponseMessage(HttpStatusCode.OK);
             _apiCallHelperMock
@@ -46,6 +46,8 @@ namespace BlazorShop.Tests.Presentation.Services
 
             Assert.True(result.Success);
             Assert.Equal("BlazorShop", result.Data?.SiteName);
+            _httpClientHelperMock.Verify(helper => helper.GetPublicClient(), Times.Once);
+            _httpClientHelperMock.Verify(helper => helper.GetPrivateClientAsync(), Times.Never);
         }
 
         [Fact]
@@ -74,6 +76,7 @@ namespace BlazorShop.Tests.Presentation.Services
             Assert.True(result.Success);
             Assert.Equal(ServiceResponseType.Success, result.ResponseType);
             Assert.Equal("BlazorShop", result.Payload?.SiteName);
+            _httpClientHelperMock.Verify(helper => helper.GetPrivateClientAsync(), Times.Once);
         }
     }
 }

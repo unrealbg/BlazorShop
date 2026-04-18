@@ -2,6 +2,7 @@ namespace BlazorShop.Tests.Application.Mapping
 {
     using AutoMapper;
 
+    using BlazorShop.Application.DTOs.Category;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Mapping;
     using BlazorShop.Domain.Entities;
@@ -98,6 +99,66 @@ namespace BlazorShop.Tests.Application.Mapping
             Assert.False(entity.RobotsIndex);
             Assert.True(entity.RobotsFollow);
             Assert.Equal(update.PublishedOn, entity.PublishedOn);
+        }
+
+        [Fact]
+        public void Map_CategoryToGetCategory_WhenSeoIsPublished_MapsPublicSeoFields()
+        {
+            var category = new Category
+            {
+                Id = Guid.NewGuid(),
+                Name = "Shoes",
+                MetaTitle = "Shop Shoes",
+                MetaDescription = "Browse the latest shoes.",
+                CanonicalUrl = "https://shop.example.com/categories/shoes",
+                OgTitle = "Shoes at BlazorShop",
+                OgDescription = "Browse the latest shoes.",
+                OgImage = "https://cdn.example.com/shoes.png",
+                RobotsIndex = false,
+                RobotsFollow = true,
+                IsPublished = true,
+            };
+
+            var result = this._mapper.Map<GetCategory>(category);
+
+            Assert.Equal(category.MetaTitle, result.MetaTitle);
+            Assert.Equal(category.MetaDescription, result.MetaDescription);
+            Assert.Equal(category.CanonicalUrl, result.CanonicalUrl);
+            Assert.Equal(category.OgTitle, result.OgTitle);
+            Assert.Equal(category.OgDescription, result.OgDescription);
+            Assert.Equal(category.OgImage, result.OgImage);
+            Assert.False(result.RobotsIndex);
+            Assert.True(result.RobotsFollow);
+        }
+
+        [Fact]
+        public void Map_CategoryToGetCategory_WhenSeoIsNotPublished_HidesPublicSeoFields()
+        {
+            var category = new Category
+            {
+                Id = Guid.NewGuid(),
+                Name = "Shoes",
+                MetaTitle = "Draft title",
+                MetaDescription = "Draft description",
+                CanonicalUrl = "https://shop.example.com/categories/shoes",
+                OgTitle = "Draft OG title",
+                OgDescription = "Draft OG description",
+                OgImage = "https://cdn.example.com/shoes.png",
+                RobotsIndex = false,
+                RobotsFollow = false,
+                IsPublished = false,
+            };
+
+            var result = this._mapper.Map<GetCategory>(category);
+
+            Assert.Null(result.MetaTitle);
+            Assert.Null(result.MetaDescription);
+            Assert.Null(result.CanonicalUrl);
+            Assert.Null(result.OgTitle);
+            Assert.Null(result.OgDescription);
+            Assert.Null(result.OgImage);
+            Assert.True(result.RobotsIndex);
+            Assert.True(result.RobotsFollow);
         }
     }
 }

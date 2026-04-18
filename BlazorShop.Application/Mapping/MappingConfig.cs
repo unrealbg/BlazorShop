@@ -20,7 +20,15 @@
             // CreateMap<Source, Destination>();
             this.CreateMap<CreateCategory, Category>();
             this.CreateMap<UpdateCategory, Category>();
-            this.CreateMap<Category, GetCategory>();
+            this.CreateMap<Category, GetCategory>()
+                .ForMember(dest => dest.MetaTitle, opt => opt.MapFrom(src => src.IsPublished ? src.MetaTitle : null))
+                .ForMember(dest => dest.MetaDescription, opt => opt.MapFrom(src => src.IsPublished ? src.MetaDescription : null))
+                .ForMember(dest => dest.CanonicalUrl, opt => opt.MapFrom(src => src.IsPublished ? src.CanonicalUrl : null))
+                .ForMember(dest => dest.OgTitle, opt => opt.MapFrom(src => src.IsPublished ? src.OgTitle : null))
+                .ForMember(dest => dest.OgDescription, opt => opt.MapFrom(src => src.IsPublished ? src.OgDescription : null))
+                .ForMember(dest => dest.OgImage, opt => opt.MapFrom(src => src.IsPublished ? src.OgImage : null))
+                .ForMember(dest => dest.RobotsIndex, opt => opt.MapFrom(src => src.IsPublished ? src.RobotsIndex : true))
+                .ForMember(dest => dest.RobotsFollow, opt => opt.MapFrom(src => src.IsPublished ? src.RobotsFollow : true));
 
             this.CreateMap<CreateProduct, Product>();
             this.CreateMap<UpdateProduct, Product>();

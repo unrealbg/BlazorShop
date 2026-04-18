@@ -32,7 +32,8 @@
         {
             public const string Products = "admin/products";
             public const string Categories = "admin/categories";
-            public const string Settings = "admin/seo/settings";
+            public const string Settings = "seo/settings";
+            public const string AdminSettings = "admin/seo/settings";
             public const string Redirects = "admin/seo/redirects";
         }
 

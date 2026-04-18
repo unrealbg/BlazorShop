@@ -18,7 +18,7 @@ namespace BlazorShop.Web.Shared.Services
 
         public async Task<QueryResult<GetSeoSettings>> GetAsync()
         {
-            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
             {
                 Route = Constant.Seo.Settings,
@@ -37,7 +37,7 @@ namespace BlazorShop.Web.Shared.Services
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
             {
-                Route = Constant.Seo.Settings,
+                Route = Constant.Seo.AdminSettings,
                 Type = Constant.ApiCallType.Update,
                 Client = client,
                 Model = request,
