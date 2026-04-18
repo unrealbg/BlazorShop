@@ -10,6 +10,8 @@
 
         Task<TResponse> GetServiceResponse<TResponse>(HttpResponseMessage responseMessage);
 
+        Task<ServiceResponse<TPayload>> GetMutationResponse<TPayload>(HttpResponseMessage responseMessage, string defaultErrorMessage);
+
         Task<QueryResult<TResponse>> GetQueryResult<TResponse>(HttpResponseMessage responseMessage, string defaultErrorMessage);
 
         ServiceResponse ConnectionError();

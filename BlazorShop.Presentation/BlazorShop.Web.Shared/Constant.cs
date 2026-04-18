@@ -28,6 +28,14 @@
             public const string Delete = "category/delete";
         }
 
+        public static class Seo
+        {
+            public const string Products = "admin/products";
+            public const string Categories = "admin/categories";
+            public const string Settings = "admin/seo/settings";
+            public const string Redirects = "admin/seo/redirects";
+        }
+
         public static class Authentication
         {
             public const string Type = "Bearer";

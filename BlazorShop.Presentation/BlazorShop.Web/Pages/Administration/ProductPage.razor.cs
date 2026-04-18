@@ -3,6 +3,7 @@
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
     using BlazorShop.Web.Shared.Models.Product;
+    using BlazorShop.Web.Shared.Models.Seo;
     using BlazorShop.Web.Shared.Services.Contracts;
     using BlazorShop.Web.Shared.Toast;
     using Microsoft.AspNetCore.Components;
@@ -23,8 +24,13 @@
         private IEnumerable<GetCategory> _categories = [];
         private CreateProduct _product = new();
         private UpdateProduct _editProduct = new();
+        private UpdateProductSeo _editProductSeo = new();
         private string? _previewImageUrl;
         private string? _producToDeleteName;
+        private bool _isProductSeoLoading;
+        private bool _isProductSeoSaving;
+        private string? _productSeoError;
+        private ProductEditorTab _activeEditTab = ProductEditorTab.Catalog;
 
         private List<GetProductVariant> _variants = [];
         private CreateOrUpdateProductVariant _variantForm = new();
@@ -39,6 +45,9 @@
 
         [Inject]
         private IProductVariantService ProductVariantService { get; set; } = default!;
+
+        [Inject]
+        private IProductSeoService ProductSeoService { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
         {
@@ -118,6 +127,36 @@
             _editingVariantId = null;
         }
 
+        private async Task LoadProductSeoAsync(Guid productId)
+        {
+            _isProductSeoLoading = true;
+            _productSeoError = null;
+
+            var seoResult = await this.ProductSeoService.GetByProductIdAsync(productId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(seoResult, "Product SEO"))
+            {
+                _editProductSeo = CreateDefaultProductSeo(productId);
+                _productSeoError = seoResult.Message;
+                _isProductSeoLoading = false;
+                return;
+            }
+
+            _editProductSeo = seoResult.Data is null
+                ? CreateDefaultProductSeo(productId)
+                : MapProductSeo(seoResult.Data);
+            _isProductSeoLoading = false;
+        }
+
+        private async Task RetryLoadProductSeoAsync()
+        {
+            if (_editProduct.Id == Guid.Empty)
+            {
+                return;
+            }
+
+            await LoadProductSeoAsync(_editProduct.Id);
+        }
+
         private async Task StartEdit(GetProduct product)
         {
             _editProduct = new UpdateProduct
@@ -131,10 +170,14 @@
                 CategoryId = product.CategoryId
             };
 
+            _activeEditTab = ProductEditorTab.Catalog;
+            _productSeoError = null;
+            _isProductSeoSaving = false;
+            _editProductSeo = CreateDefaultProductSeo(product.Id);
             _previewImageUrl = product.Image;
 
             _showEditDialog = true;
-            await LoadVariantsAsync(product.Id);
+            await Task.WhenAll(LoadVariantsAsync(product.Id), LoadProductSeoAsync(product.Id));
         }
 
         private void Cancel()
@@ -151,6 +194,11 @@
             _previewImageUrl = null;
             _variants.Clear();
             _editingVariantId = null;
+            _activeEditTab = ProductEditorTab.Catalog;
+            _editProductSeo = new();
+            _productSeoError = null;
+            _isProductSeoLoading = false;
+            _isProductSeoSaving = false;
         }
 
         private void ConfirmDelete(Guid id)
@@ -455,6 +503,47 @@
             this.ToastService.ShowToast(level: level, message: result.Message, heading: heading, iconClass: icon);
         }
 
+        private void ShowToast<TPayload>(ServiceResponse<TPayload> result, string heading)
+        {
+            var level = result.Success ? ToastLevel.Success : ToastLevel.Error;
+            var icon = result.Success ? ToastIcon.Success : ToastIcon.Error;
+            var message = string.IsNullOrWhiteSpace(result.Message)
+                ? result.Success ? "Saved successfully." : "Request failed."
+                : result.Message;
+
+            this.ToastService.ShowToast(level: level, message: message, heading: heading, iconClass: icon);
+        }
+
+        private async Task SaveProductSeoAsync()
+        {
+            if (_isProductSeoSaving || _editProduct.Id == Guid.Empty)
+            {
+                return;
+            }
+
+            _isProductSeoSaving = true;
+
+            try
+            {
+                var result = await this.ProductSeoService.UpdateAsync(_editProduct.Id, _editProductSeo);
+                if (result.Success)
+                {
+                    _productSeoError = null;
+
+                    if (result.Payload is not null)
+                    {
+                        _editProductSeo = MapProductSeo(result.Payload);
+                    }
+                }
+
+                this.ShowToast(result, "Product SEO");
+            }
+            finally
+            {
+                _isProductSeoSaving = false;
+            }
+        }
+
         private async Task UpdateProductAsync()
         {
             if (string.IsNullOrEmpty(_editProduct.Name))
@@ -482,6 +571,43 @@
         {
             _showConfirmDeleteDialog = false;
             _productToDelete = Guid.Empty;
+        }
+
+        private static UpdateProductSeo CreateDefaultProductSeo(Guid productId)
+        {
+            return new UpdateProductSeo
+            {
+                ProductId = productId,
+                RobotsIndex = true,
+                RobotsFollow = true,
+                IsPublished = true,
+            };
+        }
+
+        private static UpdateProductSeo MapProductSeo(GetProductSeo seo)
+        {
+            return new UpdateProductSeo
+            {
+                ProductId = seo.ProductId,
+                Slug = seo.Slug,
+                MetaTitle = seo.MetaTitle,
+                MetaDescription = seo.MetaDescription,
+                CanonicalUrl = seo.CanonicalUrl,
+                OgTitle = seo.OgTitle,
+                OgDescription = seo.OgDescription,
+                OgImage = seo.OgImage,
+                RobotsIndex = seo.RobotsIndex,
+                RobotsFollow = seo.RobotsFollow,
+                SeoContent = seo.SeoContent,
+                IsPublished = seo.IsPublished,
+                PublishedOn = seo.PublishedOn,
+            };
+        }
+
+        private enum ProductEditorTab
+        {
+            Catalog,
+            Seo,
         }
     }
 }

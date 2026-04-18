@@ -36,6 +36,10 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IApiCallHelper, ApiCallHelper>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
+            builder.Services.AddScoped<IProductSeoService, ProductSeoService>();
+            builder.Services.AddScoped<ICategorySeoService, CategorySeoService>();
+            builder.Services.AddScoped<ISeoSettingsService, SeoSettingsService>();
+            builder.Services.AddScoped<ISeoRedirectService, SeoRedirectService>();
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
