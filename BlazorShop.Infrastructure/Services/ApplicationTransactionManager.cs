@@ -3,6 +3,8 @@ namespace BlazorShop.Infrastructure.Services
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Infrastructure.Data;
 
+    using Microsoft.EntityFrameworkCore;
+
     public sealed class ApplicationTransactionManager : IApplicationTransactionManager
     {
         private readonly AppDbContext _context;
@@ -14,19 +16,24 @@ namespace BlazorShop.Infrastructure.Services
 
         public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
 
-            try
+            return await executionStrategy.ExecuteAsync(async () =>
             {
-                var result = await action();
-                await transaction.CommitAsync();
-                return result;
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+
+                try
+                {
+                    var result = await action();
+                    await transaction.CommitAsync();
+                    return result;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
         }
     }
 }
