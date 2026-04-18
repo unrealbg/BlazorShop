@@ -3,6 +3,7 @@ namespace BlazorShop.Application.Services
     using AutoMapper;
 
     using BlazorShop.Application.DTOs.Category;
+    using BlazorShop.Application.DTOs.Discovery;
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Domain.Contracts;
@@ -31,6 +32,32 @@ namespace BlazorShop.Application.Services
         {
             var categories = await _categoryRepository.GetPublishedCategoriesAsync();
             return categories.Any() ? _mapper.Map<IEnumerable<GetCategory>>(categories) : [];
+        }
+
+        public async Task<GetPublicCatalogSitemap> GetPublishedSitemapAsync()
+        {
+            var categoryTask = _categoryRepository.GetPublishedCategorySitemapEntriesAsync();
+            var productTask = _productReadRepository.GetPublishedProductSitemapEntriesAsync();
+
+            await Task.WhenAll(categoryTask, productTask);
+
+            return new GetPublicCatalogSitemap
+            {
+                Categories = categoryTask.Result
+                    .Select(category => new GetCategorySitemapEntry
+                    {
+                        Slug = category.Slug,
+                        LastModifiedUtc = category.LastModifiedUtc,
+                    })
+                    .ToArray(),
+                Products = productTask.Result
+                    .Select(product => new GetProductSitemapEntry
+                    {
+                        Slug = product.Slug,
+                        LastModifiedUtc = product.LastModifiedUtc,
+                    })
+                    .ToArray(),
+            };
         }
 
         public async Task<PagedResult<GetCatalogProduct>> GetPublishedCatalogPageAsync(ProductCatalogQuery query)

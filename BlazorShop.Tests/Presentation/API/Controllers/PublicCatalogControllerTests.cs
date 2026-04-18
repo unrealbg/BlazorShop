@@ -2,6 +2,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
 {
     using BlazorShop.API.Controllers;
     using BlazorShop.Application.DTOs.Category;
+    using BlazorShop.Application.DTOs.Discovery;
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Domain.Contracts;
@@ -67,6 +68,28 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             var payload = Assert.IsType<PagedResult<GetCatalogProduct>>(okResult.Value);
             Assert.Single(payload.Items);
             Assert.Equal("running-shoes", payload.Items[0].Slug);
+        }
+
+        [Fact]
+        public async Task GetSitemap_ReturnsPublishedCatalogSitemap()
+        {
+            var service = new Mock<IPublicCatalogService>();
+            service.Setup(svc => svc.GetPublishedSitemapAsync()).ReturnsAsync(new GetPublicCatalogSitemap
+            {
+                Categories = [new GetCategorySitemapEntry { Slug = "sneakers", LastModifiedUtc = new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc) }],
+                Products = [new GetProductSitemapEntry { Slug = "metro-runner", LastModifiedUtc = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc) }],
+            });
+
+            var controller = new PublicCatalogController(service.Object);
+
+            var result = await controller.GetSitemap();
+
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var payload = Assert.IsType<GetPublicCatalogSitemap>(okResult.Value);
+            Assert.Single(payload.Categories);
+            Assert.Single(payload.Products);
+            Assert.Equal("sneakers", payload.Categories[0].Slug);
+            Assert.Equal("metro-runner", payload.Products[0].Slug);
         }
     }
 }

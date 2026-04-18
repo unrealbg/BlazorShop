@@ -48,6 +48,58 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
             Assert.Null(draft);
         }
 
+        [Fact]
+        public async Task GetPublishedCategorySitemapEntriesAsync_ReturnsPublishedCategorySlugsAndMeaningfulLastModified()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            var draftCategoryId = Guid.NewGuid();
+
+            context.Categories.AddRange(
+                new Category { Id = featuredCategoryId, Name = "Featured", Slug = "featured", IsPublished = true },
+                new Category { Id = draftCategoryId, Name = "Draft", Slug = "draft", IsPublished = false },
+                new Category { Id = Guid.NewGuid(), Name = "Slugless", Slug = null, IsPublished = true });
+
+            context.Products.AddRange(
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Published One",
+                    Slug = "published-one",
+                    CategoryId = featuredCategoryId,
+                    IsPublished = true,
+                    PublishedOn = new DateTime(2026, 4, 11, 0, 0, 0, DateTimeKind.Utc),
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Published Two",
+                    Slug = "published-two",
+                    CategoryId = featuredCategoryId,
+                    IsPublished = true,
+                    PublishedOn = new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc),
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Draft Product",
+                    Slug = "draft-product",
+                    CategoryId = featuredCategoryId,
+                    IsPublished = false,
+                    PublishedOn = null,
+                });
+
+            await context.SaveChangesAsync();
+
+            var repository = new CategoryRepository(context);
+
+            var result = await repository.GetPublishedCategorySitemapEntriesAsync();
+
+            Assert.Single(result);
+            Assert.Equal("featured", result[0].Slug);
+            Assert.Equal(new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc), result[0].LastModifiedUtc);
+        }
+
         private static AppDbContext CreateContext()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()

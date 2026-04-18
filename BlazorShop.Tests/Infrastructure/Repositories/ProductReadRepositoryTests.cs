@@ -215,6 +215,61 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
             Assert.DoesNotContain(result, item => item.Name == "Featured Slugless");
         }
 
+        [Fact]
+        public async Task GetPublishedProductSitemapEntriesAsync_ReturnsOnlyPublishedProductsWithSlugRoutesAndLastModified()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, Guid.NewGuid());
+
+            context.Products.AddRange(
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Draft Product",
+                    Description = "Draft",
+                    Image = "/img/draft.png",
+                    Price = 20m,
+                    Quantity = 2,
+                    CategoryId = featuredCategoryId,
+                    Slug = "draft-product",
+                    IsPublished = false,
+                    PublishedOn = null,
+                    CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Slugless Product",
+                    Description = "No slug",
+                    Image = "/img/no-slug.png",
+                    Price = 21m,
+                    Quantity = 2,
+                    CategoryId = featuredCategoryId,
+                    Slug = null,
+                    IsPublished = true,
+                    PublishedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                    CreatedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                });
+
+            await context.SaveChangesAsync();
+
+            var repository = new ProductReadRepository(context);
+
+            var result = await repository.GetPublishedProductSitemapEntriesAsync();
+
+            Assert.Equal(5, result.Count);
+            Assert.All(result, entry => Assert.False(string.IsNullOrWhiteSpace(entry.Slug)));
+            Assert.DoesNotContain(result, entry => entry.Slug == "draft-product");
+            Assert.All(result, entry => Assert.True(entry.LastModifiedUtc > DateTime.MinValue));
+            Assert.Equal(
+                new DateTime(2026, 4, 10, 0, 0, 0, DateTimeKind.Utc),
+                result[0].LastModifiedUtc);
+            Assert.Equal(
+                new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc),
+                result[^1].LastModifiedUtc);
+        }
+
         private static AppDbContext CreateContext()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()

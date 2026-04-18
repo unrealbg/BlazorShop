@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Infrastructure.Repositories.CategoryPersistence
 {
+    using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.CategoryPersistence;
     using BlazorShop.Domain.Entities;
     using BlazorShop.Infrastructure.Data;
@@ -36,6 +37,25 @@
                 .ToListAsync();
 
             return categories.Count > 0 ? categories : [];
+        }
+
+        public async Task<IReadOnlyList<PublishedCategorySitemapEntryReadModel>> GetPublishedCategorySitemapEntriesAsync()
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .Where(category => category.IsPublished && category.Slug != null && category.Slug != string.Empty)
+                .OrderBy(category => category.Name)
+                .Select(category => new PublishedCategorySitemapEntryReadModel
+                {
+                    Slug = category.Slug!,
+                    LastModifiedUtc = category.Products!
+                        .Where(product => product.IsPublished
+                            && product.PublishedOn != null
+                            && product.Slug != null
+                            && product.Slug != string.Empty)
+                        .Max(product => product.PublishedOn),
+                })
+                .ToListAsync();
         }
 
         public async Task<Category?> GetPublishedCategoryBySlugAsync(string slug)

@@ -100,6 +100,26 @@ namespace BlazorShop.Infrastructure.Repositories
             };
         }
 
+        public async Task<IReadOnlyList<PublishedProductSitemapEntryReadModel>> GetPublishedProductSitemapEntriesAsync()
+        {
+            return await _context.Products
+                .AsNoTracking()
+                .Where(product => product.IsPublished
+                    && product.PublishedOn != null
+                    && product.Slug != null
+                    && product.Slug != string.Empty
+                    && product.Category != null
+                    && product.Category.IsPublished)
+                .OrderBy(product => product.PublishedOn)
+                .ThenBy(product => product.Id)
+                .Select(product => new PublishedProductSitemapEntryReadModel
+                {
+                    Slug = product.Slug!,
+                    LastModifiedUtc = product.PublishedOn ?? product.CreatedOn,
+                })
+                .ToListAsync();
+        }
+
         public async Task<Product?> GetProductDetailsByIdAsync(Guid id)
         {
             return await _context.Products

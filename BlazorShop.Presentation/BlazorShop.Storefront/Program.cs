@@ -2,6 +2,7 @@ using System.IO;
 
 using BlazorShop.Application.Services;
 using BlazorShop.Application.Services.Contracts;
+using BlazorShop.Storefront.Options;
 using BlazorShop.Storefront;
 using BlazorShop.Storefront.Services;
 using BlazorShop.Storefront.Services.Contracts;
@@ -12,11 +13,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<StorefrontPublicUrlOptions>(builder.Configuration.GetSection(StorefrontPublicUrlOptions.SectionName));
 builder.Services.AddRazorComponents();
 builder.Services.AddSingleton<ISeoMetadataBuilder, SeoMetadataBuilder>();
+builder.Services.AddScoped<IStorefrontPublicUrlResolver, StorefrontPublicUrlResolver>();
+builder.Services.AddScoped<IStorefrontRobotsService, StorefrontRobotsService>();
 builder.Services.AddScoped<IStorefrontSeoSettingsProvider, StorefrontSeoSettingsProvider>();
 builder.Services.AddScoped<IStorefrontSeoComposer, StorefrontSeoComposer>();
+builder.Services.AddScoped<IStorefrontSitemapService, StorefrontSitemapService>();
 builder.Services.AddHttpClient<StorefrontApiClient>((serviceProvider, client) =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
@@ -31,6 +37,18 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseAntiforgery();
 app.MapDefaultEndpoints();
+app.MapGet(StorefrontRoutes.Robots, async (IStorefrontRobotsService robotsService, CancellationToken cancellationToken) =>
+{
+    var content = await robotsService.GenerateAsync(cancellationToken);
+    return Results.Text(content, "text/plain; charset=utf-8");
+});
+app.MapGet(StorefrontRoutes.Sitemap, async (IStorefrontSitemapService sitemapService, CancellationToken cancellationToken) =>
+{
+    var result = await sitemapService.GenerateAsync(cancellationToken);
+    return result.IsServiceUnavailable || string.IsNullOrWhiteSpace(result.Content)
+        ? Results.StatusCode(StatusCodes.Status503ServiceUnavailable)
+        : Results.Text(result.Content, "application/xml; charset=utf-8");
+});
 app.MapRazorComponents<App>();
 
 app.Run();

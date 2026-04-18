@@ -5,6 +5,7 @@ namespace BlazorShop.Storefront.Services
     using System.Net.Http.Json;
     using System.Text.Json;
 
+    using BlazorShop.Web.Shared.Models.Discovery;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
     using BlazorShop.Web.Shared.Models.Product;
@@ -16,6 +17,7 @@ namespace BlazorShop.Storefront.Services
         private static readonly TimeSpan CatalogRequestTimeout = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan SeoSettingsRequestTimeout = TimeSpan.FromMilliseconds(500);
         private const string PublicCatalogBaseRoute = "public/catalog";
+        private const string PublicCatalogSitemapRoute = PublicCatalogBaseRoute + "/sitemap";
         private const string PublicCategoriesRoute = PublicCatalogBaseRoute + "/categories";
         private const string PublicProductsRoute = PublicCatalogBaseRoute + "/products";
         private const string SeoSettingsRoute = "seo/settings";
@@ -36,6 +38,11 @@ namespace BlazorShop.Storefront.Services
                 : result.IsServiceUnavailable
                     ? StorefrontApiResult<IReadOnlyList<GetCategory>>.ServiceUnavailable()
                     : StorefrontApiResult<IReadOnlyList<GetCategory>>.Success([]);
+        }
+
+        public Task<StorefrontApiResult<GetPublicCatalogSitemap>> GetPublishedSitemapAsync(CancellationToken cancellationToken = default)
+        {
+            return GetAsync(PublicCatalogSitemapRoute, cancellationToken, new GetPublicCatalogSitemap(), CatalogRequestTimeout);
         }
 
         public Task<StorefrontApiResult<PagedResult<GetCatalogProduct>>> GetPublishedCatalogPageAsync(ProductCatalogQuery query, CancellationToken cancellationToken = default)

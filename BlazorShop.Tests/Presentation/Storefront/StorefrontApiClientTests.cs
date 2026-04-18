@@ -4,6 +4,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
     using System.Net.Http.Json;
 
     using BlazorShop.Storefront.Services;
+    using BlazorShop.Web.Shared.Models.Discovery;
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Models.Seo;
 
@@ -77,6 +78,34 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.NotNull(result.Value);
             Assert.Single(result.Value!.Items);
             Assert.Equal("running-shoes", result.Value.Items[0].Slug);
+        }
+
+        [Fact]
+        public async Task GetPublishedSitemapAsync_ReturnsSuccess_WhenApiRespondsWithSitemapPayload()
+        {
+            var payload = new GetPublicCatalogSitemap
+            {
+                Categories = [new GetCategorySitemapEntry { Slug = "sneakers", LastModifiedUtc = new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc) }],
+                Products = [new GetProductSitemapEntry { Slug = "metro-runner", LastModifiedUtc = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc) }],
+            };
+
+            using var client = new HttpClient(new StaticResponseHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(payload),
+            }))
+            {
+                BaseAddress = new Uri("https://localhost:7094/api/")
+            };
+
+            var apiClient = new StorefrontApiClient(client);
+
+            var result = await apiClient.GetPublishedSitemapAsync();
+
+            Assert.True(result.IsSuccess);
+            Assert.NotNull(result.Value);
+            Assert.Single(result.Value!.Categories);
+            Assert.Single(result.Value.Products);
+            Assert.Equal("metro-runner", result.Value.Products[0].Slug);
         }
 
         private sealed class StaticResponseHttpMessageHandler : HttpMessageHandler

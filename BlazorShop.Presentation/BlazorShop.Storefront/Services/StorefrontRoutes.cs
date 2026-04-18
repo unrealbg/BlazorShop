@@ -3,6 +3,8 @@ namespace BlazorShop.Storefront.Services
     public static class StorefrontRoutes
     {
         public const string Home = "/";
+        public const string Sitemap = "/sitemap.xml";
+        public const string Robots = "/robots.txt";
         public const string About = "/about-us";
         public const string Faq = "/faq";
         public const string Privacy = "/privacy";
@@ -10,6 +12,18 @@ namespace BlazorShop.Storefront.Services
         public const string CustomerService = "/customer-service";
         public const string NewReleases = "/new-releases";
         public const string TodaysDeals = "/todays-deals";
+
+        public static IReadOnlyList<StorefrontSitemapStaticRoute> SitemapStaticPages { get; } =
+        [
+            new(Home, UseCatalogLastModified: true),
+            new(About),
+            new(Faq),
+            new(Privacy),
+            new(Terms),
+            new(CustomerService),
+            new(NewReleases, UseCatalogLastModified: true),
+            new(TodaysDeals, UseCatalogLastModified: true),
+        ];
 
         public static string Category(string? slug)
         {
@@ -25,4 +39,6 @@ namespace BlazorShop.Storefront.Services
                 : $"/product/{Uri.EscapeDataString(slug.Trim())}";
         }
     }
+
+    public sealed record StorefrontSitemapStaticRoute(string Path, bool UseCatalogLastModified = false);
 }

@@ -125,6 +125,7 @@ Default dev URLs (may vary by environment):
 
 Runtime notes:
 - Standalone Storefront still serves its own static assets such as `/css/site.css` and `/icon-192.png`.
+- Standalone and AppHost Storefront runs now expose crawl documents at `/sitemap.xml` and `/robots.txt` for the published public route surface.
 - With the API unavailable, static informational Storefront pages such as `/about-us`, `/privacy`, `/faq`, and `/terms` still return `200`, while catalog-backed routes such as `/`, `/new-releases`, `/todays-deals`, `/category/{slug}`, and `/product/{slug}` return `503`.
 - With the API available, Storefront slug routes return `200` for published content and `404` for unknown slugs.
 - AppHost remains the easiest way to verify the full local stack because it runs API + Storefront + Web together.

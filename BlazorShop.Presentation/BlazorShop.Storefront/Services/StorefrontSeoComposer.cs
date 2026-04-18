@@ -9,17 +9,22 @@ namespace BlazorShop.Storefront.Services
     public class StorefrontSeoComposer : IStorefrontSeoComposer
     {
         private readonly ISeoMetadataBuilder _metadataBuilder;
+        private readonly IStorefrontPublicUrlResolver _publicUrlResolver;
         private readonly IStorefrontSeoSettingsProvider _settingsProvider;
 
-        public StorefrontSeoComposer(ISeoMetadataBuilder metadataBuilder, IStorefrontSeoSettingsProvider settingsProvider)
+        public StorefrontSeoComposer(
+            ISeoMetadataBuilder metadataBuilder,
+            IStorefrontPublicUrlResolver publicUrlResolver,
+            IStorefrontSeoSettingsProvider settingsProvider)
         {
             _metadataBuilder = metadataBuilder;
+            _publicUrlResolver = publicUrlResolver;
             _settingsProvider = settingsProvider;
         }
 
         public async Task<SeoMetadataDto> ComposeStaticPageAsync(string title, string relativePath, string fallbackMetaDescription, CancellationToken cancellationToken = default)
         {
-            var settings = await _settingsProvider.GetAsync(cancellationToken);
+            var settings = await GetEffectiveSettingsAsync(cancellationToken);
             return _metadataBuilder.Build(new SeoMetadataBuildRequest
             {
                 PageTitle = title,
@@ -36,7 +41,7 @@ namespace BlazorShop.Storefront.Services
         {
             ArgumentNullException.ThrowIfNull(category);
 
-            var settings = await _settingsProvider.GetAsync(cancellationToken);
+            var settings = await GetEffectiveSettingsAsync(cancellationToken);
             return _metadataBuilder.Build(new SeoMetadataBuildRequest
             {
                 PageTitle = $"{category.Name} Products",
@@ -50,7 +55,7 @@ namespace BlazorShop.Storefront.Services
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            var settings = await _settingsProvider.GetAsync(cancellationToken);
+            var settings = await GetEffectiveSettingsAsync(cancellationToken);
             return _metadataBuilder.Build(new SeoMetadataBuildRequest
             {
                 PageTitle = product.Name,
@@ -62,7 +67,7 @@ namespace BlazorShop.Storefront.Services
 
         public async Task<SeoMetadataDto> ComposeServiceUnavailablePageAsync(string title, string relativePath, string fallbackMetaDescription, CancellationToken cancellationToken = default)
         {
-            var settings = await _settingsProvider.GetAsync(cancellationToken);
+            var settings = await GetEffectiveSettingsAsync(cancellationToken);
             return _metadataBuilder.Build(new SeoMetadataBuildRequest
             {
                 PageTitle = title,
@@ -79,7 +84,7 @@ namespace BlazorShop.Storefront.Services
 
         public async Task<SeoMetadataDto> ComposeNotFoundPageAsync(string title, string relativePath, string fallbackMetaDescription, CancellationToken cancellationToken = default)
         {
-            var settings = await _settingsProvider.GetAsync(cancellationToken);
+            var settings = await GetEffectiveSettingsAsync(cancellationToken);
             return _metadataBuilder.Build(new SeoMetadataBuildRequest
             {
                 PageTitle = title,
@@ -121,6 +126,53 @@ namespace BlazorShop.Storefront.Services
                 OgImage = product.OgImage,
                 RobotsIndex = product.RobotsIndex,
                 RobotsFollow = product.RobotsFollow,
+            };
+        }
+
+        private async Task<SeoSettingsDto?> GetEffectiveSettingsAsync(CancellationToken cancellationToken)
+        {
+            var settings = await _settingsProvider.GetAsync(cancellationToken);
+            var resolvedBaseUrl = _publicUrlResolver.ResolveBaseUrl(settings?.BaseCanonicalUrl);
+
+            if (string.IsNullOrWhiteSpace(resolvedBaseUrl))
+            {
+                return settings;
+            }
+
+            if (settings is null)
+            {
+                return new SeoSettingsDto
+                {
+                    BaseCanonicalUrl = resolvedBaseUrl,
+                };
+            }
+
+            if (string.Equals(settings.BaseCanonicalUrl, resolvedBaseUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return settings;
+            }
+
+            return CloneSettings(settings, resolvedBaseUrl);
+        }
+
+        private static SeoSettingsDto CloneSettings(SeoSettingsDto settings, string baseCanonicalUrl)
+        {
+            return new SeoSettingsDto
+            {
+                Id = settings.Id,
+                SiteName = settings.SiteName,
+                DefaultTitleSuffix = settings.DefaultTitleSuffix,
+                DefaultMetaDescription = settings.DefaultMetaDescription,
+                DefaultOgImage = settings.DefaultOgImage,
+                BaseCanonicalUrl = baseCanonicalUrl,
+                CompanyName = settings.CompanyName,
+                CompanyLogoUrl = settings.CompanyLogoUrl,
+                CompanyPhone = settings.CompanyPhone,
+                CompanyEmail = settings.CompanyEmail,
+                CompanyAddress = settings.CompanyAddress,
+                FacebookUrl = settings.FacebookUrl,
+                InstagramUrl = settings.InstagramUrl,
+                XUrl = settings.XUrl,
             };
         }
 

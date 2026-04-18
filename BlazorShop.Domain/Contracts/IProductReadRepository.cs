@@ -10,6 +10,8 @@ namespace BlazorShop.Domain.Contracts
 
         Task<PagedResult<CatalogProductReadModel>> GetPublishedCatalogPageAsync(ProductCatalogQuery query);
 
+        Task<IReadOnlyList<PublishedProductSitemapEntryReadModel>> GetPublishedProductSitemapEntriesAsync();
+
         Task<Product?> GetProductDetailsByIdAsync(Guid id);
 
         Task<Product?> GetPublishedProductBySlugAsync(string slug);

@@ -17,6 +17,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
         {
             _composer = new StorefrontSeoComposer(
                 new SeoMetadataBuilder(),
+                new StubPublicUrlResolver("https://shop.example.com/"),
                 new StubSeoSettingsProvider(new SeoSettingsDto
                 {
                     SiteName = "BlazorShop",
@@ -105,6 +106,33 @@ namespace BlazorShop.Tests.Presentation.Storefront
             public Task<SeoSettingsDto?> GetAsync(CancellationToken cancellationToken = default)
             {
                 return Task.FromResult<SeoSettingsDto?>(_settings);
+            }
+        }
+
+        private sealed class StubPublicUrlResolver : IStorefrontPublicUrlResolver
+        {
+            private readonly string _baseUrl;
+
+            public StubPublicUrlResolver(string baseUrl)
+            {
+                _baseUrl = baseUrl;
+            }
+
+            public string? ResolveBaseUrl(string? configuredBaseUrl = null)
+            {
+                return string.IsNullOrWhiteSpace(configuredBaseUrl) ? _baseUrl : configuredBaseUrl;
+            }
+
+            public string? ResolveAbsoluteUrl(string? relativeOrAbsoluteUrl, string? configuredBaseUrl = null)
+            {
+                if (string.IsNullOrWhiteSpace(relativeOrAbsoluteUrl))
+                {
+                    return null;
+                }
+
+                return Uri.TryCreate(relativeOrAbsoluteUrl, UriKind.Absolute, out var absoluteUri)
+                    ? absoluteUri.ToString()
+                    : new Uri(new Uri(ResolveBaseUrl(configuredBaseUrl)!, UriKind.Absolute), relativeOrAbsoluteUrl).ToString();
             }
         }
     }

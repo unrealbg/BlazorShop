@@ -1,6 +1,7 @@
 namespace BlazorShop.API.Controllers
 {
     using BlazorShop.Application.DTOs.Category;
+    using BlazorShop.Application.DTOs.Discovery;
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Domain.Contracts;
@@ -23,6 +24,13 @@ namespace BlazorShop.API.Controllers
         {
             var categories = await _publicCatalogService.GetPublishedCategoriesAsync();
             return Ok(categories);
+        }
+
+        [HttpGet("sitemap")]
+        public async Task<ActionResult<GetPublicCatalogSitemap>> GetSitemap()
+        {
+            var sitemap = await _publicCatalogService.GetPublishedSitemapAsync();
+            return Ok(sitemap);
         }
 
         [HttpGet("categories/slug/{slug}")]
