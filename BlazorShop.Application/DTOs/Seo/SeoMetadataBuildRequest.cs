@@ -6,6 +6,10 @@ namespace BlazorShop.Application.DTOs.Seo
 
         public string? RelativePath { get; set; }
 
+        public bool SuppressCanonicalUrl { get; set; }
+
+        public bool SuppressOpenGraph { get; set; }
+
         public SeoFieldsDto? PageSeo { get; set; }
 
         public SeoSettingsDto? Settings { get; set; }

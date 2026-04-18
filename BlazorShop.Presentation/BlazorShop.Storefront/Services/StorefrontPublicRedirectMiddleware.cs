@@ -42,23 +42,16 @@ namespace BlazorShop.Storefront.Services
             if (redirectResult.IsSuccess && redirectResult.Value is not null && !string.IsNullOrWhiteSpace(redirectResult.Value.NewPath))
             {
                 context.Response.StatusCode = redirectResult.Value.StatusCode;
-                context.Response.Headers.Location = BuildLocation(redirectResult.Value.NewPath!, context.Request.QueryString);
+                context.Response.Headers.Location = BuildLocation(redirectResult.Value.NewPath!);
                 return;
             }
 
             await _next(context);
         }
 
-        private static string BuildLocation(string newPath, QueryString queryString)
+        private static string BuildLocation(string newPath)
         {
-            if (!queryString.HasValue)
-            {
-                return newPath;
-            }
-
-            return newPath.Contains('?', StringComparison.Ordinal)
-                ? $"{newPath}&{queryString.Value!.TrimStart('?')}"
-                : $"{newPath}{queryString.Value}";
+            return newPath;
         }
 
         private static bool ShouldResolveRedirect(HttpRequest request)

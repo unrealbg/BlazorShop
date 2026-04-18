@@ -74,10 +74,7 @@ else if (_categoryPage is not null)
             _isServiceUnavailable = true;
             _breadcrumbs = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
-            if (HttpContext is not null)
-            {
-                HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            }
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
 
             _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
                 "Category temporarily unavailable",
@@ -94,10 +91,7 @@ else if (_categoryPage is not null)
             _isServiceUnavailable = false;
             _breadcrumbs = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
-            if (HttpContext is not null)
-            {
-                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            }
+            StorefrontResponseHeaders.ApplyNotFound(HttpContext);
 
             _metadata = await SeoComposer.ComposeNotFoundPageAsync(
                 "Category not found",

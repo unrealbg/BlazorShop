@@ -35,6 +35,17 @@ namespace BlazorShop.Tests.Presentation.Storefront
         }
 
         [Fact]
+        public async Task LegacyProductPath_DropsOriginalQueryStringOnRedirect()
+        {
+            using var client = CreateClient();
+
+            using var response = await client.GetAsync("/product/legacy-runner?utm_source=newsletter");
+
+            Assert.Equal(HttpStatusCode.MovedPermanently, response.StatusCode);
+            Assert.Equal("/product/metro-runner", response.Headers.Location?.OriginalString);
+        }
+
+        [Fact]
         public async Task LegacyCategoryPath_ReturnsPermanentRedirect()
         {
             using var client = CreateClient();
@@ -62,9 +73,30 @@ namespace BlazorShop.Tests.Presentation.Storefront
             using var client = CreateClient();
 
             using var response = await client.GetAsync("/product/missing-product");
+            var content = await response.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
             Assert.Null(response.Headers.Location);
+            Assert.Contains("noindex, nofollow", string.Join(',', response.Headers.GetValues("X-Robots-Tag")));
+            Assert.DoesNotContain("rel=\"canonical\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:title\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:description\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:image\"", content, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task UnknownRoute_UsesRouterFallbackAndReturnsNotFound()
+        {
+            using var client = CreateClient();
+
+            using var response = await client.GetAsync("/missing-storefront-page");
+            var content = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            Assert.Null(response.Headers.Location);
+            Assert.Contains("noindex, nofollow", string.Join(',', response.Headers.GetValues("X-Robots-Tag")));
+            Assert.DoesNotContain("rel=\"canonical\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:title\"", content, StringComparison.Ordinal);
         }
 
         private HttpClient CreateClient()

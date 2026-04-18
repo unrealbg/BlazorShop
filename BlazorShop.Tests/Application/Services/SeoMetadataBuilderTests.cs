@@ -45,5 +45,44 @@ namespace BlazorShop.Tests.Application.Services
             Assert.True(result.RobotsIndex);
             Assert.False(result.RobotsFollow);
         }
+
+        [Fact]
+        public void Build_WhenCanonicalAndOpenGraphAreSuppressed_OmitsThoseFields()
+        {
+            var request = new SeoMetadataBuildRequest
+            {
+                PageTitle = "Missing Product",
+                RelativePath = "/product/missing-product",
+                SuppressCanonicalUrl = true,
+                SuppressOpenGraph = true,
+                PageSeo = new SeoFieldsDto
+                {
+                    MetaDescription = "We couldn't find a published product for this address.",
+                    OgImage = "/images/og/missing.png",
+                    RobotsIndex = false,
+                    RobotsFollow = false,
+                },
+                Settings = new SeoSettingsDto
+                {
+                    SiteName = "BlazorShop",
+                    DefaultTitleSuffix = "| BlazorShop",
+                    DefaultMetaDescription = "Shop the latest catalog.",
+                    DefaultOgImage = "https://cdn.example.com/default-og.png",
+                    BaseCanonicalUrl = "https://shop.example.com",
+                },
+            };
+
+            var result = this._builder.Build(request);
+
+            Assert.Equal("Missing Product | BlazorShop", result.Title);
+            Assert.Equal("We couldn't find a published product for this address.", result.MetaDescription);
+            Assert.Null(result.CanonicalUrl);
+            Assert.Null(result.OgTitle);
+            Assert.Null(result.OgDescription);
+            Assert.Null(result.OgImage);
+            Assert.Null(result.SiteName);
+            Assert.False(result.RobotsIndex);
+            Assert.False(result.RobotsFollow);
+        }
     }
 }

@@ -37,19 +37,30 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = CreateStaticFileProvider(app.Environment),
 });
 app.UseMiddleware<StorefrontPublicRedirectMiddleware>();
+app.Use(async (context, next) =>
+{
+    StorefrontResponseHeaders.RegisterErrorStatusHeaders(context);
+    await next();
+});
 app.UseAntiforgery();
 app.MapDefaultEndpoints();
-app.MapGet(StorefrontRoutes.Robots, async (IStorefrontRobotsService robotsService, CancellationToken cancellationToken) =>
+app.MapGet(StorefrontRoutes.Robots, async (HttpContext httpContext, IStorefrontRobotsService robotsService, CancellationToken cancellationToken) =>
 {
+    StorefrontResponseHeaders.ApplyRobotsDocument(httpContext.Response);
     var content = await robotsService.GenerateAsync(cancellationToken);
     return Results.Text(content, "text/plain; charset=utf-8");
 });
-app.MapGet(StorefrontRoutes.Sitemap, async (IStorefrontSitemapService sitemapService, CancellationToken cancellationToken) =>
+app.MapGet(StorefrontRoutes.Sitemap, async (HttpContext httpContext, IStorefrontSitemapService sitemapService, CancellationToken cancellationToken) =>
 {
     var result = await sitemapService.GenerateAsync(cancellationToken);
-    return result.IsServiceUnavailable || string.IsNullOrWhiteSpace(result.Content)
-        ? Results.StatusCode(StatusCodes.Status503ServiceUnavailable)
-        : Results.Text(result.Content, "application/xml; charset=utf-8");
+    if (result.IsServiceUnavailable || string.IsNullOrWhiteSpace(result.Content))
+    {
+        StorefrontResponseHeaders.ApplySitemapUnavailable(httpContext.Response);
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    StorefrontResponseHeaders.ApplySitemapDocument(httpContext.Response);
+    return Results.Text(result.Content, "application/xml; charset=utf-8");
 });
 app.MapRazorComponents<App>();
 

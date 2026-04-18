@@ -13,16 +13,20 @@ namespace BlazorShop.Application.Services
                 FirstNonEmpty(request.PageSeo?.MetaTitle, request.PageTitle, request.Settings?.SiteName),
                 request.Settings?.DefaultTitleSuffix);
             var metaDescription = FirstNonEmpty(request.PageSeo?.MetaDescription, request.Settings?.DefaultMetaDescription);
+            var canonicalUrl = request.SuppressCanonicalUrl
+                ? null
+                : ResolveCanonicalUrl(request.PageSeo?.CanonicalUrl, request.Settings?.BaseCanonicalUrl, request.RelativePath);
+            var suppressOpenGraph = request.SuppressOpenGraph;
 
             return new SeoMetadataDto
             {
                 Title = title,
                 MetaDescription = metaDescription,
-                CanonicalUrl = ResolveCanonicalUrl(request.PageSeo?.CanonicalUrl, request.Settings?.BaseCanonicalUrl, request.RelativePath),
-                OgTitle = FirstNonEmpty(request.PageSeo?.OgTitle, title),
-                OgDescription = FirstNonEmpty(request.PageSeo?.OgDescription, metaDescription),
-                OgImage = ResolveContentUrl(FirstNonEmpty(request.PageSeo?.OgImage, request.Settings?.DefaultOgImage), request.Settings?.BaseCanonicalUrl),
-                SiteName = request.Settings?.SiteName,
+                CanonicalUrl = canonicalUrl,
+                OgTitle = suppressOpenGraph ? null : FirstNonEmpty(request.PageSeo?.OgTitle, title),
+                OgDescription = suppressOpenGraph ? null : FirstNonEmpty(request.PageSeo?.OgDescription, metaDescription),
+                OgImage = suppressOpenGraph ? null : ResolveContentUrl(FirstNonEmpty(request.PageSeo?.OgImage, request.Settings?.DefaultOgImage), request.Settings?.BaseCanonicalUrl),
+                SiteName = suppressOpenGraph ? null : request.Settings?.SiteName,
                 RobotsIndex = request.PageSeo?.RobotsIndex ?? true,
                 RobotsFollow = request.PageSeo?.RobotsFollow ?? true,
             };

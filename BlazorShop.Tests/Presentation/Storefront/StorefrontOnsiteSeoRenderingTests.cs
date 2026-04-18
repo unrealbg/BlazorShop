@@ -126,6 +126,27 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Contains("href=\"/category/sneakers\"", content, StringComparison.Ordinal);
         }
 
+        [Theory]
+        [InlineData("/")]
+        [InlineData("/new-releases")]
+        [InlineData("/todays-deals")]
+        public async Task ListingPages_WhenCatalogApiIsUnavailable_Return503WithoutCanonicalOrStructuredData(string path)
+        {
+            using var client = CreateClient(new StorefrontStubOptions(CatalogServiceUnavailable: true));
+
+            using var response = await client.GetAsync(path);
+            var content = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+            Assert.Contains("noindex, nofollow", string.Join(',', response.Headers.GetValues("X-Robots-Tag")));
+            Assert.DoesNotContain("rel=\"canonical\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:title\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:description\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("property=\"og:image\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"@type\":\"CollectionPage\"", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"@type\":\"WebSite\"", content, StringComparison.Ordinal);
+        }
+
         private HttpClient CreateClient(StorefrontStubOptions? options = null)
         {
             options ??= new StorefrontStubOptions();
@@ -159,7 +180,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             });
         }
 
-        private sealed record StorefrontStubOptions(string? CategorySeoContent = "Designed for daily mileage and weekend recovery walks.", string? ProductSeoContent = "Metro Runner adds breathable mesh and responsive cushioning.", bool IncludeRelatedProducts = true);
+        private sealed record StorefrontStubOptions(string? CategorySeoContent = "Designed for daily mileage and weekend recovery walks.", string? ProductSeoContent = "Metro Runner adds breathable mesh and responsive cushioning.", bool IncludeRelatedProducts = true, bool CatalogServiceUnavailable = false);
 
         private sealed class OnsiteSeoHttpMessageHandler : HttpMessageHandler
         {
@@ -173,6 +194,14 @@ namespace BlazorShop.Tests.Presentation.Storefront
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+
+                if (_options.CatalogServiceUnavailable && path.Contains("/public/catalog/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                    {
+                        RequestMessage = request,
+                    });
+                }
 
                 return path switch
                 {

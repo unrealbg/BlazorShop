@@ -35,6 +35,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 Name = "Shoes",
                 Slug = "shoes",
                 MetaTitle = "Shop Shoes",
+                CanonicalUrl = "https://legacy.example.com/shoes",
                 RobotsIndex = false,
                 RobotsFollow = true,
             };
@@ -55,6 +56,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 Name = "Running Shoes",
                 Slug = "running-shoes",
                 Description = "Lightweight shoes for everyday training.",
+                CanonicalUrl = "https://legacy.example.com/running-shoes",
                 RobotsIndex = true,
                 RobotsFollow = false,
             };
@@ -76,7 +78,11 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 "/product/missing-product",
                 "We couldn't find a published product for this address.");
 
-            Assert.Equal("https://shop.example.com/product/missing-product", result.CanonicalUrl);
+            Assert.Null(result.CanonicalUrl);
+            Assert.Null(result.OgTitle);
+            Assert.Null(result.OgDescription);
+            Assert.Null(result.OgImage);
+            Assert.Null(result.SiteName);
             Assert.False(result.RobotsIndex);
             Assert.False(result.RobotsFollow);
         }
@@ -89,7 +95,11 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 "/",
                 "The storefront is running, but the catalog API is not reachable right now.");
 
-            Assert.Equal("https://shop.example.com/", result.CanonicalUrl);
+            Assert.Null(result.CanonicalUrl);
+            Assert.Null(result.OgTitle);
+            Assert.Null(result.OgDescription);
+            Assert.Null(result.OgImage);
+            Assert.Null(result.SiteName);
             Assert.False(result.RobotsIndex);
             Assert.False(result.RobotsFollow);
         }

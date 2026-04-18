@@ -152,10 +152,7 @@ else if (_product is not null)
             _breadcrumbs = [];
             _relatedProducts = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
-            if (HttpContext is not null)
-            {
-                HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            }
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
 
             _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
                 "Product temporarily unavailable",
@@ -173,10 +170,7 @@ else if (_product is not null)
             _breadcrumbs = [];
             _relatedProducts = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
-            if (HttpContext is not null)
-            {
-                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            }
+            StorefrontResponseHeaders.ApplyNotFound(HttpContext);
 
             _metadata = await SeoComposer.ComposeNotFoundPageAsync(
                 "Product not found",

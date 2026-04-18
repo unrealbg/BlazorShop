@@ -38,6 +38,9 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Equal("application/xml", response.Content.Headers.ContentType?.MediaType);
+            Assert.True(response.Headers.CacheControl?.Public);
+            Assert.True(response.Headers.CacheControl?.MustRevalidate);
+            Assert.Equal(TimeSpan.FromMinutes(15), response.Headers.CacheControl?.MaxAge);
 
             var document = XDocument.Parse(content);
             XNamespace sitemapNamespace = "http://www.sitemaps.org/schemas/sitemap/0.9";
@@ -65,13 +68,28 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
+            Assert.True(response.Headers.CacheControl?.Public);
+            Assert.True(response.Headers.CacheControl?.MustRevalidate);
+            Assert.Equal(TimeSpan.FromHours(1), response.Headers.CacheControl?.MaxAge);
             Assert.Contains("User-agent: *", content);
             Assert.Contains("Allow: /", content);
             Assert.Contains("Disallow: /api/", content);
             Assert.Contains("Sitemap: https://shop.example.com/sitemap.xml", content);
         }
 
-        private HttpClient CreateClient(GetPublicCatalogSitemap sitemapPayload)
+        [Fact]
+        public async Task SitemapEndpoint_Returns503WithRetryAfter_WhenCatalogFeedIsUnavailable()
+        {
+            using var client = CreateClient(new GetPublicCatalogSitemap(), HttpStatusCode.ServiceUnavailable);
+
+            using var response = await client.GetAsync("/sitemap.xml");
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+            Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl?.ToString());
+            Assert.Equal(TimeSpan.FromMinutes(10), response.Headers.RetryAfter?.Delta);
+        }
+
+        private HttpClient CreateClient(GetPublicCatalogSitemap sitemapPayload, HttpStatusCode sitemapStatusCode = HttpStatusCode.OK)
         {
             var factory = _factory.WithWebHostBuilder(builder =>
             {
@@ -80,7 +98,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
                     services.RemoveAll<StorefrontApiClient>();
                     services.RemoveAll<IStorefrontSeoSettingsProvider>();
 
-                    services.AddScoped(_ => new StorefrontApiClient(new HttpClient(new DiscoveryHttpMessageHandler(sitemapPayload))
+                    services.AddScoped(_ => new StorefrontApiClient(new HttpClient(new DiscoveryHttpMessageHandler(sitemapPayload, sitemapStatusCode))
                     {
                         BaseAddress = new Uri("https://api.example.com/api/"),
                     }));
@@ -103,19 +121,21 @@ namespace BlazorShop.Tests.Presentation.Storefront
         private sealed class DiscoveryHttpMessageHandler : HttpMessageHandler
         {
             private readonly GetPublicCatalogSitemap _sitemapPayload;
+            private readonly HttpStatusCode _sitemapStatusCode;
 
-            public DiscoveryHttpMessageHandler(GetPublicCatalogSitemap sitemapPayload)
+            public DiscoveryHttpMessageHandler(GetPublicCatalogSitemap sitemapPayload, HttpStatusCode sitemapStatusCode)
             {
                 _sitemapPayload = sitemapPayload;
+                _sitemapStatusCode = sitemapStatusCode;
             }
 
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 if (request.RequestUri?.AbsolutePath.EndsWith("/public/catalog/sitemap", StringComparison.OrdinalIgnoreCase) == true)
                 {
-                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                    return Task.FromResult(new HttpResponseMessage(_sitemapStatusCode)
                     {
-                        Content = JsonContent.Create(_sitemapPayload),
+                        Content = _sitemapStatusCode == HttpStatusCode.OK ? JsonContent.Create(_sitemapPayload) : null,
                         RequestMessage = request,
                     });
                 }

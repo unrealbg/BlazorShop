@@ -57,15 +57,18 @@
         if (result.IsServiceUnavailable)
         {
             _isServiceUnavailable = true;
+            _products = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
-            if (HttpContext is not null)
-            {
-                HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            }
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
+                "Today's deals are temporarily unavailable",
+                StorefrontRoutes.TodaysDeals,
+                "The storefront is running, but the catalog API is not reachable right now.");
 
             return;
         }
 
+        _isServiceUnavailable = false;
         _products = result.Value?.Items ?? [];
         _structuredData = await structuredDataTask;
     }

@@ -72,6 +72,8 @@ namespace BlazorShop.Storefront.Services
             {
                 PageTitle = title,
                 RelativePath = relativePath,
+                SuppressCanonicalUrl = true,
+                SuppressOpenGraph = true,
                 Settings = settings,
                 PageSeo = new SeoFieldsDto
                 {
@@ -89,6 +91,8 @@ namespace BlazorShop.Storefront.Services
             {
                 PageTitle = title,
                 RelativePath = relativePath,
+                SuppressCanonicalUrl = true,
+                SuppressOpenGraph = true,
                 Settings = settings,
                 PageSeo = new SeoFieldsDto
                 {
@@ -105,7 +109,6 @@ namespace BlazorShop.Storefront.Services
             {
                 MetaTitle = category.MetaTitle,
                 MetaDescription = string.IsNullOrWhiteSpace(category.MetaDescription) ? fallbackMetaDescription : category.MetaDescription,
-                CanonicalUrl = category.CanonicalUrl,
                 OgTitle = category.OgTitle,
                 OgDescription = category.OgDescription,
                 OgImage = category.OgImage,
@@ -120,7 +123,6 @@ namespace BlazorShop.Storefront.Services
             {
                 MetaTitle = product.MetaTitle,
                 MetaDescription = string.IsNullOrWhiteSpace(product.MetaDescription) ? fallbackMetaDescription : product.MetaDescription,
-                CanonicalUrl = product.CanonicalUrl,
                 OgTitle = product.OgTitle,
                 OgDescription = product.OgDescription,
                 OgImage = product.OgImage,
