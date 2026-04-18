@@ -1,0 +1,18 @@
+@inject IStorefrontSeoComposer SeoComposer
+
+<SeoHead Metadata="_metadata" />
+
+<NotFoundState Title="Page not found"
+               Message="The page you requested does not exist in the current storefront surface." />
+
+@code {
+    private SeoMetadataDto _metadata = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _metadata = await SeoComposer.ComposeNotFoundPageAsync(
+            "Page not found",
+            "/not-found",
+            "The page you requested does not exist in the current storefront surface.");
+    }
+}

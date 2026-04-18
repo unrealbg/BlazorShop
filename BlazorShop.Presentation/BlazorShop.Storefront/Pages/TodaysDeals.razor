@@ -1,0 +1,58 @@
+@page "/todays-deals"
+@inject StorefrontApiClient ApiClient
+
+<StaticPageSeo Title="Today's Deals"
+               RelativePath="@StorefrontRoutes.TodaysDeals"
+               Description="Explore published BlazorShop catalog entries curated as current featured deals." />
+
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+    <div class="flex items-end justify-between gap-4">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Featured Picks</p>
+            <h1 class="mt-2 text-3xl font-extrabold tracking-tight">Today's Deals</h1>
+        </div>
+    </div>
+
+    @if (_isServiceUnavailable)
+    {
+        <ServiceUnavailableState Title="Today's deals are temporarily unavailable"
+                                 Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+    }
+    else
+    {
+        <div class="mt-8">
+            <ProductGrid Products="_products" EmptyMessage="No deal selections are available right now." />
+        </div>
+    }
+</section>
+
+@code {
+    private bool _isServiceUnavailable;
+    private IReadOnlyList<GetCatalogProduct> _products = [];
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await ApiClient.GetPublishedCatalogPageAsync(new ProductCatalogQuery
+        {
+            PageNumber = 1,
+            PageSize = 12,
+            SortBy = ProductCatalogSortBy.Newest,
+        });
+
+        if (result.IsServiceUnavailable)
+        {
+            _isServiceUnavailable = true;
+            if (HttpContext is not null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            }
+
+            return;
+        }
+
+        _products = result.Value?.Items ?? [];
+    }
+}

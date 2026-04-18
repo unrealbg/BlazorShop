@@ -1,0 +1,96 @@
+@page "/"
+@inject StorefrontApiClient ApiClient
+
+<StaticPageSeo Title="Shop Home"
+               RelativePath="@StorefrontRoutes.Home"
+               Description="Discover published products, featured categories, and route-based SEO-ready pages across the BlazorShop storefront." />
+
+<HeroBanner />
+
+@if (_isServiceUnavailable)
+{
+    <ServiceUnavailableState Title="Catalog temporarily unavailable"
+                             Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+}
+else
+{
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <div class="flex items-end justify-between gap-4">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Categories</p>
+                <h2 class="mt-2 text-3xl font-extrabold tracking-tight">Browse by category</h2>
+            </div>
+        </div>
+
+        @if (_categories.Count > 0)
+        {
+            <div class="mt-6 flex flex-wrap gap-3">
+                @foreach (var category in _categories.Where(category => !string.IsNullOrWhiteSpace(category.Slug)).Take(8))
+                {
+                    <a href="@StorefrontRoutes.Category(category.Slug)" class="inline-flex items-center rounded-full border border-neutral-200 bg-white/90 px-4 py-2 text-sm font-semibold text-neutral-900 shadow-sm hover:border-sky-300 hover:text-sky-700">
+                        @category.Name
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="mt-6 rounded-2xl border border-dashed border-neutral-300 bg-white/70 px-6 py-10 text-sm text-neutral-600">
+                No published categories are available right now.
+            </div>
+        }
+    </section>
+
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-16">
+        <div class="flex items-end justify-between gap-4">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Catalog</p>
+                <h2 class="mt-2 text-3xl font-extrabold tracking-tight">Latest products</h2>
+            </div>
+            <a href="@StorefrontRoutes.NewReleases" class="text-sm font-semibold text-neutral-900 hover:text-sky-700">See all new releases</a>
+        </div>
+
+        <div class="mt-8">
+            <ProductGrid Products="_latestProducts" EmptyMessage="No published products are available yet." />
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<GetCategory> _categories = [];
+    private bool _isServiceUnavailable;
+    private IReadOnlyList<GetCatalogProduct> _latestProducts = [];
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categoriesTask = ApiClient.GetPublishedCategoriesAsync();
+        var latestProductsTask = ApiClient.GetPublishedCatalogPageAsync(new ProductCatalogQuery
+        {
+            PageNumber = 1,
+            PageSize = 6,
+            SortBy = ProductCatalogSortBy.Newest,
+        });
+
+        await Task.WhenAll(categoriesTask, latestProductsTask);
+
+        var categoriesResult = await categoriesTask;
+        var latestProductsResult = await latestProductsTask;
+
+        if (categoriesResult.IsServiceUnavailable || latestProductsResult.IsServiceUnavailable)
+        {
+            _isServiceUnavailable = true;
+            if (HttpContext is not null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            }
+
+            return;
+        }
+
+        _categories = categoriesResult.Value ?? [];
+        _latestProducts = latestProductsResult.Value?.Items ?? [];
+    }
+}

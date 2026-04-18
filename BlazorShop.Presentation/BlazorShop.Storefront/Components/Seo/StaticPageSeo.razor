@@ -1,0 +1,24 @@
+@inject IStorefrontSeoComposer SeoComposer
+
+@if (_metadata is not null)
+{
+    <SeoHead Metadata="_metadata" />
+}
+
+@code {
+    private SeoMetadataDto? _metadata;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string RelativePath { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Description { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _metadata = await SeoComposer.ComposeStaticPageAsync(Title, RelativePath, Description);
+    }
+}

@@ -16,7 +16,12 @@ try
         .WithReference(database)
         .WaitFor(database);
 
-    builder.AddProject<Projects.BlazorShop_Web>("webfrontend")
+    builder.AddProject<Projects.BlazorShop_Storefront>("storefront")
+        .WithExternalHttpEndpoints()
+        .WithReference(apiService)
+        .WaitFor(apiService);
+
+    builder.AddProject<Projects.BlazorShop_Web>("adminclient")
         .WithExternalHttpEndpoints()
         .WithReference(apiService)
         .WaitFor(apiService);

@@ -1,0 +1,41 @@
+@inherits LayoutComponentBase
+
+<div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
+    <header class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <a href="@StorefrontRoutes.Home" class="inline-flex flex-col leading-none select-none">
+                <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP</span>
+                <span class="text-[10px] text-neutral-400 mt-1">SERVER-RENDERED STOREFRONT</span>
+            </a>
+
+            <nav class="flex flex-wrap items-center gap-2 text-sm font-medium">
+                <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
+                <NavLink href="@StorefrontRoutes.About" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About</NavLink>
+                <NavLink href="@StorefrontRoutes.NewReleases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New Releases</NavLink>
+                <NavLink href="@StorefrontRoutes.TodaysDeals" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Today's Deals</NavLink>
+                <NavLink href="@StorefrontRoutes.CustomerService" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Customer Service</NavLink>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-1">
+        @Body
+    </main>
+
+    <footer class="border-t border-neutral-200/70 bg-white/80 backdrop-blur-sm">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <div class="text-sm font-semibold tracking-wide text-neutral-900">BlazorShop Storefront</div>
+                <p class="mt-2 max-w-2xl text-sm text-neutral-600">
+                    Public catalog pages now render as server-side route surfaces for SEO. Admin tooling and legacy interactive flows remain in the existing client application during the transition.
+                </p>
+            </div>
+            <nav class="flex flex-wrap items-center gap-3 text-sm text-neutral-700">
+                <a href="@StorefrontRoutes.Faq" class="hover:text-neutral-900">FAQ</a>
+                <a href="@StorefrontRoutes.Privacy" class="hover:text-neutral-900">Privacy</a>
+                <a href="@StorefrontRoutes.Terms" class="hover:text-neutral-900">Terms</a>
+                <a href="@StorefrontRoutes.CustomerService" class="hover:text-neutral-900">Customer Service</a>
+            </nav>
+        </div>
+    </footer>
+</div>

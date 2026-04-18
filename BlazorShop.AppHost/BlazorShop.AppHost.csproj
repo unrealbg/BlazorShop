@@ -15,5 +15,6 @@
   <ItemGroup>
     <ProjectReference Include="..\BlazorShop.Presentation\BlazorShop.API\BlazorShop.API.csproj" />
     <ProjectReference Include="..\BlazorShop.Presentation\BlazorShop.Web\BlazorShop.Web.csproj" />
+    <ProjectReference Include="..\BlazorShop.Presentation\BlazorShop.Storefront\BlazorShop.Storefront.csproj" />
   </ItemGroup>
 </Project>

@@ -6,6 +6,10 @@
     {
         Task<IEnumerable<Product>> GetProductsByCategoryAsync(Guid categoryId);
 
+        Task<IEnumerable<Category>> GetPublishedCategoriesAsync();
+
+        Task<Category?> GetPublishedCategoryBySlugAsync(string slug);
+
         Task<bool> CategorySlugExistsAsync(string slug, Guid? excludedCategoryId = null);
     }
 }

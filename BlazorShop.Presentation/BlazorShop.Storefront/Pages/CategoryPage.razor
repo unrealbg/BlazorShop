@@ -1,0 +1,101 @@
+@page "/category/{Slug}"
+@inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+
+<SeoHead Metadata="_metadata" />
+
+@if (_isServiceUnavailable)
+{
+    <ServiceUnavailableState Title="Category temporarily unavailable"
+                             Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+}
+else if (_isNotFound)
+{
+    <NotFoundState Title="Category not found"
+                   Message="We couldn't find a published category for this address." />
+}
+else if (_categoryPage is not null)
+{
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Category</p>
+            <h1 class="mt-2 text-4xl font-extrabold tracking-tight">@_categoryPage.Category.Name</h1>
+            @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.MetaDescription))
+            {
+                <p class="mt-4 max-w-3xl text-base leading-7 text-neutral-700">@_categoryPage.Category.MetaDescription</p>
+            }
+        </div>
+    </section>
+
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
+        <ProductGrid Products="_categoryPage.Products"
+                     EmptyMessage="This published category does not have any public products yet." />
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.SeoContent))
+    {
+        <section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pb-16">
+            <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
+                <h2 class="text-2xl font-extrabold tracking-tight">More about @_categoryPage.Category.Name</h2>
+                <div class="mt-4 whitespace-pre-line text-sm leading-7 text-neutral-700">@_categoryPage.Category.SeoContent</div>
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private GetCategoryPage? _categoryPage;
+    private bool _isNotFound;
+    private bool _isServiceUnavailable;
+    private SeoMetadataDto _metadata = new();
+
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var categoryPageResult = await ApiClient.GetPublishedCategoryBySlugAsync(Slug);
+
+        if (categoryPageResult.IsServiceUnavailable)
+        {
+            _categoryPage = null;
+            _isNotFound = false;
+            _isServiceUnavailable = true;
+            if (HttpContext is not null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            }
+
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
+                "Category temporarily unavailable",
+                StorefrontRoutes.Category(Slug),
+                "The storefront is running, but the catalog API is not reachable right now.");
+            return;
+        }
+
+        _categoryPage = categoryPageResult.Value;
+
+        if (_categoryPage is null)
+        {
+            _isNotFound = true;
+            _isServiceUnavailable = false;
+            if (HttpContext is not null)
+            {
+                HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            }
+
+            _metadata = await SeoComposer.ComposeNotFoundPageAsync(
+                "Category not found",
+                StorefrontRoutes.Category(Slug),
+                "We couldn't find a published category for this address.");
+            return;
+        }
+
+        _isNotFound = false;
+        _isServiceUnavailable = false;
+        _metadata = await SeoComposer.ComposeCategoryPageAsync(_categoryPage.Category);
+    }
+}

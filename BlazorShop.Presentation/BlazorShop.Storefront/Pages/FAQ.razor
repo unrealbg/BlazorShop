@@ -1,0 +1,30 @@
+@page "/faq"
+
+<StaticPageSeo Title="Frequently Asked Questions"
+               RelativePath="@StorefrontRoutes.Faq"
+               Description="Find quick answers about ordering, product availability, storefront pages, and general BlazorShop support." />
+
+<section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
+    <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
+        <h1 class="text-3xl font-extrabold tracking-tight">Frequently Asked Questions</h1>
+        <div class="mt-8 space-y-4">
+            @foreach (var faq in _faqs)
+            {
+                <details class="rounded-2xl border border-neutral-200 bg-neutral-50/80 px-5 py-4">
+                    <summary class="cursor-pointer list-none font-semibold text-neutral-900">@faq.Question</summary>
+                    <p class="mt-3 text-sm leading-6 text-neutral-700">@faq.Answer</p>
+                </details>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    private readonly IReadOnlyList<(string Question, string Answer)> _faqs =
+    [
+        ("Why are product pages different now?", "The public storefront now serves product and category content on server-rendered slug routes for production SEO."),
+        ("Can I still use the admin area?", "Yes. Admin capabilities remain in the existing client application and continue to use the same backend APIs."),
+        ("Do all products appear publicly?", "No. Only published products with public SEO slugs are exposed through the new public catalog routes."),
+        ("What about redirects for slug changes?", "Redirect automation is intentionally deferred to a later step so the route migration stays controlled and coherent."),
+    ];
+}

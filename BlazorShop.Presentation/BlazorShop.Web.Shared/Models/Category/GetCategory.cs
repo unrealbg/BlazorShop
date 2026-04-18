@@ -6,6 +6,8 @@
     {
         public Guid Id { get; set; }
 
+        public string? Slug { get; set; }
+
         public string? MetaTitle { get; set; }
 
         public string? MetaDescription { get; set; }
@@ -17,6 +19,8 @@
         public string? OgDescription { get; set; }
 
         public string? OgImage { get; set; }
+
+        public string? SeoContent { get; set; }
 
         public bool RobotsIndex { get; set; } = true;
 

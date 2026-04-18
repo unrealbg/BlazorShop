@@ -27,6 +27,7 @@
             services.AddSingleton<ISeoMetadataBuilder, SeoMetadataBuilder>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
+            services.AddScoped<IPublicCatalogService, PublicCatalogService>();
             services.AddScoped<IProductSeoService, ProductSeoService>();
             services.AddScoped<ICategorySeoService, CategorySeoService>();
             services.AddScoped<ISeoSettingsService, SeoSettingsService>();

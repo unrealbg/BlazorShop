@@ -7,6 +7,8 @@ namespace BlazorShop.Web.Shared.Models.Product
         [Required]
         public Guid Id { get; set; }
 
+        public string? Slug { get; set; }
+
         [Required(ErrorMessage = "The Name field is required.")]
         public string? Name { get; set; }
 
@@ -25,6 +27,10 @@ namespace BlazorShop.Web.Shared.Models.Product
 
         [Required(ErrorMessage = "The Category field is required.")]
         public Guid CategoryId { get; set; }
+
+        public string? CategoryName { get; set; }
+
+        public string? CategorySlug { get; set; }
 
         public bool HasVariants { get; set; }
 
