@@ -26,5 +26,13 @@
 
             return products.Count > 0 ? products : [];
         }
+
+        public async Task<bool> CategorySlugExistsAsync(string slug, Guid? excludedCategoryId = null)
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .AnyAsync(category => category.Slug == slug
+                    && (!excludedCategoryId.HasValue || category.Id != excludedCategoryId.Value));
+        }
     }
 }

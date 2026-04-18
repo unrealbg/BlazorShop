@@ -12,6 +12,11 @@ namespace BlazorShop.Application.Validations.Seo
         protected SeoFieldsDtoValidator(ISlugService slugService)
         {
             RuleFor(x => x.Slug)
+                .NotEmpty()
+                .When(x => x.IsPublished)
+                .WithMessage("Slug is required for published SEO entries.");
+
+            RuleFor(x => x.Slug)
                 .MaximumLength(SeoConstraints.SlugMaxLength)
                 .Must(slug => string.IsNullOrWhiteSpace(slug) || slugService.IsSlugSafe(slug))
                 .WithMessage("Slug must already be normalized and URL-safe.");

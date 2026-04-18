@@ -117,6 +117,14 @@ namespace BlazorShop.Infrastructure.Repositories
                 .FirstOrDefaultAsync(product => product.Id == id);
         }
 
+        public async Task<bool> ProductSlugExistsAsync(string slug, Guid? excludedProductId = null)
+        {
+            return await _context.Products
+                .AsNoTracking()
+                .AnyAsync(product => product.Slug == slug
+                    && (!excludedProductId.HasValue || product.Id != excludedProductId.Value));
+        }
+
         public async Task<IReadOnlyDictionary<Guid, Product>> GetProductsByIdsAsync(IEnumerable<Guid> productIds)
         {
             var ids = productIds

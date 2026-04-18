@@ -41,7 +41,9 @@
             this.CreateMap<SeoSettings, SeoSettingsDto>();
             this.CreateMap<SeoSettings, UpdateSeoSettingsDto>();
             this.CreateMap<UpdateSeoSettingsDto, SeoSettings>();
-            this.CreateMap<SeoRedirect, SeoRedirectDto>().ReverseMap();
+            this.CreateMap<SeoRedirect, SeoRedirectDto>();
+            this.CreateMap<UpsertSeoRedirectDto, SeoRedirectDto>();
+            this.CreateMap<UpsertSeoRedirectDto, SeoRedirect>();
 
             this.CreateMap<Product, GetProductRecommendation>()
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null));

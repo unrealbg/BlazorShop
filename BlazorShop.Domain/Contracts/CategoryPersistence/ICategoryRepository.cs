@@ -5,5 +5,7 @@
     public interface ICategoryRepository
     {
         Task<IEnumerable<Product>> GetProductsByCategoryAsync(Guid categoryId);
+
+        Task<bool> CategorySlugExistsAsync(string slug, Guid? excludedCategoryId = null);
     }
 }

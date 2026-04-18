@@ -10,6 +10,7 @@
     using BlazorShop.Domain.Contracts.CategoryPersistence;
     using BlazorShop.Domain.Contracts.Newsletters;
     using BlazorShop.Domain.Contracts.Payment;
+    using BlazorShop.Domain.Contracts.Seo;
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Configuration;
     using BlazorShop.Infrastructure.Data;
@@ -19,6 +20,7 @@
     using BlazorShop.Infrastructure.Repositories.CategoryPersistence;
     using BlazorShop.Infrastructure.Repositories.Newsletters;
     using BlazorShop.Infrastructure.Repositories.Payment;
+    using BlazorShop.Infrastructure.Repositories.Seo;
     using BlazorShop.Infrastructure.Services;
 
     using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -101,6 +103,8 @@
             services.AddScoped<IOrderTrackingService, OrderTrackingService>();
             services.AddScoped<IOrderQueryService, OrderQueryService>();
             services.AddScoped<INewsletterSubscriberRepository, NewsletterSubscriberRepository>();
+            services.AddScoped<ISeoSettingsRepository, SeoSettingsRepository>();
+            services.AddScoped<ISeoRedirectRepository, SeoRedirectRepository>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 
