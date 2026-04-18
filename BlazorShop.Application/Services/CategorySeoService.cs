@@ -4,6 +4,7 @@ namespace BlazorShop.Application.Services
 
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Seo;
+    using BlazorShop.Application.Exceptions;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Validations;
     using BlazorShop.Domain.Contracts.CategoryPersistence;
@@ -18,6 +19,8 @@ namespace BlazorShop.Application.Services
         private readonly ICategoryRepository _categoryReadRepository;
         private readonly IMapper _mapper;
         private readonly ISlugService _slugService;
+        private readonly IApplicationTransactionManager _transactionManager;
+        private readonly ISeoRedirectAutomationService _seoRedirectAutomationService;
         private readonly IValidationService _validationService;
         private readonly IValidator<UpdateCategorySeoDto> _validator;
 
@@ -26,6 +29,8 @@ namespace BlazorShop.Application.Services
             ICategoryRepository categoryReadRepository,
             IMapper mapper,
             ISlugService slugService,
+            IApplicationTransactionManager transactionManager,
+            ISeoRedirectAutomationService seoRedirectAutomationService,
             IValidationService validationService,
             IValidator<UpdateCategorySeoDto> validator)
         {
@@ -33,6 +38,8 @@ namespace BlazorShop.Application.Services
             _categoryReadRepository = categoryReadRepository;
             _mapper = mapper;
             _slugService = slugService;
+            _transactionManager = transactionManager;
+            _seoRedirectAutomationService = seoRedirectAutomationService;
             _validationService = validationService;
             _validator = validator;
         }
@@ -91,15 +98,30 @@ namespace BlazorShop.Application.Services
                 return Conflict("Category slug is already in use.");
             }
 
-            _mapper.Map(normalizedRequest, category);
-            var rowsAffected = await _categoryRepository.UpdateAsync(category);
+            var oldPublicPath = BuildCategoryPublicPath(category.Slug, category.IsPublished);
+            var newPublicPath = BuildCategoryPublicPath(normalizedRequest.Slug, normalizedRequest.IsPublished);
 
-            if (rowsAffected <= 0)
+            try
             {
-                return Failure("Category SEO update failed.");
-            }
+                return await _transactionManager.ExecuteInTransactionAsync(async () =>
+                {
+                    await EnsureRedirectAsync(oldPublicPath, newPublicPath);
 
-            return Success(_mapper.Map<CategorySeoDto>(category), category.Id, "Category SEO updated successfully.");
+                    _mapper.Map(normalizedRequest, category);
+                    var rowsAffected = await _categoryRepository.UpdateAsync(category);
+
+                    if (rowsAffected <= 0)
+                    {
+                        throw new ServiceResponseException("Category SEO update failed.", ServiceResponseType.Failure);
+                    }
+
+                    return Success(_mapper.Map<CategorySeoDto>(category), category.Id, "Category SEO updated successfully.");
+                });
+            }
+            catch (ServiceResponseException exception)
+            {
+                return FromServiceException(exception);
+            }
         }
 
         private string? NormalizeSlug(UpdateCategorySeoDto request)
@@ -137,6 +159,39 @@ namespace BlazorShop.Application.Services
                 RobotsFollow = request.RobotsFollow,
                 SeoContent = request.SeoContent,
                 IsPublished = request.IsPublished,
+            };
+        }
+
+        private async Task EnsureRedirectAsync(string? oldPublicPath, string? newPublicPath)
+        {
+            if (string.IsNullOrWhiteSpace(oldPublicPath)
+                || string.IsNullOrWhiteSpace(newPublicPath)
+                || SeoRedirectPathUtility.PathsEqual(oldPublicPath, newPublicPath))
+            {
+                return;
+            }
+
+            var redirectResult = await _seoRedirectAutomationService.EnsurePermanentRedirectAsync(oldPublicPath, newPublicPath);
+            if (!redirectResult.Success)
+            {
+                throw new ServiceResponseException(
+                    redirectResult.Message ?? "Automatic redirect could not be created.",
+                    redirectResult.ResponseType);
+            }
+        }
+
+        private static string? BuildCategoryPublicPath(string? slug, bool isPublished)
+        {
+            return isPublished && !string.IsNullOrWhiteSpace(slug)
+                ? $"/category/{slug}"
+                : null;
+        }
+
+        private static ServiceResponse<CategorySeoDto> FromServiceException(ServiceResponseException exception)
+        {
+            return new ServiceResponse<CategorySeoDto>(false, exception.Message)
+            {
+                ResponseType = exception.ResponseType,
             };
         }
 

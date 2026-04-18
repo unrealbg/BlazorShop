@@ -4,6 +4,7 @@ namespace BlazorShop.Application.Services
 
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Seo;
+    using BlazorShop.Application.Exceptions;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Validations;
     using BlazorShop.Domain.Contracts;
@@ -17,6 +18,8 @@ namespace BlazorShop.Application.Services
         private readonly IProductReadRepository _productReadRepository;
         private readonly IMapper _mapper;
         private readonly ISlugService _slugService;
+        private readonly IApplicationTransactionManager _transactionManager;
+        private readonly ISeoRedirectAutomationService _seoRedirectAutomationService;
         private readonly IValidationService _validationService;
         private readonly IValidator<UpdateProductSeoDto> _validator;
 
@@ -25,6 +28,8 @@ namespace BlazorShop.Application.Services
             IProductReadRepository productReadRepository,
             IMapper mapper,
             ISlugService slugService,
+            IApplicationTransactionManager transactionManager,
+            ISeoRedirectAutomationService seoRedirectAutomationService,
             IValidationService validationService,
             IValidator<UpdateProductSeoDto> validator)
         {
@@ -32,6 +37,8 @@ namespace BlazorShop.Application.Services
             _productReadRepository = productReadRepository;
             _mapper = mapper;
             _slugService = slugService;
+            _transactionManager = transactionManager;
+            _seoRedirectAutomationService = seoRedirectAutomationService;
             _validationService = validationService;
             _validator = validator;
         }
@@ -90,26 +97,42 @@ namespace BlazorShop.Application.Services
                 return Conflict("Product slug is already in use.");
             }
 
+            var productSnapshot = await _productReadRepository.GetProductDetailsByIdAsync(productId);
             var existingPublishedOn = product.PublishedOn;
-            _mapper.Map(normalizedRequest, product);
+            var oldPublicPath = BuildProductPublicPath(productSnapshot?.Slug, productSnapshot?.IsPublished == true, productSnapshot?.PublishedOn, productSnapshot?.Category?.IsPublished == true);
+            var newPublicPath = BuildProductPublicPath(normalizedRequest.Slug, normalizedRequest.IsPublished, normalizedRequest.PublishedOn ?? existingPublishedOn ?? DateTime.UtcNow, productSnapshot?.Category?.IsPublished == true);
 
-            if (product.IsPublished)
+            try
             {
-                product.PublishedOn = normalizedRequest.PublishedOn ?? existingPublishedOn ?? DateTime.UtcNow;
+                return await _transactionManager.ExecuteInTransactionAsync(async () =>
+                {
+                    await EnsureRedirectAsync(oldPublicPath, newPublicPath);
+
+                    _mapper.Map(normalizedRequest, product);
+
+                    if (product.IsPublished)
+                    {
+                        product.PublishedOn = normalizedRequest.PublishedOn ?? existingPublishedOn ?? DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        product.PublishedOn = null;
+                    }
+
+                    var rowsAffected = await _productRepository.UpdateAsync(product);
+
+                    if (rowsAffected <= 0)
+                    {
+                        throw new ServiceResponseException("Product SEO update failed.", ServiceResponseType.Failure);
+                    }
+
+                    return Success(_mapper.Map<ProductSeoDto>(product), product.Id, "Product SEO updated successfully.");
+                });
             }
-            else
+            catch (ServiceResponseException exception)
             {
-                product.PublishedOn = null;
+                return FromServiceException(exception);
             }
-
-            var rowsAffected = await _productRepository.UpdateAsync(product);
-
-            if (rowsAffected <= 0)
-            {
-                return Failure("Product SEO update failed.");
-            }
-
-            return Success(_mapper.Map<ProductSeoDto>(product), product.Id, "Product SEO updated successfully.");
         }
 
         private string? NormalizeSlug(UpdateProductSeoDto request)
@@ -148,6 +171,39 @@ namespace BlazorShop.Application.Services
                 SeoContent = request.SeoContent,
                 IsPublished = request.IsPublished,
                 PublishedOn = request.PublishedOn,
+            };
+        }
+
+        private async Task EnsureRedirectAsync(string? oldPublicPath, string? newPublicPath)
+        {
+            if (string.IsNullOrWhiteSpace(oldPublicPath)
+                || string.IsNullOrWhiteSpace(newPublicPath)
+                || SeoRedirectPathUtility.PathsEqual(oldPublicPath, newPublicPath))
+            {
+                return;
+            }
+
+            var redirectResult = await _seoRedirectAutomationService.EnsurePermanentRedirectAsync(oldPublicPath, newPublicPath);
+            if (!redirectResult.Success)
+            {
+                throw new ServiceResponseException(
+                    redirectResult.Message ?? "Automatic redirect could not be created.",
+                    redirectResult.ResponseType);
+            }
+        }
+
+        private static string? BuildProductPublicPath(string? slug, bool isPublished, DateTime? publishedOn, bool isCategoryPublished)
+        {
+            return isPublished && publishedOn.HasValue && isCategoryPublished && !string.IsNullOrWhiteSpace(slug)
+                ? $"/product/{slug}"
+                : null;
+        }
+
+        private static ServiceResponse<ProductSeoDto> FromServiceException(ServiceResponseException exception)
+        {
+            return new ServiceResponse<ProductSeoDto>(false, exception.Message)
+            {
+                ResponseType = exception.ResponseType,
             };
         }
 

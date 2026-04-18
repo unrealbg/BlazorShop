@@ -36,6 +36,7 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = CreateStaticFileProvider(app.Environment),
 });
+app.UseMiddleware<StorefrontPublicRedirectMiddleware>();
 app.UseAntiforgery();
 app.MapDefaultEndpoints();
 app.MapGet(StorefrontRoutes.Robots, async (IStorefrontRobotsService robotsService, CancellationToken cancellationToken) =>

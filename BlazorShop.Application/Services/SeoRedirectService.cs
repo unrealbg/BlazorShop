@@ -195,8 +195,8 @@ namespace BlazorShop.Application.Services
 
         private static void NormalizeRequest(UpsertSeoRedirectDto request)
         {
-            request.OldPath = request.OldPath?.Trim();
-            request.NewPath = request.NewPath?.Trim();
+            request.OldPath = SeoRedirectPathUtility.NormalizePath(request.OldPath);
+            request.NewPath = SeoRedirectPathUtility.NormalizePath(request.NewPath);
         }
 
         private static ServiceResponse<SeoRedirectDto> Success(SeoRedirectDto payload, Guid id, string message)

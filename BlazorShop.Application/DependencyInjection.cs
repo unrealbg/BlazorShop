@@ -32,6 +32,8 @@
             services.AddScoped<ICategorySeoService, CategorySeoService>();
             services.AddScoped<ISeoSettingsService, SeoSettingsService>();
             services.AddScoped<ISeoRedirectService, SeoRedirectService>();
+            services.AddScoped<ISeoRedirectAutomationService, SeoRedirectAutomationService>();
+            services.AddScoped<ISeoRedirectResolutionService, SeoRedirectResolutionService>();
             services.AddScoped<IProductVariantService, ProductVariantService>();
             services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
 

@@ -2,6 +2,7 @@
 {
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Application.Services.Payment;
@@ -105,6 +106,7 @@
             services.AddScoped<INewsletterSubscriberRepository, NewsletterSubscriberRepository>();
             services.AddScoped<ISeoSettingsRepository, SeoSettingsRepository>();
             services.AddScoped<ISeoRedirectRepository, SeoRedirectRepository>();
+            services.AddScoped<IApplicationTransactionManager, ApplicationTransactionManager>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 

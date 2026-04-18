@@ -3,6 +3,7 @@ namespace BlazorShop.Tests.Application.Services
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Services;
+    using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Validations;
     using BlazorShop.Application.Validations.Seo;
     using BlazorShop.Domain.Contracts;
@@ -17,19 +18,29 @@ namespace BlazorShop.Tests.Application.Services
     {
         private readonly Mock<IGenericRepository<Product>> _productRepository;
         private readonly Mock<IProductReadRepository> _productReadRepository;
+        private readonly Mock<IApplicationTransactionManager> _transactionManager;
+        private readonly Mock<ISeoRedirectAutomationService> _seoRedirectAutomationService;
         private readonly ProductSeoService _service;
 
         public ProductSeoServiceTests()
         {
-            this._productRepository = new Mock<IGenericRepository<Product>>();
-            this._productReadRepository = new Mock<IProductReadRepository>();
+            _productRepository = new Mock<IGenericRepository<Product>>();
+            _productReadRepository = new Mock<IProductReadRepository>();
+            _transactionManager = new Mock<IApplicationTransactionManager>();
+            _seoRedirectAutomationService = new Mock<ISeoRedirectAutomationService>();
+
+            _transactionManager
+                .Setup(manager => manager.ExecuteInTransactionAsync(It.IsAny<Func<Task<ServiceResponse<ProductSeoDto>>>>()))
+                .Returns((Func<Task<ServiceResponse<ProductSeoDto>>> action) => action());
 
             var slugService = new SlugService();
-            this._service = new ProductSeoService(
-                this._productRepository.Object,
-                this._productReadRepository.Object,
+            _service = new ProductSeoService(
+                _productRepository.Object,
+                _productReadRepository.Object,
                 AutoMapperTestFactory.CreateMapper(),
                 slugService,
+                _transactionManager.Object,
+                _seoRedirectAutomationService.Object,
                 new ValidationService(),
                 new UpdateProductSeoDtoValidator(slugService));
         }
@@ -48,11 +59,11 @@ namespace BlazorShop.Tests.Application.Services
                 IsPublished = true,
             };
 
-            this._productRepository
+            _productRepository
                 .Setup(repository => repository.GetByIdAsync(productId))
                 .ReturnsAsync(product);
 
-            var result = await this._service.GetByProductIdAsync(productId);
+            var result = await _service.GetByProductIdAsync(productId);
 
             Assert.True(result.Success);
             Assert.Equal(ServiceResponseType.Success, result.ResponseType);
@@ -67,14 +78,14 @@ namespace BlazorShop.Tests.Application.Services
             var productId = Guid.NewGuid();
             var existingProduct = new Product { Id = productId, Slug = "existing-slug", IsPublished = true };
 
-            this._productRepository
+            _productRepository
                 .Setup(repository => repository.GetByIdAsync(productId))
                 .ReturnsAsync(existingProduct);
-            this._productReadRepository
+            _productReadRepository
                 .Setup(repository => repository.ProductSlugExistsAsync("summer-sale-2026", productId))
                 .ReturnsAsync(true);
 
-            var result = await this._service.UpdateAsync(productId, new UpdateProductSeoDto
+            var result = await _service.UpdateAsync(productId, new UpdateProductSeoDto
             {
                 Slug = "Summer Sale 2026",
                 IsPublished = true,
@@ -83,7 +94,8 @@ namespace BlazorShop.Tests.Application.Services
             Assert.False(result.Success);
             Assert.Equal(ServiceResponseType.Conflict, result.ResponseType);
             Assert.Equal("Product slug is already in use.", result.Message);
-            this._productRepository.Verify(repository => repository.UpdateAsync(It.IsAny<Product>()), Times.Never);
+            _productRepository.Verify(repository => repository.UpdateAsync(It.IsAny<Product>()), Times.Never);
+            _seoRedirectAutomationService.Verify(service => service.EnsurePermanentRedirectAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -91,11 +103,11 @@ namespace BlazorShop.Tests.Application.Services
         {
             var productId = Guid.NewGuid();
 
-            this._productRepository
+            _productRepository
                 .Setup(repository => repository.GetByIdAsync(productId))
                 .ReturnsAsync((Product?)null);
 
-            var result = await this._service.UpdateAsync(productId, new UpdateProductSeoDto
+            var result = await _service.UpdateAsync(productId, new UpdateProductSeoDto
             {
                 Slug = "valid-product-slug",
                 IsPublished = true,
@@ -107,29 +119,55 @@ namespace BlazorShop.Tests.Application.Services
         }
 
         [Fact]
-        public async Task UpdateAsync_WhenPayloadIsValid_NormalizesSlugAndUpdatesEntity()
+        public async Task UpdateAsync_WhenPublishedSlugChanges_CreatesPermanentRedirectAndUpdatesEntity()
         {
             var productId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            var existingPublishedOn = new DateTime(2026, 4, 18, 0, 0, 0, DateTimeKind.Utc);
             var existingProduct = new Product
             {
                 Id = productId,
                 Name = "Running Shoes",
                 Slug = "old-slug",
                 IsPublished = true,
-                PublishedOn = null,
+                PublishedOn = existingPublishedOn,
+                CategoryId = categoryId,
             };
 
-            this._productRepository
+            _productRepository
                 .Setup(repository => repository.GetByIdAsync(productId))
                 .ReturnsAsync(existingProduct);
-            this._productReadRepository
+            _productReadRepository
+                .Setup(repository => repository.GetProductDetailsByIdAsync(productId))
+                .ReturnsAsync(new Product
+                {
+                    Id = productId,
+                    Slug = "old-slug",
+                    IsPublished = true,
+                    PublishedOn = existingPublishedOn,
+                    Category = new Category { Id = categoryId, IsPublished = true },
+                });
+            _productReadRepository
                 .Setup(repository => repository.ProductSlugExistsAsync("summer-sale-2026", productId))
                 .ReturnsAsync(false);
-            this._productRepository
+            _seoRedirectAutomationService
+                .Setup(service => service.EnsurePermanentRedirectAsync("/product/old-slug", "/product/summer-sale-2026"))
+                .ReturnsAsync(new ServiceResponse<SeoRedirectDto>(true, "Created", Guid.NewGuid())
+                {
+                    ResponseType = ServiceResponseType.Success,
+                    Payload = new SeoRedirectDto
+                    {
+                        OldPath = "/product/old-slug",
+                        NewPath = "/product/summer-sale-2026",
+                        StatusCode = 301,
+                        IsActive = true,
+                    },
+                });
+            _productRepository
                 .Setup(repository => repository.UpdateAsync(existingProduct))
                 .ReturnsAsync(1);
 
-            var result = await this._service.UpdateAsync(productId, new UpdateProductSeoDto
+            var result = await _service.UpdateAsync(productId, new UpdateProductSeoDto
             {
                 Slug = " Summer Sale 2026 ",
                 MetaTitle = "Summer Sale",
@@ -140,8 +178,51 @@ namespace BlazorShop.Tests.Application.Services
             Assert.Equal(ServiceResponseType.Success, result.ResponseType);
             Assert.Equal("summer-sale-2026", existingProduct.Slug);
             Assert.Equal("Summer Sale", existingProduct.MetaTitle);
-            Assert.NotNull(existingProduct.PublishedOn);
-            this._productRepository.Verify(repository => repository.UpdateAsync(existingProduct), Times.Once);
+            Assert.Equal(existingPublishedOn, existingProduct.PublishedOn);
+            _seoRedirectAutomationService.Verify(service => service.EnsurePermanentRedirectAsync("/product/old-slug", "/product/summer-sale-2026"), Times.Once);
+            _productRepository.Verify(repository => repository.UpdateAsync(existingProduct), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_WhenSlugIsUnchanged_DoesNotCreateRedirect()
+        {
+            var productId = Guid.NewGuid();
+            var existingProduct = new Product
+            {
+                Id = productId,
+                Slug = "summer-sale-2026",
+                IsPublished = true,
+                PublishedOn = new DateTime(2026, 4, 18, 0, 0, 0, DateTimeKind.Utc),
+            };
+
+            _productRepository
+                .Setup(repository => repository.GetByIdAsync(productId))
+                .ReturnsAsync(existingProduct);
+            _productReadRepository
+                .Setup(repository => repository.GetProductDetailsByIdAsync(productId))
+                .ReturnsAsync(new Product
+                {
+                    Id = productId,
+                    Slug = "summer-sale-2026",
+                    IsPublished = true,
+                    PublishedOn = existingProduct.PublishedOn,
+                    Category = new Category { Id = Guid.NewGuid(), IsPublished = true },
+                });
+            _productReadRepository
+                .Setup(repository => repository.ProductSlugExistsAsync("summer-sale-2026", productId))
+                .ReturnsAsync(false);
+            _productRepository
+                .Setup(repository => repository.UpdateAsync(existingProduct))
+                .ReturnsAsync(1);
+
+            var result = await _service.UpdateAsync(productId, new UpdateProductSeoDto
+            {
+                Slug = "summer-sale-2026",
+                IsPublished = true,
+            });
+
+            Assert.True(result.Success);
+            _seoRedirectAutomationService.Verify(service => service.EnsurePermanentRedirectAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
     }
 }

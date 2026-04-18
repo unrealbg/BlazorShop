@@ -3,6 +3,7 @@ namespace BlazorShop.Tests.Application.Services
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Services;
+    using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Validations;
     using BlazorShop.Application.Validations.Seo;
     using BlazorShop.Domain.Contracts;
@@ -18,19 +19,29 @@ namespace BlazorShop.Tests.Application.Services
     {
         private readonly Mock<IGenericRepository<Category>> _categoryRepository;
         private readonly Mock<ICategoryRepository> _categoryReadRepository;
+        private readonly Mock<IApplicationTransactionManager> _transactionManager;
+        private readonly Mock<ISeoRedirectAutomationService> _seoRedirectAutomationService;
         private readonly CategorySeoService _service;
 
         public CategorySeoServiceTests()
         {
-            this._categoryRepository = new Mock<IGenericRepository<Category>>();
-            this._categoryReadRepository = new Mock<ICategoryRepository>();
+            _categoryRepository = new Mock<IGenericRepository<Category>>();
+            _categoryReadRepository = new Mock<ICategoryRepository>();
+            _transactionManager = new Mock<IApplicationTransactionManager>();
+            _seoRedirectAutomationService = new Mock<ISeoRedirectAutomationService>();
+
+            _transactionManager
+                .Setup(manager => manager.ExecuteInTransactionAsync(It.IsAny<Func<Task<ServiceResponse<CategorySeoDto>>>>()))
+                .Returns((Func<Task<ServiceResponse<CategorySeoDto>>> action) => action());
 
             var slugService = new SlugService();
-            this._service = new CategorySeoService(
-                this._categoryRepository.Object,
-                this._categoryReadRepository.Object,
+            _service = new CategorySeoService(
+                _categoryRepository.Object,
+                _categoryReadRepository.Object,
                 AutoMapperTestFactory.CreateMapper(),
                 slugService,
+                _transactionManager.Object,
+                _seoRedirectAutomationService.Object,
                 new ValidationService(),
                 new UpdateCategorySeoDtoValidator(slugService));
         }
@@ -47,11 +58,11 @@ namespace BlazorShop.Tests.Application.Services
                 IsPublished = true,
             };
 
-            this._categoryRepository
+            _categoryRepository
                 .Setup(repository => repository.GetByIdAsync(categoryId))
                 .ReturnsAsync(category);
 
-            var result = await this._service.GetByCategoryIdAsync(categoryId);
+            var result = await _service.GetByCategoryIdAsync(categoryId);
 
             Assert.True(result.Success);
             Assert.Equal(ServiceResponseType.Success, result.ResponseType);
@@ -60,22 +71,35 @@ namespace BlazorShop.Tests.Application.Services
         }
 
         [Fact]
-        public async Task UpdateAsync_WhenPayloadIsValid_NormalizesSlugAndUpdatesEntity()
+        public async Task UpdateAsync_WhenPayloadIsValid_NormalizesSlugAndUpdatesEntityAndCreatesRedirect()
         {
             var categoryId = Guid.NewGuid();
             var existingCategory = new Category { Id = categoryId, Name = "Men", Slug = "old-slug", IsPublished = true };
 
-            this._categoryRepository
+            _categoryRepository
                 .Setup(repository => repository.GetByIdAsync(categoryId))
                 .ReturnsAsync(existingCategory);
-            this._categoryReadRepository
+            _categoryReadRepository
                 .Setup(repository => repository.CategorySlugExistsAsync("mens-sale", categoryId))
                 .ReturnsAsync(false);
-            this._categoryRepository
+            _seoRedirectAutomationService
+                .Setup(service => service.EnsurePermanentRedirectAsync("/category/old-slug", "/category/mens-sale"))
+                .ReturnsAsync(new ServiceResponse<SeoRedirectDto>(true, "Created", Guid.NewGuid())
+                {
+                    ResponseType = ServiceResponseType.Success,
+                    Payload = new SeoRedirectDto
+                    {
+                        OldPath = "/category/old-slug",
+                        NewPath = "/category/mens-sale",
+                        StatusCode = 301,
+                        IsActive = true,
+                    },
+                });
+            _categoryRepository
                 .Setup(repository => repository.UpdateAsync(existingCategory))
                 .ReturnsAsync(1);
 
-            var result = await this._service.UpdateAsync(categoryId, new UpdateCategorySeoDto
+            var result = await _service.UpdateAsync(categoryId, new UpdateCategorySeoDto
             {
                 Slug = "Mens Sale",
                 MetaTitle = "Men's Sale",
@@ -86,6 +110,7 @@ namespace BlazorShop.Tests.Application.Services
             Assert.Equal(ServiceResponseType.Success, result.ResponseType);
             Assert.Equal("mens-sale", existingCategory.Slug);
             Assert.Equal("Men's Sale", existingCategory.MetaTitle);
+            _seoRedirectAutomationService.Verify(service => service.EnsurePermanentRedirectAsync("/category/old-slug", "/category/mens-sale"), Times.Once);
         }
 
         [Fact]
@@ -94,14 +119,14 @@ namespace BlazorShop.Tests.Application.Services
             var categoryId = Guid.NewGuid();
             var existingCategory = new Category { Id = categoryId, Slug = "old-slug", IsPublished = true };
 
-            this._categoryRepository
+            _categoryRepository
                 .Setup(repository => repository.GetByIdAsync(categoryId))
                 .ReturnsAsync(existingCategory);
-            this._categoryReadRepository
+            _categoryReadRepository
                 .Setup(repository => repository.CategorySlugExistsAsync("mens-sale", categoryId))
                 .ReturnsAsync(true);
 
-            var result = await this._service.UpdateAsync(categoryId, new UpdateCategorySeoDto
+            var result = await _service.UpdateAsync(categoryId, new UpdateCategorySeoDto
             {
                 Slug = "Mens Sale",
                 IsPublished = true,
@@ -110,6 +135,33 @@ namespace BlazorShop.Tests.Application.Services
             Assert.False(result.Success);
             Assert.Equal(ServiceResponseType.Conflict, result.ResponseType);
             Assert.Equal("Category slug is already in use.", result.Message);
+            _seoRedirectAutomationService.Verify(service => service.EnsurePermanentRedirectAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_WhenSlugIsUnchanged_DoesNotCreateRedirect()
+        {
+            var categoryId = Guid.NewGuid();
+            var existingCategory = new Category { Id = categoryId, Slug = "mens-sale", IsPublished = true };
+
+            _categoryRepository
+                .Setup(repository => repository.GetByIdAsync(categoryId))
+                .ReturnsAsync(existingCategory);
+            _categoryReadRepository
+                .Setup(repository => repository.CategorySlugExistsAsync("mens-sale", categoryId))
+                .ReturnsAsync(false);
+            _categoryRepository
+                .Setup(repository => repository.UpdateAsync(existingCategory))
+                .ReturnsAsync(1);
+
+            var result = await _service.UpdateAsync(categoryId, new UpdateCategorySeoDto
+            {
+                Slug = "mens-sale",
+                IsPublished = true,
+            });
+
+            Assert.True(result.Success);
+            _seoRedirectAutomationService.Verify(service => service.EnsurePermanentRedirectAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -117,11 +169,11 @@ namespace BlazorShop.Tests.Application.Services
         {
             var categoryId = Guid.NewGuid();
 
-            this._categoryRepository
+            _categoryRepository
                 .Setup(repository => repository.GetByIdAsync(categoryId))
                 .ReturnsAsync((Category?)null);
 
-            var result = await this._service.UpdateAsync(categoryId, new UpdateCategorySeoDto
+            var result = await _service.UpdateAsync(categoryId, new UpdateCategorySeoDto
             {
                 Slug = "mens-sale",
                 IsPublished = true,

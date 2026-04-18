@@ -7,6 +7,7 @@ namespace BlazorShop.Storefront.Services
 
     using BlazorShop.Web.Shared.Models.Discovery;
     using BlazorShop.Web.Shared.Models;
+    using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Web.Shared.Models.Category;
     using BlazorShop.Web.Shared.Models.Product;
     using BlazorShop.Web.Shared.Models.Seo;
@@ -15,8 +16,10 @@ namespace BlazorShop.Storefront.Services
     {
         // Static informational pages should degrade faster than catalog-backed pages when the API is offline.
         private static readonly TimeSpan CatalogRequestTimeout = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan RedirectResolutionRequestTimeout = TimeSpan.FromMilliseconds(500);
         private static readonly TimeSpan SeoSettingsRequestTimeout = TimeSpan.FromMilliseconds(500);
         private const string PublicCatalogBaseRoute = "public/catalog";
+        private const string PublicSeoRedirectsBaseRoute = "public/seo/redirects";
         private const string PublicCatalogSitemapRoute = PublicCatalogBaseRoute + "/sitemap";
         private const string PublicCategoriesRoute = PublicCatalogBaseRoute + "/categories";
         private const string PublicProductsRoute = PublicCatalogBaseRoute + "/products";
@@ -63,6 +66,11 @@ namespace BlazorShop.Storefront.Services
         public Task<StorefrontApiResult<GetSeoSettings>> GetSeoSettingsAsync(CancellationToken cancellationToken = default)
         {
             return GetAsync<GetSeoSettings>(SeoSettingsRoute, cancellationToken, requestTimeout: SeoSettingsRequestTimeout);
+        }
+
+        public Task<StorefrontApiResult<SeoRedirectResolutionDto>> GetRedirectResolutionAsync(string path, CancellationToken cancellationToken = default)
+        {
+            return GetMaybeNotFoundAsync<SeoRedirectResolutionDto>($"{PublicSeoRedirectsBaseRoute}/resolve?path={Uri.EscapeDataString(path)}", cancellationToken, RedirectResolutionRequestTimeout);
         }
 
         private async Task<StorefrontApiResult<T>> GetAsync<T>(string route, CancellationToken cancellationToken, T? fallbackValue = default, TimeSpan? requestTimeout = null)

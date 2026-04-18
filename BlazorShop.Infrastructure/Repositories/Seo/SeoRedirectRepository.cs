@@ -1,6 +1,7 @@
 namespace BlazorShop.Infrastructure.Repositories.Seo
 {
     using BlazorShop.Domain.Contracts.Seo;
+    using BlazorShop.Domain.Entities;
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,22 @@ namespace BlazorShop.Infrastructure.Repositories.Seo
                 .AsNoTracking()
                 .AnyAsync(redirect => redirect.OldPath == oldPath
                     && (!excludedRedirectId.HasValue || redirect.Id != excludedRedirectId.Value));
+        }
+
+        public async Task<SeoRedirect?> GetByOldPathAsync(string oldPath)
+        {
+            return await _context.SeoRedirects
+                .AsNoTracking()
+                .OrderByDescending(redirect => redirect.IsActive)
+                .ThenByDescending(redirect => redirect.CreatedOn)
+                .FirstOrDefaultAsync(redirect => redirect.OldPath == oldPath);
+        }
+
+        public async Task<SeoRedirect?> GetActiveByOldPathAsync(string oldPath)
+        {
+            return await _context.SeoRedirects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(redirect => redirect.IsActive && redirect.OldPath == oldPath);
         }
     }
 }

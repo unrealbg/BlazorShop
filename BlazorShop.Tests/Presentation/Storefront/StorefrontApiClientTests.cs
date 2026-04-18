@@ -3,6 +3,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
     using System.Net;
     using System.Net.Http.Json;
 
+    using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Storefront.Services;
     using BlazorShop.Web.Shared.Models.Discovery;
     using BlazorShop.Web.Shared.Models.Product;
@@ -106,6 +107,48 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Single(result.Value!.Categories);
             Assert.Single(result.Value.Products);
             Assert.Equal("metro-runner", result.Value.Products[0].Slug);
+        }
+
+        [Fact]
+        public async Task GetRedirectResolutionAsync_ReturnsNotFound_WhenApiReturns404()
+        {
+            using var client = new HttpClient(new StaticResponseHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound)))
+            {
+                BaseAddress = new Uri("https://localhost:7094/api/")
+            };
+
+            var apiClient = new StorefrontApiClient(client);
+
+            var result = await apiClient.GetRedirectResolutionAsync("/product/legacy-runner");
+
+            Assert.False(result.IsSuccess);
+            Assert.True(result.IsNotFound);
+        }
+
+        [Fact]
+        public async Task GetRedirectResolutionAsync_ReturnsSuccess_WhenApiRespondsWithRedirectPayload()
+        {
+            var payload = new SeoRedirectResolutionDto
+            {
+                NewPath = "/product/metro-runner",
+                StatusCode = 301,
+            };
+
+            using var client = new HttpClient(new StaticResponseHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(payload),
+            }))
+            {
+                BaseAddress = new Uri("https://localhost:7094/api/")
+            };
+
+            var apiClient = new StorefrontApiClient(client);
+
+            var result = await apiClient.GetRedirectResolutionAsync("/product/legacy-runner");
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal("/product/metro-runner", result.Value!.NewPath);
+            Assert.Equal(301, result.Value.StatusCode);
         }
 
         private sealed class StaticResponseHttpMessageHandler : HttpMessageHandler
