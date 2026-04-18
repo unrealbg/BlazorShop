@@ -23,6 +23,8 @@
         public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddAutoMapper(cfg => cfg.AddProfile<MappingConfig>());
+            services.AddSingleton<ISlugService, SlugService>();
+            services.AddSingleton<ISeoMetadataBuilder, SeoMetadataBuilder>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<IProductVariantService, ProductVariantService>();

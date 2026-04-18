@@ -62,8 +62,15 @@
 
         public async Task<ServiceResponse> UpdateAsync(UpdateProduct product)
         {
-            var mappedData = _mapper.Map<Product>(product);
-            int result = await _productRepository.UpdateAsync(mappedData);
+            var existingProduct = await _productRepository.GetByIdAsync(product.Id);
+
+            if (existingProduct is null)
+            {
+                return new ServiceResponse(false, "Product not found");
+            }
+
+            _mapper.Map(product, existingProduct);
+            int result = await _productRepository.UpdateAsync(existingProduct);
 
             return result > 0 ? new ServiceResponse(true, "Product updated successfully") : new ServiceResponse(false, "Product not found");
         }

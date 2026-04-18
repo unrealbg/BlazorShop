@@ -44,7 +44,16 @@
 
         public async Task<ServiceResponse> UpdateAsync(UpdateCategory category)
         {
-            int result = await _genericRepository.UpdateAsync(_mapper.Map<Category>(category));
+            var existingCategory = await _genericRepository.GetByIdAsync(category.Id);
+
+            if (existingCategory is null)
+            {
+                return new ServiceResponse(false, "Category not found");
+            }
+
+            _mapper.Map(category, existingCategory);
+            int result = await _genericRepository.UpdateAsync(existingCategory);
+
             return result > 0 ? new ServiceResponse(true, "Category updated successfully") : new ServiceResponse(false, "Category not found");
         }
 

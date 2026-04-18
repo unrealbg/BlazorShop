@@ -81,8 +81,20 @@ namespace BlazorShop.Tests.Application.Services
         {
             // Arrange
             var updateCategory = new UpdateCategory { Id = Guid.NewGuid(), Name = "Updated Category" };
-            this._mockGenericRepository.Setup(repo => repo.UpdateAsync(It.IsAny<Category>())).ReturnsAsync(1);
-            this._mockMapper.Setup(m => m.Map<Category>(It.IsAny<UpdateCategory>())).Returns(new Category { Id = updateCategory.Id, Name = updateCategory.Name });
+            var existingCategory = new Category
+            {
+                Id = updateCategory.Id,
+                Name = "Existing Category",
+                Slug = "existing-category",
+                RobotsIndex = true,
+                RobotsFollow = true,
+                IsPublished = true,
+            };
+            this._mockGenericRepository.Setup(repo => repo.GetByIdAsync(updateCategory.Id)).ReturnsAsync(existingCategory);
+            this._mockGenericRepository.Setup(repo => repo.UpdateAsync(existingCategory)).ReturnsAsync(1);
+            this._mockMapper.Setup(m => m.Map(updateCategory, existingCategory))
+                .Callback<UpdateCategory, Category>((source, destination) => destination.Name = source.Name)
+                .Returns(existingCategory);
 
             // Act
             var result = await this._categoryService.UpdateAsync(updateCategory);
@@ -90,6 +102,11 @@ namespace BlazorShop.Tests.Application.Services
             // Assert
             Assert.True(result.Success);
             Assert.Equal("Category updated successfully", result.Message);
+            Assert.Equal("Updated Category", existingCategory.Name);
+            Assert.Equal("existing-category", existingCategory.Slug);
+            Assert.True(existingCategory.RobotsIndex);
+            Assert.True(existingCategory.RobotsFollow);
+            Assert.True(existingCategory.IsPublished);
         }
 
         [Fact]

@@ -19,6 +19,10 @@
 
         public DbSet<Product> Products { get; set; }
 
+        public DbSet<SeoRedirect> SeoRedirects { get; set; }
+
+        public DbSet<SeoSettings> SeoSettings { get; set; }
+
         public DbSet<ProductVariant> ProductVariants { get; set; } // new
 
         public DbSet<RefreshToken> RefreshTokens { get; set; }
@@ -36,9 +40,7 @@
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
-
-            builder.Entity<Product>()
-                .HasIndex(p => new { p.CategoryId, p.CreatedOn });
+            builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
             // ProductVariant configuration
             builder.Entity<ProductVariant>()

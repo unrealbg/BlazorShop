@@ -29,6 +29,18 @@ namespace BlazorShop.Infrastructure.Repositories
                     Image = product.Image,
                     Quantity = product.Quantity,
                     CreatedOn = product.CreatedOn,
+                    Slug = product.Slug,
+                    MetaTitle = product.MetaTitle,
+                    MetaDescription = product.MetaDescription,
+                    CanonicalUrl = product.CanonicalUrl,
+                    OgTitle = product.OgTitle,
+                    OgDescription = product.OgDescription,
+                    OgImage = product.OgImage,
+                    RobotsIndex = product.RobotsIndex,
+                    RobotsFollow = product.RobotsFollow,
+                    SeoContent = product.SeoContent,
+                    IsPublished = product.IsPublished,
+                    PublishedOn = product.PublishedOn,
                     CategoryId = product.CategoryId,
                 })
                 .ToListAsync();

@@ -234,10 +234,21 @@
         {
             // Arrange
             var product = new UpdateProduct { Id = Guid.NewGuid(), Name = "Product1" };
-            var mappedProduct = new Product { Id = product.Id, Name = "Product1" };
-            this._mockMapper.Setup(mapper => mapper.Map<Product>(product))
-                       .Returns(mappedProduct);
-            this._mockProductRepository.Setup(repo => repo.UpdateAsync(mappedProduct))
+            var existingProduct = new Product
+            {
+                Id = product.Id,
+                Name = "Existing Product",
+                Slug = "existing-product",
+                RobotsIndex = true,
+                RobotsFollow = true,
+                IsPublished = true,
+            };
+            this._mockProductRepository.Setup(repo => repo.GetByIdAsync(product.Id))
+                .ReturnsAsync(existingProduct);
+            this._mockMapper.Setup(mapper => mapper.Map(product, existingProduct))
+                .Callback<UpdateProduct, Product>((source, destination) => destination.Name = source.Name)
+                .Returns(existingProduct);
+            this._mockProductRepository.Setup(repo => repo.UpdateAsync(existingProduct))
                                   .ReturnsAsync(1);
 
             // Act
@@ -247,8 +258,14 @@
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("Product updated successfully", result.Message);
-            this._mockMapper.Verify(mapper => mapper.Map<Product>(product), Times.Once);
-            this._mockProductRepository.Verify(repo => repo.UpdateAsync(mappedProduct), Times.Once);
+            Assert.Equal("Product1", existingProduct.Name);
+            Assert.Equal("existing-product", existingProduct.Slug);
+            Assert.True(existingProduct.RobotsIndex);
+            Assert.True(existingProduct.RobotsFollow);
+            Assert.True(existingProduct.IsPublished);
+            this._mockProductRepository.Verify(repo => repo.GetByIdAsync(product.Id), Times.Once);
+            this._mockMapper.Verify(mapper => mapper.Map(product, existingProduct), Times.Once);
+            this._mockProductRepository.Verify(repo => repo.UpdateAsync(existingProduct), Times.Once);
         }
 
         [Fact]
@@ -256,10 +273,12 @@
         {
             // Arrange
             var product = new UpdateProduct { Id = Guid.NewGuid(), Name = "Product1" };
-            var mappedProduct = new Product { Id = product.Id, Name = "Product1" };
-            this._mockMapper.Setup(mapper => mapper.Map<Product>(product))
-                       .Returns(mappedProduct);
-            this._mockProductRepository.Setup(repo => repo.UpdateAsync(mappedProduct))
+            var existingProduct = new Product { Id = product.Id, Name = "Existing Product" };
+            this._mockProductRepository.Setup(repo => repo.GetByIdAsync(product.Id))
+                .ReturnsAsync(existingProduct);
+            this._mockMapper.Setup(mapper => mapper.Map(product, existingProduct))
+                .Returns(existingProduct);
+            this._mockProductRepository.Setup(repo => repo.UpdateAsync(existingProduct))
                                   .ReturnsAsync(0);
 
             // Act
@@ -269,8 +288,29 @@
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Product not found", result.Message);
-            this._mockMapper.Verify(mapper => mapper.Map<Product>(product), Times.Once);
-            this._mockProductRepository.Verify(repo => repo.UpdateAsync(mappedProduct), Times.Once);
+            this._mockProductRepository.Verify(repo => repo.GetByIdAsync(product.Id), Times.Once);
+            this._mockMapper.Verify(mapper => mapper.Map(product, existingProduct), Times.Once);
+            this._mockProductRepository.Verify(repo => repo.UpdateAsync(existingProduct), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_WhenProductDoesNotExist_ShouldReturnFailureResponse()
+        {
+            // Arrange
+            var product = new UpdateProduct { Id = Guid.NewGuid(), Name = "Product1" };
+            this._mockProductRepository.Setup(repo => repo.GetByIdAsync(product.Id))
+                .ReturnsAsync((Product?)null);
+
+            // Act
+            var result = await this._productService.UpdateAsync(product);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.False(result.Success);
+            Assert.Equal("Product not found", result.Message);
+            this._mockProductRepository.Verify(repo => repo.GetByIdAsync(product.Id), Times.Once);
+            this._mockMapper.Verify(mapper => mapper.Map(It.IsAny<UpdateProduct>(), It.IsAny<Product>()), Times.Never);
+            this._mockProductRepository.Verify(repo => repo.UpdateAsync(It.IsAny<Product>()), Times.Never);
         }
 
         [Fact]
