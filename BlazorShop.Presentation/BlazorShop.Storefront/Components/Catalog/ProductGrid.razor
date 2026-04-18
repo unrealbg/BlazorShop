@@ -1,11 +1,13 @@
 @if (Products.Count > 0)
 {
-    <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+    <ul class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         @foreach (var product in Products)
         {
-            <ProductCard Product="product" />
+            <li>
+                <ProductCard Product="product" />
+            </li>
         }
-    </div>
+    </ul>
 }
 else
 {

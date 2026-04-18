@@ -18,6 +18,8 @@ else if (_isNotFound)
 else if (_product is not null)
 {
     <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-6" />
+
         <div class="grid gap-8 lg:grid-cols-[1fr_1fr]">
             <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-6">
                 <div class="relative aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-50">
@@ -56,6 +58,23 @@ else if (_product is not null)
                     </div>
                 }
 
+                <div class="mt-8 flex flex-wrap gap-3">
+                    @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
+                    {
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex items-center rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">
+                            Back to @_product.Category.Name
+                        </a>
+                    }
+
+                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:border-sky-300 hover:text-sky-700">
+                        Browse New Releases
+                    </a>
+
+                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:border-sky-300 hover:text-sky-700">
+                        See Today's Deals
+                    </a>
+                </div>
+
                 <div class="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
                     Product discovery now lives on this route-based public page. Cart and checkout interactions remain in the legacy interactive client while the storefront transition continues.
                 </div>
@@ -63,15 +82,43 @@ else if (_product is not null)
         </div>
     </section>
 
-    @if (!string.IsNullOrWhiteSpace(_product.SeoContent))
-    {
-        <section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pb-16">
-            <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
-                <h2 class="text-2xl font-extrabold tracking-tight">More about @_product.Name</h2>
-                <div class="mt-4 whitespace-pre-line text-sm leading-7 text-neutral-700">@_product.SeoContent</div>
-            </div>
-        </section>
-    }
+    <SeoContentSection Title="@ProductSeoContentTitle"
+                       Eyebrow="Product Details"
+                       Content="@_product.SeoContent" />
+
+    <section class="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Keep Exploring</p>
+
+            @if (_relatedProducts.Count > 0)
+            {
+                <h2 class="mt-2 text-2xl font-extrabold tracking-tight">More from @_product.Category?.Name</h2>
+                <div class="mt-8">
+                    <ProductGrid Products="_relatedProducts" EmptyMessage="No additional related products are available right now." />
+                </div>
+            }
+            else
+            {
+                <h2 class="mt-2 text-2xl font-extrabold tracking-tight">Keep browsing the public catalog</h2>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
+                    {
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex items-center rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">
+                            Explore @_product.Category.Name
+                        </a>
+                    }
+
+                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:border-sky-300 hover:text-sky-700">
+                        Browse New Releases
+                    </a>
+
+                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:border-sky-300 hover:text-sky-700">
+                        See Today's Deals
+                    </a>
+                </div>
+            }
+        </div>
+    </section>
 }
 
 @code {
@@ -79,7 +126,13 @@ else if (_product is not null)
     private bool _isNotFound;
     private bool _isServiceUnavailable;
     private GetProduct? _product;
+    private IReadOnlyList<StorefrontBreadcrumbItem> _breadcrumbs = [];
+    private IReadOnlyList<GetCatalogProduct> _relatedProducts = [];
     private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    private string ProductSeoContentTitle => _product?.Name is { Length: > 0 } productName
+        ? $"More about {productName}"
+        : string.Empty;
 
     [Parameter]
     public string Slug { get; set; } = string.Empty;
@@ -96,6 +149,8 @@ else if (_product is not null)
             _product = null;
             _isNotFound = false;
             _isServiceUnavailable = true;
+            _breadcrumbs = [];
+            _relatedProducts = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
@@ -115,6 +170,8 @@ else if (_product is not null)
         {
             _isNotFound = true;
             _isServiceUnavailable = false;
+            _breadcrumbs = [];
+            _relatedProducts = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
@@ -130,8 +187,54 @@ else if (_product is not null)
 
         _isNotFound = false;
         _isServiceUnavailable = false;
-        _metadata = await SeoComposer.ComposeProductPageAsync(_product);
-        _structuredData = await StructuredDataComposer.ComposeProductPageAsync(_product);
+        _breadcrumbs = BuildBreadcrumbs(_product);
+
+        var metadataTask = SeoComposer.ComposeProductPageAsync(_product);
+        var structuredDataTask = StructuredDataComposer.ComposeProductPageAsync(_product);
+        var relatedProductsTask = GetRelatedProductsAsync(_product);
+
+        await Task.WhenAll(metadataTask, structuredDataTask, relatedProductsTask);
+
+        _metadata = await metadataTask;
+        _structuredData = await structuredDataTask;
+        _relatedProducts = await relatedProductsTask;
+    }
+
+    private static IReadOnlyList<StorefrontBreadcrumbItem> BuildBreadcrumbs(GetProduct product)
+    {
+        var breadcrumbs = new List<StorefrontBreadcrumbItem>
+        {
+            new("Home", StorefrontRoutes.Home),
+        };
+
+        if (!string.IsNullOrWhiteSpace(product.Category?.Slug) && !string.IsNullOrWhiteSpace(product.Category?.Name))
+        {
+            breadcrumbs.Add(new StorefrontBreadcrumbItem(product.Category.Name, StorefrontRoutes.Category(product.Category.Slug)));
+        }
+
+        breadcrumbs.Add(new StorefrontBreadcrumbItem(product.Name ?? "Product"));
+
+        return breadcrumbs;
+    }
+
+    private async Task<IReadOnlyList<GetCatalogProduct>> GetRelatedProductsAsync(GetProduct product)
+    {
+        if (string.IsNullOrWhiteSpace(product.Category?.Slug))
+        {
+            return [];
+        }
+
+        var categoryPageResult = await ApiClient.GetPublishedCategoryBySlugAsync(product.Category.Slug);
+        if (!categoryPageResult.IsSuccess || categoryPageResult.Value is null)
+        {
+            return [];
+        }
+
+        return categoryPageResult.Value.Products
+            .Where(relatedProduct => relatedProduct.Id != product.Id)
+            .Where(relatedProduct => !string.IsNullOrWhiteSpace(relatedProduct.Slug))
+            .Take(3)
+            .ToArray();
     }
 
     private static string ScaleLabel(int scale)

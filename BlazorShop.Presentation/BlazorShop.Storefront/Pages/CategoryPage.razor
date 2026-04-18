@@ -18,6 +18,8 @@ else if (_isNotFound)
 else if (_categoryPage is not null)
 {
     <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-6" />
+
         <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Category</p>
             <h1 class="mt-2 text-4xl font-extrabold tracking-tight">@_categoryPage.Category.Name</h1>
@@ -29,19 +31,18 @@ else if (_categoryPage is not null)
     </section>
 
     <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
+        <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Products</p>
+            <h2 class="mt-2 text-3xl font-extrabold tracking-tight">Browse @_categoryPage.Category.Name</h2>
+        </div>
+
         <ProductGrid Products="_categoryPage.Products"
                      EmptyMessage="This published category does not have any public products yet." />
     </section>
 
-    @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.SeoContent))
-    {
-        <section class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pb-16">
-            <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
-                <h2 class="text-2xl font-extrabold tracking-tight">More about @_categoryPage.Category.Name</h2>
-                <div class="mt-4 whitespace-pre-line text-sm leading-7 text-neutral-700">@_categoryPage.Category.SeoContent</div>
-            </div>
-        </section>
-    }
+    <SeoContentSection Title="@CategorySeoContentTitle"
+                       Eyebrow="Category Guide"
+                       Content="@_categoryPage.Category.SeoContent" />
 }
 
 @code {
@@ -49,7 +50,12 @@ else if (_categoryPage is not null)
     private bool _isNotFound;
     private bool _isServiceUnavailable;
     private SeoMetadataDto _metadata = new();
+    private IReadOnlyList<StorefrontBreadcrumbItem> _breadcrumbs = [];
     private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    private string CategorySeoContentTitle => _categoryPage is null
+        ? string.Empty
+        : $"More about {_categoryPage.Category.Name}";
 
     [Parameter]
     public string Slug { get; set; } = string.Empty;
@@ -66,6 +72,7 @@ else if (_categoryPage is not null)
             _categoryPage = null;
             _isNotFound = false;
             _isServiceUnavailable = true;
+            _breadcrumbs = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
@@ -85,6 +92,7 @@ else if (_categoryPage is not null)
         {
             _isNotFound = true;
             _isServiceUnavailable = false;
+            _breadcrumbs = [];
             _structuredData = StorefrontStructuredDataDocument.Empty;
             if (HttpContext is not null)
             {
@@ -100,6 +108,11 @@ else if (_categoryPage is not null)
 
         _isNotFound = false;
         _isServiceUnavailable = false;
+        _breadcrumbs =
+        [
+            new StorefrontBreadcrumbItem("Home", StorefrontRoutes.Home),
+            new StorefrontBreadcrumbItem(_categoryPage.Category.Name ?? "Category"),
+        ];
         _metadata = await SeoComposer.ComposeCategoryPageAsync(_categoryPage.Category);
         _structuredData = await StructuredDataComposer.ComposeCategoryPageAsync(_categoryPage.Category);
     }

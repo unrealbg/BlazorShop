@@ -27,9 +27,18 @@
 
         <p class="mt-2 text-sm text-neutral-600 leading-6">@Truncate(Product.Description)</p>
 
-        <div class="mt-5 relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
-            <img src="@Product.Image" alt="@Product.Name" class="absolute inset-0 h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
-        </div>
+        @if (!string.IsNullOrWhiteSpace(Product.Slug))
+        {
+            <a href="@StorefrontRoutes.Product(Product.Slug)" aria-label="View @Product.Name" class="mt-5 block relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
+                <img src="@Product.Image" alt="@Product.Name" class="absolute inset-0 h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
+            </a>
+        }
+        else
+        {
+            <div class="mt-5 relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
+                <img src="@Product.Image" alt="@Product.Name" class="absolute inset-0 h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
+            </div>
+        }
     </div>
     <div class="flex items-center justify-between gap-4 border-t border-neutral-100 px-6 py-4">
         <div>

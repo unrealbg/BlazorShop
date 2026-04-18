@@ -1,0 +1,55 @@
+@if (_paragraphs.Count > 0)
+{
+    <section class="@ClassName">
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            @if (!string.IsNullOrWhiteSpace(Eyebrow))
+            {
+                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">@Eyebrow</p>
+            }
+
+            <h2 class="mt-2 text-2xl font-extrabold tracking-tight">@Title</h2>
+
+            <div class="mt-5 space-y-4">
+                @foreach (var paragraph in _paragraphs)
+                {
+                    <p class="whitespace-pre-line text-sm leading-7 text-neutral-700">@paragraph</p>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<string> _paragraphs = Array.Empty<string>();
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Content { get; set; }
+
+    [Parameter]
+    public string Eyebrow { get; set; } = "More to know";
+
+    [Parameter]
+    public string ClassName { get; set; } = "mx-auto max-w-5xl px-4 pb-16 sm:px-6 lg:px-8";
+
+    protected override void OnParametersSet()
+    {
+        _paragraphs = SplitParagraphs(Content);
+    }
+
+    private static IReadOnlyList<string> SplitParagraphs(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<string>();
+        }
+
+        return value
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(paragraph => !string.IsNullOrWhiteSpace(paragraph))
+            .ToArray();
+    }
+}
