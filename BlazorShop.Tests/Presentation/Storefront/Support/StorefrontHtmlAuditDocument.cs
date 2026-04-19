@@ -9,22 +9,34 @@ namespace BlazorShop.Tests.Presentation.Storefront
         private static readonly Regex AttributeRegex = new("(?<name>[\\w:-]+)\\s*=\\s*(?<quote>['\"])(?<value>.*?)\\k<quote>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
 
         private readonly IReadOnlyList<IReadOnlyDictionary<string, string>> _anchorTags;
+        private readonly IReadOnlyList<IReadOnlyDictionary<string, string>> _imageTags;
         private readonly IReadOnlyList<IReadOnlyDictionary<string, string>> _linkTags;
         private readonly IReadOnlyList<IReadOnlyDictionary<string, string>> _metaTags;
+        private readonly IReadOnlyList<IReadOnlyDictionary<string, string>> _scriptTags;
 
         private StorefrontHtmlAuditDocument(string html)
         {
             _linkTags = ExtractStartTags(html, "link");
             _metaTags = ExtractStartTags(html, "meta");
             _anchorTags = ExtractStartTags(html, "a");
+            _imageTags = ExtractStartTags(html, "img");
+            _scriptTags = ExtractStartTags(html, "script");
             JsonLdBlocks = ExtractJsonLdBlocks(html);
         }
+
+        public IReadOnlyList<string> AssetUrls => EnumerateAssetUrls()
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
         public IReadOnlyList<string> AnchorHrefs => _anchorTags
             .Select(tag => GetAttribute(tag, "href"))
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value!)
             .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        public IReadOnlyList<string> BrokenAssetUrls => AssetUrls
+            .Where(IsBrokenHref)
             .ToArray();
 
         public IReadOnlyList<string> BrokenAnchorHrefs => AnchorHrefs
@@ -62,10 +74,15 @@ namespace BlazorShop.Tests.Presentation.Storefront
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
+        public static StorefrontHtmlAuditDocument Create(string html)
+        {
+            return new StorefrontHtmlAuditDocument(html);
+        }
+
         public static async Task<StorefrontHtmlAuditDocument> CreateAsync(HttpResponseMessage response)
         {
             var html = await response.Content.ReadAsStringAsync();
-            return new StorefrontHtmlAuditDocument(html);
+            return Create(html);
         }
 
         public bool ContainsJsonProperty(string propertyName)
@@ -135,6 +152,31 @@ namespace BlazorShop.Tests.Presentation.Storefront
                     }
 
                     break;
+            }
+        }
+
+        private IEnumerable<string> EnumerateAssetUrls()
+        {
+            foreach (var value in _imageTags
+                .Select(tag => GetAttribute(tag, "src"))
+                .Where(value => !string.IsNullOrWhiteSpace(value)))
+            {
+                yield return value!;
+            }
+
+            foreach (var value in _scriptTags
+                .Select(tag => GetAttribute(tag, "src"))
+                .Where(value => !string.IsNullOrWhiteSpace(value)))
+            {
+                yield return value!;
+            }
+
+            foreach (var value in _linkTags
+                .Where(tag => !string.Equals(GetAttribute(tag, "rel"), "canonical", StringComparison.OrdinalIgnoreCase))
+                .Select(tag => GetAttribute(tag, "href"))
+                .Where(value => !string.IsNullOrWhiteSpace(value)))
+            {
+                yield return value!;
             }
         }
 

@@ -215,15 +215,80 @@ First inspection steps:
 3. For redirect anomalies, inspect the active redirect records for the logged source and target paths.
 4. For discovery failures, fetch `/sitemap.xml` and `/robots.txt` directly from the public origin and confirm the current response status, cache headers, and body.
 
+## Storefront SEO Smoke Checks
+
+The test project now includes a live-storefront SEO smoke suite tagged with `Category=SeoSmoke`. It is designed for fast post-deploy or pre-release verification against a running SSR storefront without browser automation.
+
+Run it with:
+
+```powershell
+dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"
+```
+
+Required environment variable:
+
+- `BLAZORSHOP_SEO_SMOKE_BASE_URL`: absolute storefront base URL to test, for example `https://shop.example.com/` or `https://localhost:18597/`
+
+Optional environment variables:
+
+- `BLAZORSHOP_SEO_SMOKE_ALLOW_INVALID_CERTIFICATE=true`: only for local/dev HTTPS when the certificate is not trusted
+- `BLAZORSHOP_SEO_SMOKE_REQUIRE_CONFIGURATION=true`: useful in CI or release automation; fails the smoke suite if `BLAZORSHOP_SEO_SMOKE_BASE_URL` was not provided
+- `BLAZORSHOP_SEO_SMOKE_STATIC_PATH`: defaults to `/about-us`
+- `BLAZORSHOP_SEO_SMOKE_CATEGORY_PATH`: defaults to `/category/sneakers`
+- `BLAZORSHOP_SEO_SMOKE_PRODUCT_PATH`: defaults to `/product/metro-runner`
+- `BLAZORSHOP_SEO_SMOKE_MISSING_PATH`: defaults to `/product/missing-product`
+- `BLAZORSHOP_SEO_SMOKE_REDIRECT_SOURCE_PATH`: defaults to `/product/legacy-runner`; set both redirect variables blank to disable the redirect-specific smoke check
+- `BLAZORSHOP_SEO_SMOKE_REDIRECT_TARGET_PATH`: defaults to `/product/metro-runner`
+- `BLAZORSHOP_SEO_SMOKE_REDIRECT_STATUS_CODE`: defaults to `301`
+
+The default category/product/redirect routes assume the local demo/seeded storefront data already used by the SEO QA layer. For deployed environments that do not carry those demo slugs, set the route variables explicitly to stable published URLs that should always exist.
+
+If `BLAZORSHOP_SEO_SMOKE_BASE_URL` is not set, the smoke tests do not issue live requests. That keeps the normal full test pass green by default. For release automation, set both `BLAZORSHOP_SEO_SMOKE_BASE_URL` and `BLAZORSHOP_SEO_SMOKE_REQUIRE_CONFIGURATION=true` so a missing target configuration fails the smoke stage instead of turning into a no-op.
+
+Local example:
+
+```powershell
+$env:BLAZORSHOP_SEO_SMOKE_BASE_URL = "https://localhost:18597/"
+$env:BLAZORSHOP_SEO_SMOKE_ALLOW_INVALID_CERTIFICATE = "true"
+dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"
+```
+
+Deployed-environment example:
+
+```powershell
+$env:BLAZORSHOP_SEO_SMOKE_BASE_URL = "https://shop.example.com/"
+$env:BLAZORSHOP_SEO_SMOKE_STATIC_PATH = "/about-us"
+$env:BLAZORSHOP_SEO_SMOKE_CATEGORY_PATH = "/category/sneakers"
+$env:BLAZORSHOP_SEO_SMOKE_PRODUCT_PATH = "/product/metro-runner"
+$env:BLAZORSHOP_SEO_SMOKE_MISSING_PATH = "/product/missing-product"
+$env:BLAZORSHOP_SEO_SMOKE_REDIRECT_SOURCE_PATH = "/product/legacy-runner"
+$env:BLAZORSHOP_SEO_SMOKE_REDIRECT_TARGET_PATH = "/product/metro-runner"
+dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"
+```
+
+Smoke checks currently verify:
+
+- home, one static page, one category page, and one product page return `200`, expose a single expected canonical, stay indexable, emit expected JSON-LD types, and avoid obvious broken asset references
+- one missing product/category route returns `404` without canonical or structured data and keeps `noindex, nofollow` protection on the response
+- `/sitemap.xml` returns XML and includes the critical smoke URLs
+- `/robots.txt` returns plain text and references the sitemap URL
+- one deterministic old-slug redirect returns the expected redirect status and target when configured
+
+Release-blocker guidance:
+
+- Treat any failing smoke assertion as a release blocker for the checked environment.
+- If the redirect smoke check is intentionally disabled because no deterministic old slug exists in that environment, that skip is acceptable, but the other smoke checks should still pass before traffic is opened.
+
 ## Pre-release Verification
 
 Run this checklist before promoting a release candidate.
 
 1. Run `dotnet test BlazorShop.sln -c Release`.
-2. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
-3. Run `docker compose -f compose.production.yml build api web`.
-4. Apply database migrations before opening traffic. In the standard runtime path this repository applies migrations on API startup, but if your deployment process separates migration execution from app startup, run that migration step explicitly and verify it completed successfully.
-5. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
+2. Run `dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"` against the actual running storefront environment with `BLAZORSHOP_SEO_SMOKE_BASE_URL` and any required route overrides set.
+3. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
+4. Run `docker compose -f compose.production.yml build api web`.
+5. Apply database migrations before opening traffic. In the standard runtime path this repository applies migrations on API startup, but if your deployment process separates migration execution from app startup, run that migration step explicitly and verify it completed successfully.
+6. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
 
 Suggested smoke-test focus:
 
