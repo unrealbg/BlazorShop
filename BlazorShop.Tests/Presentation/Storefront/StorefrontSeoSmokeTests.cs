@@ -7,14 +7,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
     [Trait("Category", "SeoSmoke")]
     public class StorefrontSeoSmokeTests
     {
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task HomePage_Returns200WithExpectedCanonicalAndStructuredData()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync(smokeClient.Settings.HomePath);
             var document = await StorefrontHtmlAuditDocument.CreateAsync(response);
@@ -27,14 +23,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 "WebSite");
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task StaticInformationalPage_Returns200WithExpectedCanonicalAndStructuredData()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync(smokeClient.Settings.StaticPagePath);
             var document = await StorefrontHtmlAuditDocument.CreateAsync(response);
@@ -46,14 +38,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 "WebPage");
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task CategoryPage_Returns200WithExpectedCanonicalAndStructuredData()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync(smokeClient.Settings.CategoryPath);
             var document = await StorefrontHtmlAuditDocument.CreateAsync(response);
@@ -66,14 +54,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 "BreadcrumbList");
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task ProductPage_Returns200WithExpectedCanonicalAndStructuredData()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync(smokeClient.Settings.ProductPath);
             var document = await StorefrontHtmlAuditDocument.CreateAsync(response);
@@ -87,14 +71,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 "BreadcrumbList");
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task MissingRoute_Returns404WithoutCanonicalAndWithNoindexProtection()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync(smokeClient.Settings.MissingPath);
             var document = await StorefrontHtmlAuditDocument.CreateAsync(response);
@@ -102,14 +82,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
             StorefrontSeoSmokeAssertions.AssertNoindexedErrorSurface(response, document, HttpStatusCode.NotFound);
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task Sitemap_ReturnsXmlAndContainsCriticalRoutes()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync("/sitemap.xml");
             var document = await StorefrontSitemapAuditDocument.CreateAsync(response);
@@ -123,14 +99,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 smokeClient.Settings.ResolveAbsoluteUrl(smokeClient.Settings.ProductPath));
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact]
         public async Task RobotsTxt_IsAvailableAndReferencesSitemap()
         {
-            using var smokeClient = CreateSmokeClientOrSkip();
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail();
 
             using var response = await smokeClient.GetAsync("/robots.txt");
             var content = await response.Content.ReadAsStringAsync();
@@ -141,14 +113,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 smokeClient.Settings.ResolveAbsoluteUrl("/sitemap.xml"));
         }
 
-        [Fact]
+        [StorefrontSeoSmokeFact(requireRedirect: true)]
         public async Task RedirectSource_ReturnsExpectedSingleHopCanonicalTarget()
         {
-            using var smokeClient = CreateSmokeClientOrSkip(requireRedirect: true);
-            if (smokeClient is null)
-            {
-                return;
-            }
+            using var smokeClient = CreateSmokeClientOrFail(requireRedirect: true);
 
             using var redirectResponse = await smokeClient.GetAsync(smokeClient.Settings.RedirectSourcePath!);
             StorefrontSeoSmokeAssertions.AssertPermanentRedirect(
@@ -165,20 +133,16 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 smokeClient.Settings.ResolveExpectedCanonicalUrl(smokeClient.Settings.RedirectTargetPath!));
         }
 
-        private static StorefrontSeoSmokeClient? CreateSmokeClientOrSkip(bool requireRedirect = false)
+        private static StorefrontSeoSmokeClient CreateSmokeClientOrFail(bool requireRedirect = false)
         {
             var settings = StorefrontSeoSmokeSettings.FromEnvironment();
-            if (!settings.IsEnabled)
-            {
-                Assert.False(
-                    settings.RequireConfiguration,
-                    $"Set {StorefrontSeoSmokeSettings.BaseUrlEnvironmentVariableName} to run the storefront SEO smoke suite.");
-                return null;
-            }
+            Assert.True(settings.IsEnabled, $"Set {StorefrontSeoSmokeSettings.BaseUrlEnvironmentVariableName} to run the storefront SEO smoke suite.");
 
-            if (requireRedirect && !settings.HasRedirectExpectation)
+            if (requireRedirect)
             {
-                return null;
+                Assert.True(
+                    settings.HasRedirectExpectation,
+                    $"Set both {StorefrontSeoSmokeSettings.RedirectSourcePathEnvironmentVariableName} and {StorefrontSeoSmokeSettings.RedirectTargetPathEnvironmentVariableName}, or leave them unset to use the default redirect smoke route.");
             }
 
             return new StorefrontSeoSmokeClient(settings);

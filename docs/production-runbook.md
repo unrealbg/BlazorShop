@@ -243,7 +243,7 @@ Optional environment variables:
 
 The default category/product/redirect routes assume the local demo/seeded storefront data already used by the SEO QA layer. For deployed environments that do not carry those demo slugs, set the route variables explicitly to stable published URLs that should always exist.
 
-If `BLAZORSHOP_SEO_SMOKE_BASE_URL` is not set, the smoke tests do not issue live requests. That keeps the normal full test pass green by default. For release automation, set both `BLAZORSHOP_SEO_SMOKE_BASE_URL` and `BLAZORSHOP_SEO_SMOKE_REQUIRE_CONFIGURATION=true` so a missing target configuration fails the smoke stage instead of turning into a no-op.
+If `BLAZORSHOP_SEO_SMOKE_BASE_URL` is not set, the smoke tests are skipped by default so the normal full test pass stays green without a live storefront target. For release automation, set both `BLAZORSHOP_SEO_SMOKE_BASE_URL` and `BLAZORSHOP_SEO_SMOKE_REQUIRE_CONFIGURATION=true` so a missing target configuration fails the smoke stage instead of being skipped.
 
 Local example:
 
