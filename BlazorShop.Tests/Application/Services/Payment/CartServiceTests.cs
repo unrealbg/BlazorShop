@@ -194,6 +194,53 @@ namespace BlazorShop.Tests.Application.Services.Payment
         }
 
         [Fact]
+        public async Task ConfirmOrderAsync_ShouldPersistRealOrder_ForConfirmedCheckout()
+        {
+            // Arrange
+            var productId = Guid.NewGuid();
+            var carts = new List<ProcessCart>
+            {
+                new ProcessCart
+                {
+                    ProductId = productId,
+                    Quantity = 2,
+                }
+            };
+            var products = new List<Product>
+            {
+                new Product
+                {
+                    Id = productId,
+                    Price = 12.5m,
+                }
+            };
+            Order? createdOrder = null;
+
+            _productReadRepositoryMock
+                .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(products.ToDictionary(product => product.Id));
+
+            _orderRepositoryMock
+                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
+                .Callback<Order>(order => createdOrder = order)
+                .ReturnsAsync(Guid.NewGuid());
+
+            // Act
+            var result = await _cartService.ConfirmOrderAsync(carts, "user-1", "Paid");
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.NotNull(createdOrder);
+            Assert.Equal("user-1", createdOrder!.UserId);
+            Assert.Equal("Paid", createdOrder.Status);
+            Assert.Equal(25m, createdOrder.TotalAmount);
+            Assert.Single(createdOrder.Lines);
+            Assert.Equal(2, createdOrder.Lines.First().Quantity);
+            Assert.Equal(12.5m, createdOrder.Lines.First().UnitPrice);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Once);
+        }
+
+        [Fact]
         public async Task GetOrderItemsAsync_ShouldReturnOrderItems_WhenHistoryExists()
         {
             // Arrange

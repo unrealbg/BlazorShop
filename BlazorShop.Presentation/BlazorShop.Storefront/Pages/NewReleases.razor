@@ -5,14 +5,20 @@
 
 <SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
-<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex items-end justify-between gap-4">
-        <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Catalog</p>
-            <h1 class="mt-2 text-3xl font-extrabold tracking-tight">New Releases</h1>
+<section class="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
+    <div class="text-center">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">New Releases</p>
+        <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-neutral-900">Fresh Arrivals This Week</h1>
+        <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Hand-picked products and newly published items across the BlazorShop catalog.</p>
+
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Today's Deals</a>
+            <a href="@StorefrontRoutes.Home" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">Back to Home</a>
         </div>
     </div>
+</section>
 
+<section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
     @if (_isServiceUnavailable)
     {
         <ServiceUnavailableState Title="New releases are temporarily unavailable"
@@ -20,9 +26,12 @@
     }
     else
     {
-        <div class="mt-8">
-            <ProductGrid Products="_products" EmptyMessage="No new releases have been published yet." />
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-2xl font-extrabold tracking-tight text-neutral-900">Latest Products</h2>
+            <span class="inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-neutral-700 shadow">@_products.Count picks</span>
         </div>
+
+        <ProductGrid Products="_products" EmptyMessage="No new releases have been published yet." />
     }
 </section>
 

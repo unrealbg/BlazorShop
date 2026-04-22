@@ -1,54 +1,102 @@
-<article class="group relative rounded-2xl bg-white/95 border border-neutral-200/70 shadow-md hover:shadow-2xl transition-all duration-300 overflow-hidden hover:-translate-y-0.5">
+<article class="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200/70 bg-white/95 shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl">
     <div class="p-6">
-        @if (!string.IsNullOrWhiteSpace(Product.CategoryName))
-        {
-            <div class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
-                @if (!string.IsNullOrWhiteSpace(Product.CategorySlug))
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                @if (!string.IsNullOrWhiteSpace(Product.CategoryName))
                 {
-                    <a href="@StorefrontRoutes.Category(Product.CategorySlug)" class="hover:text-neutral-900">@Product.CategoryName</a>
+                    if (!string.IsNullOrWhiteSpace(Product.CategorySlug))
+                    {
+                        <a href="@StorefrontRoutes.Category(Product.CategorySlug)" class="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500 hover:text-neutral-900">@Product.CategoryName</a>
+                    }
+                    else
+                    {
+                        <span class="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">@Product.CategoryName</span>
+                    }
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Product.Slug))
+                {
+                    <a href="@StorefrontRoutes.Product(Product.Slug)" class="block">
+                        <h2 class="mt-2 text-lg font-extrabold text-neutral-900 transition-colors group-hover:text-neutral-950">@Product.Name</h2>
+                    </a>
                 }
                 else
                 {
-                    <span>@Product.CategoryName</span>
+                    <h2 class="mt-2 text-lg font-extrabold text-neutral-900">@Product.Name</h2>
                 }
             </div>
-        }
+
+            <div class="flex flex-wrap justify-end gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]">
+                @if (IsNewArrival)
+                {
+                    <span class="inline-block rounded bg-green-600/90 px-2 py-0.5 text-white">New</span>
+                }
+                @if (Product.HasVariants)
+                {
+                    <span class="inline-block rounded bg-amber-100 px-2 py-0.5 text-amber-800">Variants</span>
+                }
+            </div>
+        </div>
+
+        <p class="mt-2 text-[15px]"><span class="text-rose-600 font-semibold">@PriceLabel</span> <span class="font-semibold">€ @Product.Price</span></p>
 
         @if (!string.IsNullOrWhiteSpace(Product.Slug))
         {
-            <a href="@StorefrontRoutes.Product(Product.Slug)" class="block">
-                <h2 class="text-lg font-extrabold text-neutral-900 group-hover:text-sky-700 transition-colors">@Product.Name</h2>
+            <a href="@StorefrontRoutes.Product(Product.Slug)" aria-label="View @Product.Name" class="mt-4 block">
+                <div class="relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
+                    <img src="@Product.Image" alt="@Product.Name" class="absolute inset-0 h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
+                </div>
             </a>
         }
         else
         {
-            <h2 class="text-lg font-extrabold text-neutral-900">@Product.Name</h2>
-        }
-
-        <p class="mt-2 text-sm text-neutral-600 leading-6">@Truncate(Product.Description)</p>
-
-        @if (!string.IsNullOrWhiteSpace(Product.Slug))
-        {
-            <a href="@StorefrontRoutes.Product(Product.Slug)" aria-label="View @Product.Name" class="mt-5 block relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
-                <img src="@Product.Image" alt="@Product.Name" class="absolute inset-0 h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
-            </a>
-        }
-        else
-        {
-            <div class="mt-5 relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
+            <div class="mt-4 relative aspect-[4/3] overflow-hidden rounded-xl bg-neutral-50">
                 <img src="@Product.Image" alt="@Product.Name" class="absolute inset-0 h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-105" />
             </div>
         }
+
+        <p class="mt-4 text-sm leading-6 text-neutral-700">@Truncate(Product.Description)</p>
     </div>
-    <div class="flex items-center justify-between gap-4 border-t border-neutral-100 px-6 py-4">
-        <div>
-            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Price</div>
-            <div class="mt-1 text-xl font-extrabold text-neutral-900">€ @Product.Price</div>
+
+    <div class="mt-auto border-t border-neutral-100 px-6 py-4 text-sm">
+        <div class="flex flex-wrap gap-2">
+            @if (CanAddDirectly)
+            {
+                <button type="button"
+                        class="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white transition hover:bg-amber-600"
+                        data-storefront-add-to-cart
+                        data-default-label="Add to Cart"
+                        data-success-label="Added"
+                        data-product-id="@Product.Id"
+                        data-product-name="@Product.Name"
+                        data-unit-price="@UnitPriceValue">
+                    Add to Cart
+                </button>
+            }
+            else if (!string.IsNullOrWhiteSpace(ProductPurchaseUrl))
+            {
+                <a href="@ProductPurchaseUrl" class="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white transition hover:bg-amber-600">
+                    Add to Cart
+                </a>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(ProductUrl))
+            {
+                <a href="@ProductUrl" class="inline-flex items-center justify-center rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-800">
+                    View Product
+                </a>
+            }
         </div>
-        @if (!string.IsNullOrWhiteSpace(Product.Slug))
+
+        @if (Product.HasVariants)
         {
-            <a href="@StorefrontRoutes.Product(Product.Slug)" class="inline-flex items-center rounded-md bg-neutral-900 text-white px-4 py-2 text-sm font-semibold hover:bg-neutral-800">
-                View Product
+            <p class="mt-3 text-xs font-medium uppercase tracking-[0.16em] text-neutral-500">Select size on the product page before adding.</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Product.CategorySlug) && !string.IsNullOrWhiteSpace(Product.CategoryName))
+        {
+            <a href="@StorefrontRoutes.Category(Product.CategorySlug)" class="mt-3 inline-flex items-center gap-2 text-sm text-neutral-700 hover:text-neutral-900">
+                Browse @Product.CategoryName
             </a>
         }
     </div>
@@ -58,7 +106,23 @@
     [Parameter, EditorRequired]
     public GetCatalogProduct Product { get; set; } = new();
 
-    private static string Truncate(string? value, int maxLength = 140)
+    private bool IsNewArrival => DateTime.UtcNow.Subtract(Product.CreatedOn).TotalDays <= 7;
+
+    private bool CanAddDirectly => !Product.HasVariants;
+
+    private string PriceLabel => Product.HasVariants ? "From" : "Price";
+
+    private string? ProductUrl => string.IsNullOrWhiteSpace(Product.Slug)
+        ? null
+        : StorefrontRoutes.Product(Product.Slug);
+
+    private string? ProductPurchaseUrl => ProductUrl is null
+        ? null
+        : $"{ProductUrl}#purchase";
+
+    private string UnitPriceValue => Product.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Truncate(string? value, int maxLength = 110)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
         {

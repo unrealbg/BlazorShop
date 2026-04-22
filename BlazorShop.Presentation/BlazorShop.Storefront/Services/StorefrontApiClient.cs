@@ -63,6 +63,16 @@ namespace BlazorShop.Storefront.Services
             return GetMaybeNotFoundAsync<GetProduct>($"{PublicProductsRoute}/slug/{Uri.EscapeDataString(slug)}", cancellationToken, CatalogRequestTimeout);
         }
 
+        public Task<StorefrontApiResult<GetProduct>> GetProductByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            if (id == Guid.Empty)
+            {
+                return Task.FromResult(StorefrontApiResult<GetProduct>.NotFound());
+            }
+
+            return GetMaybeNotFoundAsync<GetProduct>($"product/single/{id}", cancellationToken, CatalogRequestTimeout);
+        }
+
         public Task<StorefrontApiResult<GetSeoSettings>> GetSeoSettingsAsync(CancellationToken cancellationToken = default)
         {
             return GetAsync<GetSeoSettings>(SeoSettingsRoute, cancellationToken, requestTimeout: SeoSettingsRequestTimeout);

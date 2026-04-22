@@ -55,7 +55,6 @@
             services.AddDefaultIdentity<AppUser>(
                 opt =>
                     {
-                        opt.SignIn.RequireConfirmedEmail = true;
                         opt.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
                         opt.Lockout.AllowedForNewUsers = true;
                         opt.Lockout.MaxFailedAccessAttempts = 5;

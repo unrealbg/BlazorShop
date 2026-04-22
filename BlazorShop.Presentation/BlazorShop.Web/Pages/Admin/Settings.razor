@@ -1,0 +1,32 @@
+@page "/admin/settings"
+
+<PageTitle>Admin Settings</PageTitle>
+
+<section class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-8">
+        <p class="bs-section-kicker">Admin</p>
+        <h1 class="bs-section-title mt-3">Panel settings and operations</h1>
+        <p class="bs-section-copy mt-4">Use this route as the admin-only operations hub. It keeps system-facing actions distinct from the signed-in account surface and the public storefront.</p>
+    </header>
+
+    <div class="mt-8 grid gap-4 lg:grid-cols-2">
+        <section class="bs-panel p-6">
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Operational Areas</p>
+            <div class="mt-4 flex flex-col gap-3 text-sm font-semibold">
+                <a href="/admin/seo" class="bs-button bs-button-secondary">SEO settings</a>
+                <a href="/admin/redirects" class="bs-button bs-button-secondary">Redirect rules</a>
+                <a href="/admin/products" class="bs-button bs-button-secondary">Catalog management</a>
+                <a href="/admin/orders" class="bs-button bs-button-primary">Order operations</a>
+            </div>
+        </section>
+
+        <section class="bs-panel-soft p-6">
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Boundary Notes</p>
+            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <li>Storefront SEO and public route ownership remain in the SSR storefront.</li>
+                <li>Customer profile, order history, and notification tools remain in the authenticated account surface.</li>
+                <li>This admin settings page exists to keep panel-level actions out of customer-facing shells while the deeper settings feature set evolves.</li>
+            </ul>
+        </section>
+    </div>
+</section>

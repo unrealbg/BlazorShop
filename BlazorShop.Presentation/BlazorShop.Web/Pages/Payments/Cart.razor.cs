@@ -245,7 +245,10 @@
                         {
                             _showPaymentDialog = false;
                             this.StateHasChanged();
-                            this.NavigationManager.NavigateTo("/payment-success", true);
+                            var successPath = string.Equals(paymentMethod.Name, "Cash on Delivery", StringComparison.OrdinalIgnoreCase)
+                                ? "/payment-success?pm=cod"
+                                : "/payment-success?pm=card";
+                            this.NavigationManager.NavigateTo(successPath, true);
                         }
                     }
                 }
@@ -273,7 +276,7 @@
 
         private void Checkout()
         {
-            this.NavigationManager.NavigateTo($"authentication/login/{Constant.Cart.Name}");
+            this.NavigationManager.NavigateTo("/authentication/login/account");
         }
 
         private void Cancel()

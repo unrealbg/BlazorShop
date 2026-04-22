@@ -1,99 +1,83 @@
-﻿@inject BlazorShop.Web.Shared.Services.Contracts.INewsletterService NewsletterService
+﻿@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
-<div class="bg-neutral-900 text-neutral-100">
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+<div class="bs-footer-shell">
+  <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
       <div>
-        <div class="text-lg font-extrabold tracking-wider">BLAZORSHOP®</div>
-        <p class="mt-1 text-sm text-neutral-300">E‑COMMERCE APPLICATION</p>
-        <p class="mt-3 text-sm text-neutral-400">Quality products, fair prices, fast delivery.</p>
+        <div class="text-lg font-extrabold tracking-wider text-white">BLAZORSHOP</div>
+        <p class="mt-1 text-sm text-neutral-300">ACCOUNT MODE</p>
+        <p class="mt-3 text-sm leading-6 text-neutral-400">Orders, notifications, settings, checkout continuation, and admin tools when authorized.</p>
       </div>
 
       <div>
-        <div class="text-sm font-semibold uppercase text-neutral-300">Shop</div>
-        <ul class="mt-3 space-y-2 text-sm">
-          <li><a href="new-releases" class="hover:text-white/80">New Releases</a></li>
-          <li><a href="todays-deals" class="hover:text-white/80">Today's Deals</a></li>
-          <li><a href="my-cart" class="hover:text-white/80">Cart</a></li>
-          <li><a href="about-us" class="hover:text-white/80">About us</a></li>
+        <div class="text-sm font-semibold uppercase text-neutral-300">Account</div>
+        <ul class="mt-3 space-y-2 text-sm text-neutral-300">
+          <li><a href="/account" class="hover:text-white/80">Dashboard</a></li>
+          <li><a href="/account/profile" class="hover:text-white/80">Profile</a></li>
+          <li><a href="/account/orders" class="hover:text-white/80">Orders</a></li>
+          <li><a href="/account/notifications" class="hover:text-white/80">Notifications</a></li>
+          <li><a href="/account/settings" class="hover:text-white/80">Settings</a></li>
         </ul>
       </div>
 
       <div>
-        <div class="text-sm font-semibold uppercase text-neutral-300">Support</div>
-        <ul class="mt-3 space-y-2 text-sm">
-          <li><a href="customer-service" class="hover:text-white/80">Customer Service</a></li>
-          <li><a href="faq" class="hover:text-white/80">FAQ</a></li>
-          <li><a href="privacy" class="hover:text-white/80">Privacy</a></li>
-          <li><a href="terms" class="hover:text-white/80">Terms</a></li>
+        <div class="text-sm font-semibold uppercase text-neutral-300">Access</div>
+        <ul class="mt-3 space-y-2 text-sm text-neutral-300">
+          <li><a href="/" class="hover:text-white/80">Access home</a></li>
+          <AuthorizeView>
+            <Authorized>
+              <li><a href="/authentication/logout" class="hover:text-white/80">Sign out</a></li>
+            </Authorized>
+            <NotAuthorized>
+              <li><a href="/authentication/login/account" class="hover:text-white/80">Sign in</a></li>
+              <li><a href="/authentication/register" class="hover:text-white/80">Register</a></li>
+            </NotAuthorized>
+          </AuthorizeView>
+          <AuthorizeView Roles="Admin">
+            <Authorized>
+              <li><a href="/admin" class="hover:text-white/80">Admin</a></li>
+            </Authorized>
+          </AuthorizeView>
         </ul>
       </div>
 
       <div>
-        <div class="text-sm font-semibold uppercase text-neutral-300">Stay up to date</div>
-        <EditForm Model="this" OnValidSubmit="SubscribeAsync">
-          <div class="mt-3 flex items-center gap-2">
-            <InputText @bind-Value="_email" type="email" class="w-full rounded-md bg-white/10 border border-white/20 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-white/40" placeholder="Your email" />
-            <button type="submit" class="inline-flex items-center rounded bg-white text-neutral-900 px-3 py-2 text-sm font-semibold hover:bg-white/90" disabled="@_isSubmitting">@(_isSubmitting?"Subscribing…":"Subscribe")</button>
-          </div>
-        </EditForm>
-        <p class="mt-2 text-xs text-neutral-400">By subscribing you agree to our <a href="privacy" class="underline">Privacy</a>.</p>
+        <div class="text-sm font-semibold uppercase text-neutral-300">Open</div>
+        <p class="mt-3 text-sm leading-6 text-neutral-400">Jump back into account routes or return to the public store.</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <AuthorizeView>
+            <Authorized>
+              <a href="/account" class="inline-flex items-center rounded bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900 hover:bg-white">Open Account</a>
+            </Authorized>
+            <NotAuthorized>
+              <a href="/authentication/login/account" class="inline-flex items-center rounded bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900 hover:bg-white">Sign in</a>
+            </NotAuthorized>
+          </AuthorizeView>
+          @if (HasPublicStorefrontUrl)
+          {
+            <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">Storefront</a>
+          }
+        </div>
       </div>
     </div>
 
-    <div class="mt-8 border-t border-white/10 pt-4 text-xs text-neutral-400 text-center">© @DateTime.UtcNow.Year BlazorShop. All rights reserved.</div>
+    <div class="mt-8 border-t border-white/10 pt-4 text-xs text-neutral-400 sm:flex sm:items-center sm:justify-between">
+      <p>© @DateTime.UtcNow.Year BlazorShop. All rights reserved.</p>
+      <div class="mt-3 flex flex-wrap gap-4 sm:mt-0">
+        <a href="/" class="hover:text-white/80">Access</a>
+        <a href="/account/orders" class="hover:text-white/80">Orders</a>
+        <a href="/account/notifications" class="hover:text-white/80">Notifications</a>
+        @if (HasPublicStorefrontUrl)
+        {
+          <a href="@PublicStorefrontUrl" class="hover:text-white/80">Storefront</a>
+        }
+      </div>
+    </div>
   </div>
 </div>
 
 @code {
-  private string _email = string.Empty;
-  private bool _isSubmitting = false;
+  private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
 
-  private async Task SubscribeAsync()
-  {
-    if (string.IsNullOrWhiteSpace(_email) || !_email.Contains('@'))
-    {
-      NotificationService.NotifyError(
-        "Please enter a valid email address.",
-        "Newsletter",
-        NotificationKind.Promotion,
-        addToInbox: false);
-        return;
-    }
-
-    try
-    {
-        _isSubmitting = true;
-        var result = await NewsletterService.SubscribeAsync(new BlazorShop.Web.Shared.Models.Newsletter.SubscribeRequest(_email));
-        if (result.Success)
-        {
-            _email = string.Empty;
-          NotificationService.NotifySuccess(
-            "Thanks for subscribing!",
-            "Newsletter",
-            NotificationKind.Promotion,
-            addToInbox: false);
-        }
-        else
-        {
-          NotificationService.NotifyError(
-            result.Message ?? "Subscription failed.",
-            "Newsletter",
-            NotificationKind.Promotion,
-            addToInbox: false);
-        }
-    }
-    catch
-    {
-        NotificationService.NotifyError(
-          "Subscription failed. Please try again later.",
-          "Newsletter",
-          NotificationKind.Promotion,
-          addToInbox: false);
-    }
-    finally
-    {
-        _isSubmitting = false;
-    }
-  }
+  private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 }

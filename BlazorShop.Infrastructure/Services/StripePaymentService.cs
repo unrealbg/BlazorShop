@@ -59,7 +59,7 @@
                     PaymentMethodTypes = ["card"],
                     LineItems = lineItems,
                     Mode = "payment",
-                    SuccessUrl = this.BuildClientUrl("payment-success"),
+                    SuccessUrl = this.BuildClientUrl("payment-success?pm=card"),
                     CancelUrl = this.BuildClientUrl("payment-cancel"),
                 };
 

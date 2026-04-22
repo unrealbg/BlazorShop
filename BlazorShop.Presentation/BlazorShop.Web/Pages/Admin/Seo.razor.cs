@@ -1,4 +1,4 @@
-namespace BlazorShop.Web.Pages.Administration
+namespace BlazorShop.Web.Pages.Admin
 {
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Seo;
@@ -7,7 +7,7 @@ namespace BlazorShop.Web.Pages.Administration
 
     using Microsoft.AspNetCore.Components;
 
-    public partial class SeoPage
+    public partial class Seo
     {
         private SeoAdminTab _activeTab = SeoAdminTab.Settings;
         private UpdateSeoSettings _settings = new();
@@ -38,6 +38,13 @@ namespace BlazorShop.Web.Pages.Administration
         protected override async Task OnInitializedAsync()
         {
             await Task.WhenAll(LoadSettingsAsync(), LoadRedirectsAsync());
+        }
+
+        protected override void OnParametersSet()
+        {
+            _activeTab = NavigationManager.Uri.EndsWith("/admin/redirects", StringComparison.OrdinalIgnoreCase)
+                ? SeoAdminTab.Redirects
+                : SeoAdminTab.Settings;
         }
 
         private async Task LoadSettingsAsync()

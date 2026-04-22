@@ -3,7 +3,7 @@
     <ul class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         @foreach (var product in Products)
         {
-            <li>
+            <li class="h-full">
                 <ProductCard Product="product" />
             </li>
         }
@@ -11,7 +11,7 @@
 }
 else
 {
-    <div class="rounded-2xl border border-dashed border-neutral-300 bg-white/70 px-6 py-12 text-center text-sm text-neutral-600">
+    <div class="rounded-md bg-blue-50 px-6 py-5 text-center text-sm text-blue-800 shadow">
         @EmptyMessage
     </div>
 }

@@ -1,53 +1,89 @@
 ﻿@page "/admin"
-@layout AdminLayout
+
+<PageTitle>Admin Dashboard</PageTitle>
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
-  <div class="rounded-xl bg-white/80 shadow p-6 admin-panel">
-    <header class="text-center">
-      <h2 class="text-2xl font-bold">Admin Dashboard</h2>
+  <div class="bs-panel p-6 admin-panel">
+    <header class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div>
+        <p class="bs-section-kicker">Admin</p>
+        <h1 class="mt-3 text-3xl font-black tracking-tight text-slate-950">Operations dashboard</h1>
+        <p class="mt-3 text-sm leading-6 text-slate-600">Monitor revenue, orders, catalog updates, SEO, redirects, and customer operations from one signed-in workspace.</p>
+      </div>
+
+      <div class="bs-toolbar-cluster">
+        <button class="bs-button bs-button-secondary" @onclick="ExportCsvAsync">Export CSV</button>
+        <a href="/admin/orders" class="bs-button bs-button-primary">Open orders</a>
+        <a href="/admin/products" class="bs-button bs-button-ghost">Catalog</a>
+      </div>
     </header>
 
-    <div class="mt-2 flex items-center justify-end gap-2">
-      <button class="px-3 py-1.5 rounded border hover:bg-neutral-50 text-sm" @onclick="ExportCsvAsync">Export CSV</button>
+    <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <a href="/admin/orders" class="bs-card-link p-5">
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Orders queue</p>
+        <h2 class="mt-3 text-xl font-bold text-slate-950">@_pendingCount pending</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">@_countOrders total orders with shipment state, tracking updates, and manual correction tools.</p>
+      </a>
+
+      <a href="/admin/products" class="bs-card-link p-5">
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Catalog</p>
+        <h2 class="mt-3 text-xl font-bold text-slate-950">Products and pricing</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Review catalog entries, top sellers, pricing, and publication state.</p>
+      </a>
+
+      <a href="/admin/users" class="bs-card-link p-5">
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Users</p>
+        <h2 class="mt-3 text-xl font-bold text-slate-950">Customer operations</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Open user records, role access, and account support workflows.</p>
+      </a>
+
+      <div class="bs-panel-soft p-5">
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Configuration</p>
+        <div class="mt-4 flex flex-col gap-3 text-sm font-semibold">
+          <a href="/admin/categories" class="bs-footer-link">Categories</a>
+          <a href="/admin/seo" class="bs-footer-link">SEO</a>
+          <a href="/admin/settings" class="bs-footer-link">Settings</a>
+        </div>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-      <div class="rounded border p-4 bg-neutral-50">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div class="bs-metric-card p-4">
         <div class="text-sm text-neutral-500">Total Revenue</div>
         <div class="text-2xl font-bold">€ @_totalRevenue.ToString("F2")</div>
       </div>
-      <div class="rounded border p-4 bg-neutral-50">
+      <div class="bs-metric-card p-4">
         <div class="text-sm text-neutral-500">Today's Revenue</div>
         <div class="text-2xl font-bold">€ @_todayRevenue.ToString("F2")</div>
       </div>
-      <div class="rounded border p-4 bg-neutral-50">
+      <div class="bs-metric-card p-4">
         <div class="text-sm text-neutral-500">Orders</div>
         <div class="text-2xl font-bold">@_countOrders</div>
       </div>
-      <div class="rounded border p-4 bg-neutral-50">
+      <div class="bs-metric-card p-4">
         <div class="text-sm text-neutral-500">Delivered</div>
         <div class="text-2xl font-bold">@_deliveredCount</div>
       </div>
     </div>
 
-    <section class="mt-6 rounded border bg-white/90 shadow-sm">
-      <div class="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-4">
+    <section class="bs-panel-soft mt-6">
+      <div class="bs-soft-divider flex flex-wrap items-center justify-between gap-4 border-b px-4 py-4">
         <div>
-          <div class="text-sm text-neutral-500">Sales &amp; Traffic</div>
-          <div class="text-lg font-semibold">@GetMetricsRangeLabel()</div>
+          <div class="bs-section-kicker">Sales &amp; Traffic</div>
+          <div class="mt-2 text-lg font-semibold">@GetMetricsRangeLabel()</div>
         </div>
-        <div class="flex flex-wrap items-center gap-2 text-sm">
-          <div class="flex gap-1">
+        <div class="bs-toolbar-cluster text-sm">
+          <div class="bs-toolbar-cluster gap-2">
             @foreach (var range in new[] { 7, 30, 90 })
             {
               var active = IsQuickRangeSelected(range);
-              <button class="px-3 py-1 rounded border @(active ? "bg-neutral-900 text-white" : "bg-white text-neutral-800")" disabled="@_metricsLoading" @onclick="async () => await ApplyQuickRangeAsync(range)">@range d</button>
+              <button class="bs-tab-button@(active ? " bs-tab-button-active" : string.Empty)" disabled="@_metricsLoading" @onclick="async () => await ApplyQuickRangeAsync(range)">@range d</button>
             }
           </div>
-          <input type="date" class="px-2 py-1 rounded border" value="@_metricsFrom.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, true)" disabled="@_metricsLoading" />
+          <input type="date" value="@_metricsFrom.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, true)" disabled="@_metricsLoading" />
           <span>→</span>
-          <input type="date" class="px-2 py-1 rounded border" value="@_metricsTo.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, false)" disabled="@_metricsLoading" />
-          <select class="px-2 py-1 rounded border" value="@_metricsGranularity" @onchange="async e => await OnGranularityChangedAsync(e)" disabled="@_metricsLoading">
+          <input type="date" value="@_metricsTo.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, false)" disabled="@_metricsLoading" />
+          <select value="@_metricsGranularity" @onchange="async e => await OnGranularityChangedAsync(e)" disabled="@_metricsLoading">
             <option value="day">Daily</option>
             <option value="week">Weekly</option>
             <option value="month">Monthly</option>
@@ -60,7 +96,7 @@
           <div class="text-sm text-neutral-500">Loading metrics…</div>
         }
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <article class="rounded border bg-neutral-50 p-4">
+          <article class="bs-metric-card p-4">
             <div class="flex items-center justify-between text-sm text-neutral-500">
               <span>Sales</span>
               <span class="uppercase tracking-wide">@_salesSeries?.Granularity</span>
@@ -73,7 +109,7 @@
               <canvas id="salesChart"></canvas>
             </div>
           </article>
-          <article class="rounded border bg-neutral-50 p-4">
+          <article class="bs-metric-card p-4">
             <div class="flex items-center justify-between text-sm text-neutral-500">
               <span>Traffic</span>
               <span class="uppercase tracking-wide">@_trafficSeries?.Granularity</span>
@@ -90,18 +126,58 @@
       </div>
     </section>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4 text-sm">
-      <div class="rounded border p-3 text-neutral-700"><b>Pending</b>: @_pendingCount</div>
-      <div class="rounded border p-3 text-blue-700"><b>Shipped</b>: @_shippedCount</div>
-      <div class="rounded border p-3 text-blue-700"><b>InTransit</b>: @_inTransitCount</div>
-      <div class="rounded border p-3 text-emerald-700"><b>OutForDelivery</b>: @_ofdCount</div>
-      <div class="rounded border p-3 text-emerald-800"><b>Delivered</b>: @_deliveredCount</div>
+    <div class="grid gap-4 mt-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+      <section class="bs-panel-soft p-5">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Shipping pipeline</p>
+            <h2 class="mt-2 text-2xl font-bold text-slate-950">Fulfillment status</h2>
+          </div>
+          <a href="/admin/orders" class="bs-button bs-button-secondary">Manage orders</a>
+        </div>
+
+        <div class="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
+          <div class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-neutral-700"><b>Pending</b><div class="mt-1 text-lg font-bold text-slate-950">@_pendingCount</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-blue-700"><b>Shipped</b><div class="mt-1 text-lg font-bold text-slate-950">@_shippedCount</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-blue-700"><b>In transit</b><div class="mt-1 text-lg font-bold text-slate-950">@_inTransitCount</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-emerald-700"><b>Out for delivery</b><div class="mt-1 text-lg font-bold text-slate-950">@_ofdCount</div></div>
+          <div class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-emerald-800"><b>Delivered</b><div class="mt-1 text-lg font-bold text-slate-950">@_deliveredCount</div></div>
+        </div>
+      </section>
+
+      <section class="bs-panel-soft p-5">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Top products</p>
+            <h2 class="mt-2 text-2xl font-bold text-slate-950">Revenue leaders</h2>
+          </div>
+          <a href="/admin/products" class="bs-button bs-button-ghost">Open catalog</a>
+        </div>
+
+        @if (_topProducts.Any())
+        {
+          <div class="mt-5 space-y-3">
+            @foreach (var product in _topProducts.Take(4))
+            {
+              <div class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 text-sm">
+                <div class="font-semibold text-slate-950">@product.Name</div>
+                <div class="mt-1 text-slate-600">Qty: @product.Quantity</div>
+                <div class="mt-1 text-slate-600">Revenue: € @product.Revenue.ToString("F2")</div>
+              </div>
+            }
+          </div>
+        }
+        else
+        {
+          <p class="mt-5 text-sm leading-6 text-slate-600">Top products will appear after order data is available.</p>
+        }
+      </section>
     </div>
 
-    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+    <div class="bs-panel-soft mt-6 grid grid-cols-1 items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
       <div>
         <label class="block text-xs text-neutral-600">Status</label>
-        <select class="w-full border rounded px-2 py-1" value="@_statusFilter" @onchange="e => { _statusFilter = e.Value?.ToString() ?? string.Empty; ApplyFilters(); }">
+        <select value="@_statusFilter" @onchange="e => { _statusFilter = e.Value?.ToString() ?? string.Empty; ApplyFilters(); }">
           <option value="">All</option>
           <option value="PendingShipment">PendingShipment</option>
           <option value="Shipped">Shipped</option>
@@ -112,20 +188,20 @@
       </div>
       <div class="lg:col-span-2">
         <label class="block text-xs text-neutral-600">Reference</label>
-        <input class="w-full border rounded px-2 py-1" placeholder="Search..." @bind="_refQuery" @oninput="_ => ApplyFilters()" />
+        <input placeholder="Search..." @bind="_refQuery" @oninput="_ => ApplyFilters()" />
       </div>
       <div>
         <label class="block text-xs text-neutral-600">From</label>
-        <input type="date" class="w-full border rounded px-2 py-1" value="@(_fromDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _fromDate = d; else _fromDate = null; ApplyFilters(); }" />
+        <input type="date" value="@(_fromDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _fromDate = d; else _fromDate = null; ApplyFilters(); }" />
       </div>
       <div>
         <label class="block text-xs text-neutral-600">To</label>
-        <input type="date" class="w-full border rounded px-2 py-1" value="@(_toDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _toDate = d; else _toDate = null; ApplyFilters(); }" />
+        <input type="date" value="@(_toDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _toDate = d; else _toDate = null; ApplyFilters(); }" />
       </div>
     </div>
 
-    <article class="mt-6 rounded border">
-      <div class="px-4 py-2 bg-neutral-100 font-semibold flex items-center justify-between">
+    <article class="bs-table-shell mt-6 overflow-hidden">
+      <div class="bs-soft-divider flex items-center justify-between border-b bg-slate-50/90 px-4 py-3 font-semibold">
         <span>Recent Orders</span>
         <div class="text-xs text-neutral-600">Sort:
           <button class="ml-2 underline" @onclick='@(() => SortBy("Reference"))'>Reference</button>
@@ -199,8 +275,8 @@
         var daily = rows.Sum(r => r.Amount);
         grand += daily;
 
-        <article class="mt-6 rounded border">
-          <div class="px-4 py-2 bg-neutral-100 font-semibold">
+        <article class="bs-table-shell mt-6 overflow-hidden">
+          <div class="bg-slate-50/90 px-4 py-3 font-semibold">
             @g.Key.ToShortDateString() - Total: € @daily.ToString("F2")
           </div>
           <div class="p-4 overflow-x-auto">
@@ -236,7 +312,7 @@
     }
     else
     {
-      <div class="mt-6 rounded-md bg-blue-50 text-blue-800 px-6 py-5 text-center shadow font-semibold">
+      <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">
         No sales data available.
       </div>
     }
@@ -263,7 +339,7 @@
     </div>
   </Body>
   <Footer>
-    <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="SaveEditAsync">Save</button>
-    <button class="inline-flex items-center rounded bg-neutral-600 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-700 ml-2" @onclick="() => _showEdit = false">Close</button>
+    <button class="bs-button bs-button-primary" @onclick="SaveEditAsync">Save</button>
+    <button class="bs-button bs-button-ghost ml-2" @onclick="() => _showEdit = false">Close</button>
   </Footer>
 </ModalDialog>

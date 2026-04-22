@@ -59,7 +59,7 @@
             }
 
             var result = await _signInManager.CheckPasswordSignInAsync(currentUser, user.PasswordHash!, lockoutOnFailure: true);
-            return new UserLoginResult(result.Succeeded, result.IsLockedOut);
+            return new UserLoginResult(result.Succeeded, result.IsLockedOut, result.IsNotAllowed);
         }
 
         public async Task<AppUser?> GetUserByEmailAsync(string email)

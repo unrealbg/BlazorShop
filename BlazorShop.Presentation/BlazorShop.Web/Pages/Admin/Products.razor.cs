@@ -1,4 +1,4 @@
-﻿namespace BlazorShop.Web.Pages.Administration
+﻿namespace BlazorShop.Web.Pages.Admin
 {
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
@@ -9,7 +9,7 @@
     using Microsoft.AspNetCore.Components;
     using Microsoft.AspNetCore.Components.Forms;
 
-    public partial class ProductPage
+    public partial class Products
     {
         private bool _showDialog = false;
         private bool _addStep2 = false;

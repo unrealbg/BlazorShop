@@ -279,6 +279,48 @@ Release-blocker guidance:
 - Treat any failing smoke assertion as a release blocker for the checked environment.
 - If the redirect smoke check is intentionally disabled because no deterministic old slug exists in that environment, that skip is acceptable, but the other smoke checks should still pass before traffic is opened.
 
+## Development Auth Smoke Checks
+
+The test project also includes a live auth smoke suite tagged with `Category=AuthSmoke`. It is intended for local Development or other disposable environments where open registration is allowed and Identity confirmation is disabled for smoke users.
+
+Run it with:
+
+```powershell
+dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=AuthSmoke"
+```
+
+Required environment variables:
+
+- `BLAZORSHOP_AUTH_SMOKE_API_BASE_URL`: absolute API base URL or authentication base URL, for example `https://localhost:7094/` or `https://localhost:7094/api/authentication/`
+- `BLAZORSHOP_AUTH_SMOKE_STOREFRONT_BASE_URL`: absolute storefront base URL, for example `https://localhost:18597/`
+- `BLAZORSHOP_AUTH_SMOKE_CLIENT_APP_BASE_URL`: absolute authenticated client base URL, for example `https://localhost:7258/`
+
+Optional environment variables:
+
+- `BLAZORSHOP_AUTH_SMOKE_ALLOW_INVALID_CERTIFICATE=true`: only for local/dev HTTPS when the certificate is not trusted
+- `BLAZORSHOP_AUTH_SMOKE_REQUIRE_CONFIGURATION=true`: useful in CI or scripted smoke stages; fails the suite if the required auth smoke URLs were not provided
+- `BLAZORSHOP_AUTH_SMOKE_REFRESH_COOKIE_NAME`: override only if `Runtime:Security:RefreshTokenCookieName` is intentionally changed from the default `__Host-blazorshop-refresh`
+
+Local example:
+
+```powershell
+$env:BLAZORSHOP_AUTH_SMOKE_API_BASE_URL = "https://localhost:7094/"
+$env:BLAZORSHOP_AUTH_SMOKE_STOREFRONT_BASE_URL = "https://localhost:18597/"
+$env:BLAZORSHOP_AUTH_SMOKE_CLIENT_APP_BASE_URL = "https://localhost:7258/"
+$env:BLAZORSHOP_AUTH_SMOKE_ALLOW_INVALID_CERTIFICATE = "true"
+dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=AuthSmoke"
+```
+
+Auth smoke checks currently verify:
+
+- a unique disposable user can register successfully through `api/authentication/create`
+- login issues a refresh-token cookie, `refresh-token` succeeds, and `logout` clears the browser session cookie
+- storefront `/checkout` redirects anonymous users to the client-app login handoff, authenticated users to the client-app checkout handoff, and reverts to anonymous behavior after logout
+
+Safety note:
+
+- This suite creates real users and assumes Development-style confirmation bypass. Do not run it against a strict Production environment unless that environment is explicitly configured for disposable smoke registrations.
+
 ## Pre-release Verification
 
 Run this checklist before promoting a release candidate.

@@ -28,6 +28,18 @@ namespace BlazorShop.Storefront.Services
             ApplyError(httpContext.Response, StatusCodes.Status503ServiceUnavailable, includeRetryAfter: true);
         }
 
+        public static void ApplyPrivatePage(HttpContext? httpContext)
+        {
+            if (httpContext is null)
+            {
+                return;
+            }
+
+            httpContext.Response.Headers["Cache-Control"] = ErrorCacheControl;
+            httpContext.Response.Headers["X-Robots-Tag"] = NoIndexNoFollow;
+            httpContext.Response.Headers.Remove("Retry-After");
+        }
+
         public static void ApplyRobotsDocument(HttpResponse response)
         {
             ArgumentNullException.ThrowIfNull(response);

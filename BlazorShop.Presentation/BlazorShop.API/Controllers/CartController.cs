@@ -51,6 +51,21 @@
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 
+        [HttpPost("confirm-order")]
+        [Authorize(Roles = "User, Admin")]
+        public async Task<IActionResult> ConfirmOrder(IEnumerable<ProcessCart> carts, [FromQuery] string? status = null)
+        {
+            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return this.Unauthorized("User ID is invalid or not found.");
+            }
+
+            var result = await _cartService.ConfirmOrderAsync(carts, userId, status);
+            return result.Success ? this.Ok(result) : this.BadRequest(result);
+        }
+
         /// <summary>
         /// Get all order items
         /// </summary>
@@ -100,7 +115,7 @@
             }
 
             var result = await _orderQueryService.GetOrdersForUserAsync(userId);
-            return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
+            return this.Ok(result);
         }
 
         /// <summary>

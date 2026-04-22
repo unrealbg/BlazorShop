@@ -15,7 +15,7 @@
                 ? "You have been signed out successfully."
                 : response.Message;
 
-            NotificationService.NotifySuccess(message, "Signed out", NotificationKind.Authentication, link: "/");
+            NotificationService.NotifySuccess(message, "Signed out", NotificationKind.Authentication, link: "/authentication/login/account");
         }
         else
         {
@@ -23,9 +23,9 @@
                 "You were signed out locally, but we could not confirm the server logout request.",
                 "Logout",
                 NotificationKind.Authentication,
-                link: "/");
+                link: "/authentication/login/account");
         }
 
-        NavigationManager.NavigateTo("/");
+        NavigationManager.NavigateTo("/authentication/login/account");
     }
 }

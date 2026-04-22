@@ -1,127 +1,118 @@
-﻿@using BlazorShop.Web.Components.Header
-@using BlazorShop.Web.Shared.Models.Product
-@using BlazorShop.Web.Shared.Services.Contracts
+﻿@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
 
-<div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
+<div class="bs-product-shell bs-mode-workspace min-h-screen flex flex-col text-slate-900">
     <Toast />
 
-    <div class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10 hidden md:block relative">
-        <a href="/" class="hidden md:inline-flex flex-col leading-none select-none absolute left-20 sm:left-24 lg:left-28 top-1/2 -translate-y-1/2">
-            <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP®</span>
-            <span class="text-[10px] text-neutral-400 -mt-0.5">E‑COMMERCE APPLICATION</span>
-        </a>
-
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-12 sm:h-14 flex items-center justify-center">
-            <nav class="hidden md:flex items-center gap-2 sm:gap-3 text-sm sm:text-[0.95rem] font-medium whitespace-nowrap">
-                <NavLink href="/" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
-                <NavLink href="about-us" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About&nbsp;us</NavLink>
-                <NavLink href="new-releases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New&nbsp;Releases</NavLink>
-                <NavLink href="todays-deals" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Today&#39;s&nbsp;Deals</NavLink>
-                <NavLink href="customer-service" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Customer&nbsp;Service</NavLink>
-                <AuthorizeView Roles="Admin">
-                    <Authorized>
-                        <NavLink href="admin" class="px-3 py-1.5 rounded-md text-amber-300 hover:text-white hover:bg-amber-400/10 transition-colors" ActiveClass="bg-amber-400/20 text-white">Admin</NavLink>
-                    </Authorized>
-                </AuthorizeView>
-            </nav>
-        </div>
-    </div>
-
-    <header class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-4">
-        <button class="flex flex-col gap-1.5 shrink-0 md:hidden" aria-label="Open menu" @onclick="ToggleMobileMenu">
-            <span class="block h-0.5 w-8 bg-neutral-900"></span>
-            <span class="block h-0.5 w-8 bg-neutral-900"></span>
-            <span class="block h-0.5 w-8 bg-neutral-900"></span>
-        </button>
-        <button class="hidden md:inline-flex items-center gap-2 rounded-md bg-neutral-900 text-white px-3 py-2 text-sm font-medium hover:bg-neutral-800" @onclick="ToggleCategories">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-            Categories
-        </button>
-        <div class="flex-1 flex justify-center">
-            <SearchBarComponent />
-        </div>
-        <div class="flex items-center gap-5 text-sm">
-            <div class="relative inline-flex items-center gap-2">
-                <a href="my-cart" class="relative inline-block" aria-label="Cart">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
-                    @if (_cartCount > 0)
+    <AuthorizeView Roles="Admin" Context="adminAuthState">
+        <Authorized>
+            <WorkspaceHeader BrandHref="/admin" ModeLabel="ADMIN OPERATIONS">
+                <PrimaryNavigation>
+                    <NavLink href="/admin" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Dashboard</NavLink>
+                    <NavLink href="/admin/orders" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Orders</NavLink>
+                    <NavLink href="/admin/products" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Products</NavLink>
+                    <NavLink href="/admin/users" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Users</NavLink>
+                    <NavLink href="/admin/seo" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">SEO</NavLink>
+                    <NavLink href="/admin/redirects" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Redirects</NavLink>
+                    <NavLink href="/admin/settings" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Settings</NavLink>
+                </PrimaryNavigation>
+                <Actions>
+                    @if (HasPublicStorefrontUrl)
                     {
-                        <span class="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold h-5 min-w-5 px-1 z-20">@_cartCount</span>
+                        <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Back to shop</a>
                     }
-                </a>
-            </div>
-            <div class="relative inline-flex items-center gap-2">
-                <a href="/notifications" class="relative inline-block" aria-label="Notifications">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M9 17a3 3 0 0 0 6 0"/></svg>
-                    @if (NotificationService.UnreadCount > 0)
-                    {
-                        <span class="absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full bg-sky-600 text-white text-[10px] font-bold h-5 min-w-5 px-1 z-20">@(NotificationService.UnreadCount > 99 ? "99+" : NotificationService.UnreadCount)</span>
-                    }
-                </a>
-            </div>
-            <div class="relative">
-                <details class="group" @ref="_mainAccountDetails">
-                    <summary class="list-none inline-flex items-center gap-2 cursor-pointer select-none" aria-label="Account">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6"><circle cx="12" cy="8" r="4"/><path d="M6 22c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
-                    </summary>
-                    <div class="absolute right-0 mt-2 w-44 rounded-md border border-neutral-200 bg-white shadow-lg p-1 hidden group-open:block z-50">
-                        <AuthorizeView>
-                            <Authorized>
-                                <div class="px-3 py-2 text-xs text-neutral-500">Signed in</div>
-                                <div class="h-px bg-neutral-200 my-1"></div>
-                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="profile" @onclick="CloseHeaderMenu">Profile</a>
-                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/logout" @onclick="CloseHeaderMenu">Logout</a>
-                            </Authorized>
-                            <NotAuthorized>
-                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/login" @onclick="CloseHeaderMenu">Login</a>
-                                <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="/authentication/register" @onclick="CloseHeaderMenu">Register</a>
-                            </NotAuthorized>
-                        </AuthorizeView>
-                    </div>
-                </details>
-            </div>
-        </div>
-    </header>
+                    <details class="relative" @ref="_accountDetails">
+                        <summary class="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Admin menu">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4" /><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
+                            <span class="sr-only">Admin menu</span>
+                        </summary>
 
-    @if (_showCategories)
-    {
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="-mt-2 mb-2 rounded-lg border border-neutral-200 bg-white/80 shadow">
-                <div class="p-4">
-                    <BlazorShop.Web.Layout.CategoryComponent OnCategorySelected="CloseCategories" />
-                </div>
-            </div>
-        </div>
-    }
+                        <div class="absolute right-0 z-30 mt-3 w-72 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 text-white shadow-2xl ring-1 ring-black/30">
+                            <div class="border-b border-white/10 px-4 py-4">
+                                <div class="text-sm font-semibold">Admin workspace</div>
+                            </div>
 
-    @if (IsMobileMenuOpen)
-    {
-        <div class="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
-            <div class="absolute inset-0 bg-black/50" @onclick="CloseMobileMenu"></div>
-            <div class="absolute right-0 top-0 h-full w-72 max-w-[80vw] bg-white shadow-xl p-4 flex flex-col">
-                <div class="flex items-center justify-between">
-                    <div class="text-sm font-semibold tracking-wide">Menu</div>
-                    <button class="p-1 rounded hover:bg-neutral-100" @onclick="CloseMobileMenu" aria-label="Close">✕</button>
-                </div>
-                <nav class="mt-4 flex-1 space-y-1 text-sm">
-                    <NavLink href="/" Match="NavLinkMatch.All" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">Home</NavLink>
-                    <NavLink href="about-us" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">About us</NavLink>
-                    <NavLink href="new-releases" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">New Releases</NavLink>
-                    <NavLink href="todays-deals" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">Today&#39;s Deals</NavLink>
-                    <NavLink href="customer-service" class="block rounded px-3 py-2 hover:bg-neutral-100" ActiveClass="bg-neutral-200" @onclick="CloseMobileMenu">Customer Service</NavLink>
-                    <AuthorizeView Roles="Admin">
-                        <Authorized>
-                            <NavLink href="admin" class="block rounded px-3 py-2 hover:bg-neutral-100 text-amber-700" ActiveClass="bg-amber-100" @onclick="CloseMobileMenu">Admin</NavLink>
-                        </Authorized>
-                    </AuthorizeView>
-                </nav>
-            </div>
-        </div>
-    }
+                            <div class="p-2 text-sm">
+                                <a href="/account" class="block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Account</a>
+                                <a href="/authentication/logout" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Sign out</a>
+                            </div>
+                        </div>
+                    </details>
+                </Actions>
+            </WorkspaceHeader>
+        </Authorized>
+        <NotAuthorized>
+            <AuthorizeView Context="workspaceAuthState">
+                <Authorized>
+                    <WorkspaceHeader BrandHref="/account" ModeLabel="CUSTOMER ACCOUNT">
+                        <PrimaryNavigation>
+                            <NavLink href="/account" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Dashboard</NavLink>
+                            <NavLink href="/account/orders" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Orders</NavLink>
+                            <NavLink href="/account/notifications" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Notifications</NavLink>
+                            <NavLink href="/account/profile" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Profile</NavLink>
+                        </PrimaryNavigation>
+                        <Actions>
+                            <a href="/account/notifications" class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Notifications" title="Notifications">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" /><path d="M9 17a3 3 0 0 0 6 0" /></svg>
+                                @if (NotificationService.UnreadCount > 0)
+                                {
+                                    <span class="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow">@(NotificationService.UnreadCount > 99 ? "99+" : NotificationService.UnreadCount)</span>
+                                }
+                                <span class="sr-only">Notifications</span>
+                            </a>
 
-    <main class="flex-1">
+                            <details class="relative" @ref="_accountDetails">
+                                <summary class="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Account menu">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4" /><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
+                                    <span class="sr-only">Account menu</span>
+                                </summary>
+
+                                <div class="absolute right-0 z-30 mt-3 w-72 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 text-white shadow-2xl ring-1 ring-black/30">
+                                    <div class="border-b border-white/10 px-4 py-4">
+                                        <div class="text-sm font-semibold">Account</div>
+                                    </div>
+
+                                    <div class="p-2 text-sm">
+                                        <a href="/account/profile" class="block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Profile</a>
+                                        <a href="/account/orders" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Orders</a>
+                                        <a href="/account/notifications" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Notifications</a>
+                                        <a href="/account/settings" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Settings</a>
+                                        <a href="/authentication/logout" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Sign out</a>
+                                    </div>
+                                </div>
+                            </details>
+
+                            @if (HasPublicStorefrontUrl)
+                            {
+                                <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Back to shop</a>
+                            }
+                            <a href="/account/checkout" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Checkout</a>
+                        </Actions>
+                    </WorkspaceHeader>
+                </Authorized>
+                <NotAuthorized>
+                    <WorkspaceHeader BrandHref="/" ModeLabel="WORKSPACE ACCESS">
+                        <PrimaryNavigation>
+                            <NavLink href="/" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Access</NavLink>
+                            <NavLink href="/authentication/login/account" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Sign in</NavLink>
+                            <NavLink href="/authentication/register" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Create account</NavLink>
+                        </PrimaryNavigation>
+                        <Actions>
+                            @if (HasPublicStorefrontUrl)
+                            {
+                                <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Storefront</a>
+                            }
+                            <a href="/authentication/login/account" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Sign in</a>
+                            <a href="/authentication/register" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Create account</a>
+                        </Actions>
+                    </WorkspaceHeader>
+                </NotAuthorized>
+            </AuthorizeView>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    <main class="bs-workspace-page bs-shell-stage flex-1">
         @Body
     </main>
 
@@ -129,100 +120,29 @@
 </div>
 
 @code {
-    private bool IsMobileMenuOpen;
-    private bool _showCategories;
-    private int _cartCount;
-    [Inject] private IJSRuntime Js { get; set; } = default!;
-    private IJSObjectReference? _cartModule;
-    private DotNetObjectReference<MainLayout>? _selfRef;
-    private ElementReference _mainAccountDetails;
+    [Inject]
+    private IJSRuntime Js { get; set; } = default!;
+
+    private ElementReference _accountDetails;
+
+    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
+
+    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 
     protected override void OnInitialized()
     {
         NotificationService.OnChange += HandleNotificationsChanged;
     }
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadCartCountAsync();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            _cartModule = await Js.InvokeAsync<IJSObjectReference>("import", "./js/cartBadge.js");
-            _selfRef = DotNetObjectReference.Create(this);
-            if (_cartModule is not null)
-            {
-                try
-                {
-                    var json = await _cartModule.InvokeAsync<string?>("getCartCookie");
-                    if (!string.IsNullOrWhiteSpace(json))
-                    {
-                        UpdateCountFromJson(json!);
-                        await InvokeAsync(StateHasChanged);
-                    }
-                }
-                catch { }
-
-                await _cartModule.InvokeVoidAsync("subscribeCartChanges", _selfRef);
-            }
-        }
-    }
-
-    [JSInvokable]
-    public async Task RefreshCartCount()
-    {
-        await LoadCartCountAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private void UpdateCountFromJson(string json)
-    {
-        try
-        {
-            var items = System.Text.Json.JsonSerializer.Deserialize<List<BlazorShop.Web.Shared.Models.Payment.ProcessCart>>(json) ?? new();
-            _cartCount = items.Sum(i => i.Quantity);
-        }
-        catch { _cartCount = 0; }
-    }
-
-    private async Task LoadCartCountAsync()
-    {
-        try
-        {
-            var json = await CookieStorageService.GetAsync(Constant.Cart.Name);
-            if (string.IsNullOrWhiteSpace(json)) { _cartCount = 0; return; }
-            UpdateCountFromJson(json);
-        }
-        catch { _cartCount = 0; }
-    }
-
-    private void ToggleMobileMenu() => IsMobileMenuOpen = !IsMobileMenuOpen;
-    private void CloseMobileMenu() => IsMobileMenuOpen = false;
-    private void ToggleCategories() => _showCategories = !_showCategories;
-    private void CloseCategories() => _showCategories = false;
-
     private void HandleNotificationsChanged()
     {
         _ = InvokeAsync(StateHasChanged);
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         NotificationService.OnChange -= HandleNotificationsChanged;
-
-        try
-        {
-            if (_cartModule is not null)
-            {
-                await _cartModule.InvokeVoidAsync("unsubscribeCartChanges");
-                await _cartModule.DisposeAsync();
-            }
-        }
-        catch { }
-        _selfRef?.Dispose();
+        return ValueTask.CompletedTask;
     }
 
     private async Task CloseHeaderMenu()
@@ -230,7 +150,7 @@
         try
         {
             var mod = await Js.InvokeAsync<IJSObjectReference>("import", "./js/cartBadge.js");
-            await mod.InvokeVoidAsync("closeDetails", _mainAccountDetails);
+            await mod.InvokeVoidAsync("closeDetails", _accountDetails);
         }
         catch
         {

@@ -1,8 +1,94 @@
-﻿@page "/"
+﻿@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
-<StaticPageSeo Title="Shop Home"
+<StaticPageSeo Title="Account Home"
 			   RelativePath="/"
-			   Description="Discover featured products, fresh arrivals, and everyday storefront highlights across BlazorShop." />
+			   Description="Manage your BlazorShop profile, orders, notifications, support, and admin workflows." />
 
-<Banner />
-<LatestProducts />
+<section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+	<div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+		<div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+			<div>
+				<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Account</p>
+				<h1 class="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Account overview</h1>
+				<p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600">Manage your profile, orders, notifications, customer support, and admin tools.</p>
+			</div>
+
+			<div class="flex flex-wrap gap-3">
+				@if (HasPublicStorefrontUrl)
+				{
+					<a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50">Open Storefront</a>
+				}
+
+				<AuthorizeView>
+					<Authorized>
+						<a href="my-orders" class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">View Orders</a>
+						<a href="profile" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50">Open Profile</a>
+					</Authorized>
+					<NotAuthorized>
+						<a href="authentication/login" class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Sign In</a>
+						<a href="authentication/register" class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50">Create Account</a>
+					</NotAuthorized>
+				</AuthorizeView>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+	<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+		<a href="profile" class="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+			<p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Account</p>
+			<h2 class="mt-3 text-xl font-extrabold tracking-tight text-slate-950">Profile</h2>
+			<p class="mt-3 text-sm leading-6 text-slate-600">Update your details, sign-in settings, and saved information.</p>
+			<span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">Open profile <span class="transition group-hover:translate-x-1">→</span></span>
+		</a>
+
+		<a href="my-orders" class="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+			<p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Orders</p>
+			<h2 class="mt-3 text-xl font-extrabold tracking-tight text-slate-950">Order history</h2>
+			<p class="mt-3 text-sm leading-6 text-slate-600">Check order status, receipts, and recent purchases.</p>
+			<span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">See orders <span class="transition group-hover:translate-x-1">→</span></span>
+		</a>
+
+		<a href="customer-service" class="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+			<p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Support</p>
+			<h2 class="mt-3 text-xl font-extrabold tracking-tight text-slate-950">Customer service</h2>
+			<p class="mt-3 text-sm leading-6 text-slate-600">Get help with account questions, orders, delivery, and returns.</p>
+			<span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">Get support <span class="transition group-hover:translate-x-1">→</span></span>
+		</a>
+
+		<a href="notifications" class="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+			<p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Updates</p>
+			<h2 class="mt-3 text-xl font-extrabold tracking-tight text-slate-950">Notifications</h2>
+			<p class="mt-3 text-sm leading-6 text-slate-600">Keep up with account alerts, order updates, and reminders.</p>
+			<span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">Open notifications <span class="transition group-hover:translate-x-1">→</span></span>
+		</a>
+
+		@if (HasPublicStorefrontUrl)
+		{
+			<a href="@PublicStorefrontUrl" class="group rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:border-slate-300 hover:bg-white hover:shadow-md md:col-span-2 xl:col-span-2">
+				<p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Storefront</p>
+				<h2 class="mt-3 text-xl font-extrabold tracking-tight text-slate-950">Open the public shop</h2>
+				<p class="mt-3 text-sm leading-6 text-slate-600">Browse products, manage cart entry, and return to your account pages when needed.</p>
+				<span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">Go to storefront <span class="transition group-hover:translate-x-1">→</span></span>
+			</a>
+		}
+
+		<AuthorizeView Roles="Admin">
+			<Authorized>
+				<a href="admin" class="group rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md md:col-span-2 xl:col-span-2">
+					<p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Admin</p>
+					<h2 class="mt-3 text-xl font-extrabold tracking-tight text-amber-950">Open admin tools</h2>
+					<p class="mt-3 text-sm leading-6 text-amber-800">Manage catalog, operations, and other administrative tasks.</p>
+					<span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-amber-950">Open admin <span class="transition group-hover:translate-x-1">→</span></span>
+				</a>
+			</Authorized>
+		</AuthorizeView>
+	</div>
+</section>
+
+@code {
+	private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+
+	private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+}

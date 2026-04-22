@@ -1,0 +1,85 @@
+@page "/account/settings"
+
+<PageTitle>Account Settings</PageTitle>
+
+<section class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-8">
+        <p class="bs-section-kicker">Account Settings</p>
+        <h1 class="bs-section-title mt-3">Security and account access</h1>
+        <p class="bs-section-copy mt-4">Use this page for password changes and account actions. Public shopping remains separate on the storefront.</p>
+    </header>
+
+    <div class="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <section class="bs-panel p-6">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Password</p>
+                <h2 class="mt-2 text-2xl font-bold text-slate-950">Change your password</h2>
+            </div>
+
+            <EditForm Model="_changePasswordModel" OnValidSubmit="ChangePasswordAsync" class="mt-6 space-y-4">
+                <DataAnnotationsValidator />
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Current password</label>
+                    <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.CurrentPassword" />
+                    <ValidationMessage For="@(() => _changePasswordModel.CurrentPassword)" />
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">New password</label>
+                    <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.NewPassword" />
+                    <ValidationMessage For="@(() => _changePasswordModel.NewPassword)" />
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Confirm new password</label>
+                    <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.ConfirmPassword" />
+                    <ValidationMessage For="@(() => _changePasswordModel.ConfirmPassword)" />
+                </div>
+                <button type="submit" class="bs-button bs-button-primary">Update password</button>
+            </EditForm>
+        </section>
+
+        <section class="bs-panel-soft p-6">
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Quick Actions</p>
+            <div class="mt-4 flex flex-col gap-3 text-sm font-semibold">
+                <a href="/account/profile" class="bs-button bs-button-secondary">Edit profile</a>
+                <a href="/account/orders" class="bs-button bs-button-secondary">Review orders</a>
+                @if (HasPublicStorefrontUrl)
+                {
+                    <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost">Open storefront</a>
+                }
+                <a href="/authentication/logout" class="bs-button bs-button-primary">Sign out</a>
+            </div>
+        </section>
+    </div>
+</section>
+
+@code {
+    private PasswordChangeModel _changePasswordModel = new();
+
+    [Inject]
+    private Microsoft.Extensions.Configuration.IConfiguration Configuration { get; set; } = default!;
+
+    private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+
+    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+
+    private async Task ChangePasswordAsync()
+    {
+        var response = await AuthenticationService.ChangePassword(_changePasswordModel);
+        if (response.Success)
+        {
+            NotificationService.NotifySuccess(
+                string.IsNullOrWhiteSpace(response.Message) ? "Password changed successfully." : response.Message,
+                "Password updated",
+                NotificationKind.Authentication,
+                link: "/account/settings");
+            _changePasswordModel = new();
+            return;
+        }
+
+        NotificationService.NotifyError(
+            string.IsNullOrWhiteSpace(response.Message) ? "Unable to change password." : response.Message,
+            "Password update failed",
+            NotificationKind.Authentication,
+            link: "/account/settings");
+    }
+}

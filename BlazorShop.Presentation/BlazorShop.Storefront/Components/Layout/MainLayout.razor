@@ -1,41 +1,120 @@
 @inherits LayoutComponentBase
 
 <div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
-    <header class="clip-diagonal bg-neutral-900/95 text-neutral-100 border-b border-white/10">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <header class="relative border-b border-white/10 bg-neutral-900/95 text-neutral-100 shadow-xl">
+        <div class="clip-diagonal pointer-events-none absolute inset-0 border-b border-white/10 bg-neutral-900/95"></div>
+
+        <div class="relative z-10 mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
             <a href="@StorefrontRoutes.Home" class="inline-flex flex-col leading-none select-none">
                 <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP</span>
-                <span class="text-[10px] text-neutral-400 mt-1">SERVER-RENDERED STOREFRONT</span>
+                <span class="mt-1 text-[10px] text-neutral-400">PUBLIC SHOP</span>
             </a>
 
             <nav class="flex flex-wrap items-center gap-2 text-sm font-medium">
-                <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Home</NavLink>
-                <NavLink href="@StorefrontRoutes.About" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">About</NavLink>
-                <NavLink href="@StorefrontRoutes.NewReleases" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">New Releases</NavLink>
-                <NavLink href="@StorefrontRoutes.TodaysDeals" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Today's Deals</NavLink>
-                <NavLink href="@StorefrontRoutes.CustomerService" class="px-3 py-1.5 rounded-md text-neutral-200 hover:text-white hover:bg-white/10 transition-colors" ActiveClass="bg-white/20 text-white">Customer Service</NavLink>
+                <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Home</NavLink>
+                <NavLink href="@StorefrontRoutes.NewReleases" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">New Releases</NavLink>
+                <NavLink href="@StorefrontRoutes.TodaysDeals" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Today's Deals</NavLink>
+                <NavLink href="@StorefrontRoutes.About" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">About</NavLink>
+                <NavLink href="@StorefrontRoutes.CustomerService" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Customer Service</NavLink>
             </nav>
+
+            <div class="flex flex-wrap items-center gap-3 text-sm">
+                <a href="@CartUrl"
+                   class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
+                   aria-label="Open cart"
+                   title="Open cart">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+                    <span data-storefront-cart-badge hidden class="absolute -right-2 -top-2 hidden inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow">0</span>
+                    <span class="sr-only">Cart</span>
+                </a>
+
+                <StorefrontAccountMenu />
+
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">New Releases</a>
+                <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Today's Deals</a>
+            </div>
         </div>
     </header>
+
+    <div data-storefront-toast-region
+         class="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-end px-4 sm:px-6 lg:px-8"
+         aria-live="polite"
+         aria-atomic="true"></div>
+    <template data-storefront-toast-template>
+        <div data-storefront-toast
+             class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 text-white shadow-2xl ring-1 ring-black/10"
+             style="opacity: 0; transform: translateY(-8px); transition: opacity 180ms ease, transform 180ms ease;">
+            <div class="flex items-start gap-3 px-4 py-3">
+                <div data-storefront-toast-accent class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"></div>
+                <div class="min-w-0 flex-1">
+                    <p data-storefront-toast-heading class="text-sm font-semibold leading-5"></p>
+                    <p data-storefront-toast-message class="mt-1 text-sm leading-5 text-white/85"></p>
+                </div>
+                <button type="button"
+                        data-storefront-toast-close
+                        class="rounded-full border border-white/10 bg-white/5 p-1 text-white/70 transition hover:bg-white/10 hover:text-white"
+                        aria-label="Dismiss notification">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M6 6l12 12" /><path d="m18 6-12 12" /></svg>
+                </button>
+            </div>
+        </div>
+    </template>
 
     <main class="flex-1">
         @Body
     </main>
 
-    <footer class="border-t border-neutral-200/70 bg-white/80 backdrop-blur-sm">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-                <div class="text-sm font-semibold tracking-wide text-neutral-900">BlazorShop Storefront</div>
-                <p class="mt-2 max-w-2xl text-sm text-neutral-600">
-                    Public catalog pages now render as server-side route surfaces for SEO. Admin tooling and legacy interactive flows remain in the existing client application during the transition.
-                </p>
+    <footer class="border-t border-white/10 bg-neutral-900 text-neutral-100">
+        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <div class="text-lg font-extrabold tracking-wider">BLAZORSHOP</div>
+                    <p class="mt-1 text-sm text-neutral-300">PUBLIC SHOP</p>
+                    <p class="mt-3 text-sm text-neutral-400">Quality products, fair prices, and route-based public shopping pages.</p>
+                </div>
+
+                <div>
+                    <div class="text-sm font-semibold uppercase text-neutral-300">Shop</div>
+                    <ul class="mt-3 space-y-2 text-sm text-neutral-300">
+                        <li><a href="@StorefrontRoutes.Home" class="hover:text-white/80">Home</a></li>
+                        <li><a href="@StorefrontRoutes.NewReleases" class="hover:text-white/80">New Releases</a></li>
+                        <li><a href="@StorefrontRoutes.TodaysDeals" class="hover:text-white/80">Today's Deals</a></li>
+                        <li><a href="@StorefrontRoutes.About" class="hover:text-white/80">About</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div class="text-sm font-semibold uppercase text-neutral-300">Support</div>
+                    <ul class="mt-3 space-y-2 text-sm text-neutral-300">
+                        <li><a href="@StorefrontRoutes.CustomerService" class="hover:text-white/80">Customer Service</a></li>
+                        <li><a href="@StorefrontRoutes.Faq" class="hover:text-white/80">FAQ</a></li>
+                        <li><a href="@StorefrontRoutes.Privacy" class="hover:text-white/80">Privacy</a></li>
+                        <li><a href="@StorefrontRoutes.Terms" class="hover:text-white/80">Terms</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div class="text-sm font-semibold uppercase text-neutral-300">Featured</div>
+                    <p class="mt-3 text-sm leading-6 text-neutral-400">Browse fresh arrivals, featured deals, and published product pages across the shop.</p>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900 hover:bg-white">Shop New</a>
+                        <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">View Deals</a>
+                    </div>
+                </div>
             </div>
-            <nav class="flex flex-wrap items-center gap-3 text-sm text-neutral-700">
-                <a href="@StorefrontRoutes.Faq" class="hover:text-neutral-900">FAQ</a>
-                <a href="@StorefrontRoutes.Privacy" class="hover:text-neutral-900">Privacy</a>
-                <a href="@StorefrontRoutes.Terms" class="hover:text-neutral-900">Terms</a>
-                <a href="@StorefrontRoutes.CustomerService" class="hover:text-neutral-900">Customer Service</a>
-            </nav>
+
+            <div class="mt-8 border-t border-white/10 pt-4 text-xs text-neutral-400 sm:flex sm:items-center sm:justify-between">
+                <p>© @DateTime.UtcNow.Year BlazorShop. All rights reserved.</p>
+                <div class="mt-3 flex justify-center gap-4 sm:mt-0">
+                    <a href="@StorefrontRoutes.Privacy" class="hover:text-white/80">Privacy</a>
+                    <a href="@StorefrontRoutes.Terms" class="hover:text-white/80">Terms</a>
+                    <a href="@StorefrontRoutes.CustomerService" class="hover:text-white/80">Customer Service</a>
+                </div>
+            </div>
         </div>
     </footer>
 </div>
+
+@code {
+    private string CartUrl => StorefrontRoutes.Cart;
+}

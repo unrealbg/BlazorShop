@@ -7,7 +7,7 @@
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">@Eyebrow</p>
             }
 
-            <h2 class="mt-2 text-2xl font-extrabold tracking-tight">@Title</h2>
+            <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">@Title</h2>
 
             <div class="mt-5 space-y-4">
                 @foreach (var paragraph in _paragraphs)
@@ -32,7 +32,7 @@
     public string Eyebrow { get; set; } = "More to know";
 
     [Parameter]
-    public string ClassName { get; set; } = "mx-auto max-w-5xl px-4 pb-16 sm:px-6 lg:px-8";
+    public string ClassName { get; set; } = "mx-auto max-w-5xl px-4 pb-12 sm:px-6 lg:px-8";
 
     protected override void OnParametersSet()
     {

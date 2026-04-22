@@ -1,0 +1,110 @@
+@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+
+<div class="bs-product-shell bs-mode-workspace min-h-screen flex flex-col text-slate-900">
+    <Toast />
+
+    <WorkspaceHeader BrandHref="/account" ModeLabel="CUSTOMER ACCOUNT">
+        <PrimaryNavigation>
+            <NavLink href="/account" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Dashboard</NavLink>
+            <NavLink href="/account/orders" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Orders</NavLink>
+            <NavLink href="/account/notifications" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Notifications</NavLink>
+            <NavLink href="/account/profile" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Profile</NavLink>
+        </PrimaryNavigation>
+        <Actions>
+            <a href="/account/notifications" class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Notifications" title="Notifications">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" /><path d="M9 17a3 3 0 0 0 6 0" /></svg>
+                @if (NotificationService.UnreadCount > 0)
+                {
+                    <span class="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow">@(NotificationService.UnreadCount > 99 ? "99+" : NotificationService.UnreadCount)</span>
+                }
+                <span class="sr-only">Notifications</span>
+            </a>
+
+            <details class="relative" @ref="_accountDetails">
+                <summary class="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Account menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4" /><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
+                    <span class="sr-only">Account menu</span>
+                </summary>
+
+                <div class="absolute right-0 z-30 mt-3 w-72 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 text-white shadow-2xl ring-1 ring-black/30">
+                    <div class="border-b border-white/10 px-4 py-4">
+                        <div class="text-sm font-semibold">Account</div>
+                    </div>
+
+                    <div class="p-2 text-sm">
+                        <a href="/account/profile" class="block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Profile</a>
+                        <a href="/account/orders" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Orders</a>
+                        <a href="/account/notifications" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Notifications</a>
+                        <a href="/account/settings" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Settings</a>
+                    </div>
+
+                    <AuthorizeView Roles="Admin">
+                        <Authorized>
+                            <div class="border-t border-white/10 px-2 pt-2 text-sm">
+                                <a href="/admin" class="block rounded-xl px-3 py-2 text-amber-300 transition hover:bg-white/10 hover:text-white" @onclick="CloseHeaderMenu">Admin panel</a>
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
+
+                    <div class="border-t border-white/10 px-2 py-2 text-sm">
+                        <a href="/authentication/logout" class="block rounded-xl px-3 py-2 transition hover:bg-white/10" @onclick="CloseHeaderMenu">Sign out</a>
+                    </div>
+                </div>
+            </details>
+
+            @if (HasPublicStorefrontUrl)
+            {
+                <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Back to shop</a>
+            }
+            <a href="/account/checkout" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Checkout</a>
+        </Actions>
+    </WorkspaceHeader>
+
+    <main class="bs-workspace-page bs-shell-stage flex-1">
+        @Body
+    </main>
+
+    <Footer />
+</div>
+
+@code {
+    [Inject]
+    private IJSRuntime Js { get; set; } = default!;
+
+    private ElementReference _accountDetails;
+
+    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
+
+    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+
+    protected override void OnInitialized()
+    {
+        NotificationService.OnChange += HandleNotificationsChanged;
+    }
+
+    private void HandleNotificationsChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        NotificationService.OnChange -= HandleNotificationsChanged;
+        return ValueTask.CompletedTask;
+    }
+
+    private async Task CloseHeaderMenu()
+    {
+        try
+        {
+            var mod = await Js.InvokeAsync<IJSObjectReference>("import", "./js/cartBadge.js");
+            await mod.InvokeVoidAsync("closeDetails", _accountDetails);
+        }
+        catch
+        {
+            // ignored
+        }
+    }
+}

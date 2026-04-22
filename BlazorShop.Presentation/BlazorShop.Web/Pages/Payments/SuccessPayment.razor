@@ -11,7 +11,7 @@
                 <h4 class="alert-heading">Thank you for your purchase!</h4>
                 <p>Your payment was successful. Your order will be delivered soon.</p>
                 <hr>
-                <p class="mb-0">You can track your order in the <a href="/my-orders">My Orders</a> page.</p>
+                <p class="mb-0">You can track your order in the <a href="/account/orders">Orders</a> page.</p>
             </div>
         </div>
     </div>
@@ -25,9 +25,14 @@
     [SupplyParameterFromQuery(Name = "bt")]
     public int? Bt { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "pm")]
+    public string? PaymentMethod { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         var isBankTransfer = Bt.GetValueOrDefault() == 1;
+        var normalizedPaymentMethod = PaymentMethod?.Trim().ToLowerInvariant();
 
         try
         {
@@ -50,30 +55,38 @@
                     {
                         if (!isBankTransfer)
                         {
-                            var arc = list.Select(x => new CreateOrderItem
+                            if (normalizedPaymentMethod is not ("card" or "cod"))
                             {
-                                ProductId = x.ProductId,
-                                Quantity = x.Quantity,
-                                UserId = userId
-                            });
+                                NotificationService.NotifyWarning(
+                                    "We couldn't confirm the payment result for this order yet.",
+                                    "Order update",
+                                    NotificationKind.Order,
+                                    link: "/account/checkout");
+                                return;
+                            }
 
-                            var historyResult = await CartService.SaveCheckoutHistory(arc);
+                            var orderStatus = normalizedPaymentMethod == "cod"
+                                ? "Pending"
+                                : "Paid";
 
-                            if (historyResult.Success)
+                            var confirmResult = await CartService.ConfirmOrder(list, orderStatus);
+
+                            if (confirmResult.Success)
                             {
                                 NotificationService.NotifySuccess(
                                     "Your order was placed successfully.",
                                     "Order placed",
                                     NotificationKind.Order,
-                                    link: "/my-orders");
+                                    link: "/account/orders");
                             }
                             else
                             {
                                 NotificationService.NotifyWarning(
-                                    "Your payment completed, but we could not refresh your order history right now.",
+                                    "Your payment completed, but we could not finalize the order record right now.",
                                     "Order update",
                                     NotificationKind.Order,
-                                    link: "/my-orders");
+                                    link: "/account/orders");
+                                return;
                             }
                         }
                         else
@@ -82,7 +95,7 @@
                                 "Your order has been placed. Complete the bank transfer using the checkout instructions.",
                                 "Payment pending",
                                 NotificationKind.Payment,
-                                link: "/my-orders");
+                                link: "/account/orders");
                         }
 
                         await CookieStorageService.RemoveAsync(Constant.Cart.Name);
@@ -96,7 +109,7 @@
                 "Your payment was processed, but we could not update the local order state completely.",
                 "Order update",
                 NotificationKind.Order,
-                link: "/my-orders");
+                link: "/account/orders");
         }
     }
 }

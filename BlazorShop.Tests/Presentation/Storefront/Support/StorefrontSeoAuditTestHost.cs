@@ -306,6 +306,13 @@ namespace BlazorShop.Tests.Presentation.Storefront
                         : CreateStatusResponseAsync(HttpStatusCode.NotFound, request);
                 }
 
+                if (TryGetGuidId(path, "/product/single/", out var productId))
+                {
+                    return productId == _scenario.Product.Id
+                        ? CreateResponseAsync(HttpStatusCode.OK, _scenario.Product, request)
+                        : CreateStatusResponseAsync(HttpStatusCode.NotFound, request);
+                }
+
                 if (path.EndsWith("/public/catalog/categories", StringComparison.OrdinalIgnoreCase))
                 {
                     return CreateResponseAsync(_scenario.CategoriesStatusCode, _scenario.Categories, request);
@@ -344,6 +351,19 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
                 slug = path[(index + prefix.Length)..];
                 return !string.IsNullOrWhiteSpace(slug);
+            }
+
+            private static bool TryGetGuidId(string path, string prefix, out Guid id)
+            {
+                id = Guid.Empty;
+                var index = path.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (index < 0)
+                {
+                    return false;
+                }
+
+                var candidate = path[(index + prefix.Length)..];
+                return Guid.TryParse(candidate, out id);
             }
 
             private static Task<HttpResponseMessage> CreateResponseAsync<T>(HttpStatusCode statusCode, T payload, HttpRequestMessage request)

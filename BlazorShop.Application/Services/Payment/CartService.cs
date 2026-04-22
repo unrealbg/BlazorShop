@@ -56,6 +56,16 @@
             return result > 0 ? new ServiceResponse(true, "Checkout history saved successfully") : new ServiceResponse(false, "Failed to save checkout history");
         }
 
+        public async Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<ProcessCart> carts, string userId, string? status = null)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new ServiceResponse(false, "A signed-in user is required to confirm the order.");
+            }
+
+            return await CreateOrderAsync(carts, userId, status ?? "Paid", "ORD");
+        }
+
         public async Task<ServiceResponse> CheckoutAsync(Checkout checkout)
         {
             return await CheckoutAsync(checkout, null);
@@ -87,23 +97,12 @@
             if (bankId.HasValue && checkout.PaymentMethodId == bankId.Value)
             {
                 var reference = $"BT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}";
+                var orderResult = await CreateOrderAsync(checkout.Carts, userId, "Pending", "BT", reference);
 
-                var order = new Order
+                if (!orderResult.Success)
                 {
-                    UserId = userId ?? string.Empty,
-                    Status = "Pending",
-                    Reference = reference,
-                    TotalAmount = totalAmount,
-                    Lines = checkout.Carts.Select(ci =>
-                        new OrderLine
-                        {
-                            ProductId = ci.ProductId,
-                            Quantity = ci.Quantity,
-                            UnitPrice = products.First(p => p.Id == ci.ProductId).Price
-                        }).ToList()
-                };
-
-                var orderId = await _orderRepository.CreateAsync(order);
+                    return orderResult;
+                }
 
                 try
                 {
@@ -150,6 +149,64 @@
             }
 
             return new ServiceResponse(false, "Invalid payment method");
+        }
+
+        private async Task<ServiceResponse> CreateOrderAsync(
+            IEnumerable<ProcessCart> carts,
+            string? userId,
+            string status,
+            string referencePrefix,
+            string? reference = null)
+        {
+            var cartList = carts
+                .Where(item => item.ProductId != Guid.Empty && item.Quantity > 0)
+                .ToList();
+
+            if (cartList.Count == 0)
+            {
+                return new ServiceResponse(false, "Your cart is empty.");
+            }
+
+            var (products, totalAmount) = await GetCartTotalAmount(cartList);
+            var productMap = products.ToDictionary(product => product.Id);
+
+            if (productMap.Count == 0 || totalAmount <= 0)
+            {
+                return new ServiceResponse(false, "We couldn't resolve the cart items for this order.");
+            }
+
+            var order = new Order
+            {
+                UserId = userId ?? string.Empty,
+                Status = status,
+                Reference = reference ?? $"{referencePrefix}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}",
+                TotalAmount = totalAmount,
+                Lines = cartList
+                    .Where(item => productMap.ContainsKey(item.ProductId))
+                    .Select(item => new OrderLine
+                    {
+                        ProductId = item.ProductId,
+                        Quantity = item.Quantity,
+                        UnitPrice = productMap[item.ProductId].Price,
+                    })
+                    .ToList(),
+            };
+
+            if (order.Lines.Count == 0)
+            {
+                return new ServiceResponse(false, "We couldn't resolve the cart items for this order.");
+            }
+
+            await _orderRepository.CreateAsync(order);
+
+            return new ServiceResponse(true, "Order saved successfully")
+            {
+                Payload = new
+                {
+                    order.Id,
+                    order.Reference,
+                }
+            };
         }
 
         public async Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync()

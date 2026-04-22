@@ -1,4 +1,4 @@
-﻿namespace BlazorShop.Web.Pages.Administration
+﻿namespace BlazorShop.Web.Pages.Admin
 {
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
@@ -8,7 +8,7 @@
 
     using Microsoft.AspNetCore.Components;
 
-    public partial class CategoryPage
+    public partial class Categories
     {
         private bool _showDialog = false;
         private bool _showEditDialog = false;

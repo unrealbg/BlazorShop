@@ -5,6 +5,8 @@ module.exports = {
     "./**/*.cshtml",
     "./**/*.html",
     "./**/*.cs",
+    "../BlazorShop.Storefront/**/*.razor",
+    "../BlazorShop.Storefront/**/*.cs",
     "../BlazorShop.Web.Shared/**/*.razor",
     "../BlazorShop.Web.Shared/**/*.cs"
   ],

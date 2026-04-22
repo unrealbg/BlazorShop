@@ -24,7 +24,7 @@
                         "Registration successful. Please check your email to confirm your account.",
                         "Registration",
                         NotificationKind.Authentication);
-                    this.NavigationManager.NavigateTo("/authentication/login");
+                    this.NavigationManager.NavigateTo("/authentication/login/account");
                 }
                 else
                 {

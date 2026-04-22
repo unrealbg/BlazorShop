@@ -1,0 +1,31 @@
+@page "/admin/users"
+
+<PageTitle>Admin Users</PageTitle>
+
+<section class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-8">
+        <p class="bs-section-kicker">Admin</p>
+        <h1 class="bs-section-title mt-3">User management surface</h1>
+        <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">This route keeps customer and role administration under admin ownership. The current codebase does not yet expose a dedicated WASM user-management workflow, so this page stays intentionally lightweight instead of reusing storefront or account UI.</p>
+    </header>
+
+    <div class="mt-8 grid gap-4 xl:grid-cols-3">
+        <section class="bs-panel p-6 xl:col-span-2">
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Current State</p>
+            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <li>Customer account tooling is isolated under the authenticated account surface.</li>
+                <li>Admin role access is enforced at the folder level for the entire admin surface.</li>
+                <li>A dedicated user-administration feature can be added here later without reintroducing storefront or customer-shell overlap.</li>
+            </ul>
+        </section>
+
+        <section class="bs-panel-soft p-6">
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Admin Links</p>
+            <div class="mt-4 flex flex-col gap-3 text-sm font-semibold">
+                <a href="/admin" class="bs-button bs-button-primary">Dashboard</a>
+                <a href="/admin/settings" class="bs-button bs-button-secondary">Admin settings</a>
+                <a href="/account" class="bs-button bs-button-ghost">Account</a>
+            </div>
+        </section>
+    </div>
+</section>

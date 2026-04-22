@@ -1,4 +1,4 @@
-﻿namespace BlazorShop.Web.Pages.Administration
+﻿namespace BlazorShop.Web.Pages.Admin
 {
     using System;
     using System.Linq;
@@ -13,7 +13,7 @@
     using BlazorShop.Web.Interop;
     using Microsoft.AspNetCore.Components;
 
-    public partial class SalesPage : ComponentBase, IAsyncDisposable
+    public partial class Dashboard : ComponentBase, IAsyncDisposable
     {
         private List<GetOrder> _orders = new();
         private List<GetOrder> _recentOrders = new();

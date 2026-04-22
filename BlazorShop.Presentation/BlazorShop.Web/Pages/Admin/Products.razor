@@ -1,14 +1,16 @@
-﻿@page "/product"
-@layout AdminLayout
+﻿@page "/admin/products"
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
-    <div class="bg-white/80 rounded-xl shadow p-6 pb-8">
+    <div class="bs-panel bs-page-hero p-6 pb-8">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 class="text-xl font-bold">Manage Products</h2>
-            <div class="flex items-center gap-2">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h2 class="mt-2 text-2xl font-bold text-slate-950">Manage products</h2>
+            </div>
+            <div class="bs-toolbar-cluster">
                 <input class="border rounded px-3 py-2 text-sm w-60" placeholder="Search products..." @bind="_query" />
-                <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-3 py-2 text-sm font-semibold hover:bg-neutral-300" @onclick="ToggleAllCats">@(_allExpanded ? "Collapse All" : "Expand All")</button>
-                <button class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="AddProduct">
+                <button class="bs-button bs-button-ghost" @onclick="ToggleAllCats">@(_allExpanded ? "Collapse All" : "Expand All")</button>
+                <button class="bs-button bs-button-primary" @onclick="AddProduct">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
                     Add Product
                 </button>
@@ -31,8 +33,8 @@
                 @foreach (var g in groups)
                 {
                     bool isOpen = _expandedCats.Contains(g.Key);
-                    <article class="rounded border">
-                        <button type="button" class="w-full px-4 py-2 bg-neutral-100 flex items-center justify-between" @onclick="() => ToggleCat(g.Key)">
+                    <article class="bs-table-shell overflow-hidden">
+                        <button type="button" class="flex w-full items-center justify-between bg-slate-50/90 px-4 py-3" @onclick="() => ToggleCat(g.Key)">
                             <div class="font-semibold">@g.Name</div>
                             <div class="text-sm">Count: <b>@g.Items.Count</b></div>
                         </button>
@@ -66,10 +68,10 @@
                                                 <td class="px-3 py-2 align-top">@product.CreatedOn</td>
                                                 <td class="px-3 py-2 align-top">
                                                     <div class="flex items-center justify-center gap-3">
-                                                        <button class="text-blue-600 hover:text-blue-700" title="Edit" @onclick="async () => await StartEdit(product)">
+                                                        <button class="bs-icon-button h-10 w-10 text-blue-700" title="Edit" @onclick="async () => await StartEdit(product)">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                                                         </button>
-                                                        <button class="text-red-600 hover:text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
+                                                        <button class="bs-icon-button h-10 w-10 text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
                                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
                                                         </button>
                                                     </div>
@@ -85,7 +87,7 @@
             }
             else
             {
-                <div class="mt-6 rounded-md bg-blue-50 text-blue-800 px-6 py-5 text-center shadow font-semibold">
+                <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">
                     No products found.
                 </div>
             }
@@ -242,13 +244,13 @@
     <Footer>
         @if (!_addStep2)
         {
-            <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="button" @onclick="() => InvokeAsync(() => SaveProduct())">Save & Continue</button>
-            <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
+            <button class="bs-button bs-button-primary" type="button" @onclick="() => InvokeAsync(() => SaveProduct())">Save & Continue</button>
+            <button class="bs-button bs-button-danger" type="button" @onclick="Cancel">Cancel</button>
         }
         else
         {
-            <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300" type="button" @onclick="Cancel">Close</button>
-            <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="button" @onclick="FinishAdd">Finish</button>
+            <button class="bs-button bs-button-ghost" type="button" @onclick="Cancel">Close</button>
+            <button class="bs-button bs-button-primary" type="button" @onclick="FinishAdd">Finish</button>
         }
     </Footer>
 </ModalDialog>
@@ -258,9 +260,9 @@
         <h5 class="text-lg font-semibold">Edit Product</h5>
     </Header>
     <Body>
-        <div class="mb-4 flex flex-wrap gap-2 border-b border-neutral-200 pb-3">
-            <button type="button" class="rounded-full px-4 py-1.5 text-sm font-semibold @(_activeEditTab == ProductEditorTab.Catalog ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700")" @onclick="() => _activeEditTab = ProductEditorTab.Catalog">Catalog</button>
-            <button type="button" class="rounded-full px-4 py-1.5 text-sm font-semibold @(_activeEditTab == ProductEditorTab.Seo ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700")" @onclick="() => _activeEditTab = ProductEditorTab.Seo">SEO</button>
+        <div class="bs-soft-divider mb-4 flex flex-wrap gap-2 border-b pb-3">
+            <button type="button" class="bs-tab-button@(_activeEditTab == ProductEditorTab.Catalog ? " bs-tab-button-active" : string.Empty)" @onclick="() => _activeEditTab = ProductEditorTab.Catalog">Catalog</button>
+            <button type="button" class="bs-tab-button@(_activeEditTab == ProductEditorTab.Seo ? " bs-tab-button-active" : string.Empty)" @onclick="() => _activeEditTab = ProductEditorTab.Seo">SEO</button>
         </div>
 
         @if (_activeEditTab == ProductEditorTab.Catalog)
@@ -303,7 +305,7 @@
                         <div class="form-group mb-3">
                             <label class="block text-xs text-neutral-600 mb-1">Image</label>
                             <div class="flex items-center justify-between">
-                                <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer">
+                                <label class="bs-button bs-button-primary cursor-pointer">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
                                     <span>Upload Image</span>
                                     <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnEditFileSelected)" accept="image/*" class="sr-only" />
@@ -368,12 +370,12 @@
                                 <div class="ml-auto flex gap-2">
                                     @if (_editingVariantId is null)
                                     {
-                                        <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800" @onclick="AddVariantAsync">Add Variant</button>
+                                        <button type="button" class="bs-button bs-button-primary" @onclick="AddVariantAsync">Add Variant</button>
                                     }
                                     else
                                     {
-                                        <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800" @onclick="UpdateVariantAsync">Update Variant</button>
-                                        <button type="button" class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-3 py-1.5 font-semibold hover:bg-neutral-300" @onclick="CancelVariantEdit">Cancel</button>
+                                        <button type="button" class="bs-button bs-button-primary" @onclick="UpdateVariantAsync">Update Variant</button>
+                                        <button type="button" class="bs-button bs-button-ghost" @onclick="CancelVariantEdit">Cancel</button>
                                     }
                                 </div>
                             </div>
@@ -425,17 +427,17 @@
         }
         else if (_isProductSeoLoading)
         {
-            <div class="rounded border bg-neutral-50 px-4 py-6 text-sm text-neutral-600">
+            <div class="bs-panel-soft px-4 py-6 text-sm text-neutral-600">
                 Loading product SEO…
             </div>
         }
         else if (!string.IsNullOrWhiteSpace(_productSeoError))
         {
-            <div class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+            <div class="rounded-[1.4rem] border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700 shadow-sm">
                 <div>@_productSeoError</div>
                 <div class="mt-3 flex gap-2">
-                    <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800" @onclick="RetryLoadProductSeoAsync">Retry</button>
-                    <button type="button" class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-3 py-1.5 font-semibold hover:bg-neutral-300" @onclick="CancelEdit">Close</button>
+                    <button type="button" class="bs-button bs-button-primary" @onclick="RetryLoadProductSeoAsync">Retry</button>
+                    <button type="button" class="bs-button bs-button-ghost" @onclick="CancelEdit">Close</button>
                 </div>
             </div>
         }
@@ -456,9 +458,9 @@
                     </div>
 
                     <div class="flex justify-end gap-2">
-                        <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-60" type="submit" disabled="@_isProductSeoSaving">@(_isProductSeoSaving ? "Saving..." : "Save SEO")</button>
-                        <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300 disabled:opacity-60" type="button" @onclick="() => _activeEditTab = ProductEditorTab.Catalog" disabled="@_isProductSeoSaving">Back</button>
-                        <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@_isProductSeoSaving">Close</button>
+                        <button class="bs-button bs-button-primary disabled:opacity-60" type="submit" disabled="@_isProductSeoSaving">@(_isProductSeoSaving ? "Saving..." : "Save SEO")</button>
+                        <button class="bs-button bs-button-ghost disabled:opacity-60" type="button" @onclick="() => _activeEditTab = ProductEditorTab.Catalog" disabled="@_isProductSeoSaving">Back</button>
+                        <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@_isProductSeoSaving">Close</button>
                     </div>
                 </div>
             </EditForm>

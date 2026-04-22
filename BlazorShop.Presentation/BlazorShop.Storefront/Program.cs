@@ -1,6 +1,7 @@
 using System.IO;
 
 using BlazorShop.Application.Diagnostics;
+using BlazorShop.Application.Options;
 using BlazorShop.Application.Services;
 using BlazorShop.Application.Services.Contracts;
 using BlazorShop.Storefront.Options;
@@ -16,15 +17,22 @@ builder.AddServiceDefaults();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<ClientAppOptions>(builder.Configuration.GetSection(ClientAppOptions.SectionName));
 builder.Services.Configure<StorefrontPublicUrlOptions>(builder.Configuration.GetSection(StorefrontPublicUrlOptions.SectionName));
 builder.Services.AddRazorComponents();
 builder.Services.AddSingleton<ISeoMetadataBuilder, SeoMetadataBuilder>();
+builder.Services.AddScoped<IStorefrontClientAppUrlResolver, StorefrontClientAppUrlResolver>();
 builder.Services.AddScoped<IStorefrontPublicUrlResolver, StorefrontPublicUrlResolver>();
 builder.Services.AddScoped<IStorefrontRobotsService, StorefrontRobotsService>();
 builder.Services.AddScoped<IStorefrontSeoSettingsProvider, StorefrontSeoSettingsProvider>();
 builder.Services.AddScoped<IStorefrontSeoComposer, StorefrontSeoComposer>();
 builder.Services.AddScoped<IStorefrontStructuredDataComposer, StorefrontStructuredDataComposer>();
 builder.Services.AddScoped<IStorefrontSitemapService, StorefrontSitemapService>();
+builder.Services.AddHttpClient<IStorefrontSessionResolver, StorefrontSessionResolver>((serviceProvider, client) =>
+{
+    var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    client.BaseAddress = ResolveApiBaseAddress(configuration);
+});
 builder.Services.AddHttpClient<StorefrontApiClient>((serviceProvider, client) =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
@@ -45,6 +53,18 @@ app.Use(async (context, next) =>
 });
 app.UseAntiforgery();
 app.MapDefaultEndpoints();
+app.MapGet(StorefrontRoutes.SignIn, (IStorefrontClientAppUrlResolver clientAppUrlResolver) =>
+    CreateClientRedirectResult(clientAppUrlResolver, "/authentication/login/account"));
+app.MapGet(StorefrontRoutes.Register, (IStorefrontClientAppUrlResolver clientAppUrlResolver) =>
+    CreateClientRedirectResult(clientAppUrlResolver, "/authentication/register"));
+app.MapGet(StorefrontRoutes.Checkout, async (HttpContext httpContext, IStorefrontClientAppUrlResolver clientAppUrlResolver, IStorefrontSessionResolver sessionResolver, CancellationToken cancellationToken) =>
+{
+    StorefrontResponseHeaders.ApplyPrivatePage(httpContext);
+
+    var session = await sessionResolver.GetCurrentUserAsync(cancellationToken);
+    var targetPath = session.IsAuthenticated ? "/account/checkout" : "/authentication/login/account/checkout";
+    return CreateClientRedirectResult(clientAppUrlResolver, targetPath);
+});
 app.MapGet(StorefrontRoutes.Robots, async (HttpContext httpContext, IStorefrontRobotsService robotsService, CancellationToken cancellationToken) =>
 {
     try
@@ -128,6 +148,16 @@ static IFileProvider CreateStaticFileProvider(IWebHostEnvironment environment)
     return fileProviders.Count == 1
         ? fileProviders[0]
         : new CompositeFileProvider(fileProviders);
+}
+
+static IResult CreateClientRedirectResult(IStorefrontClientAppUrlResolver clientAppUrlResolver, string targetPath)
+{
+    if (string.IsNullOrWhiteSpace(clientAppUrlResolver.ResolveBaseUrl()))
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    return Results.Redirect(clientAppUrlResolver.ResolveUrl(targetPath));
 }
 
 public partial class Program;

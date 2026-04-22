@@ -1,0 +1,5 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@using BlazorShop.Web.Layout
+@namespace BlazorShop.Web.Pages.Admin
+@layout AdminLayout
+@attribute [Authorize(Roles = Constant.Administration.AdminRole)]

@@ -1,0 +1,206 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@page "/"
+
+<PageTitle>BlazorShop Access</PageTitle>
+
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="bs-panel p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="bs-section-kicker">Access</p>
+                <h1 class="mt-2 text-3xl font-black tracking-tight text-slate-950">@StatusHeading</h1>
+                <p class="mt-2 text-sm leading-6 text-slate-600">@StatusMessage</p>
+            </div>
+
+            <div class="bs-toolbar-cluster">
+                <a href="@PrimaryLink" class="bs-button bs-button-primary">@PrimaryLabel</a>
+                @if (HasSecondaryLink)
+                {
+                    <a href="@SecondaryLink" class="bs-button bs-button-secondary">@SecondaryLabel</a>
+                }
+                @if (HasPublicStorefrontUrl)
+                {
+                    <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost">Storefront</a>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (IsAuthenticated)
+    {
+        <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <a href="/account" class="bs-card-link p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Account</p>
+                <h2 class="mt-3 text-xl font-bold text-slate-950">Dashboard</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Profile summary, notifications, and recent activity.</p>
+            </a>
+
+            <a href="/account/orders" class="bs-card-link p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Orders</p>
+                <h2 class="mt-3 text-xl font-bold text-slate-950">Order history</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Track references, shipment state, and completed purchases.</p>
+            </a>
+
+            <a href="/account/notifications" class="bs-card-link p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Notifications</p>
+                <h2 class="mt-3 text-xl font-bold text-slate-950">Inbox</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Review account, order, and payment updates.</p>
+                @if (NotificationService.UnreadCount > 0)
+                {
+                    <div class="bs-chip-accent mt-4 inline-flex">@NotificationService.UnreadCount unread</div>
+                }
+            </a>
+
+            <a href="/account/settings" class="bs-card-link p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Settings</p>
+                <h2 class="mt-3 text-xl font-bold text-slate-950">Security</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Password changes and account actions.</p>
+            </a>
+
+            <a href="/account/checkout" class="bs-card-link p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Checkout</p>
+                <h2 class="mt-3 text-xl font-bold text-slate-950">Continue checkout</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">Resume the authenticated checkout flow when needed.</p>
+            </a>
+
+            @if (IsAdmin)
+            {
+                <a href="/admin" class="bs-card-link p-6">
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Admin</p>
+                    <h2 class="mt-3 text-xl font-bold text-slate-950">Operations</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Catalog, orders, SEO, redirects, and user operations.</p>
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <a href="/authentication/login/account" class="bs-card-link p-6">
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Sign in</p>
+                    <h2 class="mt-3 text-xl font-bold text-slate-950">Open your account</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Dashboard, orders, notifications, settings, and admin entry when authorized.</p>
+                </a>
+
+                <a href="/authentication/register" class="bs-card-link p-6">
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Register</p>
+                    <h2 class="mt-3 text-xl font-bold text-slate-950">Create an account</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Create the profile used for orders, checkout continuation, and notifications.</p>
+                </a>
+
+                <a href="/authentication/login/account/checkout" class="bs-card-link p-6">
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Checkout</p>
+                    <h2 class="mt-3 text-xl font-bold text-slate-950">Protected handoff</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Use the sign-in handoff when checkout needs an authenticated account.</p>
+                </a>
+
+                @if (HasPublicStorefrontUrl)
+                {
+                    <a href="@PublicStorefrontUrl" class="bs-card-link p-6">
+                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Storefront</p>
+                        <h2 class="mt-3 text-xl font-bold text-slate-950">Keep shopping</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">Return to public browsing, catalog discovery, and cart entry.</p>
+                    </a>
+                }
+            </div>
+
+            <section class="bs-panel-soft p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Available after sign-in</p>
+                <div class="mt-4 space-y-3">
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm">
+                        <span class="font-semibold text-slate-950">Account dashboard</span>
+                        <span class="bs-chip">Sign in</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm">
+                        <span class="font-semibold text-slate-950">Recent orders</span>
+                        <span class="bs-chip">Sign in</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm">
+                        <span class="font-semibold text-slate-950">Notifications</span>
+                        <span class="bs-chip">Sign in</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm">
+                        <span class="font-semibold text-slate-950">Checkout continuation</span>
+                        <span class="bs-chip">Sign in</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm">
+                        <span class="font-semibold text-slate-950">Admin panel</span>
+                        <span class="bs-chip-accent">Authorized only</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+    private bool IsAuthenticated { get; set; }
+
+    private bool IsAdmin { get; set; }
+
+    private string? UserDisplayName { get; set; }
+
+    private string StatusHeading { get; set; } = "Preparing access";
+
+    private string StatusMessage { get; set; } = "Checking your permissions so BlazorShop can send you to the right account surface.";
+
+    private string PrimaryLabel { get; set; } = "Continue";
+
+    private string PrimaryLink { get; set; } = "/authentication/login/account";
+
+    private string? SecondaryLabel { get; set; }
+
+    private string? SecondaryLink { get; set; }
+
+    private bool HasSecondaryLink => !string.IsNullOrWhiteSpace(SecondaryLabel) && !string.IsNullOrWhiteSpace(SecondaryLink);
+
+    private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+
+    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateTask;
+        var user = authenticationState.User;
+
+        IsAuthenticated = user.Identity?.IsAuthenticated == true;
+        IsAdmin = user.IsInRole(Constant.Administration.AdminRole);
+        UserDisplayName = user.Claims.FirstOrDefault(claim => claim.Type == "FullName")?.Value
+            ?? user.Identity?.Name
+            ?? user.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Email)?.Value;
+
+        if (IsAuthenticated)
+        {
+            if (IsAdmin)
+            {
+                StatusHeading = string.IsNullOrWhiteSpace(UserDisplayName) ? "Admin access" : $"Admin access for {UserDisplayName}";
+                StatusMessage = "Open admin operations or move back to the account surface.";
+                PrimaryLabel = "Open admin panel";
+                PrimaryLink = "/admin";
+                SecondaryLabel = "Open account";
+                SecondaryLink = "/account";
+                return;
+            }
+
+            StatusHeading = string.IsNullOrWhiteSpace(UserDisplayName) ? "Account access" : $"Welcome back, {UserDisplayName}";
+            StatusMessage = "Open the signed-in routes you use most.";
+            PrimaryLabel = "Open account";
+            PrimaryLink = "/account";
+            SecondaryLabel = "Checkout";
+            SecondaryLink = "/account/checkout";
+            return;
+        }
+
+        StatusHeading = "Sign in required";
+        StatusMessage = "Sign in for account, orders, notifications, checkout continuation, and admin entry when authorized.";
+        PrimaryLabel = "Sign in";
+        PrimaryLink = "/authentication/login/account";
+        SecondaryLabel = "Register";
+        SecondaryLink = "/authentication/register";
+    }
+}

@@ -7,6 +7,8 @@
     {
         Task<ServiceResponse> SaveCheckoutHistoryAsync(IEnumerable<CreateOrderItem> orderItems);
 
+        Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<ProcessCart> carts, string userId, string? status = null);
+
         Task<ServiceResponse> CheckoutAsync(Checkout checkout);
 
         Task<ServiceResponse> CheckoutAsync(Checkout checkout, string? userId);

@@ -29,6 +29,7 @@
         private readonly IValidationService _validationService;
         private readonly IEmailService _emailService;
         private readonly ClientAppOptions _clientAppOptions;
+        private readonly IdentityConfirmationOptions _identityConfirmationOptions;
 
         public AuthenticationService(
             IAppTokenManager tokenManager,
@@ -41,7 +42,8 @@
             IValidationService validationService,
             IValidator<ChangePassword> changePasswordValidator,
             IEmailService emailService,
-            IOptions<ClientAppOptions> clientAppOptions)
+            IOptions<ClientAppOptions> clientAppOptions,
+            IOptions<IdentityConfirmationOptions> identityConfirmationOptions)
         {
             _tokenManager = tokenManager;
             _userManager = userManager;
@@ -54,6 +56,7 @@
             _changePasswordValidator = changePasswordValidator;
             _emailService = emailService;
             _clientAppOptions = clientAppOptions.Value;
+            _identityConfirmationOptions = identityConfirmationOptions.Value;
         }
 
         public async Task<ServiceResponse> CreateUser(CreateUser user)
@@ -81,23 +84,10 @@
                 return new ServiceResponse { Message = "User already exists." };
             }
 
-            try
-            {
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(mappedUser);
-                var confirmationLink = this.BuildClientUrl($"confirm-email?userId={mappedUser.Id}&token={Uri.EscapeDataString(token)}");
-
-                await this.SendConfirmationEmail(user.Email,
-                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to send email confirmation link to {user.Email}");
-                return new ServiceResponse { Message = "Failed to send confirmation email." };
-            }
-
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
             if (currentUser == null)
             {
+                await RollbackCreatedUserAsync(user.Email, "Unable to remove user after create because the newly created user could not be loaded.");
                 return new ServiceResponse { Message = "Unable to load the newly created user." };
             }
 
@@ -107,23 +97,32 @@
 
             if (!assignedResult)
             {
-                if (string.IsNullOrWhiteSpace(currentUser.Email))
-                {
-                    _logger.LogError(new InvalidOperationException("Cannot remove user after failed role assignment because email is missing."),
-                        "Cannot remove user after failed role assignment because email is missing.");
-                    return new ServiceResponse { Message = "Error occurred in creating account." };
-                }
-
-                var removeUserResult = await _userManager.RemoveUserByEmail(currentUser.Email);
-
-                if (removeUserResult <= 0)
-                {
-                    _logger.LogError(new Exception($"User with Email {currentUser.Email} failed to be removed after failed role assignment."),
-                        "User could not be assigned a role and could not be removed.");
-                    return new ServiceResponse { Message = "Error occurred in creating account." };
-                }
-
+                await RollbackCreatedUserAsync(currentUser.Email,
+                    $"User with Email {currentUser.Email} failed to be removed after failed role assignment.");
                 return new ServiceResponse { Message = "Error occurred in creating account." };
+            }
+
+            if (RequiresConfirmedEmail())
+            {
+                try
+                {
+                    var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
+                    var confirmationLink = this.BuildClientUrl($"confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}");
+
+                    await this.SendConfirmationEmail(user.Email,
+                        $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to send email confirmation link to {user.Email}");
+                    await RollbackCreatedUserAsync(currentUser.Email,
+                        $"User with Email {currentUser.Email} failed to be removed after confirmation email dispatch failed.");
+                    return new ServiceResponse { Message = "Failed to send confirmation email." };
+                }
+            }
+            else
+            {
+                await TryConfirmUserForNonStrictRegistrationAsync(currentUser);
             }
 
             return new ServiceResponse { Success = true, Message = "User created successfully." };
@@ -141,40 +140,32 @@
             var mappedUser = _mapper.Map<AppUser>(user);
             mappedUser.PasswordHash = user.Password;
 
-            var loginResult = await _userManager.LoginUserAsync(mappedUser);
-
-            if (!loginResult.Success)
-            {
-                return loginResult.IsLockedOut
-                    ? new LoginResponse { Message = "Account is temporarily locked. Please try again later." }
-                    : new LoginResponse { Message = "Invalid credentials." };
-            }
-
             var currentUser = await _userManager.GetUserByEmailAsync(user.Email);
             if (currentUser == null)
             {
                 return new LoginResponse { Message = "Invalid credentials." };
             }
 
-            if (!currentUser.EmailConfirmed)
-            {
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
-                var confirmationLink = this.BuildClientUrl($"confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}");
+            var loginResult = await _userManager.LoginUserAsync(mappedUser);
 
-                var pendingEmail = currentUser.Email;
-                if (!string.IsNullOrWhiteSpace(pendingEmail))
+            if (!loginResult.Success)
+            {
+                if (loginResult.IsLockedOut)
                 {
-                    await this.SendConfirmationEmail(pendingEmail,
-                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+                    return new LoginResponse { Message = "Account is temporarily locked. Please try again later." };
                 }
 
-                _logger.LogWarning($"User with unconfirmed email tried to log in. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+                if (loginResult.IsNotAllowed && RequiresConfirmedSignIn() && !currentUser.EmailConfirmed)
+                {
+                    return await CreateConfirmationRequiredResponseAsync(currentUser);
+                }
 
-                return new LoginResponse
-                           {
-                               Success = false,
-                               Message = "Email not confirmed. A new confirmation link has been sent to your email."
-                           };
+                return new LoginResponse { Message = "Invalid credentials." };
+            }
+
+            if (RequiresConfirmedSignIn() && !currentUser.EmailConfirmed)
+            {
+                return await CreateConfirmationRequiredResponseAsync(currentUser);
             }
 
 
@@ -337,6 +328,76 @@
         private string BuildClientUrl(string pathAndQuery)
         {
             return $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{pathAndQuery.TrimStart('/')}";
+        }
+
+        private bool RequiresConfirmedSignIn()
+        {
+            return _identityConfirmationOptions.RequireConfirmedAccount || _identityConfirmationOptions.RequireConfirmedEmail;
+        }
+
+        private bool RequiresConfirmedEmail()
+        {
+            return _identityConfirmationOptions.RequireConfirmedEmail;
+        }
+
+        private async Task<LoginResponse> CreateConfirmationRequiredResponseAsync(AppUser currentUser)
+        {
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
+            var confirmationLink = this.BuildClientUrl($"confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}");
+
+            var pendingEmail = currentUser.Email;
+            if (!string.IsNullOrWhiteSpace(pendingEmail))
+            {
+                await this.SendConfirmationEmail(pendingEmail,
+                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
+            }
+
+            _logger.LogWarning($"User with unconfirmed email tried to log in. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+
+            return new LoginResponse
+                       {
+                           Success = false,
+                           Message = "Email not confirmed. A new confirmation link has been sent to your email."
+                       };
+        }
+
+        private async Task TryConfirmUserForNonStrictRegistrationAsync(AppUser currentUser)
+        {
+            if (currentUser.EmailConfirmed)
+            {
+                return;
+            }
+
+            try
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
+                var confirmationResult = await _userManager.ConfirmEmailAsync(currentUser, token);
+                if (!confirmationResult)
+                {
+                    _logger.LogWarning($"User was created without confirmation requirements, but local email confirmation could not be completed. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to locally confirm email for user created without confirmation requirements. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+            }
+        }
+
+        private async Task RollbackCreatedUserAsync(string? email, string rollbackFailureMessage)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                _logger.LogError(
+                    new InvalidOperationException("Cannot remove user because email is missing."),
+                    "Cannot remove user because email is missing.");
+                return;
+            }
+
+            var removeUserResult = await _userManager.RemoveUserByEmail(email);
+            if (removeUserResult <= 0)
+            {
+                _logger.LogError(new Exception(rollbackFailureMessage), rollbackFailureMessage);
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.Web.Authentication.Components
 {
+    using System.Security.Claims;
+
     using BlazorShop.Web.Authentication.Providers;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Authentication;
@@ -37,12 +39,24 @@
 
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
 
-            var targetRoute = string.IsNullOrWhiteSpace(this.Route) ? "/" : this.Route;
+            var authState = await this.AuthStateProvider.GetAuthenticationStateAsync();
+            var targetRoute = ResolveTargetRoute(authState.User);
             var inboxLink = targetRoute.StartsWith('/') ? targetRoute : $"/{targetRoute}";
             var successMessage = string.IsNullOrWhiteSpace(result.Message) ? "You have signed in successfully." : result.Message;
 
             this.NotificationService.NotifySuccess(successMessage, "Signed in", NotificationKind.Authentication, link: inboxLink);
             this.NavigationManager.NavigateTo(targetRoute);
+        }
+
+        private string ResolveTargetRoute(ClaimsPrincipal user)
+        {
+            if (!string.IsNullOrWhiteSpace(this.Route)
+                && !string.Equals(this.Route, Constant.Cart.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return this.Route.StartsWith('/') ? this.Route : $"/{this.Route}";
+            }
+
+            return user.IsInRole(Constant.Administration.AdminRole) ? "/admin" : "/account";
         }
     }
 }

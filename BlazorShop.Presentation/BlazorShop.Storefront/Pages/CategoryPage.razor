@@ -19,27 +19,36 @@ else if (_isNotFound)
 }
 else if (_categoryPage is not null)
 {
-    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-6" />
+    <section class="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
+        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-4" />
 
-        <div class="rounded-3xl bg-white/90 border border-neutral-200/70 shadow-lg p-8">
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Category</p>
-            <h1 class="mt-2 text-4xl font-extrabold tracking-tight">@_categoryPage.Category.Name</h1>
-            @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.MetaDescription))
-            {
-                <p class="mt-4 max-w-3xl text-base leading-7 text-neutral-700">@_categoryPage.Category.MetaDescription</p>
-            }
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Category</p>
+                    <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-neutral-900">@_categoryPage.Category.Name</h1>
+                    @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.MetaDescription))
+                    {
+                        <p class="mt-4 max-w-3xl text-base leading-7 text-neutral-700">@_categoryPage.Category.MetaDescription</p>
+                    }
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 shadow">@_categoryPage.Products.Count items</span>
+                    <a href="@StorefrontRoutes.Home" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Back to Home</a>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">New Releases</a>
+                <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 text-sm font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">Today's Deals</a>
+            </div>
         </div>
     </section>
 
-    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-14">
-        <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Products</p>
-            <h2 class="mt-2 text-3xl font-extrabold tracking-tight">Browse @_categoryPage.Category.Name</h2>
-        </div>
-
+    <section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
         <ProductGrid Products="_categoryPage.Products"
-                     EmptyMessage="This published category does not have any public products yet." />
+                     EmptyMessage="No products are available in this category right now." />
     </section>
 
     <SeoContentSection Title="@CategorySeoContentTitle"
