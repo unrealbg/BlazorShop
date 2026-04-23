@@ -1,4 +1,5 @@
 ﻿@page "/admin/categories"
+@using BlazorShop.Web.Services
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
     <div class="bs-panel bs-page-hero p-6">
@@ -8,14 +9,29 @@
                 <h2 class="mt-2 text-2xl font-bold text-slate-950">Manage categories</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-600">Keep category structure and category-level SEO management inside the admin surface.</p>
             </div>
-            <button class="bs-button bs-button-primary" @onclick="AddCategory">
+            <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="AddCategory" disabled="@(_isCategoriesLoading || IsSavingCategory || IsUpdatingCategory || IsDeletingCategory)">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
                 Add Category
             </button>
         </div>
 
         <div class="bs-table-shell mt-6 overflow-auto max-h-500">
-            @if (_categories.Any())
+            @if (_isCategoriesLoading)
+            {
+                <div class="bs-panel-soft mt-6 px-6 py-5 text-center text-sm text-neutral-600">
+                    Loading categories...
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_categoriesError))
+            {
+                <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-center text-sm text-red-700">
+                    <div>@_categoriesError</div>
+                    <div class="mt-4">
+                        <button type="button" class="bs-button bs-button-primary" @onclick="GetCategories">Retry</button>
+                    </div>
+                </div>
+            }
+            else if (_categories.Any())
             {
                 <table class="min-w-full text-sm">
                     <thead class="sticky top-0 z-10">
@@ -64,14 +80,15 @@
     <Body>
         <EditForm Model="_category" OnValidSubmit="SaveCategory">
             <DataAnnotationsValidator />
+            <ValidationSummary class="mb-4 text-sm text-red-700" />
             <div class="p-2">
                 <FloatingTextInput @bind-Value="_category.Name" Label="Category Name" class="w-full" />
                 <ValidationMessage For="@(() => _category.Name)" />
             </div>
             <hr />
             <div class="flex justify-end gap-2">
-                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" type="submit">Save</button>
-                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" type="button" @onclick="Cancel">Cancel</button>
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsSavingCategory">@(IsSavingCategory ? "Saving..." : "Save")</button>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60" type="button" @onclick="Cancel" disabled="@IsSavingCategory">Cancel</button>
             </div>
         </EditForm>
     </Body>
@@ -91,6 +108,7 @@
         {
             <EditForm Model="_editCategory" OnValidSubmit="UpdateCategoryAsync">
                 <DataAnnotationsValidator />
+                <ValidationSummary class="mb-4 text-sm text-red-700" />
                 <div class="p-2">
                     <label class="block text-sm text-neutral-700 mb-1">Category Name</label>
                     <InputText @bind-Value="_editCategory.Name" class="w-full border rounded px-3 py-2" autofocus />
@@ -98,8 +116,8 @@
                 </div>
                 <hr class="my-4" />
                 <div class="flex justify-end gap-2">
-                    <button class="bs-button bs-button-primary" type="submit">Update</button>
-                    <button class="bs-button bs-button-danger" type="button" @onclick="CancelEdit">Cancel</button>
+                    <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsUpdatingCategory">@(IsUpdatingCategory ? "Updating..." : "Update")</button>
+                    <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@IsUpdatingCategory">Cancel</button>
                 </div>
             </EditForm>
         }
@@ -144,7 +162,7 @@
         Are you sure you want to delete the category
     </Body>
     <Footer>
-        <button class="bs-button bs-button-danger" @onclick="DeleteCategoryConfirmed">Yes, Delete</button>
-        <button class="bs-button bs-button-ghost" @onclick="CancelDelete">Cancel</button>
+        <button class="bs-button bs-button-danger disabled:opacity-60 disabled:cursor-not-allowed" @onclick="DeleteCategoryConfirmed" disabled="@IsDeletingCategory">@(IsDeletingCategory ? "Deleting..." : "Yes, Delete")</button>
+        <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="CancelDelete" disabled="@IsDeletingCategory">Cancel</button>
     </Footer>
 </ModalDialog>

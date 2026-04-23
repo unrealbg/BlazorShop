@@ -1,0 +1,16 @@
+{
+  "Api": {
+    "BaseUrl": "https://api.shop.example.com/api/"
+  },
+  "ClientApp": {
+    "BaseUrl": "https://account.shop.example.com"
+  },
+  "PublicUrl": {
+    "BaseUrl": "https://shop.example.com"
+  },
+  "StorefrontSeo": {
+    "SiteName": "BlazorShop",
+    "DefaultTitleSuffix": "| BlazorShop",
+    "DefaultMetaDescription": "Discover published categories and products across the BlazorShop storefront."
+  }
+}

@@ -1,5 +1,7 @@
 @page "/account"
 @implements IDisposable
+@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
+@using BlazorShop.Web.Services
 
 <PageTitle>Account Dashboard</PageTitle>
 
@@ -37,6 +39,13 @@
             @if (_loadingOrders)
             {
                 <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">Loading your orders...</div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_ordersError))
+            {
+                <div class="mt-5 rounded-3xl border border-red-200 bg-red-50 px-5 py-8 text-center text-sm text-red-700">
+                    <div>@_ordersError</div>
+                    <button type="button" class="bs-button bs-button-primary mt-4" @onclick="RetryLoadOrdersAsync">Retry</button>
+                </div>
             }
             else if (_recentOrders.Count == 0)
             {
@@ -180,9 +189,7 @@
     private bool _isAdmin;
     private string _userName = string.Empty;
     private string _userEmail = string.Empty;
-
-    [Inject]
-    private Microsoft.Extensions.Configuration.IConfiguration Configuration { get; set; } = default!;
+    private string? _ordersError;
 
     [CascadingParameter]
     private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
@@ -199,18 +206,36 @@
         ? "Your signed-in routes are ready."
         : $"Signed in as {_userEmail}. Orders, notifications, settings, and checkout continuation are available here.";
 
-    private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
 
     private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 
     protected override async Task OnInitializedAsync()
     {
         NotificationService.OnChange += HandleNotificationsChanged;
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
 
-        var user = (await AuthenticationStateTask).User;
+        await LoadUserStateAsync(AuthenticationStateTask);
+
+        await LoadRecentOrdersAsync();
+    }
+
+    private async Task LoadUserStateAsync(Task<AuthenticationState>? authenticationStateTask = null)
+    {
+        var user = authenticationStateTask is null
+            ? (await AuthStateProvider.GetAuthenticationStateAsync()).User
+            : (await authenticationStateTask).User;
+
         _isAdmin = user.IsInRole(Constant.Administration.AdminRole);
         _userEmail = user.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Email)?.Value ?? string.Empty;
         _userName = user.Claims.FirstOrDefault(claim => claim.Type == "FullName")?.Value ?? _userEmail;
+    }
+
+    private async Task LoadRecentOrdersAsync()
+    {
+        _loadingOrders = true;
+        _ordersError = null;
+        _recentOrders.Clear();
 
         var client = await HttpClientHelper.GetPrivateClientAsync();
         var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
@@ -219,12 +244,20 @@
             http,
             "We couldn't load your dashboard orders right now. Please try again.");
 
-        if (!QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders"))
+        if (QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders", showToast: false))
         {
-            _recentOrders.AddRange((ordersResult.Data ?? []).OrderByDescending(order => order.CreatedOn).Take(3));
+            _ordersError = FeedbackMessageResolver.ResolveQueryFailure(ordersResult, "We couldn't load your dashboard orders right now. Please try again.");
+            _loadingOrders = false;
+            return;
         }
 
+        _recentOrders.AddRange((ordersResult.Data ?? []).OrderByDescending(order => order.CreatedOn).Take(3));
         _loadingOrders = false;
+    }
+
+    private Task RetryLoadOrdersAsync()
+    {
+        return LoadRecentOrdersAsync();
     }
 
     private void HandleNotificationsChanged()
@@ -232,8 +265,18 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadUserStateAsync(authenticationStateTask);
+            StateHasChanged();
+        });
+    }
+
     public void Dispose()
     {
         NotificationService.OnChange -= HandleNotificationsChanged;
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
     }
 }

@@ -18,7 +18,7 @@ namespace BlazorShop.Web.Shared.Services
 
         public async Task<QueryResult<IEnumerable<GetProductVariant>>> GetByProductIdAsync(Guid productId)
         {
-            var client = _httpClientHelper.GetPublicClient();
+            var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
             {
                 Route = $"{Constant.Product.Variants}/{productId}/variants",

@@ -85,7 +85,7 @@
             return await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
         }
 
-        public async Task<LoginResponse> ReviveToken()
+        public async Task<QueryResult<LoginResponse>> ReviveToken()
         {
             var client = _httpClientHelper.GetPublicClient();
             var currentApiCall = new ApiCall
@@ -97,10 +97,9 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
 
-            return result is null || !result.IsSuccessStatusCode
-                       ? new LoginResponse(Message: this._apiCallHelper.ConnectionError().Message)
-                       : await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
-
+            return await _apiCallHelper.GetQueryResult<LoginResponse>(
+                result,
+                this._apiCallHelper.ConnectionError().Message);
         }
 
         public async Task<ServiceResponse> Logout()

@@ -21,6 +21,7 @@ namespace BlazorShop.API.Controllers
         /// Get all variants for a product
         /// </summary>
         [HttpGet("{productId}/variants")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<GetProductVariant>>> GetByProductId(Guid productId)
         {
             var data = await _variantService.GetByProductIdAsync(productId);

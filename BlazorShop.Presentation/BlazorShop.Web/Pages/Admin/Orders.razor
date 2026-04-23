@@ -1,4 +1,5 @@
 @page "/admin/orders"
+@using BlazorShop.Web.Services
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
   <div class="bs-panel bs-page-hero p-6 admin-panel">
@@ -10,13 +11,26 @@
       </div>
       <div class="bs-toolbar-cluster">
         <input class="border rounded px-2 py-1 text-sm w-60" placeholder="Search name/email" @bind="_customerQuery" />
-        <button class="bs-button bs-button-ghost" @onclick="ToggleAll">@(_allExpanded ? "Collapse All" : "Expand All")</button>
-        <button class="bs-button bs-button-primary" @onclick="ReloadAsync">Reload</button>
+        <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ToggleAll" disabled="@_isLoading">@(_allExpanded ? "Collapse All" : "Expand All")</button>
+        <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="ReloadAsync" disabled="@(_isLoading || _isSaving)">@(_isLoading ? "Reloading..." : "Reload")</button>
       </div>
     </header>
 
     <div class="mt-4 space-y-4">
-      @if (_orders.Any())
+      @if (_isLoading)
+      {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-center text-sm text-neutral-600">Loading orders...</div>
+      }
+      else if (!string.IsNullOrWhiteSpace(_loadError))
+      {
+        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-center text-sm text-red-700">
+          <div>@_loadError</div>
+          <div class="mt-4">
+            <button type="button" class="bs-button bs-button-primary" @onclick="ReloadAsync">Retry</button>
+          </div>
+        </div>
+      }
+      else if (_orders.Any())
       {
         var groups = _orders
             .GroupBy(o => new { o.UserId, Name = o.CustomerName ?? o.CustomerEmail ?? "(Unknown)", Email = o.CustomerEmail })
@@ -158,13 +172,16 @@
     </div>
   </Body>
   <Footer>
-    <button class="bs-button bs-button-primary" @onclick="SaveAsync">Save</button>
-    <button class="bs-button bs-button-secondary ml-2" @onclick="() => _showDialog = false">Close</button>
+    <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="SaveAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save")</button>
+    <button class="bs-button bs-button-secondary ml-2 disabled:opacity-60" @onclick="() => _showDialog = false" disabled="@_isSaving">Close</button>
   </Footer>
 </ModalDialog>
 
 @code {
   private List<GetOrder> _orders = new();
+  private bool _isLoading;
+  private bool _isSaving;
+  private string? _loadError;
   private bool _showDialog;
   private GetOrder? _editOrder;
   private string _carrier = string.Empty;
@@ -185,6 +202,9 @@
 
   private async Task ReloadAsync()
   {
+    _isLoading = true;
+    _loadError = null;
+
     var client = await HttpClientHelper.GetPrivateClientAsync();
     var api = new ApiCall { Client = client, Route = Constant.Cart.GetAllOrders, Type = Constant.ApiCallType.Get };
     var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
@@ -192,12 +212,21 @@
       http,
       "We couldn't load orders right now. Please try again.");
 
-    _orders = QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders")
-      ? new()
-      : (ordersResult.Data ?? []).ToList();
+    if (QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders", showToast: false))
+    {
+      _orders = new();
+      _loadError = FeedbackMessageResolver.ResolveQueryFailure(ordersResult, "We couldn't load orders right now. Please try again.");
+      _expanded.Clear();
+      _allExpanded = false;
+      _isLoading = false;
+      return;
+    }
+
+    _orders = (ordersResult.Data ?? []).ToList();
 
     _expanded.Clear();
     _allExpanded = false;
+    _isLoading = false;
   }
 
   private void Toggle(string key)
@@ -235,25 +264,34 @@
 
   private async Task SaveAsync()
   {
-    if (_editOrder is null) return;
+    if (_editOrder is null || _isSaving) return;
 
-    var client = await HttpClientHelper.GetPrivateClientAsync();
-    var tApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/tracking", Type = Constant.ApiCallType.Update, Model = new { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl } };
-    var sApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/shipping-status", Type = Constant.ApiCallType.Update, Model = new { ShippingStatus = _shippingStatus } };
+    _isSaving = true;
 
-    var tRes = await ApiCallHelper.ApiCallTypeCall<object>(tApi);
-    var sRes = await ApiCallHelper.ApiCallTypeCall<object>(sApi);
-
-    _showDialog = false;
-
-    if (tRes.IsSuccessStatusCode && sRes.IsSuccessStatusCode)
+    try
     {
-      ToastService.ShowToast(Shared.Toast.ToastLevel.Success, "Saved", "Orders");
-      await ReloadAsync();
+      var client = await HttpClientHelper.GetPrivateClientAsync();
+      var tApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/tracking", Type = Constant.ApiCallType.Update, Model = new { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl } };
+      var sApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/shipping-status", Type = Constant.ApiCallType.Update, Model = new { ShippingStatus = _shippingStatus } };
+
+      var tRes = await ApiCallHelper.ApiCallTypeCall<object>(tApi);
+      var sRes = await ApiCallHelper.ApiCallTypeCall<object>(sApi);
+
+      _showDialog = false;
+
+      if (tRes.IsSuccessStatusCode && sRes.IsSuccessStatusCode)
+      {
+        ToastService.ShowToast(Shared.Toast.ToastLevel.Success, "Order updates saved successfully.", "Orders");
+        await ReloadAsync();
+      }
+      else
+      {
+        ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "We couldn't save those order updates. Try again.", "Orders");
+      }
     }
-    else
+    finally
     {
-      ToastService.ShowToast(Shared.Toast.ToastLevel.Error, "Failed to save", "Orders");
+      _isSaving = false;
     }
   }
 

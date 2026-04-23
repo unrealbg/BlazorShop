@@ -1,4 +1,6 @@
 @page "/account/settings"
+@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
+@using BlazorShop.Web.Services
 
 <PageTitle>Account Settings</PageTitle>
 
@@ -18,6 +20,11 @@
 
             <EditForm Model="_changePasswordModel" OnValidSubmit="ChangePasswordAsync" class="mt-6 space-y-4">
                 <DataAnnotationsValidator />
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <div class="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">@_errorMessage</div>
+                }
+                <ValidationSummary class="text-sm text-red-700" />
                 <div>
                     <label class="mb-1 block text-sm font-medium text-slate-700">Current password</label>
                     <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.CurrentPassword" />
@@ -33,7 +40,7 @@
                     <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.ConfirmPassword" />
                     <ValidationMessage For="@(() => _changePasswordModel.ConfirmPassword)" />
                 </div>
-                <button type="submit" class="bs-button bs-button-primary">Update password</button>
+                <button type="submit" class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" disabled="@IsChangingPassword">@(IsChangingPassword ? "Updating password..." : "Update password")</button>
             </EditForm>
         </section>
 
@@ -53,33 +60,36 @@
 </section>
 
 @code {
+    private readonly AsyncActionGate _changePasswordGate = new();
     private PasswordChangeModel _changePasswordModel = new();
+    private string? _errorMessage;
 
-    [Inject]
-    private Microsoft.Extensions.Configuration.IConfiguration Configuration { get; set; } = default!;
-
-    private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
 
     private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 
+    private bool IsChangingPassword => _changePasswordGate.IsRunning;
+
     private async Task ChangePasswordAsync()
     {
-        var response = await AuthenticationService.ChangePassword(_changePasswordModel);
-        if (response.Success)
+        await _changePasswordGate.RunAsync(async () =>
         {
-            NotificationService.NotifySuccess(
-                string.IsNullOrWhiteSpace(response.Message) ? "Password changed successfully." : response.Message,
-                "Password updated",
-                NotificationKind.Authentication,
-                link: "/account/settings");
-            _changePasswordModel = new();
-            return;
-        }
+            _errorMessage = null;
+            await InvokeAsync(StateHasChanged);
 
-        NotificationService.NotifyError(
-            string.IsNullOrWhiteSpace(response.Message) ? "Unable to change password." : response.Message,
-            "Password update failed",
-            NotificationKind.Authentication,
-            link: "/account/settings");
+            var response = await AuthenticationService.ChangePassword(_changePasswordModel);
+            if (response.Success)
+            {
+                NotificationService.NotifySuccess(
+                    string.IsNullOrWhiteSpace(response.Message) ? "Password changed successfully." : response.Message,
+                    "Password updated",
+                    NotificationKind.Authentication,
+                    link: "/account/settings");
+                _changePasswordModel = new();
+                return;
+            }
+
+            _errorMessage = string.IsNullOrWhiteSpace(response.Message) ? "Unable to change password." : response.Message;
+        });
     }
 }

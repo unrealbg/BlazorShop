@@ -14,6 +14,8 @@ namespace BlazorShop.Domain.Contracts
 
         Task<Product?> GetProductDetailsByIdAsync(Guid id);
 
+        Task<Product?> GetPublishedProductDetailsByIdAsync(Guid id);
+
         Task<Product?> GetPublishedProductBySlugAsync(string slug);
 
         Task<IReadOnlyList<CatalogProductReadModel>> GetPublishedProductsByCategoryAsync(Guid categoryId);

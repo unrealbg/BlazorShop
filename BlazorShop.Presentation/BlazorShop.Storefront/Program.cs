@@ -4,12 +4,14 @@ using BlazorShop.Application.Diagnostics;
 using BlazorShop.Application.Options;
 using BlazorShop.Application.Services;
 using BlazorShop.Application.Services.Contracts;
+using BlazorShop.Storefront.Configuration;
 using BlazorShop.Storefront.Options;
 using BlazorShop.Storefront;
 using BlazorShop.Storefront.Services;
 using BlazorShop.Storefront.Services.Contracts;
 
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +19,18 @@ builder.AddServiceDefaults();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
-builder.Services.Configure<ClientAppOptions>(builder.Configuration.GetSection(ClientAppOptions.SectionName));
-builder.Services.Configure<StorefrontPublicUrlOptions>(builder.Configuration.GetSection(StorefrontPublicUrlOptions.SectionName));
+builder.Services.AddSingleton<IValidateOptions<StorefrontApiOptions>, StorefrontApiOptionsValidator>();
+builder.Services.AddSingleton<IValidateOptions<ClientAppOptions>, StorefrontClientAppOptionsValidator>();
+builder.Services.AddSingleton<IValidateOptions<StorefrontPublicUrlOptions>, StorefrontPublicUrlOptionsValidator>();
+builder.Services.AddOptions<StorefrontApiOptions>()
+    .Bind(builder.Configuration.GetSection(StorefrontApiOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddOptions<ClientAppOptions>()
+    .Bind(builder.Configuration.GetSection(ClientAppOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddOptions<StorefrontPublicUrlOptions>()
+    .Bind(builder.Configuration.GetSection(StorefrontPublicUrlOptions.SectionName))
+    .ValidateOnStart();
 builder.Services.AddRazorComponents();
 builder.Services.AddSingleton<ISeoMetadataBuilder, SeoMetadataBuilder>();
 builder.Services.AddScoped<IStorefrontClientAppUrlResolver, StorefrontClientAppUrlResolver>();
@@ -122,7 +134,7 @@ app.Run();
 
 static Uri ResolveApiBaseAddress(IConfiguration configuration)
 {
-    var configuredBaseAddress = configuration["Api:BaseUrl"];
+    var configuredBaseAddress = configuration[$"{StorefrontApiOptions.SectionName}:BaseUrl"];
     if (!string.IsNullOrWhiteSpace(configuredBaseAddress)
         && Uri.TryCreate(configuredBaseAddress, UriKind.Absolute, out var configuredUri))
     {

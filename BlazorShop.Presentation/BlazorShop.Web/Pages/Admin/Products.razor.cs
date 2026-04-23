@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Web.Pages.Admin
 {
+    using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Category;
     using BlazorShop.Web.Shared.Models.Product;
@@ -11,10 +12,15 @@
 
     public partial class Products
     {
+        private readonly AsyncActionGate _saveProductGate = new();
+        private readonly AsyncActionGate _updateProductGate = new();
+        private readonly AsyncActionGate _deleteProductGate = new();
+        private readonly AsyncActionGate _variantGate = new();
         private bool _showDialog = false;
         private bool _addStep2 = false;
         private Guid _newProductId;
         private List<GetProductVariant> _newVariants = new();
+        private string? _newVariantsError;
         private CreateOrUpdateProductVariant _newVariantForm = new() { SizeScale = 1, SizeValue = "XS", Stock = 0 };
 
         private bool _showEditDialog = false;
@@ -22,17 +28,22 @@
         private Guid _productToDelete;
         private IEnumerable<GetProduct> _products = [];
         private IEnumerable<GetCategory> _categories = [];
+        private bool _isProductsLoading;
+        private string? _productsError;
+        private string? _categoriesError;
         private CreateProduct _product = new();
         private UpdateProduct _editProduct = new();
         private UpdateProductSeo _editProductSeo = new();
         private string? _previewImageUrl;
         private string? _producToDeleteName;
+        private bool _isUploadingImage;
         private bool _isProductSeoLoading;
         private bool _isProductSeoSaving;
         private string? _productSeoError;
         private ProductEditorTab _activeEditTab = ProductEditorTab.Catalog;
 
         private List<GetProductVariant> _variants = [];
+        private string? _variantsError;
         private CreateOrUpdateProductVariant _variantForm = new();
         private Guid? _editingVariantId;
 
@@ -49,32 +60,64 @@
         [Inject]
         private IProductSeoService ProductSeoService { get; set; } = default!;
 
+        private bool IsSavingProduct => _saveProductGate.IsRunning;
+
+        private bool IsUpdatingProduct => _updateProductGate.IsRunning;
+
+        private bool IsDeletingProduct => _deleteProductGate.IsRunning;
+
+        private bool IsRunningVariantAction => _variantGate.IsRunning;
+
         protected override async Task OnInitializedAsync()
         {
-            var categoriesResult = await this.CategoryService.GetAllAsync();
-            if (this.QueryFailureNotifier.TryNotifyFailure(categoriesResult, "Categories"))
+            await RetryLoadCatalogAsync();
+        }
+
+        private async Task LoadCategoriesAsync()
+        {
+            _categoriesError = null;
+
+            var categoriesResult = await this.CategoryService.GetAllForAdminAsync();
+            if (this.QueryFailureNotifier.TryNotifyFailure(categoriesResult, "Categories", showToast: false))
             {
-                this._categories = [];
-            }
-            else
-            {
-                this._categories = categoriesResult.Data ?? [];
+                _categories = [];
+                _categoriesError = FeedbackMessageResolver.ResolveQueryFailure(categoriesResult, "We couldn't load categories right now. Please try again.");
+                return;
             }
 
-            await this.GetProducts();
-            foreach (var c in _categories) _expandedCats.Add(c.Id);
+            _categories = categoriesResult.Data ?? [];
+        }
+
+        private async Task RetryLoadCatalogAsync()
+        {
+            _expandedCats.Clear();
+            await LoadCategoriesAsync();
+            await GetProducts();
+
+            foreach (var c in _categories)
+            {
+                _expandedCats.Add(c.Id);
+            }
+
+            _allExpanded = _categories.Any();
         }
 
         private async Task GetProducts()
         {
+            _isProductsLoading = true;
+            _productsError = null;
+
             var productsResult = await this.ProductService.GetAllAsync();
-            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
+            if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products", showToast: false))
             {
                 _products = [];
+                _productsError = FeedbackMessageResolver.ResolveQueryFailure(productsResult, "We couldn't load products right now. Please try again.");
+                _isProductsLoading = false;
                 return;
             }
 
             _products = productsResult.Data ?? [];
+            _isProductsLoading = false;
         }
 
         private void ToggleCat(Guid id)
@@ -103,16 +146,20 @@
             _addStep2 = false;
             _newProductId = Guid.Empty;
             _newVariants.Clear();
+            _newVariantsError = null;
             _newVariantForm = new CreateOrUpdateProductVariant { SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
             _showDialog = true;
         }
 
         private async Task LoadVariantsAsync(Guid productId)
         {
+            _variantsError = null;
+
             var variantsResult = await this.ProductVariantService.GetByProductIdAsync(productId);
-            if (this.QueryFailureNotifier.TryNotifyFailure(variantsResult, "Variants"))
+            if (this.QueryFailureNotifier.TryNotifyFailure(variantsResult, "Variants", showToast: false))
             {
                 _variants = [];
+                _variantsError = FeedbackMessageResolver.ResolveQueryFailure(variantsResult, "We couldn't load product variants right now. Please try again.");
                 return;
             }
 
@@ -133,10 +180,10 @@
             _productSeoError = null;
 
             var seoResult = await this.ProductSeoService.GetByProductIdAsync(productId);
-            if (this.QueryFailureNotifier.TryNotifyFailure(seoResult, "Product SEO"))
+            if (this.QueryFailureNotifier.TryNotifyFailure(seoResult, "Product SEO", showToast: false))
             {
                 _editProductSeo = CreateDefaultProductSeo(productId);
-                _productSeoError = seoResult.Message;
+                _productSeoError = FeedbackMessageResolver.ResolveQueryFailure(seoResult, "We couldn't load product SEO right now. Please try again.");
                 _isProductSeoLoading = false;
                 return;
             }
@@ -186,6 +233,7 @@
             _addStep2 = false;
             _newProductId = Guid.Empty;
             _previewImageUrl = null;
+            _isUploadingImage = false;
         }
 
         private void CancelEdit()
@@ -193,12 +241,14 @@
             _showEditDialog = false;
             _previewImageUrl = null;
             _variants.Clear();
+            _variantsError = null;
             _editingVariantId = null;
             _activeEditTab = ProductEditorTab.Catalog;
             _editProductSeo = new();
             _productSeoError = null;
             _isProductSeoLoading = false;
             _isProductSeoSaving = false;
+            _isUploadingImage = false;
         }
 
         private void ConfirmDelete(Guid id)
@@ -210,40 +260,53 @@
 
         private async Task DeleteProductConfirmed()
         {
-            _showConfirmDeleteDialog = false;
-            var result = await this.ProductService.DeleteAsync(_productToDelete);
-
-            if (result.Success)
+            await _deleteProductGate.RunAsync(async () =>
             {
-                await this.GetProducts();
-            }
+                _showConfirmDeleteDialog = false;
+                var result = await this.ProductService.DeleteAsync(_productToDelete);
 
-            this.ShowToast(result, "Delete-Product");
+                if (result.Success)
+                {
+                    await this.GetProducts();
+                }
+
+                this.ShowToast(result, "Products", successFallback: "Product deleted successfully.", failureFallback: "We couldn't delete that product. Try again.");
+            });
         }
 
         private async Task SaveProduct()
         {
+            if (IsSavingProduct)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(_product.Name))
             {
-                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Add-Product");
+                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Products");
+                return;
             }
 
             if (string.IsNullOrEmpty(_product.Image))
             {
-                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Add-Product");
+                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Products");
                 return;
             }
 
-            var result = await this.ProductService.AddAsync(_product);
-            if (result.Success)
+            await _saveProductGate.RunAsync(async () =>
             {
-                await this.GetProducts();
-                _newProductId = result.Id ?? Guid.Empty;
-                _addStep2 = true;
-                _newVariantForm.ProductId = _newProductId;
-            }
+                var result = await this.ProductService.AddAsync(_product);
+                if (result.Success)
+                {
+                    await this.GetProducts();
+                    _newProductId = result.Id ?? Guid.Empty;
+                    _addStep2 = true;
+                    _newVariantsError = null;
+                    _newVariantForm.ProductId = _newProductId;
+                }
 
-            this.ShowToast(result, "Add-Product");
+                this.ShowToast(result, "Products", successFallback: "Product created successfully.", failureFallback: "We couldn't create that product. Try again.");
+            });
         }
 
         private async Task FinishAdd()
@@ -281,12 +344,15 @@
                 return;
             }
 
-            var response = await this.ProductVariantService.AddAsync(_editProduct.Id, _variantForm);
-            this.ShowToast(response, "Add-Variant");
-            if (response.Success)
+            await _variantGate.RunAsync(async () =>
             {
-                await LoadVariantsAsync(_editProduct.Id);
-            }
+                var response = await this.ProductVariantService.AddAsync(_editProduct.Id, _variantForm);
+                this.ShowToast(response, "Product Variants", successFallback: "Variant added successfully.", failureFallback: "We couldn't add that variant. Try again.");
+                if (response.Success)
+                {
+                    await LoadVariantsAsync(_editProduct.Id);
+                }
+            });
         }
 
         private async Task AddVariantForNewAsync()
@@ -297,20 +363,35 @@
                 return;
             }
 
-            var response = await this.ProductVariantService.AddAsync(_newProductId, _newVariantForm);
-            this.ShowToast(response, "Add-Variant");
-            if (response.Success)
+            await _variantGate.RunAsync(async () =>
             {
-                var variantsResult = await this.ProductVariantService.GetByProductIdAsync(_newProductId);
-                if (this.QueryFailureNotifier.TryNotifyFailure(variantsResult, "Variants"))
+                var response = await this.ProductVariantService.AddAsync(_newProductId, _newVariantForm);
+                this.ShowToast(response, "Product Variants", successFallback: "Variant added successfully.", failureFallback: "We couldn't add that variant. Try again.");
+                if (response.Success)
                 {
-                    _newVariants = [];
-                    return;
-                }
+                    if (!await LoadNewVariantsAsync())
+                    {
+                        return;
+                    }
 
-                _newVariants = (variantsResult.Data ?? []).ToList();
-                _newVariantForm = new CreateOrUpdateProductVariant { ProductId = _newProductId, SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
+                    _newVariantForm = new CreateOrUpdateProductVariant { ProductId = _newProductId, SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
+                }
+            });
+        }
+
+        private async Task<bool> LoadNewVariantsAsync()
+        {
+            var variantsResult = await this.ProductVariantService.GetByProductIdAsync(_newProductId);
+            if (this.QueryFailureNotifier.TryNotifyFailure(variantsResult, "Variants", showToast: false))
+            {
+                _newVariants = [];
+                _newVariantsError = FeedbackMessageResolver.ResolveQueryFailure(variantsResult, "We couldn't reload product variants right now. Please try again.");
+                return false;
             }
+
+            _newVariantsError = null;
+            _newVariants = (variantsResult.Data ?? []).ToList();
+            return true;
         }
 
         private void BeginVariantEdit(GetProductVariant v)
@@ -337,12 +418,15 @@
                 return;
             }
 
-            var response = await this.ProductVariantService.UpdateAsync(_variantForm);
-            this.ShowToast(response, "Update-Variant");
-            if (response.Success)
+            await _variantGate.RunAsync(async () =>
             {
-                await LoadVariantsAsync(_editProduct.Id);
-            }
+                var response = await this.ProductVariantService.UpdateAsync(_variantForm);
+                this.ShowToast(response, "Product Variants", successFallback: "Variant updated successfully.", failureFallback: "We couldn't update that variant. Try again.");
+                if (response.Success)
+                {
+                    await LoadVariantsAsync(_editProduct.Id);
+                }
+            });
         }
 
         private void CancelVariantEdit()
@@ -358,16 +442,24 @@
 
         private async Task DeleteVariantAsync(Guid id)
         {
-            var response = await this.ProductVariantService.DeleteAsync(id);
-            this.ShowToast(response, "Delete-Variant");
-            if (response.Success)
+            await _variantGate.RunAsync(async () =>
             {
-                await LoadVariantsAsync(_editProduct.Id);
-            }
+                var response = await this.ProductVariantService.DeleteAsync(id);
+                this.ShowToast(response, "Product Variants", successFallback: "Variant deleted successfully.", failureFallback: "We couldn't delete that variant. Try again.");
+                if (response.Success)
+                {
+                    await LoadVariantsAsync(_editProduct.Id);
+                }
+            });
         }
 
         private async Task OnFileSelected(InputFileChangeEventArgs e)
         {
+            if (_isUploadingImage)
+            {
+                return;
+            }
+
             var file = e.File;
 
             var allowedImageFormats = new List<string>
@@ -388,6 +480,8 @@
                     iconClass: ToastIcon.Error);
                 return;
             }
+
+            _isUploadingImage = true;
 
             try
             {
@@ -409,7 +503,7 @@
                 {
                     this.ToastService.ShowToast(
                         level: ToastLevel.Error,
-                        message: "Failed to upload the file.",
+                        message: "We couldn't upload the image. Try again.",
                         heading: "Upload Image",
                         iconClass: ToastIcon.Error);
                 }
@@ -422,10 +516,19 @@
                     heading: "Upload Image",
                     iconClass: ToastIcon.Error);
             }
+            finally
+            {
+                _isUploadingImage = false;
+            }
         }
 
         private async Task OnEditFileSelected(InputFileChangeEventArgs e)
         {
+            if (_isUploadingImage)
+            {
+                return;
+            }
+
             var file = e.File;
 
             var allowedImageFormats = new List<string>
@@ -447,6 +550,8 @@
                 return;
             }
 
+            _isUploadingImage = true;
+
             try
             {
                 var result = await this.FileUploadService.UploadFileAsync(file);
@@ -460,7 +565,7 @@
                 {
                     this.ToastService.ShowToast(
                         level: ToastLevel.Error,
-                        message: "Failed to upload the file.",
+                        message: "We couldn't upload the image. Try again.",
                         heading: "Upload Image",
                         iconClass: ToastIcon.Error);
                 }
@@ -472,6 +577,10 @@
                     message: ex.Message,
                     heading: "Upload Image",
                     iconClass: ToastIcon.Error);
+            }
+            finally
+            {
+                _isUploadingImage = false;
             }
         }
 
@@ -495,21 +604,19 @@
             _ => "—"
         };
 
-        private void ShowToast(ServiceResponse result, string heading)
+        private void ShowToast(ServiceResponse result, string heading, string successFallback = "Saved successfully.", string failureFallback = "Request failed.")
         {
             var level = result.Success ? ToastLevel.Success : ToastLevel.Error;
             var icon = result.Success ? ToastIcon.Success : ToastIcon.Error;
 
-            this.ToastService.ShowToast(level: level, message: result.Message, heading: heading, iconClass: icon);
+            this.ToastService.ShowToast(level: level, message: FeedbackMessageResolver.ResolveMutation(result, successFallback, failureFallback), heading: heading, iconClass: icon);
         }
 
-        private void ShowToast<TPayload>(ServiceResponse<TPayload> result, string heading)
+        private void ShowToast<TPayload>(ServiceResponse<TPayload> result, string heading, string successFallback = "Saved successfully.", string failureFallback = "Request failed.")
         {
             var level = result.Success ? ToastLevel.Success : ToastLevel.Error;
             var icon = result.Success ? ToastIcon.Success : ToastIcon.Error;
-            var message = string.IsNullOrWhiteSpace(result.Message)
-                ? result.Success ? "Saved successfully." : "Request failed."
-                : result.Message;
+            var message = FeedbackMessageResolver.ResolveMutation(result, successFallback, failureFallback);
 
             this.ToastService.ShowToast(level: level, message: message, heading: heading, iconClass: icon);
         }
@@ -546,25 +653,34 @@
 
         private async Task UpdateProductAsync()
         {
+            if (IsUpdatingProduct)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(_editProduct.Name))
             {
-                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Edit-Product");
+                this.ShowToast(new ServiceResponse(false, "Product name is required."), "Products");
+                return;
             }
 
             if (string.IsNullOrEmpty(_editProduct.Image))
             {
-                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Edit-Product");
+                this.ShowToast(new ServiceResponse(false, "Please upload an image for the product."), "Products");
                 return;
             }
 
-            var result = await this.ProductService.UpdateAsync(_editProduct);
-            if (result.Success)
+            await _updateProductGate.RunAsync(async () =>
             {
-                _showEditDialog = false;
-                await this.GetProducts();
-            }
+                var result = await this.ProductService.UpdateAsync(_editProduct);
+                if (result.Success)
+                {
+                    _showEditDialog = false;
+                    await this.GetProducts();
+                }
 
-            this.ShowToast(result, "Edit-Product");
+                this.ShowToast(result, "Products", successFallback: "Product updated successfully.", failureFallback: "We couldn't update that product. Try again.");
+            });
         }
 
         private void CancelDelete()

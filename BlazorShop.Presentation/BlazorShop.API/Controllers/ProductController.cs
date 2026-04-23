@@ -12,10 +12,12 @@
     public class ProductController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IPublicCatalogService _publicCatalogService;
 
-        public ProductController(IProductService productService)
+        public ProductController(IProductService productService, IPublicCatalogService publicCatalogService)
         {
             _productService = productService;
+            _publicCatalogService = publicCatalogService;
         }
 
         /// <summary>
@@ -23,6 +25,7 @@
         /// </summary>
         /// <returns>List of products.</returns>
         [HttpGet("all")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<GetProduct>>> GetAll()
         {
             var data = await _productService.GetAllAsync();
@@ -37,7 +40,7 @@
         [HttpGet("catalog")]
         public async Task<ActionResult<PagedResult<GetCatalogProduct>>> GetCatalog([FromQuery] ProductCatalogQuery query)
         {
-            var data = await _productService.GetCatalogPageAsync(query);
+            var data = await _publicCatalogService.GetPublishedCatalogPageAsync(query);
             return Ok(data);
         }
 
@@ -49,7 +52,7 @@
         [HttpGet("single/{id}")]
         public async Task<ActionResult<GetProduct>> GetSingle(Guid id)
         {
-            var data = await _productService.GetByIdAsync(id);
+            var data = await _publicCatalogService.GetPublishedProductByIdAsync(id);
             return data != null ? this.Ok(data) : this.NotFound();
         }
 

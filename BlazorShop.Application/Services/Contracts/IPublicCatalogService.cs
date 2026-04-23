@@ -13,7 +13,13 @@ namespace BlazorShop.Application.Services.Contracts
 
         Task<PagedResult<GetCatalogProduct>> GetPublishedCatalogPageAsync(ProductCatalogQuery query);
 
+        Task<GetProduct?> GetPublishedProductByIdAsync(Guid id);
+
         Task<GetProduct?> GetPublishedProductBySlugAsync(string slug);
+
+        Task<GetCategory?> GetPublishedCategoryByIdAsync(Guid id);
+
+        Task<IReadOnlyList<GetCatalogProduct>> GetPublishedProductsByCategoryAsync(Guid categoryId);
 
         Task<GetCategoryPage?> GetPublishedCategoryPageBySlugAsync(string slug);
     }

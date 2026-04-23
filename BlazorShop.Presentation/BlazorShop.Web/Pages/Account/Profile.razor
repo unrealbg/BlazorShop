@@ -1,4 +1,7 @@
 @page "/account/profile"
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticationSessionEventPublisher SessionEventPublisher
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticationSessionRefresher AuthenticationSessionRefresher
+@using BlazorShop.Web.Services
 
 <PageTitle>Profile</PageTitle>
 
@@ -37,6 +40,11 @@
 
             <EditForm Model="_updateProfile" OnValidSubmit="UpdateProfileAsync" class="mt-6 space-y-4">
                 <DataAnnotationsValidator />
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <div class="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">@_errorMessage</div>
+                }
+                <ValidationSummary class="text-sm text-red-700" />
                 <div>
                     <ValidationMessage For="@(() => _updateProfile.FullName)" />
                     <FloatingTextInput class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_updateProfile.FullName" Label="Full Name" Placeholder="John Doe" />
@@ -49,7 +57,7 @@
                     <FloatingTextInput class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_updateProfile.PhoneNumber" Label="Phone (optional)" Type="text" Placeholder="+359 ..." />
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button type="submit" class="bs-button bs-button-primary">Save changes</button>
+                    <button type="submit" class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" disabled="@IsSaving">@(IsSaving ? "Saving changes..." : "Save changes")</button>
                     <a href="/account/settings" class="bs-button bs-button-secondary">Open settings</a>
                 </div>
             </EditForm>
@@ -58,9 +66,13 @@
 </section>
 
 @code {
+    private readonly AsyncActionGate _saveProfileGate = new();
     private UpdateProfileModel _updateProfile = new();
     private string _userEmail = string.Empty;
     private string _userName = string.Empty;
+    private string? _errorMessage;
+
+    private bool IsSaving => _saveProfileGate.IsRunning;
 
     [CascadingParameter]
     private Task<AuthenticationState> AuthState { get; set; } = default!;
@@ -90,23 +102,31 @@
 
     private async Task UpdateProfileAsync()
     {
-        var response = await AuthenticationService.UpdateProfile(_updateProfile);
-        if (response.Success)
+        await _saveProfileGate.RunAsync(async () =>
         {
-            NotificationService.NotifySuccess(
-                "Profile updated.",
-                "Profile",
-                NotificationKind.Authentication,
-                link: "/account/profile");
-            _userEmail = _updateProfile.Email;
-            _userName = _updateProfile.FullName;
-            return;
-        }
+            _errorMessage = null;
+            await InvokeAsync(StateHasChanged);
 
-        NotificationService.NotifyError(
-            string.IsNullOrWhiteSpace(response.Message) ? "Unable to update profile." : response.Message,
-            "Profile update failed",
-            NotificationKind.Authentication,
-            link: "/account/profile");
+            var response = await AuthenticationService.UpdateProfile(_updateProfile);
+            if (response.Success)
+            {
+                var refreshResult = await AuthenticationSessionRefresher.TryRefreshAsync(clearTokenOnFailure: false);
+                if (refreshResult is not null)
+                {
+                    await SessionEventPublisher.PublishSessionRefreshedAsync();
+                }
+
+                NotificationService.NotifySuccess(
+                    "Profile updated.",
+                    "Profile",
+                    NotificationKind.Authentication,
+                    link: "/account/profile");
+                _userEmail = _updateProfile.Email;
+                _userName = _updateProfile.FullName;
+                return;
+            }
+
+            _errorMessage = string.IsNullOrWhiteSpace(response.Message) ? "Unable to update profile." : response.Message;
+        });
     }
 }

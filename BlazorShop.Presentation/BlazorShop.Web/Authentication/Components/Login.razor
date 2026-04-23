@@ -26,6 +26,7 @@
 
         <EditForm Model="User" OnValidSubmit="LoginUser">
           <DataAnnotationsValidator />
+          <ValidationSummary class="mb-4 text-sm text-red-700" />
           <div class="mb-4">
             <ValidationMessage For="@(() => User.Email)" />
             <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="User.Email" Label="Email Address" Type="text" Placeholder="my@email.com" />
@@ -36,7 +37,7 @@
             <FloatingTextInput class="w-full border rounded px-3 py-2" @bind-Value="User.Password" Label="Password" Type="Password" Placeholder="Password" />
           </div>
 
-          <button type="submit" class="bs-button bs-button-primary w-full">Login</button>
+          <button type="submit" class="bs-button bs-button-primary w-full disabled:opacity-60 disabled:cursor-not-allowed" disabled="@IsSubmitting">@(IsSubmitting ? "Signing in..." : "Login")</button>
         </EditForm>
       </div>
 

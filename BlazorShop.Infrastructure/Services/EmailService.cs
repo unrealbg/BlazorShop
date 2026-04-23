@@ -1,13 +1,14 @@
 ﻿namespace BlazorShop.Infrastructure.Services
 {
-
     using BlazorShop.Application.DTOs;
     using BlazorShop.Domain.Contracts;
+
+    using MailKit.Net.Smtp;
+
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     using MimeKit;
-    using MailKit.Net.Smtp;
 
     public class EmailService : IEmailService
     {
@@ -40,11 +41,12 @@
                 await smtp.SendAsync(email, cts.Token).ConfigureAwait(false);
                 await smtp.DisconnectAsync(true, cts.Token).ConfigureAwait(false);
 
-                _logger.LogInformation($"Email sent to {toEmail}");
+                _logger.LogInformation("Email sent to {ToEmail} with subject {Subject}", toEmail, subject);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error sending email to {toEmail}: {ex.Message}");
+                _logger.LogError(ex, "Failed to send email to {ToEmail} with subject {Subject}", toEmail, subject);
+                throw;
             }
         }
     }

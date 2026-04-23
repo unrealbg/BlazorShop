@@ -17,6 +17,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         public async Task GetCatalog_ReturnsOkWithPagedCatalog()
         {
             var productService = new Mock<IProductService>();
+            var publicCatalogService = new Mock<IPublicCatalogService>();
             var page = new PagedResult<GetCatalogProduct>
             {
                 Items =
@@ -38,17 +39,31 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 TotalCount = 1,
             };
 
-            productService
-                .Setup(service => service.GetCatalogPageAsync(It.IsAny<ProductCatalogQuery>()))
+            publicCatalogService
+                .Setup(service => service.GetPublishedCatalogPageAsync(It.IsAny<ProductCatalogQuery>()))
                 .ReturnsAsync(page);
 
-            var controller = new ProductController(productService.Object);
+            var controller = new ProductController(productService.Object, publicCatalogService.Object);
 
             var result = await controller.GetCatalog(new ProductCatalogQuery { PageNumber = 1, PageSize = 12 });
 
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var payload = Assert.IsType<PagedResult<GetCatalogProduct>>(okResult.Value);
             Assert.Single(payload.Items);
+        }
+
+        [Fact]
+        public async Task GetSingle_ReturnsNotFound_WhenProductIsNotPubliclyVisible()
+        {
+            var productService = new Mock<IProductService>();
+            var publicCatalogService = new Mock<IPublicCatalogService>();
+            publicCatalogService.Setup(service => service.GetPublishedProductByIdAsync(It.IsAny<Guid>())).ReturnsAsync((GetProduct?)null);
+
+            var controller = new ProductController(productService.Object, publicCatalogService.Object);
+
+            var result = await controller.GetSingle(Guid.NewGuid());
+
+            Assert.IsType<NotFoundResult>(result.Result);
         }
     }
 }

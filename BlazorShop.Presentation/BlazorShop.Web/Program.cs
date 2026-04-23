@@ -43,6 +43,11 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
+            builder.Services.AddScoped<IAuthenticatedClientStateCleaner, AuthenticatedClientStateCleaner>();
+            builder.Services.AddScoped<IAuthenticationSessionRefresher, AuthenticationSessionRefresher>();
+            builder.Services.AddScoped<IAuthenticationSessionBootstrapper, AuthenticationSessionBootstrapper>();
+            builder.Services.AddScoped<IAuthenticationSessionEventPublisher, AuthenticationSessionEventPublisher>();
+            builder.Services.AddScoped<IAuthenticationSessionSyncService, AuthenticationSessionSyncService>();
             builder.Services.AddSingleton<IStorefrontSeoMetadataBuilder, StorefrontSeoMetadataBuilder>();
             builder.Services.AddScoped<IStorefrontSeoService, StorefrontSeoService>();
             builder.Services.AddScoped<BrowserCredentialsHandler>();
@@ -70,7 +75,9 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IAppJsInterop, AppJsInterop>();
             builder.Services.AddScoped<IQueryFailureNotifier, QueryFailureNotifier>();
 
-            await builder.Build().RunAsync();
+            var host = builder.Build();
+            await host.Services.GetRequiredService<IAuthenticationSessionBootstrapper>().RestoreAsync();
+            await host.RunAsync();
         }
 
         private static async Task<Uri> ResolveApiBaseAddressAsync(WebAssemblyHostBuilder builder)

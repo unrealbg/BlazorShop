@@ -12,11 +12,23 @@
       </div>
 
       <div class="bs-toolbar-cluster">
-        <button class="bs-button bs-button-secondary" @onclick="ExportCsvAsync">Export CSV</button>
+        <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="ExportCsvAsync" disabled="@(_ordersLoading || !string.IsNullOrWhiteSpace(_ordersError))">Export CSV</button>
         <a href="/admin/orders" class="bs-button bs-button-primary">Open orders</a>
         <a href="/admin/products" class="bs-button bs-button-ghost">Catalog</a>
       </div>
     </header>
+
+    @if (!string.IsNullOrWhiteSpace(_ordersError))
+    {
+      <div class="mt-6 rounded border border-red-200 bg-red-50 px-5 py-5 text-sm text-red-700">
+        <div>@_ordersError</div>
+        <button type="button" class="bs-button bs-button-primary mt-4" @onclick="RetryLoadOrdersAsync">Retry orders</button>
+      </div>
+    }
+    else if (_ordersLoading)
+    {
+      <div class="mt-6 rounded border border-slate-200 bg-slate-50 px-5 py-5 text-sm text-slate-600">Loading admin orders...</div>
+    }
 
     <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <a href="/admin/orders" class="bs-card-link p-5">
@@ -94,6 +106,13 @@
         @if (_metricsLoading)
         {
           <div class="text-sm text-neutral-500">Loading metrics…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_metricsError))
+        {
+          <div class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+            <div>@_metricsError</div>
+            <button type="button" class="bs-button bs-button-primary mt-3" @onclick="RetryLoadMetricsAsync">Retry analytics</button>
+          </div>
         }
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <article class="bs-metric-card p-4">

@@ -129,6 +129,21 @@ namespace BlazorShop.Infrastructure.Repositories
                 .FirstOrDefaultAsync(product => product.Id == id);
         }
 
+        public async Task<Product?> GetPublishedProductDetailsByIdAsync(Guid id)
+        {
+            return await _context.Products
+                .AsNoTracking()
+                .Include(product => product.Category)
+                .Include(product => product.Variants)
+                .FirstOrDefaultAsync(product => product.Id == id
+                    && product.IsPublished
+                    && product.PublishedOn != null
+                    && product.Slug != null
+                    && product.Slug != string.Empty
+                    && product.Category != null
+                    && product.Category.IsPublished);
+        }
+
         public async Task<Product?> GetPublishedProductBySlugAsync(string slug)
         {
             return await _context.Products
@@ -150,7 +165,9 @@ namespace BlazorShop.Infrastructure.Repositories
                     && product.IsPublished
                     && product.PublishedOn != null
                     && product.Slug != null
-                    && product.Slug != string.Empty)
+                    && product.Slug != string.Empty
+                    && product.Category != null
+                    && product.Category.IsPublished)
                 .OrderByDescending(product => product.CreatedOn)
                 .ThenBy(product => product.Id)
                 .Select(MapCatalogProduct())

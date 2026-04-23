@@ -8,7 +8,11 @@
     "Audience": "https://api.shop.example.com"
   },
   "ClientApp": {
-    "BaseUrl": "https://shop.example.com"
+    "BaseUrl": "https://account.shop.example.com"
+  },
+  "Identity": {
+    "RequireConfirmedAccount": true,
+    "RequireConfirmedEmail": true
   },
   "Stripe": {
     "SecretKey": "<set-in-secret-store-or-env>"
@@ -25,8 +29,7 @@
   "Runtime": {
     "Cors": {
       "AllowedOrigins": [
-        "https://shop.example.com",
-        "https://admin.shop.example.com"
+        "https://account.shop.example.com"
       ]
     },
     "ForwardedHeaders": {

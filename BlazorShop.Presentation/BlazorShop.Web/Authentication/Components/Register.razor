@@ -17,8 +17,16 @@
         </div>
 
         <div class="px-6 py-6 sm:px-8">
+          @if (!string.IsNullOrWhiteSpace(_errorMessage))
+          {
+            <div class="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
+              @_errorMessage
+            </div>
+          }
+
           <EditForm Model="_user" OnValidSubmit="HandleRegister">
             <DataAnnotationsValidator />
+            <ValidationSummary class="mb-4 text-sm text-red-700" />
             <div class="mb-4">
               <ValidationMessage For="@(() => _user.FullName)" />
               <FloatingTextInput type="text" id="username" class="w-full border rounded px-3 py-2" @bind-Value="_user.FullName" Label="Full Name" placeholder="John Doe" />
@@ -35,7 +43,7 @@
               <ValidationMessage For="@(() => _user.ConfirmPassword)" />
               <FloatingTextInput type="Password" id="confirmPassword" class="w-full border rounded px-3 py-2" @bind-Value="_user.ConfirmPassword" Label="Confirm Password" placeholder="Confirm Password" />
             </div>
-            <button class="bs-button bs-button-accent w-full disabled:opacity-60" type="submit" disabled="@_isLoading">Register</button>
+            <button class="bs-button bs-button-accent w-full disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@_isLoading">@(_isLoading ? "Creating account..." : "Register")</button>
           </EditForm>
         </div>
 

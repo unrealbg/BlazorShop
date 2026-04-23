@@ -1,4 +1,4 @@
-﻿@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+﻿@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
 
 <div class="bs-footer-shell">
   <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -77,7 +77,7 @@
 </div>
 
 @code {
-  private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+  private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
 
   private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 }

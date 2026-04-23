@@ -48,9 +48,29 @@
             _btSettings = bankTransferOptions.Value;
         }
 
-        public async Task<ServiceResponse> SaveCheckoutHistoryAsync(IEnumerable<CreateOrderItem> orderItems)
+        public async Task<ServiceResponse> SaveCheckoutHistoryAsync(string userId, IEnumerable<CreateOrderItem> orderItems)
         {
-            var mappedData = _mapper.Map<IEnumerable<OrderItem>>(orderItems);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new ServiceResponse(false, "A signed-in user is required to save checkout history.");
+            }
+
+            var sanitizedOrderItems = orderItems
+                .Where(orderItem => orderItem.ProductId != Guid.Empty && orderItem.Quantity > 0)
+                .Select(orderItem => new CreateOrderItem
+                {
+                    ProductId = orderItem.ProductId,
+                    Quantity = orderItem.Quantity,
+                    UserId = userId,
+                })
+                .ToArray();
+
+            if (sanitizedOrderItems.Length == 0)
+            {
+                return new ServiceResponse(false, "No valid checkout items were provided.");
+            }
+
+            var mappedData = _mapper.Map<IEnumerable<OrderItem>>(sanitizedOrderItems);
             var result = await _cart.SaveCheckoutHistory(mappedData);
 
             return result > 0 ? new ServiceResponse(true, "Checkout history saved successfully") : new ServiceResponse(false, "Failed to save checkout history");

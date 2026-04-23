@@ -10,12 +10,15 @@
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Analytics;
     using BlazorShop.Web.Shared.Services.Contracts;
+    using BlazorShop.Web.Services;
     using BlazorShop.Web.Interop;
     using Microsoft.AspNetCore.Components;
 
     public partial class Dashboard : ComponentBase, IAsyncDisposable
     {
         private List<GetOrder> _orders = new();
+        private bool _ordersLoading;
+        private string? _ordersError;
         private List<GetOrder> _recentOrders = new();
         private decimal _totalRevenue;
         private decimal _todayRevenue;
@@ -39,6 +42,7 @@
         private MetricsSeriesModel? _salesSeries;
         private MetricsSeriesModel? _trafficSeries;
         private bool _metricsLoading;
+        private string? _metricsError;
         private string _metricsGranularity = "day";
         private DateTime _metricsFrom = DateTime.UtcNow.Date.AddDays(-13);
         private DateTime _metricsTo = DateTime.UtcNow.Date;
@@ -55,6 +59,15 @@
 
         protected override async Task OnInitializedAsync()
         {
+            await LoadOrdersAsync();
+            await LoadMetricsAsync();
+        }
+
+        private async Task LoadOrdersAsync()
+        {
+            _ordersLoading = true;
+            _ordersError = null;
+
             var client = await this.HttpClientHelper.GetPrivateClientAsync();
             var api = new ApiCall { Client = client, Route = Constant.Cart.GetAllOrders, Type = Constant.ApiCallType.Get };
             var http = await this.ApiCallHelper.ApiCallTypeCall<object>(api);
@@ -62,9 +75,10 @@
                 http,
                 "We couldn't load orders right now. Please try again.");
 
-            if (this.QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders"))
+            if (this.QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders", showToast: false))
             {
                 _orders = new();
+                _ordersError = FeedbackMessageResolver.ResolveQueryFailure(ordersResult, "We couldn't load orders right now. Please try again.");
             }
             else
             {
@@ -74,7 +88,7 @@
             ComputeStats();
             ApplyFilters();
             BuildTopProducts();
-            await LoadMetricsAsync();
+            _ordersLoading = false;
         }
 
         private void ComputeStats()
@@ -180,6 +194,7 @@
         private async Task LoadMetricsAsync()
         {
             _metricsLoading = true;
+            _metricsError = null;
             StateHasChanged();
 
             try
@@ -202,7 +217,7 @@
                 {
                     _salesSeries = null;
                     _trafficSeries = null;
-                    ToastService.ShowErrorToast("Failed to load analytics data.");
+                    _metricsError = "Analytics data is unavailable right now. Try again.";
                     return;
                 }
 
@@ -210,13 +225,23 @@
             }
             catch
             {
-                ToastService.ShowErrorToast("Failed to load analytics data.");
+                _metricsError = "Analytics data is unavailable right now. Try again.";
             }
             finally
             {
                 _metricsLoading = false;
                 StateHasChanged();
             }
+        }
+
+        private Task RetryLoadOrdersAsync()
+        {
+            return LoadOrdersAsync();
+        }
+
+        private Task RetryLoadMetricsAsync()
+        {
+            return LoadMetricsAsync();
         }
 
         private async Task RenderChartsAsync()

@@ -74,44 +74,67 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 {
                     ProductId = Guid.NewGuid(),
                     Quantity = 2,
-                    UserId = "user123"
+                    UserId = "spoofed-user"
                 }
             };
             var mappedData = new List<OrderItem>();
+            List<CreateOrderItem>? capturedItems = null;
             _mapperMock
-                .Setup(m => m.Map<IEnumerable<OrderItem>>(orderItems))
+                .Setup(m => m.Map<IEnumerable<OrderItem>>(It.IsAny<object>()))
+                .Callback<object>(items => capturedItems = ((IEnumerable<CreateOrderItem>)items).ToList())
                 .Returns(mappedData);
             _cartMock
                 .Setup(c => c.SaveCheckoutHistory(mappedData))
                 .ReturnsAsync(1);
 
             // Act
-            var result = await _cartService.SaveCheckoutHistoryAsync(orderItems);
+            var result = await _cartService.SaveCheckoutHistoryAsync("user123", orderItems);
 
             // Assert
             Assert.True(result.Success);
             Assert.Equal("Checkout history saved successfully", result.Message);
+            Assert.NotNull(capturedItems);
+            Assert.Single(capturedItems!);
+            Assert.All(capturedItems!, item => Assert.Equal("user123", item.UserId));
         }
 
         [Fact]
         public async Task SaveCheckoutHistoryAsync_ShouldReturnFailure_WhenHistoryNotSaved()
         {
             // Arrange
-            var orderItems = new List<CreateOrderItem>();
+            var orderItems = new List<CreateOrderItem>
+            {
+                new()
+                {
+                    ProductId = Guid.NewGuid(),
+                    Quantity = 1,
+                    UserId = "other-user",
+                }
+            };
             var mappedData = new List<OrderItem>();
             _mapperMock
-                .Setup(m => m.Map<IEnumerable<OrderItem>>(orderItems))
+                .Setup(m => m.Map<IEnumerable<OrderItem>>(It.IsAny<object>()))
                 .Returns(mappedData);
             _cartMock
                 .Setup(c => c.SaveCheckoutHistory(mappedData))
                 .ReturnsAsync(0);
 
             // Act
-            var result = await _cartService.SaveCheckoutHistoryAsync(orderItems);
+            var result = await _cartService.SaveCheckoutHistoryAsync("user123", orderItems);
 
             // Assert
             Assert.False(result.Success);
             Assert.Equal("Failed to save checkout history", result.Message);
+        }
+
+        [Fact]
+        public async Task SaveCheckoutHistoryAsync_ShouldReturnFailure_WhenUserIdIsMissing()
+        {
+            var result = await _cartService.SaveCheckoutHistoryAsync(string.Empty, Array.Empty<CreateOrderItem>());
+
+            Assert.False(result.Success);
+            Assert.Equal("A signed-in user is required to save checkout history.", result.Message);
+            _cartMock.Verify(cart => cart.SaveCheckoutHistory(It.IsAny<IEnumerable<OrderItem>>()), Times.Never);
         }
 
         [Fact]

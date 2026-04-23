@@ -78,6 +78,45 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
         }
 
         [Fact]
+        public async Task GetPublishedProductDetailsByIdAsync_ReturnsNullForDraftProduct()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, Guid.NewGuid());
+
+            var draftProduct = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Draft Product",
+                Description = "Draft",
+                Image = "/img/draft.png",
+                Price = 30m,
+                Quantity = 1,
+                CategoryId = featuredCategoryId,
+                Slug = "draft-product",
+                IsPublished = false,
+                PublishedOn = null,
+                CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+            };
+
+            context.Products.Add(draftProduct);
+            await context.SaveChangesAsync();
+
+            var publishedProductId = await context.Products
+                .Where(product => product.Name == "Product 5")
+                .Select(product => product.Id)
+                .SingleAsync();
+            var repository = new ProductReadRepository(context);
+
+            var publishedResult = await repository.GetPublishedProductDetailsByIdAsync(publishedProductId);
+            var draftResult = await repository.GetPublishedProductDetailsByIdAsync(draftProduct.Id);
+
+            Assert.NotNull(publishedResult);
+            Assert.Equal("Product 5", publishedResult!.Name);
+            Assert.Null(draftResult);
+        }
+
+        [Fact]
         public async Task GetPublishedCatalogPageAsync_ExcludesDraftProductsAndProductsWithoutSlugs()
         {
             await using var context = CreateContext();

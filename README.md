@@ -150,7 +150,7 @@ Runtime notes:
 ## API & Docs
 - Swagger UI available when API runs in Development at `/swagger`
 - CORS is configuration-driven; localhost origins work out of the box in Development
-- Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, and `compose.production.yml`
+- Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, `docs/storefront.production.appsettings.example.json`, and `compose.production.yml`
 
 ## Screenshots
 <table>

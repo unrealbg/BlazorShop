@@ -4,13 +4,23 @@
 
 Use this runbook together with `docs/production.appsettings.example.json` when promoting BlazorShop to a real production environment.
 
+BlazorShop now has three deployable surfaces with different configuration ownership:
+
+- API: auth, email, payments, uploads, JWT, CORS, cookie policy, and internal business APIs
+- Storefront: the SSR public shopping site, public canonical/discovery origin, and storefront-to-account handoff URLs
+- Web: the authenticated account/admin Blazor WebAssembly client
+
+Use [docs/production.appsettings.example.json](docs/production.appsettings.example.json) as the API example and [docs/storefront.production.appsettings.example.json](docs/storefront.production.appsettings.example.json) as the standalone storefront example.
+
 ## Replace the placeholders
 
-- `https://shop.example.com`: the public Blazor Web origin.
-- `https://admin.shop.example.com`: a second allowed browser origin; remove it if you only have one frontend origin.
+- `https://shop.example.com`: the public storefront origin.
+- `https://account.shop.example.com`: the authenticated Web client origin used for confirmation links, password-reset links, Stripe success/cancel redirects, and storefront handoff targets.
 - `https://api.shop.example.com`: the public API origin used for JWT issuer and audience if you keep origin-based token settings.
 - `10.0.0.10`: the exact IP of the reverse proxy or ingress hop directly in front of the API.
 - `<set-in-secret-store-or-env>`: values that must come from a secret manager or environment variables, never from source control.
+
+If you deploy the storefront and authenticated client under the same origin with path-based routing, set both public URLs to that same origin. If you split them by subdomain, keep the storefront and client-app URLs distinct and configure them explicitly.
 
 ## Forwarded Headers Profiles
 
@@ -68,7 +78,9 @@ ConnectionStrings__DefaultConnection=Host=db.internal;Port=5432;Database=blazors
 Jwt__Key=<secret>
 Jwt__Issuer=https://api.shop.example.com
 Jwt__Audience=https://api.shop.example.com
-ClientApp__BaseUrl=https://shop.example.com
+ClientApp__BaseUrl=https://account.shop.example.com
+Identity__RequireConfirmedAccount=true
+Identity__RequireConfirmedEmail=true
 Stripe__SecretKey=<secret>
 EmailSettings__From=shop@example.com
 EmailSettings__DisplayName=BlazorShop
@@ -77,8 +89,7 @@ EmailSettings__Port=587
 EmailSettings__UseSsl=true
 EmailSettings__Username=<secret>
 EmailSettings__Password=<secret>
-Runtime__Cors__AllowedOrigins__0=https://shop.example.com
-Runtime__Cors__AllowedOrigins__1=https://admin.shop.example.com
+Runtime__Cors__AllowedOrigins__0=https://account.shop.example.com
 Runtime__ForwardedHeaders__Enabled=true
 Runtime__ForwardedHeaders__KnownProxies__0=10.0.0.10
 Runtime__ForwardedHeaders__ForwardLimit=1
@@ -99,6 +110,20 @@ Runtime__RateLimiting__Auth__WindowSeconds=60
 Runtime__RateLimiting__Auth__QueueLimit=0
 ```
 
+Standalone storefront hosts have a separate runtime contract:
+
+```text
+Api__BaseUrl=https://api.shop.example.com/api/
+ClientApp__BaseUrl=https://account.shop.example.com
+PublicUrl__BaseUrl=https://shop.example.com
+```
+
+Outside `Development`, the storefront now fails startup unless:
+
+- `Api:BaseUrl` is configured as an absolute URL, or Aspire service discovery provides `Services:apiservice:*`
+- `ClientApp:BaseUrl` is configured as an absolute URL, or Aspire service discovery provides `Services:adminclient:*`
+- `PublicUrl:BaseUrl` is configured as an absolute URL
+
 In the standard production build, email is not optional. Account confirmation and newsletter flows depend on a working SMTP sender configuration. Outside `Development`, the API fails startup when `EmailSettings:From`, `SmtpServer`, `Username`, or `Password` are blank or still placeholder values.
 
 If you deploy with an appsettings override file instead of environment variables, treat these email keys as required in production:
@@ -110,6 +135,22 @@ If you deploy with an appsettings override file instead of environment variables
 - `EmailSettings:Port` must be a valid TCP port
 
 `EmailSettings:DisplayName` is optional.
+
+## Auth and Email Production Notes
+
+- Production auth assumes `Identity:RequireConfirmedAccount=true` and `Identity:RequireConfirmedEmail=true` unless you intentionally override both.
+- Confirmation emails and password-reset style links depend on `ClientApp:BaseUrl` because they link back into the authenticated Web client, not the SSR storefront.
+- Stripe success and cancel URLs also depend on `ClientApp:BaseUrl`; do not point that value at the public storefront domain unless the authenticated client is actually hosted there.
+- Refresh-token cookies remain `HttpOnly` and `Secure`. `SameSite=Strict` is correct for the standard `shop.example.com` / `account.shop.example.com` / `api.shop.example.com` model because those subdomains are cross-origin but still same-site.
+- SMTP delivery failures are now logged with the full exception and bubble back to callers. In strict confirmation mode, that keeps registration fail-closed instead of creating users who never receive a usable confirmation link.
+
+## Web Runtime Config
+
+The WebAssembly client now keeps its checked-in production `wwwroot/appsettings.json` empty. That prevents a published production build from silently falling back to `https://localhost:7094/api/` when it is deployed away from the local dev topology.
+
+- Standard container deployment: leave the file empty and use the built-in same-origin `/api/` proxy from the Web nginx container.
+- Split-origin static deployment: provide a deployment-specific `wwwroot/appsettings.json` with `Api:DirectBaseUrl` pointing at the real API base URL before publishing the client.
+- Local development still uses `wwwroot/appsettings.Development.json` for the localhost direct API fallback.
 
 ## Edge TLS and HSTS Ownership
 
@@ -135,11 +176,13 @@ Required environment variables before startup:
 - `BLAZORSHOP_DB_PASSWORD`
 - `BLAZORSHOP_JWT_KEY`
 - `BLAZORSHOP_STRIPE_SECRET_KEY`
+- `BLAZORSHOP_API_BASE_URL`
+- `BLAZORSHOP_CLIENT_APP_BASE_URL`
+- `BLAZORSHOP_STOREFRONT_BASE_URL`
 - `BLAZORSHOP_EMAIL_FROM`
 - `BLAZORSHOP_EMAIL_SMTP_SERVER`
 - `BLAZORSHOP_EMAIL_USERNAME`
 - `BLAZORSHOP_EMAIL_PASSWORD`
-- `BLAZORSHOP_PUBLIC_BASE_URL`
 
 Optional compose overrides:
 
@@ -157,7 +200,9 @@ The production compose file now uses required-variable expansion for the SMTP se
 
 Notes:
 
-- The Web container fronts the API under the same origin and proxies `/api` and `/uploads` to the API container.
+- The compose stack now runs three public-facing services: `storefront` on host port `8080`, `web` on host port `8081`, and `api` only on the private Docker network.
+- The `storefront` container is the public SSR shopping surface. Its `PublicUrl:BaseUrl` must match the real public storefront origin and its `ClientApp:BaseUrl` must match the authenticated client origin.
+- The Web container fronts the API under its own origin and proxies `/api` and `/uploads` to the API container.
 - `compose.production.yml` mounts a named volume at `/app/uploads`, so uploaded files survive API container replacement.
 - The API resolves uploads under `<content-root>/uploads`; in the production API image the content root is `/app`, so the runtime upload path is exactly `/app/uploads`.
 - The bundled Web container is intentionally HTTP-only inside the private Docker network; put TLS termination, HSTS, and port 80 to 443 redirects on the public edge in front of it.
@@ -166,6 +211,33 @@ Notes:
 - The compose example also sets `Runtime__ForwardedHeaders__ForwardLimit=1`; keep that value unless you intentionally add another trusted proxy hop directly in front of the API.
 - The compose example disables API-level HSTS and HTTPS redirection because the API sits behind the Web proxy. If you expose the API directly over HTTPS instead, re-enable both.
 - PayPal is intentionally disabled in this build until a real provider integration and capture flow are implemented.
+
+## Logging and Failure Visibility
+
+- API startup/runtime logs go to console and to `BlazorShop.Presentation/BlazorShop.API/log/log*.txt` by default.
+- Storefront runtime signals for discovery, redirect, and public catalog failures are emitted as structured log event names such as `public.discovery.sitemap_failure`, `public.redirect.invalid_target_blocked`, and `public.product.service_unavailable`.
+- SMTP failures are logged with the exception details and no longer fail silently in confirmation-required auth paths.
+- If storefront handoff routes start returning `503`, check `ClientApp:BaseUrl` on the storefront host first. That is the explicit failure mode when neither standalone config nor service discovery can resolve the authenticated client origin.
+
+## Deployment Smoke Checks
+
+Use these as a minimum post-deploy checklist in addition to the test suites:
+
+1. Fetch the storefront home page and confirm `200` from the public storefront origin.
+2. Fetch `/robots.txt` and `/sitemap.xml` from the storefront origin and confirm `200` plus the expected public URLs.
+3. Fetch the authenticated client login page from the client-app origin and confirm `200`.
+4. Request storefront `/checkout` without auth and confirm it redirects to the configured client-app login handoff.
+5. If the API is exposed directly, fetch the readiness path and confirm `200`.
+
+PowerShell examples:
+
+```powershell
+Invoke-WebRequest -Uri https://shop.example.com/ | Select-Object StatusCode, StatusDescription
+Invoke-WebRequest -Uri https://shop.example.com/robots.txt | Select-Object StatusCode, StatusDescription
+Invoke-WebRequest -Uri https://shop.example.com/sitemap.xml | Select-Object StatusCode, StatusDescription
+Invoke-WebRequest -Uri https://account.shop.example.com/authentication/login/account | Select-Object StatusCode, StatusDescription
+Invoke-WebRequest -Uri https://shop.example.com/checkout -MaximumRedirection 0 -SkipHttpErrorCheck | Select-Object StatusCode, Headers
+```
 
 ## Image Update Cadence
 

@@ -9,7 +9,7 @@
 
         Task<LoginResponse> LoginUser(LoginUser user);
 
-        Task<LoginResponse> ReviveToken();
+        Task<QueryResult<LoginResponse>> ReviveToken();
 
         Task<ServiceResponse> Logout();
 

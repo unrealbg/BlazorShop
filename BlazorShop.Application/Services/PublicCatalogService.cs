@@ -74,6 +74,17 @@ namespace BlazorShop.Application.Services
             };
         }
 
+        public async Task<GetProduct?> GetPublishedProductByIdAsync(Guid id)
+        {
+            if (id == Guid.Empty)
+            {
+                return null;
+            }
+
+            var product = await _productReadRepository.GetPublishedProductDetailsByIdAsync(id);
+            return product is null ? null : _mapper.Map<GetProduct>(product);
+        }
+
         public async Task<GetProduct?> GetPublishedProductBySlugAsync(string slug)
         {
             var normalizedSlug = NormalizeSlug(slug);
@@ -84,6 +95,28 @@ namespace BlazorShop.Application.Services
 
             var product = await _productReadRepository.GetPublishedProductBySlugAsync(normalizedSlug);
             return product is null ? null : _mapper.Map<GetProduct>(product);
+        }
+
+        public async Task<GetCategory?> GetPublishedCategoryByIdAsync(Guid id)
+        {
+            if (id == Guid.Empty)
+            {
+                return null;
+            }
+
+            var category = await _categoryRepository.GetPublishedCategoryByIdAsync(id);
+            return category is null ? null : _mapper.Map<GetCategory>(category);
+        }
+
+        public async Task<IReadOnlyList<GetCatalogProduct>> GetPublishedProductsByCategoryAsync(Guid categoryId)
+        {
+            if (categoryId == Guid.Empty)
+            {
+                return [];
+            }
+
+            var products = await _productReadRepository.GetPublishedProductsByCategoryAsync(categoryId);
+            return products.Count > 0 ? _mapper.Map<IReadOnlyList<GetCatalogProduct>>(products) : [];
         }
 
         public async Task<GetCategoryPage?> GetPublishedCategoryPageBySlugAsync(string slug)

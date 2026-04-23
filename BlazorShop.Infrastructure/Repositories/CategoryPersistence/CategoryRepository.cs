@@ -58,6 +58,16 @@
                 .ToListAsync();
         }
 
+        public async Task<Category?> GetPublishedCategoryByIdAsync(Guid id)
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(category => category.Id == id
+                    && category.IsPublished
+                    && category.Slug != null
+                    && category.Slug != string.Empty);
+        }
+
         public async Task<Category?> GetPublishedCategoryBySlugAsync(string slug)
         {
             return await _context.Categories

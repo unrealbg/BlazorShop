@@ -88,7 +88,10 @@
 </section>
 
 @code {
-	private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+	[Inject]
+	private BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver { get; set; } = default!;
+
+	private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
 
 	private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 }

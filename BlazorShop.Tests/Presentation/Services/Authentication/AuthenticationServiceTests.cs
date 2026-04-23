@@ -274,16 +274,17 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             // Arrange
             var httpClient = new HttpClient();
             var apiCallResult = new HttpResponseMessage(HttpStatusCode.OK);
-            var loginResponse = new LoginResponse
+            var loginResponse = QueryResult<LoginResponse>.Succeeded(new LoginResponse
             {
                 Success = true,
                 Message = "Token revived",
                 Token = "newToken"
-            };
+            });
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
             this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
-            this._apiCallHelperMock.Setup(a => a.GetServiceResponse<LoginResponse>(apiCallResult)).ReturnsAsync(loginResponse);
+            this._apiCallHelperMock.Setup(a => a.ConnectionError()).Returns(new ServiceResponse { Success = false, Message = "Connection error" });
+            this._apiCallHelperMock.Setup(a => a.GetQueryResult<LoginResponse>(apiCallResult, It.IsAny<string>())).ReturnsAsync(loginResponse);
 
             // Act
             var result = await this._authenticationService.ReviveToken();
@@ -291,8 +292,8 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             // Assert
             Assert.NotNull(result);
             Assert.True(result.Success);
-            Assert.Equal("Token revived", result.Message);
-            Assert.Equal("newToken", result.Token);
+            Assert.Equal("Token revived", result.Data!.Message);
+            Assert.Equal("newToken", result.Data.Token);
         }
 
         [Fact]
@@ -301,10 +302,12 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             // Arrange
             var httpClient = new HttpClient();
             HttpResponseMessage apiCallResult = null!;
+            var failedResult = QueryResult<LoginResponse>.Failed("Connection error", HttpStatusCode.ServiceUnavailable);
 
             this._httpClientHelperMock.Setup(h => h.GetPublicClient()).Returns(httpClient);
             this._apiCallHelperMock.Setup(a => a.ApiCallTypeCall<Unit>(It.IsAny<ApiCall>())).ReturnsAsync(apiCallResult);
             this._apiCallHelperMock.Setup(a => a.ConnectionError()).Returns(new ServiceResponse { Success = false, Message = "Connection error" });
+            this._apiCallHelperMock.Setup(a => a.GetQueryResult<LoginResponse>(apiCallResult, It.IsAny<string>())).ReturnsAsync(failedResult);
 
             // Act
             var result = await this._authenticationService.ReviveToken();
@@ -313,6 +316,7 @@ namespace BlazorShop.Tests.Presentation.Services.Authentication
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Connection error", result.Message);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, result.StatusCode);
         }
 
         [Fact]

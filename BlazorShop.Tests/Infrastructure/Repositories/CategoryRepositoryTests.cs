@@ -49,6 +49,26 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
         }
 
         [Fact]
+        public async Task GetPublishedCategoryByIdAsync_ReturnsNullForDraftCategory()
+        {
+            await using var context = CreateContext();
+            var featuredCategory = new Category { Id = Guid.NewGuid(), Name = "Featured", Slug = "featured", IsPublished = true };
+            var draftCategory = new Category { Id = Guid.NewGuid(), Name = "Draft", Slug = "draft", IsPublished = false };
+
+            context.Categories.AddRange(featuredCategory, draftCategory);
+            await context.SaveChangesAsync();
+
+            var repository = new CategoryRepository(context);
+
+            var published = await repository.GetPublishedCategoryByIdAsync(featuredCategory.Id);
+            var draft = await repository.GetPublishedCategoryByIdAsync(draftCategory.Id);
+
+            Assert.NotNull(published);
+            Assert.Equal("Featured", published!.Name);
+            Assert.Null(draft);
+        }
+
+        [Fact]
         public async Task GetPublishedCategorySitemapEntriesAsync_ReturnsPublishedCategorySlugsAndMeaningfulLastModified()
         {
             await using var context = CreateContext();

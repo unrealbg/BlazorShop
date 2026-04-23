@@ -3,11 +3,34 @@
 @attribute [Authorize]
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-6">
-    @if (_selectedProducts.Any())
+    @if (_isCartLoading)
+    {
+        <div class="mt-16 rounded-xl bg-amber-100/60 p-6">
+            <div class="rounded-md bg-white/80 px-6 py-8 text-center text-sm text-neutral-600 shadow-sm">
+                Loading your cart...
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_cartLoadError))
+    {
+        <div class="mt-16 rounded-xl bg-amber-100/60 p-6">
+            <div class="rounded-md border border-red-200 bg-red-50 px-6 py-8 text-center text-sm text-red-700 shadow-sm">
+                <div>@_cartLoadError</div>
+                <button type="button" class="bs-button bs-button-primary mt-4" @onclick="RetryLoadCartAsync">Retry</button>
+            </div>
+        </div>
+    }
+    else if (_cartLines.Any())
     {
         <div class="mt-6 rounded-xl bg-amber-100/60">
             <div class="p-6">
                 <h4 class="text-center text-xl font-bold">My Cart</h4>
+                @if (HasUnavailableCartLines)
+                {
+                    <div class="mt-4 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-800 shadow-sm">
+                        One or more cart items are no longer available. Remove them before checkout continues.
+                    </div>
+                }
                 <div class="mt-4 overflow-auto">
                     <table class="min-w-full text-sm">
                         <thead>
@@ -21,23 +44,38 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-200">
-                            @foreach (var product in _selectedProducts)
+                            @foreach (var line in _cartLines)
                             {
-                                Guid productId = product.Id;
                                 <tr>
-                                    <td class="px-3 py-2 w-40"><img src="@product.Image" alt="@product.Name" class="h-16 w-24 object-contain" /></td>
-                                    <td class="px-3 py-2 w-56">@product.Name</td>
-                                    <td class="px-3 py-2">€ @product.Price</td>
+                                    <td class="px-3 py-2 w-40">
+                                        @if (!string.IsNullOrWhiteSpace(line.ImageUrl))
+                                        {
+                                            <img src="@line.ImageUrl" alt="@line.DisplayName" class="h-16 w-24 object-contain" />
+                                        }
+                                    </td>
+                                    <td class="px-3 py-2 w-56">
+                                        <div class="font-semibold">@line.DisplayName</div>
+                                        @if (!string.IsNullOrWhiteSpace(line.VariantLabel))
+                                        {
+                                            <div class="mt-1 text-xs uppercase tracking-[0.16em] text-neutral-500">@line.VariantLabel</div>
+                                        }
+                                        @if (line.IsUnavailable)
+                                        {
+                                            <div class="mt-2 text-xs font-medium text-amber-800">Unavailable in catalog</div>
+                                        }
+                                    </td>
+                                    <td class="px-3 py-2">€ @line.UnitPrice.ToString("F2")</td>
                                     <td class="px-3 py-2">
                                         <input class="w-20 text-center border rounded px-2 py-1"
                                                type="number"
-                                               value="@(GetProductQuantity(productId))"
+                                               value="@line.Quantity"
                                                min="1"
-                                               @oninput="(e) => HandleInputChange(e, productId)" />
+                                               disabled="@IsCartLineBusy(line.ProductId, line.VariantId)"
+                                               @onchange="(e) => HandleInputChange(e, line.ProductId, line.VariantId)" />
                                     </td>
-                                    <td class="px-3 py-2">€ @GetProductTotalPrice(productId)</td>
+                                    <td class="px-3 py-2">€ @line.LineTotal.ToString("F2")</td>
                                     <td class="px-3 py-2 text-center">
-                                        <button class="text-red-600 hover:text-red-700" title="Remove" @onclick="() => RemoveCartItem(product.Id)">
+                                        <button class="text-red-600 hover:text-red-700 disabled:opacity-60" title="Remove" @onclick="() => RemoveCartItem(line.ProductId, line.VariantId)" disabled="@IsCartLineBusy(line.ProductId, line.VariantId)">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
                                         </button>
                                     </td>
@@ -46,12 +84,19 @@
                         </tbody>
                     </table>
                 </div>
+                @if (!string.IsNullOrWhiteSpace(_paymentMethodsError))
+                {
+                    <div class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
+                        <div>@_paymentMethodsError</div>
+                        <button type="button" class="bs-button bs-button-primary mt-3" @onclick="RetryLoadPaymentMethodsAsync">Retry payment methods</button>
+                    </div>
+                }
                 <div class="mt-4 flex items-center justify-between">
-                    <h4 class="text-lg font-bold">Total: € @(GetGrandTotal(_selectedProducts))</h4>
+                    <h4 class="text-lg font-bold">Total: € @CartGrandTotal.ToString("F2")</h4>
                     <div>
                         <AuthorizeView>
                             <Authorized>
-                                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="() => _showPaymentDialog = true">Checkout</button>
+                                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" disabled="@(HasUnavailableCartLines || _isSavingCart || _isPaymentMethodsLoading || !string.IsNullOrWhiteSpace(_paymentMethodsError))" @onclick="() => _showPaymentDialog = true">@(_isPaymentMethodsLoading ? "Loading payment methods..." : "Checkout")</button>
                             </Authorized>
                             <NotAuthorized>
                                 <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800" @onclick="() => Checkout()">Checkout</button>
@@ -81,31 +126,49 @@
                 <h5 class="text-lg font-semibold">Select Payment Method</h5>
             </Header>
             <Body>
-                <ul class="divide-y">
-                    @foreach (var paymentMethod in _paymentMethods)
-                    {
-                        <li class="flex items-center justify-between py-2">
-                            @paymentMethod.Name
-                            @if (_processingMethodId.HasValue && _processingMethodId.Value == paymentMethod.Id)
-                            {
-                                <span class="inline-flex items-center text-emerald-600 mr-2">
-                                    <svg class="animate-spin h-5 w-5 mr-2 text-emerald-600" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                                    </svg>
-                                    Processing...
-                                </span>
-                            }
-                            else
-                            {
-                                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800" @onclick="() => SelectPaymentMethod(paymentMethod)">Select</button>
-                            }
-                        </li>
-                    }
-                </ul>
+                @if (_isPaymentMethodsLoading)
+                {
+                    <div class="px-2 py-6 text-center text-sm text-neutral-600">Loading payment methods...</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_paymentMethodsError))
+                {
+                    <div class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+                        <div>@_paymentMethodsError</div>
+                        <button type="button" class="bs-button bs-button-primary mt-3" @onclick="RetryLoadPaymentMethodsAsync">Retry</button>
+                    </div>
+                }
+                else if (_paymentMethods.Any())
+                {
+                    <ul class="divide-y">
+                        @foreach (var paymentMethod in _paymentMethods)
+                        {
+                            <li class="flex items-center justify-between py-2">
+                                @paymentMethod.Name
+                                @if (_processingMethodId.HasValue && _processingMethodId.Value == paymentMethod.Id)
+                                {
+                                    <span class="inline-flex items-center text-emerald-600 mr-2">
+                                        <svg class="animate-spin h-5 w-5 mr-2 text-emerald-600" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                        </svg>
+                                        Processing...
+                                    </span>
+                                }
+                                else
+                                {
+                                    <button class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1 text-sm font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" @onclick="() => SelectPaymentMethod(paymentMethod)" disabled="@_processingMethodId.HasValue">Select</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="px-2 py-6 text-center text-sm text-neutral-600">No payment methods are available right now.</div>
+                }
             </Body>
             <Footer>
-                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700" @onclick="Cancel">Cancel</button>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60" @onclick="Cancel" disabled="@_processingMethodId.HasValue">Cancel</button>
             </Footer>
         </ModalDialog>
     }

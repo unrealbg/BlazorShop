@@ -1,5 +1,7 @@
 ﻿@page "/authentication/logout"
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticatedClientStateCleaner AuthenticatedClientStateCleaner
 @inject BlazorShop.Web.Authentication.Providers.IAuthenticationStateNotifier AuthenticationStateNotifier
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticationSessionEventPublisher SessionEventPublisher
 
 @code {
 
@@ -7,7 +9,9 @@
     {
         var response = await AuthenticationService.Logout();
         await TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
+        await AuthenticatedClientStateCleaner.ClearAsync();
         AuthenticationStateNotifier.NotifyAuthenticationState();
+        await SessionEventPublisher.PublishSignedOutAsync();
 
         if (response.Success)
         {
@@ -15,7 +19,7 @@
                 ? "You have been signed out successfully."
                 : response.Message;
 
-            NotificationService.NotifySuccess(message, "Signed out", NotificationKind.Authentication, link: "/authentication/login/account");
+            NotificationService.NotifySuccess(message, "Signed out", NotificationKind.Authentication, addToInbox: false, link: "/authentication/login/account");
         }
         else
         {
@@ -23,6 +27,7 @@
                 "You were signed out locally, but we could not confirm the server logout request.",
                 "Logout",
                 NotificationKind.Authentication,
+                addToInbox: false,
                 link: "/authentication/login/account");
         }
 

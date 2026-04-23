@@ -1,6 +1,7 @@
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
 @page "/"
+@implements IDisposable
 
 <PageTitle>BlazorShop Access</PageTitle>
 
@@ -136,6 +137,9 @@
 </section>
 
 @code {
+    [Inject]
+    private BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver { get; set; } = default!;
+
     [CascadingParameter]
     private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
 
@@ -159,13 +163,21 @@
 
     private bool HasSecondaryLink => !string.IsNullOrWhiteSpace(SecondaryLabel) && !string.IsNullOrWhiteSpace(SecondaryLink);
 
-    private string? PublicStorefrontUrl => Configuration["PublicStorefront:BaseUrl"]?.Trim();
+    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
 
     private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
 
     protected override async Task OnInitializedAsync()
     {
-        var authenticationState = await AuthenticationStateTask;
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+        await LoadViewStateAsync(AuthenticationStateTask);
+    }
+
+    private async Task LoadViewStateAsync(Task<AuthenticationState>? authenticationStateTask = null)
+    {
+        var authenticationState = authenticationStateTask is null
+            ? await AuthStateProvider.GetAuthenticationStateAsync()
+            : await authenticationStateTask;
         var user = authenticationState.User;
 
         IsAuthenticated = user.Identity?.IsAuthenticated == true;
@@ -202,5 +214,19 @@
         PrimaryLink = "/authentication/login/account";
         SecondaryLabel = "Register";
         SecondaryLink = "/authentication/register";
+    }
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadViewStateAsync(authenticationStateTask);
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
     }
 }
