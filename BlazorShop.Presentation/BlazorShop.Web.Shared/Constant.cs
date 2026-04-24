@@ -91,6 +91,37 @@
             public const string AdminRole = "Admin";
         }
 
+        public static class AdminUsers
+        {
+            public const string Base = "admin/users";
+            public const string Roles = "admin/users/roles";
+        }
+
+        public static class AdminSettings
+        {
+            public const string Base = "admin/settings";
+            public const string Store = "admin/settings/store";
+            public const string Orders = "admin/settings/orders";
+            public const string Notifications = "admin/settings/notifications";
+        }
+
+        public static class AdminAudit
+        {
+            public const string Base = "admin/audit";
+        }
+
+        public static class AdminInventory
+        {
+            public const string Base = "admin/inventory";
+            public const string Product = "admin/inventory/product";
+            public const string Variant = "admin/inventory/variant";
+        }
+
+        public static class AdminOrders
+        {
+            public const string Base = "admin/orders";
+        }
+
         public static class File
         {
             public const string Upload = "upload/image";

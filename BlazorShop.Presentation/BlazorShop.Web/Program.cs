@@ -40,6 +40,11 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<ICategorySeoService, CategorySeoService>();
             builder.Services.AddScoped<ISeoSettingsService, SeoSettingsService>();
             builder.Services.AddScoped<ISeoRedirectService, SeoRedirectService>();
+            builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+            builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+            builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
+            builder.Services.AddScoped<IAdminInventoryService, AdminInventoryService>();
+            builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();

@@ -1,5 +1,6 @@
 @page "/admin/orders"
 @using BlazorShop.Web.Services
+@inject IAdminOrderService AdminOrderService
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
   <div class="bs-panel bs-page-hero p-6 admin-panel">
@@ -12,6 +13,7 @@
       <div class="bs-toolbar-cluster">
         <input class="border rounded px-2 py-1 text-sm w-60" placeholder="Search name/email" @bind="_customerQuery" />
         <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ToggleAll" disabled="@_isLoading">@(_allExpanded ? "Collapse All" : "Expand All")</button>
+        <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="ExportCsvAsync" disabled="@(_isLoading || !_orders.Any())">Export CSV</button>
         <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="ReloadAsync" disabled="@(_isLoading || _isSaving)">@(_isLoading ? "Reloading..." : "Reload")</button>
       </div>
     </header>
@@ -67,6 +69,7 @@
                         <span><span class="font-semibold">Ref:</span> @o.Reference</span>
                         <button class="bs-subtle-action-link text-xs" @onclick="() => CopyAsync(o.Reference)">Copy</button>
                         <span class="ml-2"><span class="font-semibold">Date:</span> @o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                        <button class="bs-subtle-action-link text-xs" @onclick="() => OpenDetailsDialog(o)">Details</button>
                       </div>
                       <div class="text-sm">
                         <span class="mr-3">Status: <b>@o.ShippingStatus</b></span>
@@ -169,11 +172,52 @@
         <option>OutForDelivery</option>
         <option>Delivered</option>
       </select>
+      <textarea class="border rounded w-full px-2 py-1 min-h-24" placeholder="Admin note" @bind="_adminNote"></textarea>
     </div>
   </Body>
   <Footer>
     <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="SaveAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save")</button>
     <button class="bs-button bs-button-secondary ml-2 disabled:opacity-60" @onclick="() => _showDialog = false" disabled="@_isSaving">Close</button>
+  </Footer>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showDetailsDialog" Size="xl">
+  <Header>
+    <h5 class="text-lg font-semibold">Order Details</h5>
+  </Header>
+  <Body>
+    @if (_detailsOrder is not null)
+    {
+      <div class="grid grid-cols-1 gap-4 text-sm lg:grid-cols-2">
+        <section class="bs-panel-soft p-4">
+          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customer</div>
+          <div class="mt-2 font-semibold text-slate-950">@(_detailsOrder.CustomerName ?? "(Unknown)")</div>
+          <div class="mt-1 break-all text-slate-600">@_detailsOrder.CustomerEmail</div>
+          <div class="mt-1 break-all text-slate-500">@_detailsOrder.UserId</div>
+        </section>
+        <section class="bs-panel-soft p-4">
+          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fulfillment</div>
+          <div class="mt-2 text-slate-950">@_detailsOrder.ShippingStatus</div>
+          <div class="mt-1 text-slate-600">@_detailsOrder.ShippingCarrier @_detailsOrder.TrackingNumber</div>
+          <div class="mt-1 break-all text-slate-500">@_detailsOrder.TrackingUrl</div>
+        </section>
+      </div>
+      <div class="bs-table-shell mt-4 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead><tr><th class="px-3 py-2 text-left">Product</th><th class="px-3 py-2 text-left">Qty</th><th class="px-3 py-2 text-left">Unit</th><th class="px-3 py-2 text-left">Total</th></tr></thead>
+          <tbody class="divide-y divide-slate-200">
+            @foreach (var line in _detailsOrder.Lines)
+            {
+              <tr><td class="px-3 py-2">@line.ProductName</td><td class="px-3 py-2">@line.Quantity</td><td class="px-3 py-2">@line.UnitPrice.ToString("F2")</td><td class="px-3 py-2">@((line.UnitPrice * line.Quantity).ToString("F2"))</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">@(!string.IsNullOrWhiteSpace(_detailsOrder.AdminNote) ? _detailsOrder.AdminNote : "No admin note.")</div>
+    }
+  </Body>
+  <Footer>
+    <button class="bs-button bs-button-ghost" @onclick="() => _showDetailsDialog = false">Close</button>
   </Footer>
 </ModalDialog>
 
@@ -188,6 +232,9 @@
   private string _trackingNumber = string.Empty;
   private string _trackingUrl = string.Empty;
   private string _shippingStatus = "PendingShipment";
+  private string? _adminNote;
+  private bool _showDetailsDialog;
+  private GetOrder? _detailsOrder;
 
   private string _customerQuery = string.Empty;
   private bool _allExpanded = false;
@@ -205,12 +252,7 @@
     _isLoading = true;
     _loadError = null;
 
-    var client = await HttpClientHelper.GetPrivateClientAsync();
-    var api = new ApiCall { Client = client, Route = Constant.Cart.GetAllOrders, Type = Constant.ApiCallType.Get };
-    var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
-    var ordersResult = await ApiCallHelper.GetQueryResult<IEnumerable<GetOrder>>(
-      http,
-      "We couldn't load orders right now. Please try again.");
+    var ordersResult = await AdminOrderService.GetAsync(new AdminOrderQuery { PageSize = 100 });
 
     if (QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders", showToast: false))
     {
@@ -222,7 +264,7 @@
       return;
     }
 
-    _orders = (ordersResult.Data ?? []).ToList();
+    _orders = (ordersResult.Data?.Items ?? []).ToList();
 
     _expanded.Clear();
     _allExpanded = false;
@@ -259,7 +301,14 @@
     _trackingNumber = order.TrackingNumber ?? string.Empty;
     _trackingUrl = order.TrackingUrl ?? string.Empty;
     _shippingStatus = order.ShippingStatus;
+    _adminNote = order.AdminNote;
     _showDialog = true;
+  }
+
+  private void OpenDetailsDialog(GetOrder order)
+  {
+    _detailsOrder = order;
+    _showDetailsDialog = true;
   }
 
   private async Task SaveAsync()
@@ -270,16 +319,13 @@
 
     try
     {
-      var client = await HttpClientHelper.GetPrivateClientAsync();
-      var tApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/tracking", Type = Constant.ApiCallType.Update, Model = new { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl } };
-      var sApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/shipping-status", Type = Constant.ApiCallType.Update, Model = new { ShippingStatus = _shippingStatus } };
-
-      var tRes = await ApiCallHelper.ApiCallTypeCall<object>(tApi);
-      var sRes = await ApiCallHelper.ApiCallTypeCall<object>(sApi);
+      var tRes = await AdminOrderService.UpdateTrackingAsync(_editOrder.Id, new UpdateTrackingRequest { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl });
+      var sRes = await AdminOrderService.UpdateShippingStatusAsync(_editOrder.Id, new UpdateShippingStatusRequest { ShippingStatus = _shippingStatus });
+      var nRes = await AdminOrderService.UpdateAdminNoteAsync(_editOrder.Id, new UpdateOrderAdminNote { AdminNote = _adminNote });
 
       _showDialog = false;
 
-      if (tRes.IsSuccessStatusCode && sRes.IsSuccessStatusCode)
+      if (tRes.Success && sRes.Success && nRes.Success)
       {
         ToastService.ShowToast(Shared.Toast.ToastLevel.Success, "Order updates saved successfully.", "Orders");
         await ReloadAsync();
@@ -307,5 +353,39 @@
     {
       ToastService.ShowErrorToast("Copy failed");
     }
+  }
+
+  private async Task ExportCsvAsync()
+  {
+    var rows = FilteredOrders()
+      .Select(o => new[]
+      {
+        o.Reference,
+        o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+        o.CustomerName ?? string.Empty,
+        o.CustomerEmail ?? string.Empty,
+        o.Status,
+        o.ShippingStatus,
+        o.TotalAmount.ToString("F2"),
+        o.TrackingNumber ?? string.Empty,
+      });
+
+    var csv = string.Join(Environment.NewLine, new[] { "Reference,Created,Customer,Email,Status,ShippingStatus,Total,Tracking" }
+      .Concat(rows.Select(row => string.Join(",", row.Select(EscapeCsv)))));
+
+    await JS.InvokeVoidAsync("navigator.clipboard.writeText", csv);
+    ToastService.ShowSuccessToast("Filtered orders CSV copied to clipboard.", "Orders");
+  }
+
+  private IEnumerable<GetOrder> FilteredOrders()
+  {
+    return _orders.Where(o => string.IsNullOrWhiteSpace(_customerQuery)
+        || (o.CustomerName?.Contains(_customerQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+        || (o.CustomerEmail?.Contains(_customerQuery, StringComparison.OrdinalIgnoreCase) ?? false));
+  }
+
+  private static string EscapeCsv(string value)
+  {
+    return "\"" + value.Replace("\"", "\"\"") + "\"";
   }
 }

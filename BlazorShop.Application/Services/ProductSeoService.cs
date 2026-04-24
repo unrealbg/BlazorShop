@@ -1,11 +1,15 @@
 namespace BlazorShop.Application.Services
 {
+    using System.Text.Json;
+
     using AutoMapper;
 
     using BlazorShop.Application.DTOs;
+    using BlazorShop.Application.DTOs.Admin.Audit;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Exceptions;
     using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Application.Validations;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Entities;
@@ -22,6 +26,7 @@ namespace BlazorShop.Application.Services
         private readonly ISeoRedirectAutomationService _seoRedirectAutomationService;
         private readonly IValidationService _validationService;
         private readonly IValidator<UpdateProductSeoDto> _validator;
+        private readonly IAdminAuditService? _auditService;
 
         public ProductSeoService(
             IGenericRepository<Product> productRepository,
@@ -31,7 +36,8 @@ namespace BlazorShop.Application.Services
             IApplicationTransactionManager transactionManager,
             ISeoRedirectAutomationService seoRedirectAutomationService,
             IValidationService validationService,
-            IValidator<UpdateProductSeoDto> validator)
+            IValidator<UpdateProductSeoDto> validator,
+            IAdminAuditService? auditService = null)
         {
             _productRepository = productRepository;
             _productReadRepository = productReadRepository;
@@ -41,6 +47,7 @@ namespace BlazorShop.Application.Services
             _seoRedirectAutomationService = seoRedirectAutomationService;
             _validationService = validationService;
             _validator = validator;
+            _auditService = auditService;
         }
 
         public async Task<ServiceResponse<ProductSeoDto>> GetByProductIdAsync(Guid productId)
@@ -126,6 +133,7 @@ namespace BlazorShop.Application.Services
                         throw new ServiceResponseException("Product SEO update failed.", ServiceResponseType.Failure);
                     }
 
+                    await LogAsync(product.Id, "Product SEO updated.", normalizedRequest);
                     return Success(_mapper.Map<ProductSeoDto>(product), product.Id, "Product SEO updated successfully.");
                 });
             }
@@ -172,6 +180,23 @@ namespace BlazorShop.Application.Services
                 IsPublished = request.IsPublished,
                 PublishedOn = request.PublishedOn,
             };
+        }
+
+        private async Task LogAsync(Guid productId, string summary, UpdateProductSeoDto request)
+        {
+            if (_auditService is null)
+            {
+                return;
+            }
+
+            await _auditService.LogAsync(new CreateAdminAuditLogDto
+            {
+                Action = "ProductSeo.Updated",
+                EntityType = "Product",
+                EntityId = productId.ToString(),
+                Summary = summary,
+                MetadataJson = JsonSerializer.Serialize(new { request.Slug, request.MetaTitle, request.IsPublished }),
+            });
         }
 
         private async Task EnsureRedirectAsync(string? oldPublicPath, string? newPublicPath)

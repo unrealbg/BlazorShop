@@ -1,31 +1,372 @@
 @page "/admin/users"
+@inject IAdminUserService AdminUserService
 
 <PageTitle>Admin Users</PageTitle>
 
-<section class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-    <header class="bs-panel bs-page-hero p-8">
-        <p class="bs-section-kicker">Admin</p>
-        <h1 class="bs-section-title mt-3">User management surface</h1>
-        <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">This route keeps customer and role administration under admin ownership. The current codebase does not yet expose a dedicated WASM user-management workflow, so this page stays intentionally lightweight instead of reusing storefront or account UI.</p>
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h1 class="mt-2 text-2xl font-bold text-slate-950">Users</h1>
+            </div>
+            <div class="bs-toolbar-cluster">
+                <input placeholder="Search email or name" @bind="_query.SearchTerm" @bind:event="oninput" />
+                <select class="min-w-44" @bind="_query.Role">
+                    <option value="">All roles</option>
+                    @foreach (var role in _roles)
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </select>
+                <select class="min-w-44" @bind="_lockedFilter">
+                    <option value="">All statuses</option>
+                    <option value="locked">Locked</option>
+                    <option value="active">Unlocked</option>
+                </select>
+                <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply</button>
+                <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ClearFiltersAsync" disabled="@_isLoading">Clear</button>
+            </div>
+        </div>
     </header>
 
-    <div class="mt-8 grid gap-4 xl:grid-cols-3">
-        <section class="bs-panel p-6 xl:col-span-2">
-            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Current State</p>
-            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>Customer account tooling is isolated under the authenticated account surface.</li>
-                <li>Admin role access is enforced at the folder level for the entire admin surface.</li>
-                <li>A dedicated user-administration feature can be added here later without reintroducing storefront or customer-shell overlap.</li>
-            </ul>
-        </section>
+    @if (_isLoading)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading users...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+            <div>@_loadError</div>
+            <button class="bs-button bs-button-primary mt-4" @onclick="LoadUsersAsync">Retry</button>
+        </div>
+    }
+    else if ((_page?.Items.Count ?? 0) == 0)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">No users found.</div>
+    }
+    else
+    {
+        <div class="bs-table-shell mt-6 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left">
+                        <th class="px-3 py-2">User</th>
+                        <th class="px-3 py-2">Roles</th>
+                        <th class="px-3 py-2">Email</th>
+                        <th class="px-3 py-2">Status</th>
+                        <th class="px-3 py-2">Created</th>
+                        <th class="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    @foreach (var user in _page!.Items)
+                    {
+                        <tr>
+                            <td class="px-3 py-3 align-top">
+                                <div class="font-semibold text-slate-950">@DisplayName(user)</div>
+                                <div class="text-xs text-slate-500 break-all">@user.Id</div>
+                            </td>
+                            <td class="px-3 py-3 align-top">
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach (var role in user.Roles)
+                                    {
+                                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">@role</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="px-3 py-3 align-top">
+                                <span class="rounded-full px-2 py-1 text-xs font-semibold @(user.EmailConfirmed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800")">
+                                    @(user.EmailConfirmed ? "Confirmed" : "Unconfirmed")
+                                </span>
+                            </td>
+                            <td class="px-3 py-3 align-top">
+                                <div class="flex flex-wrap gap-1">
+                                    <span class="rounded-full px-2 py-1 text-xs font-semibold @(user.IsLocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")">
+                                        @(user.IsLocked ? "Locked" : "Unlocked")
+                                    </span>
+                                    @if (user.RequirePasswordChange)
+                                    {
+                                        <span class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">Password change</span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="px-3 py-3 align-top">@user.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                            <td class="px-3 py-3 align-top">
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenDetailsAsync(user.Id)" disabled="@IsBusy">Details</button>
+                                    <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenRoles(user)" disabled="@IsBusy">Roles</button>
+                                    @if (user.IsLocked)
+                                    {
+                                        <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => UnlockAsync(user.Id)" disabled="@IsBusy">Unlock</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="text-amber-700 transition hover:text-amber-800 disabled:opacity-60" @onclick="() => LockAsync(user.Id)" disabled="@IsBusy">Lock</button>
+                                    }
+                                    <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => ConfirmEmailAsync(user.Id)" disabled="@(IsBusy || user.EmailConfirmed)">Confirm email</button>
+                                    <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => RequirePasswordChangeAsync(user.Id)" disabled="@IsBusy">Require password</button>
+                                    <button class="text-red-700 transition hover:text-red-800 disabled:opacity-60" @onclick="() => DeactivateAsync(user.Id)" disabled="@IsBusy">Deactivate</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
 
-        <section class="bs-panel-soft p-6">
-            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Admin Links</p>
-            <div class="mt-4 flex flex-col gap-3 text-sm font-semibold">
-                <a href="/admin" class="bs-button bs-button-primary">Dashboard</a>
-                <a href="/admin/settings" class="bs-button bs-button-secondary">Admin settings</a>
-                <a href="/account" class="bs-button bs-button-ghost">Account</a>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm text-slate-600">
+                Page @_page!.PageNumber of @Math.Max(1, _page.TotalPages) · @_page.TotalCount user(s)
             </div>
-        </section>
-    </div>
+            <div class="flex gap-2">
+                <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="PreviousPageAsync" disabled="@(_isLoading || _query.PageNumber <= 1)">Previous</button>
+                <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="NextPageAsync" disabled="@(_isLoading || _page.PageNumber >= _page.TotalPages)">Next</button>
+            </div>
+        </div>
+    }
 </section>
+
+<ModalDialog @bind-IsVisible="_showDetails">
+    <Header>
+        <h5 class="text-lg font-semibold">User Details</h5>
+    </Header>
+    <Body>
+        @if (_details is not null)
+        {
+            <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Name</dt><dd class="mt-1 text-slate-900">@_details.FullName</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Email</dt><dd class="mt-1 break-all text-slate-900">@_details.Email</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Phone</dt><dd class="mt-1 text-slate-900">@(_details.PhoneNumber ?? "-")</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Access failures</dt><dd class="mt-1 text-slate-900">@_details.AccessFailedCount</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Lockout</dt><dd class="mt-1 text-slate-900">@(_details.LockoutEnd?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-")</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Created</dt><dd class="mt-1 text-slate-900">@_details.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd></div>
+            </dl>
+        }
+    </Body>
+    <Footer>
+        <button class="bs-button bs-button-ghost" @onclick="() => _showDetails = false">Close</button>
+    </Footer>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showRoles">
+    <Header>
+        <h5 class="text-lg font-semibold">Edit Roles</h5>
+    </Header>
+    <Body>
+        <div class="space-y-3">
+            <div class="text-sm font-semibold text-slate-900">@DisplayName(_roleUser)</div>
+            @foreach (var role in _roles)
+            {
+                <label class="flex items-center gap-3 rounded border border-slate-200 px-3 py-2 text-sm">
+                    <input type="checkbox" class="h-4 w-4" checked="@_selectedRoles.Contains(role)" @onchange="args => ToggleRole(role, args)" />
+                    <span>@role</span>
+                </label>
+            }
+        </div>
+    </Body>
+    <Footer>
+        <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="SaveRolesAsync" disabled="@IsBusy">@(_isMutating ? "Saving..." : "Save")</button>
+        <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="() => _showRoles = false" disabled="@IsBusy">Cancel</button>
+    </Footer>
+</ModalDialog>
+
+@code {
+    private AdminUserQuery _query = new();
+    private string _lockedFilter = string.Empty;
+    private PagedResult<AdminUserListItem>? _page;
+    private List<string> _roles = new();
+    private bool _isLoading;
+    private bool _isMutating;
+    private string? _loadError;
+    private bool _showDetails;
+    private AdminUserDetails? _details;
+    private bool _showRoles;
+    private AdminUserListItem? _roleUser;
+    private HashSet<string> _selectedRoles = new(StringComparer.OrdinalIgnoreCase);
+
+    private bool IsBusy => _isLoading || _isMutating;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRolesAsync();
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        var result = await AdminUserService.GetRolesAsync();
+        if (!QueryFailureNotifier.TryNotifyFailure(result, "User roles", showToast: false))
+        {
+            _roles = (result.Data ?? Array.Empty<string>()).ToList();
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        ApplyLockedFilter();
+
+        var result = await AdminUserService.GetUsersAsync(_query);
+        if (QueryFailureNotifier.TryNotifyFailure(result, "Users", showToast: false))
+        {
+            _page = null;
+            _loadError = FeedbackMessageResolver.ResolveQueryFailure(result, "We couldn't load users right now. Please try again.");
+        }
+        else
+        {
+            _page = result.Data;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        _query.PageNumber = 1;
+        await LoadUsersAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _query = new AdminUserQuery();
+        _lockedFilter = string.Empty;
+        await LoadUsersAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        _query.PageNumber = Math.Max(1, _query.PageNumber - 1);
+        await LoadUsersAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        _query.PageNumber += 1;
+        await LoadUsersAsync();
+    }
+
+    private async Task OpenDetailsAsync(string userId)
+    {
+        var result = await AdminUserService.GetByIdAsync(userId);
+        if (QueryFailureNotifier.TryNotifyFailure(result, "User details"))
+        {
+            return;
+        }
+
+        _details = result.Data;
+        _showDetails = true;
+    }
+
+    private void OpenRoles(AdminUserListItem user)
+    {
+        _roleUser = user;
+        _selectedRoles = user.Roles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _showRoles = true;
+    }
+
+    private void ToggleRole(string role, ChangeEventArgs args)
+    {
+        var isSelected = args.Value is bool value && value;
+        if (isSelected)
+        {
+            _selectedRoles.Add(role);
+        }
+        else
+        {
+            _selectedRoles.Remove(role);
+        }
+    }
+
+    private async Task SaveRolesAsync()
+    {
+        if (_roleUser is null)
+        {
+            return;
+        }
+
+        await MutateAsync(
+            () => AdminUserService.UpdateRolesAsync(_roleUser.Id, new UpdateUserRoles { Roles = _selectedRoles.OrderBy(role => role).ToArray() }),
+            "Roles saved.",
+            () => _showRoles = false);
+    }
+
+    private async Task LockAsync(string userId)
+    {
+        await MutateAsync(() => AdminUserService.LockAsync(userId, new UserLockRequest()), "User locked.");
+    }
+
+    private async Task UnlockAsync(string userId)
+    {
+        await MutateAsync(() => AdminUserService.UnlockAsync(userId), "User unlocked.");
+    }
+
+    private async Task ConfirmEmailAsync(string userId)
+    {
+        await MutateAsync(() => AdminUserService.ConfirmEmailAsync(userId), "Email confirmed.");
+    }
+
+    private async Task RequirePasswordChangeAsync(string userId)
+    {
+        await MutateAsync(() => AdminUserService.RequirePasswordChangeAsync(userId), "Password change required.");
+    }
+
+    private async Task DeactivateAsync(string userId)
+    {
+        await MutateAsync(() => AdminUserService.DeactivateAsync(userId), "User deactivated.");
+    }
+
+    private async Task MutateAsync(Func<Task<ServiceResponse<AdminUserDetails>>> action, string successFallback, Action? onSuccess = null)
+    {
+        if (_isMutating)
+        {
+            return;
+        }
+
+        _isMutating = true;
+        try
+        {
+            var result = await action();
+            ShowMutationToast(result, successFallback);
+            if (result.Success)
+            {
+                onSuccess?.Invoke();
+                await LoadUsersAsync();
+            }
+        }
+        finally
+        {
+            _isMutating = false;
+        }
+    }
+
+    private void ShowMutationToast<TPayload>(ServiceResponse<TPayload> result, string successFallback)
+    {
+        ToastService.ShowToast(
+            result.Success ? Shared.Toast.ToastLevel.Success : Shared.Toast.ToastLevel.Error,
+            FeedbackMessageResolver.ResolveMutation(result, successFallback, "Request failed."),
+            "Users",
+            result.Success ? Shared.Toast.ToastIcon.Success : Shared.Toast.ToastIcon.Error);
+    }
+
+    private void ApplyLockedFilter()
+    {
+        _query.Locked = _lockedFilter switch
+        {
+            "locked" => true,
+            "active" => false,
+            _ => null,
+        };
+    }
+
+    private static string DisplayName(AdminUserListItem? user)
+    {
+        if (user is null)
+        {
+            return string.Empty;
+        }
+
+        return string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? user.UserName ?? user.Id : user.FullName;
+    }
+}

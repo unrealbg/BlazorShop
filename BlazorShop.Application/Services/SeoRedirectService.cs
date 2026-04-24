@@ -1,10 +1,14 @@
 namespace BlazorShop.Application.Services
 {
+    using System.Text.Json;
+
     using AutoMapper;
 
     using BlazorShop.Application.DTOs;
+    using BlazorShop.Application.DTOs.Admin.Audit;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Application.Validations;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Seo;
@@ -19,19 +23,22 @@ namespace BlazorShop.Application.Services
         private readonly IMapper _mapper;
         private readonly IValidationService _validationService;
         private readonly IValidator<SeoRedirectDto> _validator;
+        private readonly IAdminAuditService? _auditService;
 
         public SeoRedirectService(
             IGenericRepository<SeoRedirect> genericRepository,
             ISeoRedirectRepository seoRedirectRepository,
             IMapper mapper,
             IValidationService validationService,
-            IValidator<SeoRedirectDto> validator)
+            IValidator<SeoRedirectDto> validator,
+            IAdminAuditService? auditService = null)
         {
             _genericRepository = genericRepository;
             _seoRedirectRepository = seoRedirectRepository;
             _mapper = mapper;
             _validationService = validationService;
             _validator = validator;
+            _auditService = auditService;
         }
 
         public async Task<IReadOnlyList<SeoRedirectDto>> GetAllAsync()
@@ -83,6 +90,7 @@ namespace BlazorShop.Application.Services
                 return Failure("SEO redirect could not be created.");
             }
 
+            await LogAsync("SeoRedirect.Created", redirect.Id, $"Redirect {redirect.OldPath} created.", redirect);
             return Success(_mapper.Map<SeoRedirectDto>(redirect), redirect.Id, "SEO redirect created successfully.");
         }
 
@@ -124,6 +132,7 @@ namespace BlazorShop.Application.Services
                 return Failure("SEO redirect could not be updated.");
             }
 
+            await LogAsync("SeoRedirect.Updated", redirect.Id, $"Redirect {redirect.OldPath} updated.", redirect);
             return Success(_mapper.Map<SeoRedirectDto>(redirect), redirect.Id, "SEO redirect updated successfully.");
         }
 
@@ -149,6 +158,7 @@ namespace BlazorShop.Application.Services
                 return Failure("SEO redirect could not be deactivated.");
             }
 
+            await LogAsync("SeoRedirect.Deactivated", redirect.Id, $"Redirect {redirect.OldPath} deactivated.", redirect);
             return Success(_mapper.Map<SeoRedirectDto>(redirect), redirect.Id, "SEO redirect deactivated successfully.");
         }
 
@@ -174,7 +184,25 @@ namespace BlazorShop.Application.Services
                 return Failure("SEO redirect could not be deleted.");
             }
 
+            await LogAsync("SeoRedirect.Deleted", id, $"Redirect {redirect.OldPath} deleted.", redirect);
             return Success(payload, id, "SEO redirect deleted successfully.");
+        }
+
+        private async Task LogAsync(string action, Guid entityId, string summary, SeoRedirect redirect)
+        {
+            if (_auditService is null)
+            {
+                return;
+            }
+
+            await _auditService.LogAsync(new CreateAdminAuditLogDto
+            {
+                Action = action,
+                EntityType = "SeoRedirect",
+                EntityId = entityId.ToString(),
+                Summary = summary,
+                MetadataJson = JsonSerializer.Serialize(new { redirect.OldPath, redirect.NewPath, redirect.StatusCode, redirect.IsActive }),
+            });
         }
 
         private async Task<ServiceResponse<SeoRedirectDto>> ValidateAsync(UpsertSeoRedirectDto request)

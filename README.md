@@ -48,7 +48,11 @@ BlazorShop delivers a modern shopping experience with a server-rendered public s
 - Newsletter
   - Email subscription with welcome email
 - Admin Area
-  - Manage categories, products, variants, orders, and shipping
+  - Dashboard, products, categories, variants, orders, users, inventory, SEO, redirects, settings, and audit log
+  - User role editing, lock/unlock, email confirmation, password-change requirement flag, and guarded admin safety checks
+  - Operational store/order/notification settings without exposing SMTP passwords or API secrets
+  - Admin audit trail for sensitive catalog, SEO, redirect, order, user, settings, and inventory operations
+  - Inventory overview with low/out-of-stock filtering and product/variant stock updates
 - Developer Experience
   - OpenAPI/Swagger, Serilog logging, unit tests, GitHub Actions CI
   - Modern UI (Tailwind-style classes), toast notifications, Chart.js

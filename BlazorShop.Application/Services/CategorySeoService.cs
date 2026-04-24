@@ -1,11 +1,15 @@
 namespace BlazorShop.Application.Services
 {
+    using System.Text.Json;
+
     using AutoMapper;
 
     using BlazorShop.Application.DTOs;
+    using BlazorShop.Application.DTOs.Admin.Audit;
     using BlazorShop.Application.DTOs.Seo;
     using BlazorShop.Application.Exceptions;
     using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Application.Validations;
     using BlazorShop.Domain.Contracts.CategoryPersistence;
     using BlazorShop.Domain.Contracts;
@@ -23,6 +27,7 @@ namespace BlazorShop.Application.Services
         private readonly ISeoRedirectAutomationService _seoRedirectAutomationService;
         private readonly IValidationService _validationService;
         private readonly IValidator<UpdateCategorySeoDto> _validator;
+        private readonly IAdminAuditService? _auditService;
 
         public CategorySeoService(
             IGenericRepository<Category> categoryRepository,
@@ -32,7 +37,8 @@ namespace BlazorShop.Application.Services
             IApplicationTransactionManager transactionManager,
             ISeoRedirectAutomationService seoRedirectAutomationService,
             IValidationService validationService,
-            IValidator<UpdateCategorySeoDto> validator)
+            IValidator<UpdateCategorySeoDto> validator,
+            IAdminAuditService? auditService = null)
         {
             _categoryRepository = categoryRepository;
             _categoryReadRepository = categoryReadRepository;
@@ -42,6 +48,7 @@ namespace BlazorShop.Application.Services
             _seoRedirectAutomationService = seoRedirectAutomationService;
             _validationService = validationService;
             _validator = validator;
+            _auditService = auditService;
         }
 
         public async Task<ServiceResponse<CategorySeoDto>> GetByCategoryIdAsync(Guid categoryId)
@@ -115,6 +122,7 @@ namespace BlazorShop.Application.Services
                         throw new ServiceResponseException("Category SEO update failed.", ServiceResponseType.Failure);
                     }
 
+                    await LogAsync(category.Id, "Category SEO updated.", normalizedRequest);
                     return Success(_mapper.Map<CategorySeoDto>(category), category.Id, "Category SEO updated successfully.");
                 });
             }
@@ -160,6 +168,23 @@ namespace BlazorShop.Application.Services
                 SeoContent = request.SeoContent,
                 IsPublished = request.IsPublished,
             };
+        }
+
+        private async Task LogAsync(Guid categoryId, string summary, UpdateCategorySeoDto request)
+        {
+            if (_auditService is null)
+            {
+                return;
+            }
+
+            await _auditService.LogAsync(new CreateAdminAuditLogDto
+            {
+                Action = "CategorySeo.Updated",
+                EntityType = "Category",
+                EntityId = categoryId.ToString(),
+                Summary = summary,
+                MetadataJson = JsonSerializer.Serialize(new { request.Slug, request.MetaTitle, request.IsPublished }),
+            });
         }
 
         private async Task EnsureRedirectAsync(string? oldPublicPath, string? newPublicPath)

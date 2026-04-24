@@ -3,6 +3,7 @@
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Application.Services.Payment;
@@ -23,6 +24,7 @@
     using BlazorShop.Infrastructure.Repositories.Payment;
     using BlazorShop.Infrastructure.Repositories.Seo;
     using BlazorShop.Infrastructure.Services;
+    using BlazorShop.Infrastructure.Services.Admin;
 
     using Microsoft.AspNetCore.Authentication.JwtBearer;
     using Microsoft.AspNetCore.Builder;
@@ -106,6 +108,12 @@
             services.AddScoped<ISeoSettingsRepository, SeoSettingsRepository>();
             services.AddScoped<ISeoRedirectRepository, SeoRedirectRepository>();
             services.AddScoped<IApplicationTransactionManager, ApplicationTransactionManager>();
+            services.AddHttpContextAccessor();
+            services.AddScoped<IAdminAuditService, AdminAuditService>();
+            services.AddScoped<IAdminUserService, AdminUserService>();
+            services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+            services.AddScoped<IAdminInventoryService, AdminInventoryService>();
+            services.AddScoped<IAdminOrderService, AdminOrderService>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 

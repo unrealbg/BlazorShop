@@ -77,6 +77,7 @@ namespace BlazorShop.Application.Services.Payment
                     UserId = o.UserId,
                     CustomerName = userName,
                     CustomerEmail = email,
+                    AdminNote = o.AdminNote,
                     Lines = o.Lines.Select(l => new GetOrderLine
                     {
                         ProductId = l.ProductId,
