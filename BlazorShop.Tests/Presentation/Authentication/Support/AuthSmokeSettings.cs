@@ -168,12 +168,13 @@ namespace BlazorShop.Tests.Presentation.Authentication
                 throw new ArgumentException("Value cannot be null or whitespace.", parameterName);
             }
 
-            if (Uri.TryCreate(actionPath.Trim(), UriKind.Absolute, out _))
+            var trimmedValue = actionPath.Trim();
+            if (HasExplicitUriScheme(trimmedValue) || trimmedValue.StartsWith("//", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException($"{parameterName} must be a relative auth action segment.");
             }
 
-            return actionPath.Trim().Trim('/');
+            return trimmedValue.Trim('/');
         }
 
         private static bool ParseBoolean(string? rawValue, string environmentVariableName)
@@ -198,20 +199,33 @@ namespace BlazorShop.Tests.Presentation.Authentication
                 throw new ArgumentException("Value cannot be null or whitespace.", parameterName);
             }
 
-            if (Uri.TryCreate(routePath.Trim(), UriKind.Absolute, out _))
+            var normalizedPath = routePath.Trim();
+            if (HasExplicitUriScheme(normalizedPath) || normalizedPath.StartsWith("//", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException($"{parameterName} must be a relative route path.");
             }
 
-            var normalizedPath = routePath.Trim();
             if (!normalizedPath.StartsWith("/", StringComparison.Ordinal))
             {
-                normalizedPath = $"/{normalizedPath}";
+                throw new InvalidOperationException($"{parameterName} must begin with '/'.");
             }
 
             return normalizedPath == "/"
                 ? string.Empty
                 : normalizedPath.TrimStart('/');
+        }
+
+        private static bool HasExplicitUriScheme(string value)
+        {
+            var trimmedValue = value.Trim();
+            var colonIndex = trimmedValue.IndexOf(':');
+            if (colonIndex <= 0)
+            {
+                return false;
+            }
+
+            var firstPathSeparatorIndex = trimmedValue.IndexOfAny(['/', '?', '#']);
+            return firstPathSeparatorIndex < 0 || colonIndex < firstPathSeparatorIndex;
         }
     }
 }
