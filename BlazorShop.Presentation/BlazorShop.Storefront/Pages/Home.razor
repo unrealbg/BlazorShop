@@ -1,0 +1,168 @@
+@page "/"
+@inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
+
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
+
+<HeroBanner />
+
+@if (_isServiceUnavailable)
+{
+    <ServiceUnavailableState Title="Catalog temporarily unavailable"
+                             Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+}
+else
+{
+    <section class="mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+        <div class="text-center">
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Shop Categories</p>
+            <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900">Browse by Category</h2>
+            <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Explore the same BlazorShop collections and jump straight into public product pages.</p>
+        </div>
+
+        @if (FeaturedCategories.Count > 0)
+        {
+            <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                @for (var index = 0; index < FeaturedCategories.Count; index++)
+                {
+                    var category = FeaturedCategories[index];
+
+                    <a href="@StorefrontRoutes.Category(category.Slug)" class="group relative rounded-xl border border-neutral-200 bg-white/90 px-4 py-4 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
+                        <div class="flex items-start gap-3">
+                            <div class="mt-0.5 grid h-10 w-10 place-items-center rounded-full text-white @GetCategoryBadgeClass(index)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 7h18M3 12h18M3 17h18" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-semibold leading-snug text-neutral-900">@category.Name</div>
+                                <div class="mt-1 text-xs uppercase tracking-[0.18em] text-neutral-500">Browse</div>
+                                <p class="mt-2 text-sm leading-6 text-neutral-700">@GetCategorySummary(category)</p>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mt-1 h-4 w-4 text-neutral-400 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6" /></svg>
+                        </div>
+                    </a>
+                }
+            </div>
+
+            <div class="mt-6 flex justify-center">
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">See New Releases</a>
+            </div>
+        }
+        else
+        {
+            <div class="mt-8 rounded-md bg-blue-50 px-6 py-5 text-center text-sm text-blue-800 shadow">
+                No published categories are available right now.
+            </div>
+        }
+    </section>
+
+    <section id="latest" class="relative z-[1]">
+        <div class="mx-auto max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Catalog</p>
+                <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900">Latest Products</h2>
+                <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Fresh products, clear prices, and direct links into the catalog.</p>
+            </div>
+
+            <div class="mt-8">
+                <ProductGrid Products="_latestProducts" EmptyMessage="No published products are available yet." />
+            </div>
+
+            <div class="mt-8 flex justify-center">
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">See All New Releases</a>
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<GetCategory> _categories = [];
+    private bool _isServiceUnavailable;
+    private IReadOnlyList<GetCatalogProduct> _latestProducts = [];
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    private IReadOnlyList<GetCategory> FeaturedCategories => _categories
+        .Where(category => !string.IsNullOrWhiteSpace(category.Slug))
+        .Take(8)
+        .ToArray();
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "Shop Home",
+            StorefrontRoutes.Home,
+            "Discover published products, featured categories, and route-based SEO-ready pages across the BlazorShop storefront.");
+        var structuredDataTask = StructuredDataComposer.ComposeHomePageAsync();
+        var categoriesTask = ApiClient.GetPublishedCategoriesAsync();
+        var latestProductsTask = ApiClient.GetPublishedCatalogPageAsync(new ProductCatalogQuery
+        {
+            PageNumber = 1,
+            PageSize = 6,
+            SortBy = ProductCatalogSortBy.Newest,
+        });
+
+        await Task.WhenAll(metadataTask, structuredDataTask, categoriesTask, latestProductsTask);
+
+        _metadata = await metadataTask;
+
+        var categoriesResult = await categoriesTask;
+        var latestProductsResult = await latestProductsTask;
+
+        if (categoriesResult.IsServiceUnavailable || latestProductsResult.IsServiceUnavailable)
+        {
+            _isServiceUnavailable = true;
+            _categories = [];
+            _latestProducts = [];
+            _structuredData = StorefrontStructuredDataDocument.Empty;
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
+                "Catalog temporarily unavailable",
+                StorefrontRoutes.Home,
+                "The storefront is running, but the catalog API is not reachable right now.");
+
+            return;
+        }
+
+        _isServiceUnavailable = false;
+        _categories = categoriesResult.Value ?? [];
+        _latestProducts = latestProductsResult.Value?.Items ?? [];
+        _structuredData = await structuredDataTask;
+    }
+
+    private static string GetCategoryBadgeClass(int index)
+    {
+        return (index % 4) switch
+        {
+            0 => "bg-sky-500",
+            1 => "bg-amber-500",
+            2 => "bg-emerald-500",
+            _ => "bg-neutral-900",
+        };
+    }
+
+    private static string GetCategorySummary(GetCategory category)
+    {
+        if (!string.IsNullOrWhiteSpace(category.MetaDescription))
+        {
+            return Truncate(category.MetaDescription, 88);
+        }
+
+        return "Explore products in this collection.";
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return string.Concat(value[..maxLength].TrimEnd(), "...");
+    }
+}

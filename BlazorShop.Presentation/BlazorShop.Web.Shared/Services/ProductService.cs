@@ -20,7 +20,7 @@
 
         public async Task<QueryResult<IEnumerable<GetProduct>>> GetAllAsync()
         {
-            var client = _httpClientHelper.GetPublicClient();
+            var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
             {
                 Route = Constant.Product.GetAll,

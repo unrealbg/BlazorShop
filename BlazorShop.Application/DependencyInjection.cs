@@ -23,8 +23,17 @@
         public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddAutoMapper(cfg => cfg.AddProfile<MappingConfig>());
+            services.AddSingleton<ISlugService, SlugService>();
+            services.AddSingleton<ISeoMetadataBuilder, SeoMetadataBuilder>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<ICategoryService, CategoryService>();
+            services.AddScoped<IPublicCatalogService, PublicCatalogService>();
+            services.AddScoped<IProductSeoService, ProductSeoService>();
+            services.AddScoped<ICategorySeoService, CategorySeoService>();
+            services.AddScoped<ISeoSettingsService, SeoSettingsService>();
+            services.AddScoped<ISeoRedirectService, SeoRedirectService>();
+            services.AddScoped<ISeoRedirectAutomationService, SeoRedirectAutomationService>();
+            services.AddScoped<ISeoRedirectResolutionService, SeoRedirectResolutionService>();
             services.AddScoped<IProductVariantService, ProductVariantService>();
             services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
 

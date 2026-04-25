@@ -20,7 +20,7 @@
                         {
                             <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="admin" @onclick="CloseMenu">Admin Menu</a>
                         }
-                        @if (_isAdmin || _isUser)
+                        @if (_isAuthenticated)
                         {
                             <a class="block px-3 py-2 rounded hover:bg-neutral-50" href="profile" @onclick="CloseMenu">Profile</a>
                         }

@@ -1,12 +1,50 @@
-﻿<div class="container text-center mt-5">
-    <div class="card shadow p-4 glass-card">
-        <div class="card-body">
-            <h1 class="text-danger">Access Denied</h1>
-            <p class="lead">You do not have permission to access this page.</p>
-            <div class="mt-4">
-                <a class="btn btn-primary btn-lg" href="/">Go to Home</a>
-                <a class="btn btn-secondary btn-lg" href="authentication/login">Login</a>
+﻿@using BlazorShop.Web.Authentication
+@inject NavigationManager NavigationManager
+
+@if (_redirectingToLogin)
+{
+    <section class="mx-auto flex min-h-[70vh] max-w-3xl items-center px-4 py-12 sm:px-6 lg:px-8">
+        <div class="bs-panel bs-page-hero w-full p-8 text-center sm:p-10">
+            <p class="bs-section-kicker">Access</p>
+            <h1 class="bs-section-title mt-3">Sign-in required</h1>
+            <p class="mt-4 text-base leading-7 text-slate-600">Redirecting you to the sign-in handoff for this protected route.</p>
+        </div>
+    </section>
+}
+else
+{
+    <section class="mx-auto flex min-h-[70vh] max-w-3xl items-center px-4 py-12 sm:px-6 lg:px-8">
+        <div class="bs-panel bs-page-hero w-full p-8 text-center sm:p-10">
+            <p class="bs-section-kicker">Access</p>
+            <h1 class="bs-section-title mt-3">Access denied</h1>
+            <p class="mt-4 text-base leading-7 text-slate-600">You do not have permission to access this route with the current account.</p>
+            <div class="mt-6 flex flex-wrap justify-center gap-3">
+                <a class="bs-button bs-button-primary" href="/account">Account</a>
+                <a class="bs-button bs-button-secondary" href="/authentication/logout">Switch account</a>
             </div>
         </div>
-    </div>
-</div>
+    </section>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+    private bool _redirectingToLogin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateTask;
+        var redirectPath = ProtectedRouteRedirectResolver.ResolveLoginRedirectPath(
+            NavigationManager.ToBaseRelativePath(NavigationManager.Uri),
+            authenticationState.User.Identity?.IsAuthenticated == true);
+
+        if (string.IsNullOrWhiteSpace(redirectPath))
+        {
+            return;
+        }
+
+        _redirectingToLogin = true;
+        NavigationManager.NavigateTo(redirectPath);
+    }
+}

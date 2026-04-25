@@ -1,0 +1,51 @@
+@inject IStorefrontSessionResolver SessionResolver
+@inject IStorefrontClientAppUrlResolver ClientAppUrlResolver
+
+<details class="relative">
+    <summary class="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+        <span class="sr-only">Account</span>
+    </summary>
+
+    <div class="absolute right-0 z-30 mt-3 w-72 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 text-white shadow-2xl ring-1 ring-black/30">
+        @if (_session.IsAuthenticated)
+        {
+            <div class="border-b border-white/10 px-4 py-4">
+                <div class="text-sm font-semibold">@(_session.DisplayName ?? "Signed in")</div>
+                @if (!string.IsNullOrWhiteSpace(_session.Email))
+                {
+                    <div class="mt-1 text-xs text-neutral-400">@_session.Email</div>
+                }
+            </div>
+
+            <div class="p-2 text-sm">
+                <a href="@ClientAppUrlResolver.ResolveUrl("/account")" class="block rounded-xl px-3 py-2 transition hover:bg-white/10">My Account</a>
+                @if (_session.IsAdmin)
+                {
+                    <a href="@ClientAppUrlResolver.ResolveUrl("/admin")" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10">Admin Panel</a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="border-b border-white/10 px-4 py-4">
+                <div class="text-sm font-semibold">Account access</div>
+                <div class="mt-1 text-xs leading-5 text-neutral-400">Sign in for your customer workspace, or register before you continue to checkout.</div>
+            </div>
+
+            <div class="p-2 text-sm">
+                <a href="@StorefrontRoutes.SignIn" class="block rounded-xl px-3 py-2 transition hover:bg-white/10">Sign in</a>
+                <a href="@StorefrontRoutes.Register" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10">Register</a>
+            </div>
+        }
+    </div>
+</details>
+
+@code {
+    private StorefrontSessionInfo _session = StorefrontSessionInfo.Anonymous;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _session = await SessionResolver.GetCurrentUserAsync();
+    }
+}

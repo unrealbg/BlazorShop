@@ -35,6 +35,24 @@
                 "We couldn't load categories right now. Please try again.");
         }
 
+        public async Task<QueryResult<IEnumerable<GetCategory>>> GetAllForAdminAsync()
+        {
+            var client = await _httpClientHelper.GetPrivateClientAsync();
+            var currentApiCall = new ApiCall
+            {
+                Route = Constant.Category.GetAllForAdmin,
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+                Model = null!,
+                Id = null!
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
+            return await _apiCallHelper.GetQueryResult<IEnumerable<GetCategory>>(
+                result,
+                "We couldn't load categories right now. Please try again.");
+        }
+
         public async Task<QueryResult<GetCategory>> GetByIdAsync(Guid id)
         {
             var client = _httpClientHelper.GetPublicClient();

@@ -11,6 +11,7 @@
 
     public class ApiCallHelper : IApiCallHelper
     {
+        private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
         private readonly ILogger<ApiCallHelper>? _logger;
 
         public ApiCallHelper()
@@ -99,13 +100,52 @@
                     $"Expected JSON from {responseMessage.RequestMessage?.RequestUri}, but received {mediaType ?? "no content type"}. Response starts with: {responsePreview}");
             }
 
-            var response = await responseMessage.Content.ReadFromJsonAsync<TResponse>();
+            var response = await TryReadJsonResponse<TResponse>(responseMessage);
             if (response == null)
             {
                 throw new Exception("Failed to deserialize the response");
             }
 
             return response;
+        }
+
+        public async Task<ServiceResponse<TPayload>> GetMutationResponse<TPayload>(HttpResponseMessage responseMessage, string defaultErrorMessage)
+        {
+            if (responseMessage == null)
+            {
+                return new ServiceResponse<TPayload>(Message: defaultErrorMessage)
+                {
+                    ResponseType = ServiceResponseType.Failure,
+                };
+            }
+
+            var response = await TryReadJsonResponse<ServiceResponse<TPayload>>(responseMessage);
+            if (response is not null)
+            {
+                if (responseMessage.IsSuccessStatusCode && response.ResponseType == ServiceResponseType.None)
+                {
+                    return response with { ResponseType = ServiceResponseType.Success };
+                }
+
+                return response;
+            }
+
+            if (responseMessage.IsSuccessStatusCode)
+            {
+                return new ServiceResponse<TPayload>(Success: true, Message: string.Empty)
+                {
+                    ResponseType = ServiceResponseType.Success,
+                };
+            }
+
+            var message = ShouldUseDefaultErrorMessage(responseMessage.StatusCode)
+                ? defaultErrorMessage
+                : await GetFailureMessageAsync(responseMessage, defaultErrorMessage);
+
+            return new ServiceResponse<TPayload>(Message: message)
+            {
+                ResponseType = MapFailureType(responseMessage.StatusCode),
+            };
         }
 
         public async Task<QueryResult<TResponse>> GetQueryResult<TResponse>(HttpResponseMessage responseMessage, string defaultErrorMessage)
@@ -220,6 +260,47 @@
         private static bool ShouldUseDefaultErrorMessage(HttpStatusCode statusCode)
         {
             return statusCode == HttpStatusCode.RequestTimeout || (int)statusCode >= 500;
+        }
+
+        private async Task<TResponse?> TryReadJsonResponse<TResponse>(HttpResponseMessage responseMessage)
+        {
+            if (responseMessage.Content is null)
+            {
+                return default;
+            }
+
+            var mediaType = responseMessage.Content.Headers.ContentType?.MediaType;
+            if (!IsJsonMediaType(mediaType))
+            {
+                return default;
+            }
+
+            var payload = await responseMessage.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return default;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<TResponse>(payload, SerializerOptions);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Failed to deserialize JSON response from {RequestUri}.", responseMessage.RequestMessage?.RequestUri);
+                return default;
+            }
+        }
+
+        private static ServiceResponseType MapFailureType(HttpStatusCode statusCode)
+        {
+            return statusCode switch
+            {
+                HttpStatusCode.BadRequest => ServiceResponseType.ValidationError,
+                HttpStatusCode.NotFound => ServiceResponseType.NotFound,
+                HttpStatusCode.Conflict => ServiceResponseType.Conflict,
+                _ => ServiceResponseType.Failure,
+            };
         }
 
         private static bool IsJsonMediaType(string? mediaType)

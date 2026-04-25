@@ -58,7 +58,7 @@ namespace BlazorShop.Application.Services
 
                 _logger.LogInformation($"Cache miss, fetching recommendations for product {productId}");
 
-                var product = await _productReadRepository.GetProductDetailsByIdAsync(productId);
+                var product = await _productReadRepository.GetPublishedProductDetailsByIdAsync(productId);
                 if (product == null)
                 {
                     _logger.LogWarning($"Product {productId} not found");

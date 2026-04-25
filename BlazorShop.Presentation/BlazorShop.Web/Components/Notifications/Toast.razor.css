@@ -1,111 +1,142 @@
-﻿.custom-toast-container {
+﻿.bs-toast-stack {
     position: fixed;
     z-index: 9999;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 12px;
+    padding: 0 16px;
+    pointer-events: none;
 }
 
-    /* Контейнерите за различните ъгли */
-    .custom-toast-container.top-right {
-        top: 1rem;
-        right: 1rem;
-        align-items: flex-end;
-    }
-
-    .custom-toast-container.top-left {
-        top: 1rem;
-        left: 1rem;
-        align-items: flex-start;
-    }
-
-    .custom-toast-container.bottom-right {
-        bottom: 1rem;
-        right: 1rem;
-        align-items: flex-end;
-    }
-
-    .custom-toast-container.bottom-left {
-        bottom: 1rem;
-        left: 1rem;
-        align-items: flex-start;
-    }
-
-/* Общ вид на тоста */
-.custom-toast {
-    min-width: 300px;
-    margin-bottom: 0.5rem;
-    color: #fff;
-    background-color: rgba(0, 0, 0, 0.85);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    border-radius: 0.5rem;
-    opacity: 1;
-    transition: opacity 0.5s ease, transform 0.5s ease;
+.bs-toast-stack.top-right {
+    top: 1rem;
+    right: 1rem;
+    align-items: flex-end;
 }
 
-    /* Преход при показване/скриване */
-    .custom-toast.fade.show {
+.bs-toast-stack.top-left {
+    top: 1rem;
+    left: 1rem;
+    align-items: flex-start;
+}
+
+.bs-toast-stack.bottom-right {
+    right: 1rem;
+    bottom: 1rem;
+    align-items: flex-end;
+}
+
+.bs-toast-stack.bottom-left {
+    left: 1rem;
+    bottom: 1rem;
+    align-items: flex-start;
+}
+
+.bs-toast-card {
+    width: min(92vw, 380px);
+    pointer-events: auto;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    background: rgba(23, 23, 23, 0.95);
+    color: #ffffff;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+    animation: bs-toast-in 180ms ease-out forwards;
+}
+
+.bs-toast-card.Info {
+    --toast-accent-bg: rgba(14, 165, 233, 0.18);
+    --toast-accent-color: #e0f2fe;
+}
+
+.bs-toast-card.Success {
+    --toast-accent-bg: rgba(16, 185, 129, 0.18);
+    --toast-accent-color: #d1fae5;
+}
+
+.bs-toast-card.Warning {
+    --toast-accent-bg: rgba(245, 158, 11, 0.18);
+    --toast-accent-color: #fef3c7;
+}
+
+.bs-toast-card.Error {
+    --toast-accent-bg: rgba(239, 68, 68, 0.18);
+    --toast-accent-color: #fee2e2;
+}
+
+.bs-toast-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+}
+
+.bs-toast-accent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    background: var(--toast-accent-bg, rgba(255, 255, 255, 0.12));
+    color: var(--toast-accent-color, #ffffff);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.bs-toast-heading-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bs-toast-heading-row strong {
+    font-size: 0.92rem;
+    line-height: 1.4;
+}
+
+.bs-toast-heading-row small {
+    margin-left: auto;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.bs-toast-body {
+    margin-top: 4px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.bs-toast-close {
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background-color 180ms ease, color 180ms ease;
+}
+
+.bs-toast-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+@keyframes bs-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
         opacity: 1;
         transform: translateY(0);
     }
-
-    .custom-toast.fade {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-/* Хедър на тоста */
-.custom-toast-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    color: #fff;
-    background-color: inherit;
-    border-top-left-radius: 0.25rem;
-    border-top-right-radius: 0.25rem;
-}
-
-    .custom-toast-header small {
-        margin-left: auto;
-        margin-right: 0.1rem;
-    }
-
-    .custom-toast-header button {
-        margin-left: 0.1rem;
-    }
-
-/* Текстът */
-.custom-toast-body {
-    padding: 1rem;
-    font-size: 0.9rem;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-bottom-left-radius: 0.25rem;
-    border-bottom-right-radius: 0.25rem;
-}
-
-/* Бутона за затваряне */
-.close {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 1.25rem;
-    line-height: 1;
-}
-
-/* Цветове спрямо типа на тоста */
-.custom-toast.Info {
-    background-color: #17a2b8;
-}
-
-.custom-toast.Success {
-    background-color: #28a745;
-}
-
-.custom-toast.Warning {
-    background-color: #ea6813;
-}
-
-.custom-toast.Error {
-    background-color: #a50000;
 }

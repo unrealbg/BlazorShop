@@ -36,7 +36,13 @@ namespace BlazorShop.Infrastructure.Repositories
                     .Where(p =>
                         p.CategoryId == categoryId &&
                         p.Id != productId &&
-                        p.Quantity > 0)
+                        p.Quantity > 0 &&
+                        p.IsPublished &&
+                        p.PublishedOn != null &&
+                        p.Slug != null &&
+                        p.Slug != string.Empty &&
+                        p.Category != null &&
+                        p.Category.IsPublished)
                     .OrderByDescending(p => p.CreatedOn)
                     .Take(count)
                     .ToListAsync();
@@ -74,7 +80,13 @@ namespace BlazorShop.Infrastructure.Repositories
 
                     var product = await _context.Products
                         .AsNoTracking()
-                        .FirstOrDefaultAsync(p => p.Id == productId);
+                        .FirstOrDefaultAsync(p => p.Id == productId
+                            && p.IsPublished
+                            && p.PublishedOn != null
+                            && p.Slug != null
+                            && p.Slug != string.Empty
+                            && p.Category != null
+                            && p.Category.IsPublished);
 
                     if (product == null)
                     {
@@ -89,7 +101,14 @@ namespace BlazorShop.Infrastructure.Repositories
                     .AsNoTracking()
                     .Include(p => p.Category)
                     .Include(p => p.Variants)
-                    .Where(p => relatedProductIds.Contains(p.Id) && p.Quantity > 0)
+                    .Where(p => relatedProductIds.Contains(p.Id)
+                        && p.Quantity > 0
+                        && p.IsPublished
+                        && p.PublishedOn != null
+                        && p.Slug != null
+                        && p.Slug != string.Empty
+                        && p.Category != null
+                        && p.Category.IsPublished)
                     .ToListAsync();
 
                 _logger.LogInformation($"Found {products.Count} frequently bought together products");
@@ -122,7 +141,14 @@ namespace BlazorShop.Infrastructure.Repositories
                     .AsNoTracking()
                     .Include(p => p.Category)
                     .Include(p => p.Variants)
-                    .Where(p => productIdsList.Contains(p.Id) && p.Quantity > 0)
+                    .Where(p => productIdsList.Contains(p.Id)
+                        && p.Quantity > 0
+                        && p.IsPublished
+                        && p.PublishedOn != null
+                        && p.Slug != null
+                        && p.Slug != string.Empty
+                        && p.Category != null
+                        && p.Category.IsPublished)
                     .OrderByDescending(p => p.CreatedOn)
                     .Take(count)
                     .ToListAsync();

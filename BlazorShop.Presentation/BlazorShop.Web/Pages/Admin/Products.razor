@@ -1,0 +1,521 @@
+﻿@page "/admin/products"
+
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
+    <div class="bs-panel bs-page-hero p-6 pb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h2 class="mt-2 text-2xl font-bold text-slate-950">Manage products</h2>
+            </div>
+            <div class="bs-toolbar-cluster">
+                <input class="border rounded px-3 py-2 text-sm w-60" placeholder="Search products..." @bind="_query" />
+                <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ToggleAllCats" disabled="@_isProductsLoading">@(_allExpanded ? "Collapse All" : "Expand All")</button>
+                <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="AddProduct" disabled="@(_isProductsLoading || IsSavingProduct || IsUpdatingProduct || IsDeletingProduct || !string.IsNullOrWhiteSpace(_categoriesError))">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
+                    Add Product
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-4 space-y-4">
+            @if (!string.IsNullOrWhiteSpace(_categoriesError))
+            {
+                <div class="rounded border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+                    <div>@_categoriesError</div>
+                    <button type="button" class="bs-button bs-button-primary mt-3" @onclick="RetryLoadCatalogAsync">Retry catalog</button>
+                </div>
+            }
+
+            @if (_isProductsLoading)
+            {
+                <div class="bs-panel-soft mt-6 px-6 py-5 text-center text-sm text-neutral-600">
+                    Loading products...
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_productsError))
+            {
+                <div class="rounded border border-red-200 bg-red-50 px-5 py-4 text-center text-sm text-red-700">
+                    <div>@_productsError</div>
+                    <button type="button" class="bs-button bs-button-primary mt-3" @onclick="RetryLoadCatalogAsync">Retry catalog</button>
+                </div>
+            }
+            else if (_products.Any())
+            {
+                var map = _categories?.ToDictionary(c => c.Id, c => c.Name) ?? new Dictionary<Guid, string>();
+                var filtered = _products
+                    .Where(p => string.IsNullOrWhiteSpace(_query) || (p.Name?.Contains(_query, StringComparison.OrdinalIgnoreCase) ?? false))
+                    .ToList();
+                var groups = filtered
+                    .GroupBy(p => p.CategoryId ?? Guid.Empty)
+                    .Select(g => new { Key = g.Key, Name = (g.Key != Guid.Empty && map.TryGetValue(g.Key, out var n) ? n : "(Uncategorized)"), Items = g.ToList() })
+                    .OrderBy(g => g.Name)
+                    .ToList();
+
+                @foreach (var g in groups)
+                {
+                    bool isOpen = _expandedCats.Contains(g.Key);
+                    <article class="bs-table-shell overflow-hidden">
+                        <button type="button" class="flex w-full items-center justify-between bg-slate-50/90 px-4 py-3" @onclick="() => ToggleCat(g.Key)">
+                            <div class="font-semibold">@g.Name</div>
+                            <div class="text-sm">Count: <b>@g.Items.Count</b></div>
+                        </button>
+
+                        @if (isOpen)
+                        {
+                            <div class="p-3 overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead>
+                                        <tr class="bg-neutral-50 text-left">
+                                            <th class="px-3 py-2">Id</th>
+                                            <th class="px-3 py-2">Image</th>
+                                            <th class="px-3 py-2">Name</th>
+                                            <th class="px-3 py-2">Description</th>
+                                            <th class="px-3 py-2">Price</th>
+                                            <th class="px-3 py-2">Quantity</th>
+                                            <th class="px-3 py-2">Created Date</th>
+                                            <th class="px-3 py-2 text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-neutral-200">
+                                        @foreach (var product in g.Items)
+                                        {
+                                            <tr>
+                                                <td class="px-3 py-2 align-top">@product.Id</td>
+                                                <td class="px-3 py-2 align-top"><img src="@(product.Image ?? string.Empty)" alt="@(product.Name ?? "Product image")" class="h-12 w-12 object-cover rounded" /></td>
+                                                <td class="px-3 py-2 align-top">@(product.Name ?? string.Empty)</td>
+                                                <td class="px-3 py-2 align-top">@(product.Description ?? string.Empty)</td>
+                                                <td class="px-3 py-2 align-top">@product.Price</td>
+                                                <td class="px-3 py-2 align-top">@product.Quantity</td>
+                                                <td class="px-3 py-2 align-top">@product.CreatedOn</td>
+                                                <td class="px-3 py-2 align-top">
+                                                    <div class="flex items-center justify-center gap-3">
+                                                        <button class="bs-icon-button h-10 w-10 text-blue-700" title="Edit" @onclick="async () => await StartEdit(product)">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                                        </button>
+                                                        <button class="bs-icon-button h-10 w-10 text-red-700" title="Delete" @onclick="() => ConfirmDelete(product.Id)">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </article>
+                }
+            }
+            else
+            {
+                <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">
+                    No products found.
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<ModalDialog @bind-IsVisible="_showDialog" Size="xl">
+    <Header>
+        <div class="flex items-center justify-between w-full">
+            <h5 class="text-lg font-semibold">@(!_addStep2 ? "Add New Product" : "Add Variants")</h5>
+            @if (_addStep2)
+            {
+                <span class="text-xs text-neutral-500">Step 2 of 2</span>
+            }
+            else
+            {
+                <span class="text-xs text-neutral-500">Step 1 of 2</span>
+            }
+        </div>
+    </Header>
+    <Body>
+        @if (!_addStep2)
+        {
+            <EditForm Model="_product" OnValidSubmit="SaveProduct">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-4 text-sm text-red-700" />
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Product Name</label>
+                    <InputText @bind-Value="_product.Name" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Name)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Price</label>
+                    <InputNumber @bind-Value="_product.Price" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Price)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Quantity</label>
+                    <InputNumber @bind-Value="_product.Quantity" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Quantity)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label class="block text-xs text-neutral-600 mb-1">Product Description</label>
+                    <InputTextArea @bind-Value="_product.Description" class="w-full border rounded px-3 py-2" />
+                    <ValidationMessage For="@(() => _product.Description)" />
+                </div>
+                <div class="form-group mb-3">
+                    <label for="category" class="block text-xs text-neutral-600 mb-1">Category</label>
+                    <InputSelect id="category" class="w-full border rounded px-3 py-2" @bind-Value="_product.CategoryId">
+                        <option value="" selected>-- Select a Category --</option>
+                        @foreach (var category in _categories ?? Array.Empty<GetCategory>())
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => _product.CategoryId)" />
+                </div>
+                <div class="form-group mb-3 flex items-center justify-between">
+                    <label class="inline-flex items-center gap-2 rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 cursor-pointer disabled:opacity-60 @(_isUploadingImage ? "opacity-60 pointer-events-none" : string.Empty)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                        <span>@(_isUploadingImage ? "Uploading image..." : "Upload Image")</span>
+                        <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileSelected)" accept="image/*" class="sr-only" disabled="@_isUploadingImage" />
+                    </label>
+                    @if (!string.IsNullOrEmpty(_previewImageUrl))
+                    {
+                        <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
+                    }
+                    <ValidationMessage For="@(() => _product.Image)" />
+                </div>
+            </EditForm>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="col-span-2">
+                    @if (!string.IsNullOrWhiteSpace(_newVariantsError))
+                    {
+                        <div class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+                            <div>@_newVariantsError</div>
+                            <button type="button" class="bs-button bs-button-primary mt-3" @onclick="LoadNewVariantsAsync" disabled="@IsRunningVariantAction">Retry variants</button>
+                        </div>
+                    }
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size Scale</label>
+                            <select class="w-full border rounded px-3 py-2" @onchange="OnScaleChangedAdd" value="@_newVariantForm.SizeScale">
+                                <option value="1">Clothing (XS-XXL)</option>
+                                <option value="2">Clothing Numeric EU</option>
+                                <option value="10">Shoes EU</option>
+                                <option value="11">Shoes US</option>
+                                <option value="12">Shoes UK</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Size</label>
+                            <select class="w-full border rounded px-3 py-2" @bind="_newVariantForm.SizeValue">
+                                @foreach (var v in GetSizeOptions(_newVariantForm.SizeScale))
+                                {
+                                    <option value="@v">@v</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">SKU</label>
+                            <InputText @bind-Value="_newVariantForm.Sku" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Price (optional)</label>
+                            <InputNumber @bind-Value="_newVariantForm.Price" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Stock</label>
+                            <InputNumber @bind-Value="_newVariantForm.Stock" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Color (optional)</label>
+                            <InputText @bind-Value="_newVariantForm.Color" class="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div class="col-span-2 flex items-center gap-3">
+                            <input id="isDefaultNew" type="checkbox" @bind="_newVariantForm.IsDefault" class="h-4 w-4" />
+                            <label for="isDefaultNew" class="text-sm">Set as default</label>
+                            <div class="ml-auto">
+                                <button type="button" class="inline-flex items-center rounded bg-neutral-900 text-white px-3 py-1.5 font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" @onclick="AddVariantForNewAsync" disabled="@IsRunningVariantAction">@(IsRunningVariantAction ? "Adding..." : "Add Variant")</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 overflow-auto max-h-64">
+                        <table class="min-w-full text-xs">
+                            <thead>
+                                <tr class="bg-neutral-100 text-left">
+                                    <th class="px-2 py-1">SizeScale</th>
+                                    <th class="px-2 py-1">Size</th>
+                                    <th class="px-2 py-1">SKU</th>
+                                    <th class="px-2 py-1">Price</th>
+                                    <th class="px-2 py-1">Stock</th>
+                                    <th class="px-2 py-1">Color</th>
+                                    <th class="px-2 py-1">Default</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-neutral-200">
+                                @foreach (var v in _newVariants)
+                                {
+                                    <tr>
+                                        <td class="px-2 py-1">@ScaleLabel(v.SizeScale)</td>
+                                        <td class="px-2 py-1">@v.SizeValue</td>
+                                        <td class="px-2 py-1">@v.Sku</td>
+                                        <td class="px-2 py-1">@(v.Price?.ToString() ?? "—")</td>
+                                        <td class="px-2 py-1">@v.Stock</td>
+                                        <td class="px-2 py-1">@v.Color</td>
+                                        <td class="px-2 py-1">@(v.IsDefault ? "Yes" : "No")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </Body>
+    <Footer>
+        @if (!_addStep2)
+        {
+            <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" type="button" @onclick="SaveProduct" disabled="@(IsSavingProduct || _isUploadingImage || !string.IsNullOrWhiteSpace(_categoriesError))">@(IsSavingProduct ? "Saving..." : "Save & Continue")</button>
+            <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="Cancel" disabled="@(IsSavingProduct || _isUploadingImage)">Cancel</button>
+        }
+        else
+        {
+            <button class="bs-button bs-button-ghost disabled:opacity-60" type="button" @onclick="Cancel" disabled="@IsRunningVariantAction">Close</button>
+            <button class="bs-button bs-button-primary disabled:opacity-60" type="button" @onclick="FinishAdd" disabled="@IsRunningVariantAction">Finish</button>
+        }
+    </Footer>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showEditDialog" Size="xl">
+    <Header>
+        <h5 class="text-lg font-semibold">Edit Product</h5>
+    </Header>
+    <Body>
+        <div class="bs-soft-divider mb-4 flex flex-wrap gap-2 border-b pb-3">
+            <button type="button" class="bs-tab-button@(_activeEditTab == ProductEditorTab.Catalog ? " bs-tab-button-active" : string.Empty)" @onclick="() => _activeEditTab = ProductEditorTab.Catalog">Catalog</button>
+            <button type="button" class="bs-tab-button@(_activeEditTab == ProductEditorTab.Seo ? " bs-tab-button-active" : string.Empty)" @onclick="() => _activeEditTab = ProductEditorTab.Seo">SEO</button>
+        </div>
+
+        @if (_activeEditTab == ProductEditorTab.Catalog)
+        {
+            <EditForm Model="_editProduct" OnValidSubmit="UpdateProductAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-4 text-sm text-red-700" />
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="space-y-4">
+                        <div class="form-group mb-3">
+                            <label class="block text-xs text-neutral-600 mb-1">Product Name</label>
+                            <InputText @bind-Value="_editProduct.Name" class="w-full border rounded px-3 py-2" />
+                            <ValidationMessage For="@(() => _editProduct.Name)" />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="block text-xs text-neutral-600 mb-1">Price</label>
+                            <InputNumber @bind-Value="_editProduct.Price" class="w-full border rounded px-3 py-2" />
+                            <ValidationMessage For="@(() => _editProduct.Price)" />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="block text-xs text-neutral-600 mb-1">Quantity</label>
+                            <InputNumber @bind-Value="_editProduct.Quantity" class="w-full border rounded px-3 py-2" />
+                            <ValidationMessage For="@(() => _editProduct.Quantity)" />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="block text-xs text-neutral-600 mb-1">Product Description</label>
+                            <InputTextArea @bind-Value="_editProduct.Description" class="w-full border rounded px-3 py-2" />
+                            <ValidationMessage For="@(() => _editProduct.Description)" />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="edit-category" class="block text-xs text-neutral-600 mb-1">Category</label>
+                            <InputSelect id="edit-category" class="w-full border rounded px-3 py-2" @bind-Value="_editProduct.CategoryId">
+                                <option value="" selected>-- Select a Category --</option>
+                                @foreach (var category in _categories ?? Array.Empty<GetCategory>())
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _editProduct.CategoryId)" />
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="block text-xs text-neutral-600 mb-1">Image</label>
+                            <div class="flex items-center justify-between">
+                                <label class="bs-button bs-button-primary cursor-pointer @(_isUploadingImage ? "opacity-60 pointer-events-none" : string.Empty)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 5v14m7-7H5"/></svg>
+                                    <span>@(_isUploadingImage ? "Uploading image..." : "Upload Image")</span>
+                                    <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnEditFileSelected)" accept="image/*" class="sr-only" disabled="@_isUploadingImage" />
+                                </label>
+                                @if (!string.IsNullOrEmpty(_previewImageUrl))
+                                {
+                                    <img src="@_previewImageUrl" alt="Preview Image" class="ml-4 max-w-24 max-h-24 border rounded" />
+                                }
+                            </div>
+                            <ValidationMessage For="@(() => _editProduct.Image)" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <h6 class="text-base font-semibold">Variants</h6>
+                            @if (_editingVariantId is not null)
+                            {
+                                <span class="text-xs text-neutral-500">Editing variant</span>
+                            }
+                        </div>
+
+                        <div class="mt-3 grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-neutral-600 mb-1">Size Scale</label>
+                                <select class="w-full border rounded px-3 py-2" @onchange="OnScaleChanged" value="@_variantForm.SizeScale">
+                                    <option value="1">Clothing (XS-XXL)</option>
+                                    <option value="2">Clothing Numeric EU</option>
+                                    <option value="10">Shoes EU</option>
+                                    <option value="11">Shoes US</option>
+                                    <option value="12">Shoes UK</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-neutral-600 mb-1">Size</label>
+                                <select class="w-full border rounded px-3 py-2" @bind="_variantForm.SizeValue">
+                                    @foreach (var v in GetSizeOptions(_variantForm.SizeScale))
+                                    {
+                                        <option value="@v">@v</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-neutral-600 mb-1">SKU</label>
+                                <InputText @bind-Value="_variantForm.Sku" class="w-full border rounded px-3 py-2" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-neutral-600 mb-1">Price (optional)</label>
+                                <InputNumber @bind-Value="_variantForm.Price" class="w-full border rounded px-3 py-2" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-neutral-600 mb-1">Stock</label>
+                                <InputNumber @bind-Value="_variantForm.Stock" class="w-full border rounded px-3 py-2" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-neutral-600 mb-1">Color (optional)</label>
+                                <InputText @bind-Value="_variantForm.Color" class="w-full border rounded px-3 py-2" />
+                            </div>
+                            <div class="col-span-2 flex items-center gap-3">
+                                <input id="isDefault" type="checkbox" @bind="_variantForm.IsDefault" class="h-4 w-4" />
+                                <label for="isDefault" class="text-sm">Set as default</label>
+                                <div class="ml-auto flex gap-2">
+                                    @if (_editingVariantId is null)
+                                    {
+                                        <button type="button" class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="AddVariantAsync" disabled="@IsRunningVariantAction">@(IsRunningVariantAction ? "Saving..." : "Add Variant")</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="UpdateVariantAsync" disabled="@IsRunningVariantAction">@(IsRunningVariantAction ? "Saving..." : "Update Variant")</button>
+                                        <button type="button" class="bs-button bs-button-ghost disabled:opacity-60" @onclick="CancelVariantEdit" disabled="@IsRunningVariantAction">Cancel</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_variantsError))
+                        {
+                            <div class="mt-4 rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+                                <div>@_variantsError</div>
+                                <button type="button" class="bs-button bs-button-primary mt-3" @onclick="() => LoadVariantsAsync(_editProduct.Id)" disabled="@IsRunningVariantAction">Retry variants</button>
+                            </div>
+                        }
+
+                        <div class="mt-4 overflow-auto max-h-64">
+                            <table class="min-w-full text-xs">
+                                <thead>
+                                    <tr class="bg-neutral-100 text-left">
+                                        <th class="px-2 py-1">SizeScale</th>
+                                        <th class="px-2 py-1">Size</th>
+                                        <th class="px-2 py-1">SKU</th>
+                                        <th class="px-2 py-1">Price</th>
+                                        <th class="px-2 py-1">Stock</th>
+                                        <th class="px-2 py-1">Color</th>
+                                        <th class="px-2 py-1">Default</th>
+                                        <th class="px-2 py-1 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-neutral-200">
+                                    @foreach (var v in _variants)
+                                    {
+                                        <tr>
+                                            <td class="px-2 py-1">@ScaleLabel(v.SizeScale)</td>
+                                            <td class="px-2 py-1">@v.SizeValue</td>
+                                            <td class="px-2 py-1">@v.Sku</td>
+                                            <td class="px-2 py-1">@(v.Price?.ToString() ?? "—")</td>
+                                            <td class="px-2 py-1">@v.Stock</td>
+                                            <td class="px-2 py-1">@v.Color</td>
+                                            <td class="px-2 py-1">@(v.IsDefault ? "Yes" : "No")</td>
+                                            <td class="px-2 py-1 text-center">
+                                                <button class="text-blue-600 hover:text-blue-700 mr-2 disabled:opacity-60" title="Edit" @onclick="() => BeginVariantEdit(v)" disabled="@IsRunningVariantAction">Edit</button>
+                                                <button class="text-red-600 hover:text-red-700 disabled:opacity-60" title="Delete" @onclick="() => DeleteVariantAsync(v.Id)" disabled="@IsRunningVariantAction">Delete</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="mt-6" />
+                <div class="flex justify-end gap-2 mt-4">
+                    <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@(IsUpdatingProduct || _isUploadingImage || IsRunningVariantAction)">@(IsUpdatingProduct ? "Updating..." : "Update")</button>
+                    <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@(IsUpdatingProduct || _isUploadingImage || IsRunningVariantAction)">Cancel</button>
+                </div>
+            </EditForm>
+        }
+        else if (_isProductSeoLoading)
+        {
+            <div class="bs-panel-soft px-4 py-6 text-sm text-neutral-600">
+                Loading product SEO…
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_productSeoError))
+        {
+            <div class="rounded-[1.4rem] border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700 shadow-sm">
+                <div>@_productSeoError</div>
+                <div class="mt-3 flex gap-2">
+                    <button type="button" class="bs-button bs-button-primary" @onclick="RetryLoadProductSeoAsync">Retry</button>
+                    <button type="button" class="bs-button bs-button-ghost" @onclick="CancelEdit">Close</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <EditForm Model="_editProductSeo" OnValidSubmit="SaveProductSeoAsync">
+                <DataAnnotationsValidator />
+                <div class="space-y-6">
+                    <SeoFieldsEditor Model="_editProductSeo" />
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-neutral-600 mb-1">Published On</label>
+                            <InputDate @bind-Value="_editProductSeo.PublishedOn" class="w-full border rounded px-3 py-2" />
+                            <ValidationMessage For="@(() => _editProductSeo.PublishedOn)" />
+                            <div class="mt-1 text-xs text-neutral-500">Optional publish date carried with the product SEO record. If Published is turned off, the backend clears this value.</div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button class="bs-button bs-button-primary disabled:opacity-60" type="submit" disabled="@_isProductSeoSaving">@(_isProductSeoSaving ? "Saving..." : "Save SEO")</button>
+                        <button class="bs-button bs-button-ghost disabled:opacity-60" type="button" @onclick="() => _activeEditTab = ProductEditorTab.Catalog" disabled="@_isProductSeoSaving">Back</button>
+                        <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@_isProductSeoSaving">Close</button>
+                    </div>
+                </div>
+            </EditForm>
+        }
+    </Body>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
+    <Header>
+        <h5 class="text-lg font-semibold">Confirm Delete</h5>
+    </Header>
+    <Body>
+        Are you sure you want to delete the product
+        <span class="text-red-600"><strong>@_producToDeleteName</strong></span>?
+    </Body>
+    <Footer>
+        <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed" @onclick="DeleteProductConfirmed" disabled="@IsDeletingProduct">@(IsDeletingProduct ? "Deleting..." : "Yes, Delete")</button>
+        <button class="inline-flex items-center rounded bg-neutral-200 text-neutral-900 px-4 py-2 font-semibold hover:bg-neutral-300 disabled:opacity-60" @onclick="CancelDelete" disabled="@IsDeletingProduct">Cancel</button>
+    </Footer>
+</ModalDialog>

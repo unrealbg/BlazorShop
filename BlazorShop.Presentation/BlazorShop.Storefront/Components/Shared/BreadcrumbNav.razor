@@ -1,0 +1,36 @@
+@if (Items.Count > 1)
+{
+    <nav aria-label="Breadcrumb" class="@ClassName">
+        <ol class="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+            @for (var index = 0; index < Items.Count; index++)
+            {
+                var item = Items[index];
+                var isCurrent = index == Items.Count - 1;
+
+                <li class="flex items-center gap-2">
+                    @if (!isCurrent && !string.IsNullOrWhiteSpace(item.Href))
+                    {
+                        <a href="@item.Href" class="font-medium text-neutral-500 hover:text-neutral-900">@item.Title</a>
+                    }
+                    else
+                    {
+                        <span aria-current="page" class="font-semibold text-neutral-900">@item.Title</span>
+                    }
+
+                    @if (!isCurrent)
+                    {
+                        <span aria-hidden="true" class="text-neutral-300">/</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<StorefrontBreadcrumbItem> Items { get; set; } = Array.Empty<StorefrontBreadcrumbItem>();
+
+    [Parameter]
+    public string ClassName { get; set; } = string.Empty;
+}

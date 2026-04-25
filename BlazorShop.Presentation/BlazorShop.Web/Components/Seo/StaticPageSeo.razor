@@ -1,0 +1,34 @@
+@using BlazorShop.Web.Services
+@inject IStorefrontSeoService StorefrontSeoService
+
+@if (_metadata is not null)
+{
+    <SeoHead Metadata="_metadata" />
+}
+
+@code {
+    private StorefrontSeoMetadata? _metadata;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string RelativePath { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string? FallbackOgImage { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _metadata = await StorefrontSeoService.BuildAsync(new StorefrontSeoMetadataBuildRequest
+        {
+            PageTitle = Title,
+            RelativePath = RelativePath,
+            FallbackMetaDescription = Description,
+            FallbackOgImage = FallbackOgImage,
+        });
+    }
+}

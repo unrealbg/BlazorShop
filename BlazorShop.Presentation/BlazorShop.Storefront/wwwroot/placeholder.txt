@@ -1,0 +1,1 @@
+This directory must exist for ASP.NET Core static web assets initialization.

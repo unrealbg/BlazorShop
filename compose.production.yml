@@ -23,9 +23,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=blazorshop;Username=blazorshop;Password=${BLAZORSHOP_DB_PASSWORD}
       Jwt__Key: ${BLAZORSHOP_JWT_KEY}
-      Jwt__Issuer: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
-      Jwt__Audience: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
-      ClientApp__BaseUrl: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
+      Jwt__Issuer: ${BLAZORSHOP_API_BASE_URL:?BLAZORSHOP_API_BASE_URL is required}
+      Jwt__Audience: ${BLAZORSHOP_API_BASE_URL:?BLAZORSHOP_API_BASE_URL is required}
+      ClientApp__BaseUrl: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
       Stripe__SecretKey: ${BLAZORSHOP_STRIPE_SECRET_KEY}
       EmailSettings__From: "${BLAZORSHOP_EMAIL_FROM:?BLAZORSHOP_EMAIL_FROM is required}"
       EmailSettings__DisplayName: ${BLAZORSHOP_EMAIL_DISPLAY_NAME:-BlazorShop}
@@ -34,7 +34,7 @@ services:
       EmailSettings__UseSsl: ${BLAZORSHOP_EMAIL_USE_SSL:-true}
       EmailSettings__Username: "${BLAZORSHOP_EMAIL_USERNAME:?BLAZORSHOP_EMAIL_USERNAME is required}"
       EmailSettings__Password: "${BLAZORSHOP_EMAIL_PASSWORD:?BLAZORSHOP_EMAIL_PASSWORD is required}"
-      Runtime__Cors__AllowedOrigins__0: ${BLAZORSHOP_PUBLIC_BASE_URL:-http://localhost:8080}
+      Runtime__Cors__AllowedOrigins__0: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
       Runtime__ForwardedHeaders__Enabled: true
       Runtime__ForwardedHeaders__KnownProxies__0: 172.30.0.10
       Runtime__ForwardedHeaders__ForwardLimit: 1
@@ -53,6 +53,22 @@ services:
     networks:
       - blazorshop
 
+  storefront:
+    build:
+      context: .
+      dockerfile: BlazorShop.Presentation/BlazorShop.Storefront/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Api__BaseUrl: http://api:8080/api/
+      ClientApp__BaseUrl: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
+      PublicUrl__BaseUrl: ${BLAZORSHOP_STOREFRONT_BASE_URL:?BLAZORSHOP_STOREFRONT_BASE_URL is required}
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+    networks:
+      - blazorshop
+
   web:
     build:
       context: .
@@ -60,7 +76,7 @@ services:
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - "8081:80"
     networks:
       blazorshop:
         ipv4_address: 172.30.0.10

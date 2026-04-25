@@ -49,7 +49,12 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _validationServiceMock = new Mock<IValidationService>();
             _emailServiceMock = new Mock<IEmailService>();
 
-            _authenticationService = new AuthenticationService(
+            _authenticationService = CreateAuthenticationService();
+        }
+
+        private AuthenticationService CreateAuthenticationService(IdentityConfirmationOptions? identityConfirmationOptions = null)
+        {
+            return new AuthenticationService(
                 _tokenManagerMock.Object,
                 _userManagerMock.Object,
                 _roleManagerMock.Object,
@@ -60,7 +65,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 _validationServiceMock.Object,
                 _changePasswordValidatorMock.Object,
                 _emailServiceMock.Object,
-                Options.Create(new ClientAppOptions { BaseUrl = "https://localhost:7258" }));
+                Options.Create(new ClientAppOptions { BaseUrl = "https://localhost:7258" }),
+                Options.Create(identityConfirmationOptions ?? new IdentityConfirmationOptions()));
         }
 
         [Fact]
@@ -68,20 +74,20 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         {
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
-            var mappedUser = new AppUser { Email = createUser.Email, PasswordHash = createUser.Password };
+            var mappedUser = new AppUser { Id = "user-id", Email = createUser.Email, PasswordHash = createUser.Password, EmailConfirmed = false };
 
             _validationServiceMock.Setup(v => v.ValidateAsync(createUser, _createUserValidatorMock.Object))
                 .ReturnsAsync(new ServiceResponse { Success = true });
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
-            _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser))
-                .ReturnsAsync("confirmation-token");
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email))
                 .ReturnsAsync(mappedUser);
             _userManagerMock.Setup(u => u.GetAllUsersAsync())
                 .ReturnsAsync(new List<AppUser> { mappedUser });
             _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin"))
                 .ReturnsAsync(true);
+            _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser))
+                .ReturnsAsync("confirmation-token");
 
             // Act
             var result = await _authenticationService.CreateUser(createUser);
@@ -90,6 +96,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             Assert.True(result.Success);
             Assert.Equal("User created successfully.", result.Message);
             _emailServiceMock.Verify(e => e.SendEmailAsync(createUser.Email, "Confirm your email", It.IsAny<string>()), Times.Once);
+            _userManagerMock.Verify(u => u.ConfirmEmailAsync(It.IsAny<AppUser>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -136,16 +143,20 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         {
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
-            var mappedUser = new AppUser { Email = createUser.Email, PasswordHash = createUser.Password };
+            var mappedUser = new AppUser { Id = "user-id", Email = createUser.Email, PasswordHash = createUser.Password, EmailConfirmed = false };
 
             _validationServiceMock
                 .Setup(v => v.ValidateAsync(createUser, _createUserValidatorMock.Object))
                 .ReturnsAsync(new ServiceResponse { Success = true });
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
+            _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
+            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
             _emailServiceMock.Setup(e => e.SendEmailAsync(createUser.Email, It.IsAny<string>(), It.IsAny<string>()))
                 .ThrowsAsync(new Exception("Email service error"));
+            _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.CreateUser(createUser);
@@ -154,6 +165,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             Assert.False(result.Success);
             Assert.Equal("Failed to send confirmation email.", result.Message);
             _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
+            _userManagerMock.Verify(u => u.RemoveUserByEmail(createUser.Email), Times.Once);
         }
 
         [Fact]
@@ -168,7 +180,6 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .ReturnsAsync(new ServiceResponse { Success = true });
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
-            _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
             _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
             _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(false);
@@ -203,30 +214,76 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task CreateUser_ReturnsError_WhenEmailConfirmationFails()
+        public async Task CreateUser_ReturnsSuccess_WhenConfirmationIsNotRequired()
         {
             // Arrange
+            var authenticationService = CreateAuthenticationService(new IdentityConfirmationOptions
+            {
+                RequireConfirmedAccount = false,
+                RequireConfirmedEmail = false,
+            });
+
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
-            var mappedUser = new AppUser { Email = createUser.Email, PasswordHash = createUser.Password };
+            var mappedUser = new AppUser { Id = "user-id", Email = createUser.Email, PasswordHash = createUser.Password, EmailConfirmed = false };
 
             _validationServiceMock
                 .Setup(v => v.ValidateAsync(createUser, _createUserValidatorMock.Object))
                 .ReturnsAsync(new ServiceResponse { Success = true });
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
+            _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
+            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
+            _userManagerMock.Setup(u => u.ConfirmEmailAsync(mappedUser, "confirmation-token")).ReturnsAsync(true);
+
+            // Act
+            var result = await authenticationService.CreateUser(createUser);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.True(result.Success);
+            Assert.Equal("User created successfully.", result.Message);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            _userManagerMock.Verify(u => u.ConfirmEmailAsync(mappedUser, "confirmation-token"), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateUser_ReturnsSuccess_WhenConfirmationIsNotRequiredAndMailSenderFails()
+        {
+            // Arrange
+            var authenticationService = CreateAuthenticationService(new IdentityConfirmationOptions
+            {
+                RequireConfirmedAccount = false,
+                RequireConfirmedEmail = false,
+            });
+
+            var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
+            var mappedUser = new AppUser { Id = "user-id", Email = createUser.Email, PasswordHash = createUser.Password, EmailConfirmed = false };
+
+            _validationServiceMock
+                .Setup(v => v.ValidateAsync(createUser, _createUserValidatorMock.Object))
+                .ReturnsAsync(new ServiceResponse { Success = true });
+            _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
+            _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
+            _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
+            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(true);
+            _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
+            _userManagerMock.Setup(u => u.ConfirmEmailAsync(mappedUser, "confirmation-token")).ReturnsAsync(true);
             _emailServiceMock
                 .Setup(e => e.SendEmailAsync(createUser.Email, It.IsAny<string>(), It.IsAny<string>()))
                 .ThrowsAsync(new Exception("Email service error"));
 
             // Act
-            var result = await _authenticationService.CreateUser(createUser);
+            var result = await authenticationService.CreateUser(createUser);
 
             // Assert
             Assert.NotNull(result);
-            Assert.False(result.Success);
-            Assert.Equal("Failed to send confirmation email.", result.Message);
-            _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
+            Assert.True(result.Success);
+            Assert.Equal("User created successfully.", result.Message);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            _userManagerMock.Verify(u => u.ConfirmEmailAsync(mappedUser, "confirmation-token"), Times.Once);
         }
 
         [Fact]
@@ -241,10 +298,10 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .ReturnsAsync(new ServiceResponse { Success = true });
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
-            _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
             _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
             _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(false);
+            _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(1);
 
             // Act
             var result = await _authenticationService.CreateUser(createUser);
@@ -253,7 +310,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Error occurred in creating account.", result.Message);
-            _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
+            _userManagerMock.Verify(u => u.RemoveUserByEmail(createUser.Email), Times.Once);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -356,6 +414,10 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .Returns(appUser);
 
             _userManagerMock
+                .Setup(u => u.GetUserByEmailAsync(user.Email))
+                .ReturnsAsync(appUser);
+
+            _userManagerMock
                 .Setup(u => u.LoginUserAsync(It.IsAny<AppUser>()))
                 .ReturnsAsync(new UserLoginResult(false));
 
@@ -384,6 +446,10 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .Returns(appUser);
 
             _userManagerMock
+                .Setup(u => u.GetUserByEmailAsync(user.Email))
+                .ReturnsAsync(appUser);
+
+            _userManagerMock
                 .Setup(u => u.LoginUserAsync(It.IsAny<AppUser>()))
                 .ReturnsAsync(new UserLoginResult(false, true));
 
@@ -397,7 +463,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task LoginUser_ReturnsError_WhenEmailIsNotConfirmed()
+        public async Task LoginUser_ReturnsError_WhenIdentityDisallowsUnconfirmedEmail()
         {
             // Arrange
             var user = new LoginUser { Email = "test@example.com", Password = "Password123" };
@@ -411,8 +477,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .Setup(m => m.Map<AppUser>(It.IsAny<LoginUser>()))
                 .Returns(appUser);
 
-            _userManagerMock.Setup(u => u.LoginUserAsync(It.IsAny<AppUser>())).ReturnsAsync(new UserLoginResult(true));
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(user.Email)).ReturnsAsync(appUser);
+            _userManagerMock.Setup(u => u.LoginUserAsync(It.IsAny<AppUser>())).ReturnsAsync(new UserLoginResult(false, false, true));
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(It.IsAny<AppUser>())).ReturnsAsync("valid_token");
 
             // Act
@@ -422,6 +488,78 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Email not confirmed. A new confirmation link has been sent to your email.", result.Message);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(user.Email, "Confirm your email", It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task LoginUser_AllowsUnconfirmedEmail_WhenConfirmationIsDisabled()
+        {
+            // Arrange
+            var authenticationService = CreateAuthenticationService(new IdentityConfirmationOptions
+            {
+                RequireConfirmedAccount = false,
+                RequireConfirmedEmail = false,
+            });
+
+            var loginUser = new LoginUser { Email = "test@example.com", Password = "Password123" };
+            var appUser = new AppUser
+            {
+                Id = "userId",
+                Email = loginUser.Email,
+                PasswordHash = loginUser.Password,
+                EmailConfirmed = false,
+            };
+            var claims = new List<Claim> { new Claim(ClaimTypes.Name, "Test User") };
+            var accessToken = "accessToken";
+            var refreshToken = "refreshToken";
+            var storedRefreshToken = new RefreshToken { UserId = appUser.Id, TokenHash = "hashed-token" };
+
+            _validationServiceMock
+                .Setup(v => v.ValidateAsync(loginUser, this._loginUserValidatorMock.Object))
+                .ReturnsAsync(new ServiceResponse { Success = true });
+
+            _mapperMock
+                .Setup(m => m.Map<AppUser>(loginUser))
+                .Returns(appUser);
+
+            _userManagerMock
+                .Setup(u => u.GetUserByEmailAsync(loginUser.Email))
+                .ReturnsAsync(appUser);
+
+            _userManagerMock
+                .Setup(u => u.LoginUserAsync(appUser))
+                .ReturnsAsync(new UserLoginResult(true));
+
+            _userManagerMock
+                .Setup(u => u.GetUserClaimsAsync(loginUser.Email))
+                .ReturnsAsync(claims);
+
+            _tokenManagerMock
+                .Setup(t => t.GenerateAccessToken(claims))
+                .Returns(accessToken);
+
+            _tokenManagerMock
+                .Setup(t => t.GetReFreshToken())
+                .Returns(refreshToken);
+
+            _tokenManagerMock
+                .Setup(t => t.CreateRefreshToken(appUser.Id, refreshToken, null, null))
+                .Returns(storedRefreshToken);
+
+            _tokenManagerMock
+                .Setup(t => t.AddRefreshTokenAsync(storedRefreshToken))
+                .ReturnsAsync(1);
+
+            // Act
+            var result = await authenticationService.LoginUser(loginUser);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.True(result.Success);
+            Assert.Equal("Login successful.", result.Message);
+            Assert.Equal(accessToken, result.Token);
+            Assert.Equal(refreshToken, result.RefreshToken);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]

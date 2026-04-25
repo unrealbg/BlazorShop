@@ -1,0 +1,189 @@
+@page "/admin/audit"
+@inject IAdminAuditService AdminAuditService
+
+<PageTitle>Admin Audit</PageTitle>
+
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h1 class="mt-2 text-2xl font-bold text-slate-950">Audit Log</h1>
+            </div>
+            <div class="bs-toolbar-cluster">
+                <input placeholder="Actor" @bind="_query.Actor" @bind:event="oninput" />
+                <input placeholder="Action" @bind="_query.Action" @bind:event="oninput" />
+                <input placeholder="Entity" @bind="_query.EntityType" @bind:event="oninput" />
+                <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply</button>
+                <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ClearFiltersAsync" disabled="@_isLoading">Clear</button>
+            </div>
+        </div>
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading audit log...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+            <div>@_loadError</div>
+            <button class="bs-button bs-button-primary mt-4" @onclick="LoadAsync">Retry</button>
+        </div>
+    }
+    else if ((_page?.Items.Count ?? 0) == 0)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">No audit entries found.</div>
+    }
+    else
+    {
+        <div class="bs-table-shell mt-6 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left">
+                        <th class="px-3 py-2">Date</th>
+                        <th class="px-3 py-2">Actor</th>
+                        <th class="px-3 py-2">Action</th>
+                        <th class="px-3 py-2">Entity</th>
+                        <th class="px-3 py-2">Summary</th>
+                        <th class="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    @foreach (var entry in _page!.Items)
+                    {
+                        <tr>
+                            <td class="px-3 py-3">@entry.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="px-3 py-3 break-all">@(!string.IsNullOrWhiteSpace(entry.ActorEmail) ? entry.ActorEmail : entry.ActorUserId ?? "-")</td>
+                            <td class="px-3 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">@entry.Action</span></td>
+                            <td class="px-3 py-3">@entry.EntityType</td>
+                            <td class="px-3 py-3">@entry.Summary</td>
+                            <td class="px-3 py-3 text-right">
+                                <button class="bs-subtle-action-link" @onclick="() => OpenDetailsAsync(entry.Id)">Details</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm text-slate-600">Page @_page!.PageNumber of @Math.Max(1, _page.TotalPages) · @_page.TotalCount entr@( _page.TotalCount == 1 ? "y" : "ies")</div>
+            <div class="flex gap-2">
+                <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="PreviousPageAsync" disabled="@(_isLoading || _query.PageNumber <= 1)">Previous</button>
+                <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="NextPageAsync" disabled="@(_isLoading || _page.PageNumber >= _page.TotalPages)">Next</button>
+            </div>
+        </div>
+    }
+</section>
+
+<ModalDialog @bind-IsVisible="_showDetails" Size="xl">
+    <Header>
+        <h5 class="text-lg font-semibold">Audit Details</h5>
+    </Header>
+    <Body>
+        @if (_selected is not null)
+        {
+            <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Actor</dt><dd class="mt-1 break-all text-slate-900">@(!string.IsNullOrWhiteSpace(_selected.ActorEmail) ? _selected.ActorEmail : _selected.ActorUserId ?? "-")</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Date</dt><dd class="mt-1 text-slate-900">@_selected.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Action</dt><dd class="mt-1 text-slate-900">@_selected.Action</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Entity</dt><dd class="mt-1 break-all text-slate-900">@_selected.EntityType @_selected.EntityId</dd></div>
+                <div class="sm:col-span-2"><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Summary</dt><dd class="mt-1 text-slate-900">@_selected.Summary</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">IP</dt><dd class="mt-1 text-slate-900">@(_selected.IpAddress ?? "-")</dd></div>
+                <div><dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">User agent</dt><dd class="mt-1 break-all text-slate-900">@(_selected.UserAgent ?? "-")</dd></div>
+            </dl>
+            <pre class="mt-4 max-h-96 overflow-auto rounded bg-slate-950 p-4 text-xs text-slate-50">@FormatJson(_selected.MetadataJson)</pre>
+        }
+    </Body>
+    <Footer>
+        <button class="bs-button bs-button-ghost" @onclick="() => _showDetails = false">Close</button>
+    </Footer>
+</ModalDialog>
+
+@code {
+    private AdminAuditQuery _query = new();
+    private PagedResult<AdminAuditLog>? _page;
+    private bool _isLoading;
+    private string? _loadError;
+    private bool _showDetails;
+    private AdminAuditLog? _selected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        var result = await AdminAuditService.GetAsync(_query);
+        if (QueryFailureNotifier.TryNotifyFailure(result, "Audit Log", showToast: false))
+        {
+            _page = null;
+            _loadError = FeedbackMessageResolver.ResolveQueryFailure(result, "We couldn't load the audit log right now. Please try again.");
+        }
+        else
+        {
+            _page = result.Data;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        _query.PageNumber = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _query = new AdminAuditQuery();
+        await LoadAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        _query.PageNumber = Math.Max(1, _query.PageNumber - 1);
+        await LoadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        _query.PageNumber += 1;
+        await LoadAsync();
+    }
+
+    private async Task OpenDetailsAsync(Guid id)
+    {
+        var result = await AdminAuditService.GetByIdAsync(id);
+        if (QueryFailureNotifier.TryNotifyFailure(result, "Audit Details"))
+        {
+            return;
+        }
+
+        _selected = result.Data;
+        _showDetails = true;
+    }
+
+    private static string FormatJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "{}";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
+    }
+}

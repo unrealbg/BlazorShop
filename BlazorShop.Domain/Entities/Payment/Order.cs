@@ -29,5 +29,7 @@ namespace BlazorShop.Domain.Entities.Payment
         public DateTime? DeliveredOn { get; set; }
 
         public DateTime? LastTrackingUpdate { get; set; }
+
+        public string? AdminNote { get; set; }
     }
 }

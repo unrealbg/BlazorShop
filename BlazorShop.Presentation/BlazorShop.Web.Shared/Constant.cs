@@ -21,11 +21,21 @@
         public static class Category
         {
             public const string GetAll = "category/all";
+            public const string GetAllForAdmin = "category/all/admin";
             public const string GetProductByCategory = "category/products-by-category";
             public const string Get = "category/single";
             public const string Add = "category/add";
             public const string Update = "category/update";
             public const string Delete = "category/delete";
+        }
+
+        public static class Seo
+        {
+            public const string Products = "admin/products";
+            public const string Categories = "admin/categories";
+            public const string Settings = "seo/settings";
+            public const string AdminSettings = "admin/seo/settings";
+            public const string Redirects = "admin/seo/redirects";
         }
 
         public static class Authentication
@@ -67,6 +77,7 @@
         public static class Cart
         {
             public const string Checkout = "cart/checkout";
+            public const string ConfirmOrder = "cart/confirm-order";
             public const string SaveCart = "cart/save-checkout";
             public const string Name = "my-cart";
             public const string GetOrderItems = "cart/order-items";
@@ -78,6 +89,37 @@
         public static class Administration
         {
             public const string AdminRole = "Admin";
+        }
+
+        public static class AdminUsers
+        {
+            public const string Base = "admin/users";
+            public const string Roles = "admin/users/roles";
+        }
+
+        public static class AdminSettings
+        {
+            public const string Base = "admin/settings";
+            public const string Store = "admin/settings/store";
+            public const string Orders = "admin/settings/orders";
+            public const string Notifications = "admin/settings/notifications";
+        }
+
+        public static class AdminAudit
+        {
+            public const string Base = "admin/audit";
+        }
+
+        public static class AdminInventory
+        {
+            public const string Base = "admin/inventory";
+            public const string Product = "admin/inventory/product";
+            public const string Variant = "admin/inventory/variant";
+        }
+
+        public static class AdminOrders
+        {
+            public const string Base = "admin/orders";
         }
 
         public static class File

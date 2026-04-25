@@ -1,0 +1,84 @@
+@page "/todays-deals"
+@inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
+
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
+
+<section class="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
+    <div class="text-center">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Today's Deals</p>
+        <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-neutral-900">Hot Deals You Can't Miss</h1>
+        <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Current featured deals and fast-moving picks across the BlazorShop catalog.</p>
+
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">See New Releases</a>
+            <a href="@StorefrontRoutes.Home" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Back to Home</a>
+        </div>
+    </div>
+</section>
+
+<section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+    @if (_isServiceUnavailable)
+    {
+        <ServiceUnavailableState Title="Today's deals are temporarily unavailable"
+                                 Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+    }
+    else
+    {
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-2xl font-extrabold tracking-tight text-neutral-900">Featured Picks</h2>
+            <span class="inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-neutral-700 shadow">@_products.Count deals</span>
+        </div>
+
+        <ProductGrid Products="_products" EmptyMessage="No deal selections are available right now." />
+    }
+</section>
+
+@code {
+    private bool _isServiceUnavailable;
+    private IReadOnlyList<GetCatalogProduct> _products = [];
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "Today's Deals",
+            StorefrontRoutes.TodaysDeals,
+            "Explore published BlazorShop catalog entries curated as current featured deals.");
+        var structuredDataTask = StructuredDataComposer.ComposeCollectionPageAsync(
+            "Today's Deals",
+            StorefrontRoutes.TodaysDeals,
+            "Explore published BlazorShop catalog entries curated as current featured deals.");
+        var result = await ApiClient.GetPublishedCatalogPageAsync(new ProductCatalogQuery
+        {
+            PageNumber = 1,
+            PageSize = 12,
+            SortBy = ProductCatalogSortBy.Newest,
+        });
+
+        _metadata = await metadataTask;
+
+        if (result.IsServiceUnavailable)
+        {
+            _isServiceUnavailable = true;
+            _products = [];
+            _structuredData = StorefrontStructuredDataDocument.Empty;
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
+                "Today's deals are temporarily unavailable",
+                StorefrontRoutes.TodaysDeals,
+                "The storefront is running, but the catalog API is not reachable right now.");
+
+            return;
+        }
+
+        _isServiceUnavailable = false;
+        _products = result.Value?.Items ?? [];
+        _structuredData = await structuredDataTask;
+    }
+}

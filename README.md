@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml)
 
-BlazorShop is an open-source e-commerce application built with Blazor WebAssembly and ASP.NET Core (.NET 10). It follows a clean, layered architecture and provides a ready-to-extend foundation for real online stores.
+BlazorShop is an open-source e-commerce application built on .NET 10 with an ASP.NET Core Web API backend, a server-rendered Blazor Web App public storefront, and an existing Blazor WebAssembly client for admin and legacy interactive flows. It follows a clean, layered architecture and provides a ready-to-extend foundation for real online stores.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -20,7 +20,7 @@ BlazorShop is an open-source e-commerce application built with Blazor WebAssembl
 - [Acknowledgements](#acknowledgements)
 
 ## Introduction
-BlazorShop delivers a modern, responsive shopping experience with a Blazor WebAssembly frontend and a secure ASP.NET Core Web API backend. It includes product catalog, cart, checkout with multiple payment methods, order tracking, admin tooling, and more.
+BlazorShop delivers a modern shopping experience with a server-rendered public storefront, a secure ASP.NET Core Web API backend, and a separate Blazor WebAssembly client that continues to host admin tooling and legacy interactive storefront flows. It includes product catalog, cart, checkout with multiple payment methods, order tracking, admin tooling, and more.
 
 ### Who Is It For?
 - Small/medium businesses looking to bootstrap an online shop on .NET.
@@ -35,6 +35,9 @@ BlazorShop delivers a modern, responsive shopping experience with a Blazor WebAs
 - Catalog Management
   - Categories, products, product variants (size/stock), image upload
   - Product search/typeahead UI
+- Public SEO Storefront
+  - Server-rendered product and category routes (`/product/{slug}` and `/category/{slug}`)
+  - Published-only public catalog exposure and route-based metadata rendering
 - Cart & Checkout
   - Persistent cart (cookie), quantity updates, totals
   - Multiple payment methods: Stripe (card), Cash on Delivery, Bank Transfer
@@ -45,14 +48,19 @@ BlazorShop delivers a modern, responsive shopping experience with a Blazor WebAs
 - Newsletter
   - Email subscription with welcome email
 - Admin Area
-  - Manage categories, products, variants, orders, and shipping
+  - Dashboard, products, categories, variants, orders, users, inventory, SEO, redirects, settings, and audit log
+  - User role editing, lock/unlock, email confirmation, password-change requirement flag, and guarded admin safety checks
+  - Operational store/order/notification settings without exposing SMTP passwords or API secrets
+  - Admin audit trail for sensitive catalog, SEO, redirect, order, user, settings, and inventory operations
+  - Inventory overview with low/out-of-stock filtering and product/variant stock updates
 - Developer Experience
   - OpenAPI/Swagger, Serilog logging, unit tests, GitHub Actions CI
   - Modern UI (Tailwind-style classes), toast notifications, Chart.js
 
 ## Technologies Used
 - .NET 10, ASP.NET Core Web API
-- Blazor WebAssembly (client)
+- Blazor Web App (server-rendered public storefront)
+- Blazor WebAssembly (existing admin and legacy interactive client)
 - Entity Framework Core 10 + PostgreSQL
 - ASP.NET Core Identity (email confirmation enabled)
 - AutoMapper, FluentValidation
@@ -105,17 +113,26 @@ Tip: keep secrets out of source control via `dotnet user-secrets` for the API pr
    dotnet run --project BlazorShop.AppHost
    ```
 
-- Run projects separately (two terminals):
+- Run projects separately (two or three terminals, depending on what you need):
 
    ```bash
    dotnet run --project BlazorShop.Presentation/BlazorShop.API
+  dotnet run --project BlazorShop.Presentation/BlazorShop.Storefront
    dotnet run --project BlazorShop.Presentation/BlazorShop.Web
    ```
 
 Default dev URLs (may vary by environment):
 - API: https://localhost:7094  
+- Storefront: ASP.NET Core Kestrel/AppHost-assigned URL  
 - Web: https://localhost:7258  
-- The Web client calls the API at https://localhost:7094/api/
+- The Storefront and Web clients call the API at https://localhost:7094/api/ by default unless overridden in configuration.
+
+Runtime notes:
+- Standalone Storefront still serves its own static assets such as `/css/site.css` and `/icon-192.png`.
+- Standalone and AppHost Storefront runs now expose crawl documents at `/sitemap.xml` and `/robots.txt` for the published public route surface.
+- With the API unavailable, static informational Storefront pages such as `/about-us`, `/privacy`, `/faq`, and `/terms` still return `200`, while catalog-backed routes such as `/`, `/new-releases`, `/todays-deals`, `/category/{slug}`, and `/product/{slug}` return `503`.
+- With the API available, Storefront slug routes return `200` for published content and `404` for unknown slugs.
+- AppHost remains the easiest way to verify the full local stack because it runs API + Storefront + Web together.
 
 5) Tests
 
@@ -128,15 +145,16 @@ Default dev URLs (may vary by environment):
 - **BlazorShop.Application** – DTOs, services, validations
 - **BlazorShop.Infrastructure** – EF Core, repositories, Identity, email, payments, logging
 - **BlazorShop.Presentation/BlazorShop.API** – ASP.NET Core Web API controllers and configuration
-- **BlazorShop.Presentation/BlazorShop.Web** – Blazor WebAssembly client
+- **BlazorShop.Presentation/BlazorShop.Storefront** – Server-rendered Blazor Web App public storefront
+- **BlazorShop.Presentation/BlazorShop.Web** – Existing Blazor WebAssembly admin and legacy interactive client
 - **BlazorShop.Presentation/BlazorShop.Web.Shared** – Shared models/services used by the Web client
-- **BlazorShop.AppHost** – Local orchestrator (Microsoft Aspire) to run API + Web together
+- **BlazorShop.AppHost** – Local orchestrator (Microsoft Aspire) to run API + Storefront + Web together
 - **BlazorShop.Tests** – Unit tests
 
 ## API & Docs
 - Swagger UI available when API runs in Development at `/swagger`
 - CORS is configuration-driven; localhost origins work out of the box in Development
-- Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, and `compose.production.yml`
+- Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, `docs/storefront.production.appsettings.example.json`, and `compose.production.yml`
 
 ## Screenshots
 <table>

@@ -15,16 +15,19 @@
 @using BlazorShop.Web.Components
 @using BlazorShop.Web.Components.Notifications
 @using BlazorShop.Web.Components.FormControls
+@using BlazorShop.Web.Components.Seo
 @using BlazorShop.Web.Components.Templates
 @using BlazorShop.Web.Components.Search
 @using BlazorShop.Web.Components.Shared
-@using BlazorShop.Web.Pages.Administration
+@using BlazorShop.Web.Pages.Account
+@using BlazorShop.Web.Pages.Admin
 @using BlazorShop.Web.Pages.Public
 @using BlazorShop.Web.Pages.Public.Deals
 @using BlazorShop.Web.Pages.Errors
 @using BlazorShop.Web.Pages.Products
 @using BlazorShop.Web.Pages.Payments
 @using BlazorShop.Web.Services.Contracts
+@using BlazorShop.Web.Services
 @using BlazorShop.Web.Layout
 @using BlazorShop.Web.Shared
 @using BlazorShop.Web.Shared.Helper.Contracts
@@ -32,6 +35,7 @@
 @using BlazorShop.Web.Shared.Models.Authentication
 @using BlazorShop.Web.Shared.Models.Category
 @using BlazorShop.Web.Shared.Models.Product
+@using BlazorShop.Web.Shared.Models.Seo
 @using BlazorShop.Web.Shared.Models.Payment
 @using BlazorShop.Web.Shared.Services
 @using Blazored.Typeahead
@@ -39,6 +43,11 @@
 @using BlazorShop.Web.Shared.Models
 @using BlazorShop.Web.Shared.Models.Analytics
 @using BlazorShop.Web.Shared.Models.Notifications
+@using BlazorShop.Web.Shared.Models.Admin.Users
+@using BlazorShop.Web.Shared.Models.Admin.Settings
+@using BlazorShop.Web.Shared.Models.Admin.Audit
+@using BlazorShop.Web.Shared.Models.Admin.Inventory
+@using BlazorShop.Web.Shared.Models.Admin.Orders
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ICategoryService CategoryService
 @inject IProductService ProductService

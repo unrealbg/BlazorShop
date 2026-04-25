@@ -1,7 +1,9 @@
 ﻿namespace BlazorShop.Web.Pages.Payments
 {
+    using System.Net;
     using System.Text.Json;
 
+    using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Notifications;
     using BlazorShop.Web.Shared.Models.Payment;
@@ -11,9 +13,15 @@
     public partial class Cart
     {
         private List<ProcessCart> _myCarts = [];
-        private List<GetProduct> _selectedProducts = [];
+        private IReadOnlyList<CheckoutCartLine> _cartLines = [];
         private IEnumerable<GetProduct> _products = [];
         private IEnumerable<GetPaymentMethod> _paymentMethods = [];
+        private bool _isCartLoading;
+        private string? _cartLoadError;
+        private bool _isPaymentMethodsLoading;
+        private string? _paymentMethodsError;
+        private bool _isSavingCart;
+        private string? _busyCartLineKey;
         private Guid? _processingMethodId = null;
         private bool _showPaymentDialog;
 
@@ -32,44 +40,64 @@
 
         protected override async Task OnInitializedAsync()
         {
+            await LoadCartAsync();
+        }
+
+        private async Task LoadCartAsync()
+        {
+            _isCartLoading = true;
+            _cartLoadError = null;
+            _paymentMethodsError = null;
+            _showPaymentDialog = false;
+
+            _myCarts = [];
             var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
             if (!string.IsNullOrEmpty(cartJson))
             {
                 _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
             }
 
-            await this.LoadCartProductsAsync();
+            if (!await this.LoadCartProductsAsync())
+            {
+                _cartLines = [];
+                _paymentMethods = [];
+                _isCartLoading = false;
+                return;
+            }
 
-            this.GetCart();
+            this.BuildCartLines();
+            await LoadPaymentMethodsAsync();
+            _isCartLoading = false;
+        }
+
+        private async Task LoadPaymentMethodsAsync()
+        {
+            _isPaymentMethodsLoading = true;
+            _paymentMethodsError = null;
 
             var paymentMethodsResult = await this.PaymentMethodService.GetPaymentMethods();
-            if (this.QueryFailureNotifier.TryNotifyFailure(paymentMethodsResult, "Checkout"))
+            if (this.QueryFailureNotifier.TryNotifyFailure(paymentMethodsResult, "Checkout", showToast: false))
             {
                 _paymentMethods = [];
+                _paymentMethodsError = FeedbackMessageResolver.ResolveQueryFailure(paymentMethodsResult, "We couldn't load payment methods right now. Please try again.");
+                _isPaymentMethodsLoading = false;
                 return;
             }
 
             _paymentMethods = paymentMethodsResult.Data ?? [];
+            _isPaymentMethodsLoading = false;
         }
 
-        private void GetCart()
+        private bool HasUnavailableCartLines => _cartLines.Any(line => line.IsUnavailable);
+
+        private decimal CartGrandTotal => _cartLines.Sum(line => line.LineTotal);
+
+        private void BuildCartLines()
         {
-            _selectedProducts.Clear();
-
-            foreach (var processCart in _myCarts)
-            {
-                var product = _products.FirstOrDefault(x => x.Id == processCart.ProductId);
-
-                if (product is not null && !_selectedProducts.Contains(product))
-                {
-                    _selectedProducts.Add(product);
-                }
-            }
-
-            _selectedProducts = _selectedProducts.OrderBy(x => x.Name).ToList();
+            _cartLines = CheckoutCartLineMapper.Build(_myCarts, _products);
         }
 
-        private async Task LoadCartProductsAsync()
+        private async Task<bool> LoadCartProductsAsync()
         {
             var uniqueProductIds = _myCarts
                 .Select(cart => cart.ProductId)
@@ -80,7 +108,7 @@
             if (uniqueProductIds.Length == 0)
             {
                 _products = [];
-                return;
+                return true;
             }
 
             var productTasks = uniqueProductIds.Select(id => this.ProductService.GetByIdAsync(id));
@@ -92,53 +120,70 @@
                 if (productResult.Success && productResult.Data is not null)
                 {
                     successfulProducts.Add(productResult.Data);
+                    continue;
                 }
+
+                if (productResult.StatusCode == HttpStatusCode.NotFound)
+                {
+                    continue;
+                }
+
+                _products = [];
+                _cartLoadError = FeedbackMessageResolver.ResolveQueryFailure(productResult, "We couldn't refresh your cart right now. Please try again.");
+                return false;
             }
 
             _products = successfulProducts;
+            return true;
         }
 
-        private int GetProductQuantity(Guid productId)
+        private ProcessCart? GetCartItem(Guid productId, Guid? variantId)
         {
-            return _myCarts.Where(x => x.ProductId == productId).Sum(x => x.Quantity);
+            return _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == variantId);
         }
 
-        private ProcessCart? GetCartItem(Guid productId)
+        private static string GetCartLineKey(Guid productId, Guid? variantId)
         {
-            return _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
+            return $"{productId}:{variantId?.ToString() ?? "none"}";
         }
 
-        private decimal GetProductTotalPrice(Guid productId)
+        private bool IsCartLineBusy(Guid productId, Guid? variantId)
         {
-            var lineItems = _myCarts.Where(x => x.ProductId == productId);
-            decimal total = 0m;
-            foreach (var li in lineItems)
+            return _busyCartLineKey == GetCartLineKey(productId, variantId) || _processingMethodId.HasValue || _isSavingCart;
+        }
+
+        private async Task HandleInputChange(ChangeEventArgs e, Guid productId, Guid? variantId)
+        {
+            var cartItem = GetCartItem(productId, variantId);
+            if (cartItem is null || IsCartLineBusy(productId, variantId))
             {
-                var price = li.UnitPrice ?? _products.FirstOrDefault(x => x.Id == li.ProductId)?.Price ?? 0m;
-                total += li.Quantity * price;
+                return;
             }
-            return total;
-        }
 
-        private async Task HandleInputChange(ChangeEventArgs e, Guid productId)
-        {
             try
             {
                 var newQuantity = int.Parse(e.Value?.ToString() ?? "0");
-                var item = _myCarts.FirstOrDefault(x => x.ProductId == productId && x.VariantId == null);
-                if (item is not null)
+                if (newQuantity == cartItem.Quantity)
                 {
-                    if (newQuantity <= 0)
-                    {
-                        _myCarts.RemoveAll(x => x.ProductId == productId);
-                    }
-                    else
-                    {
-                        item.Quantity = newQuantity;
-                    }
-                    await this.SaveCart(_myCarts);
-                    this.GetCart();
+                    return;
                 }
+
+                _isSavingCart = true;
+                _busyCartLineKey = GetCartLineKey(productId, variantId);
+
+                if (newQuantity <= 0)
+                {
+                    _myCarts.RemoveAll(x => x.ProductId == productId && x.VariantId == variantId);
+                    await this.SaveCart(_myCarts);
+                    this.BuildCartLines();
+                    this.NotificationService.NotifySuccess("Product removed from cart.", "Cart", NotificationKind.Order, addToInbox: false);
+                    return;
+                }
+
+                cartItem.Quantity = newQuantity;
+                await this.SaveCart(_myCarts);
+                this.BuildCartLines();
+                this.NotificationService.NotifySuccess("Cart quantity updated.", "Cart", NotificationKind.Order, addToInbox: false);
             }
             catch
             {
@@ -146,6 +191,8 @@
             }
             finally
             {
+                _isSavingCart = false;
+                _busyCartLineKey = null;
                 this.StateHasChanged();
             }
         }
@@ -156,32 +203,31 @@
             await this.CookieStorageService.SetAsync(Constant.Cart.Name, JsonSerializer.Serialize(_myCarts), 30);
         }
 
-        private decimal GetGrandTotal(List<GetProduct> products)
+        private async Task RemoveCartItem(Guid productId, Guid? variantId)
         {
-            decimal total = 0m;
-            foreach (var product in products)
+            if (IsCartLineBusy(productId, variantId))
             {
-                total += this.GetProductTotalPrice(product.Id);
+                return;
             }
 
-            return total;
-        }
+            _isSavingCart = true;
+            _busyCartLineKey = GetCartLineKey(productId, variantId);
+            _myCarts.RemoveAll(x => x.ProductId == productId && x.VariantId == variantId);
 
-        private async Task RemoveCartItem(Guid productId)
-        {
-            _myCarts.RemoveAll(x => x.ProductId == productId);
-
-            var product = _selectedProducts.FirstOrDefault(x => x.Id == productId);
-            if (product is not null)
+            try
             {
-                _selectedProducts.Remove(product);
+                this.NotificationService.NotifySuccess("Product removed from cart.", "Cart", NotificationKind.Order, addToInbox: false);
+
+                await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
+                await this.SaveCart(_myCarts);
+                this.BuildCartLines();
+                this.StateHasChanged();
             }
-
-            this.NotificationService.NotifyWarning("Product removed from cart", "Cart", NotificationKind.Order, addToInbox: false);
-
-            await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
-            await this.SaveCart(_myCarts);
-            this.StateHasChanged();
+            finally
+            {
+                _isSavingCart = false;
+                _busyCartLineKey = null;
+            }
         }
 
         private static bool TryGetProp(JsonElement obj, string name, out JsonElement value)
@@ -196,6 +242,16 @@
         {
             if (paymentMethod is null)
             {
+                return;
+            }
+
+            if (HasUnavailableCartLines)
+            {
+                this.NotificationService.NotifyWarning(
+                    "Remove unavailable items from the cart before checkout continues.",
+                    "Checkout",
+                    NotificationKind.Order,
+                    addToInbox: false);
                 return;
             }
 
@@ -245,7 +301,10 @@
                         {
                             _showPaymentDialog = false;
                             this.StateHasChanged();
-                            this.NavigationManager.NavigateTo("/payment-success", true);
+                            var successPath = string.Equals(paymentMethod.Name, "Cash on Delivery", StringComparison.OrdinalIgnoreCase)
+                                ? "/payment-success?pm=cod"
+                                : "/payment-success?pm=card";
+                            this.NavigationManager.NavigateTo(successPath, true);
                         }
                     }
                 }
@@ -273,7 +332,17 @@
 
         private void Checkout()
         {
-            this.NavigationManager.NavigateTo($"authentication/login/{Constant.Cart.Name}");
+            this.NavigationManager.NavigateTo("/authentication/login/account");
+        }
+
+        private Task RetryLoadCartAsync()
+        {
+            return LoadCartAsync();
+        }
+
+        private Task RetryLoadPaymentMethodsAsync()
+        {
+            return LoadPaymentMethodsAsync();
         }
 
         private void Cancel()

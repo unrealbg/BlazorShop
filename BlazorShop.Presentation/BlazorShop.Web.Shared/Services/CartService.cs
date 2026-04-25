@@ -35,6 +35,25 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
+        public async Task<ServiceResponse> ConfirmOrder(IEnumerable<ProcessCart> carts, string status)
+        {
+            var privateClient = await _httpClientHelper.GetPrivateClientAsync();
+            var apiCallModel = new ApiCall
+            {
+                Route = $"{Constant.Cart.ConfirmOrder}?status={Uri.EscapeDataString(status)}",
+                Type = Constant.ApiCallType.Post,
+                Client = privateClient,
+                Id = null!,
+                Model = carts,
+            };
+
+            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<ProcessCart>>(apiCallModel);
+
+            return result is null || !result.IsSuccessStatusCode
+                       ? _apiCallHelper.ConnectionError()
+                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+        }
+
         public async Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();

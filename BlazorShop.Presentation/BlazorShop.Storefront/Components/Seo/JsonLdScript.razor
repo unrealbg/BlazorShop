@@ -1,0 +1,9 @@
+@if (Document is not null && !Document.IsEmpty)
+{
+    <script type="application/ld+json">@((MarkupString)Document.ToJson())</script>
+}
+
+@code {
+    [Parameter]
+    public StorefrontStructuredDataDocument? Document { get; set; }
+}

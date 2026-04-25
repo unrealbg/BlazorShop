@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "BlazorShop.Storefront": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:18597;http://localhost:18598"
+    }
+  }
+}

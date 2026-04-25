@@ -17,7 +17,15 @@
 
         public DbSet<Category> Categories { get; set; }
 
+        public DbSet<AdminAuditLog> AdminAuditLogs { get; set; }
+
+        public DbSet<AdminSettings> AdminSettings { get; set; }
+
         public DbSet<Product> Products { get; set; }
+
+        public DbSet<SeoRedirect> SeoRedirects { get; set; }
+
+        public DbSet<SeoSettings> SeoSettings { get; set; }
 
         public DbSet<ProductVariant> ProductVariants { get; set; } // new
 
@@ -36,9 +44,7 @@
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
-
-            builder.Entity<Product>()
-                .HasIndex(p => new { p.CategoryId, p.CreatedOn });
+            builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
             // ProductVariant configuration
             builder.Entity<ProductVariant>()
@@ -100,6 +106,15 @@
                 .HasForeignKey(token => token.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<AppUser>()
+                .Property(user => user.CreatedOn)
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            builder.Entity<Order>()
+                .Property(order => order.AdminNote)
+                .HasMaxLength(2000);
+
             builder.Entity<PaymentMethod>().HasData(
                 new PaymentMethod
                 {
@@ -119,19 +134,19 @@
 
             builder.Entity<IdentityRole>().HasData(
                 new IdentityRole
-                    {
-                        Id = "93f5cdac-43de-4895-8426-2048c228e76d",
-                        ConcurrencyStamp = "02d86d56-8e63-4d2e-92f8-81b154ba0532",
-                        Name = "Admin",
-                        NormalizedName = "ADMIN"
-                    },
+                {
+                    Id = "93f5cdac-43de-4895-8426-2048c228e76d",
+                    ConcurrencyStamp = "02d86d56-8e63-4d2e-92f8-81b154ba0532",
+                    Name = "Admin",
+                    NormalizedName = "ADMIN"
+                },
                 new IdentityRole
-                    {
-                        Id = "b7af6842-02fa-4af4-8f61-ae04a49644a2",
-                        ConcurrencyStamp = "75e8afa8-8df5-4431-a220-ac56b1fd0cda",
-                        Name = "User",
-                        NormalizedName = "USER"
-                    });
+                {
+                    Id = "b7af6842-02fa-4af4-8f61-ae04a49644a2",
+                    ConcurrencyStamp = "75e8afa8-8df5-4431-a220-ac56b1fd0cda",
+                    Name = "User",
+                    NormalizedName = "USER"
+                });
 
             // NewsletterSubscriber config
             builder.Entity<NewsletterSubscriber>()

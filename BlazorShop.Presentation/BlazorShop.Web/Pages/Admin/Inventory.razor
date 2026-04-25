@@ -1,0 +1,286 @@
+@page "/admin/inventory"
+@inject IAdminInventoryService AdminInventoryService
+
+<PageTitle>Admin Inventory</PageTitle>
+
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h1 class="mt-2 text-2xl font-bold text-slate-950">Inventory</h1>
+            </div>
+            <div class="bs-toolbar-cluster">
+                <input placeholder="Search product or SKU" @bind="_query.SearchTerm" @bind:event="oninput" />
+                <label class="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" class="h-4 w-4" @bind="_query.LowStockOnly" /> Low</label>
+                <label class="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" class="h-4 w-4" @bind="_query.OutOfStockOnly" /> Out</label>
+                <input type="number" class="w-28" min="0" @bind="_query.LowStockThreshold" />
+                <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply</button>
+                <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ClearFiltersAsync" disabled="@_isLoading">Clear</button>
+            </div>
+        </div>
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading inventory...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+            <div>@_loadError</div>
+            <button class="bs-button bs-button-primary mt-4" @onclick="LoadAsync">Retry</button>
+        </div>
+    }
+    else if ((_page?.Items.Count ?? 0) == 0)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">No inventory items found.</div>
+    }
+    else
+    {
+        <div class="mt-6 space-y-4">
+            @foreach (var item in _page!.Items)
+            {
+                <article class="bs-table-shell overflow-hidden">
+                    <div class="flex flex-col gap-3 bg-slate-50/90 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <div class="font-semibold text-slate-950">@item.ProductName</div>
+                            <div class="text-xs text-slate-500">@item.CategoryName</div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-sm">
+                            @StockBadge(item.IsOutOfStock, item.IsLowStock)
+                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">Product: @item.Quantity</span>
+                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">Variants: @item.VariantStock</span>
+                            <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="() => OpenProductStock(item)" disabled="@_isSaving">Edit product stock</button>
+                        </div>
+                    </div>
+
+                    @if (item.Variants.Any())
+                    {
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="text-left">
+                                        <th class="px-3 py-2">SKU</th>
+                                        <th class="px-3 py-2">Size</th>
+                                        <th class="px-3 py-2">Color</th>
+                                        <th class="px-3 py-2">Stock</th>
+                                        <th class="px-3 py-2">Status</th>
+                                        <th class="px-3 py-2 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    @foreach (var variant in item.Variants)
+                                    {
+                                        <tr>
+                                            <td class="px-3 py-2">@(!string.IsNullOrWhiteSpace(variant.Sku) ? variant.Sku : "-")</td>
+                                            <td class="px-3 py-2">@variant.SizeScale @variant.SizeValue</td>
+                                            <td class="px-3 py-2">@(!string.IsNullOrWhiteSpace(variant.Color) ? variant.Color : "-")</td>
+                                            <td class="px-3 py-2">@variant.Stock</td>
+                                            <td class="px-3 py-2">@StockBadge(variant.IsOutOfStock, variant.IsLowStock)</td>
+                                            <td class="px-3 py-2 text-right">
+                                                <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenVariantStock(variant)" disabled="@_isSaving">Edit</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </article>
+            }
+        </div>
+
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm text-slate-600">Page @_page!.PageNumber of @Math.Max(1, _page.TotalPages) · @_page.TotalCount item(s)</div>
+            <div class="flex gap-2">
+                <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="PreviousPageAsync" disabled="@(_isLoading || _query.PageNumber <= 1)">Previous</button>
+                <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="NextPageAsync" disabled="@(_isLoading || _page.PageNumber >= _page.TotalPages)">Next</button>
+            </div>
+        </div>
+    }
+</section>
+
+<ModalDialog @bind-IsVisible="_showProductStock">
+    <Header><h5 class="text-lg font-semibold">Product Stock</h5></Header>
+    <Body>
+        <div class="space-y-3">
+            <div class="font-semibold text-slate-900">@_editingProductName</div>
+            <input type="number" min="0" @bind="_productQuantity" />
+        </div>
+    </Body>
+    <Footer>
+        <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="SaveProductStockAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save")</button>
+        <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="() => _showProductStock = false" disabled="@_isSaving">Cancel</button>
+    </Footer>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showVariantStock">
+    <Header><h5 class="text-lg font-semibold">Variant Stock</h5></Header>
+    <Body>
+        <div class="space-y-3">
+            <div class="font-semibold text-slate-900">@_editingVariantLabel</div>
+            <input type="number" min="0" @bind="_variantStock" />
+        </div>
+    </Body>
+    <Footer>
+        <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="SaveVariantStockAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save")</button>
+        <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="() => _showVariantStock = false" disabled="@_isSaving">Cancel</button>
+    </Footer>
+</ModalDialog>
+
+@code {
+    private AdminInventoryQuery _query = new();
+    private PagedResult<AdminInventoryItem>? _page;
+    private bool _isLoading;
+    private bool _isSaving;
+    private string? _loadError;
+    private bool _showProductStock;
+    private Guid _editingProductId;
+    private string _editingProductName = string.Empty;
+    private int _productQuantity;
+    private bool _showVariantStock;
+    private Guid _editingVariantId;
+    private string _editingVariantLabel = string.Empty;
+    private int _variantStock;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        if (_query.OutOfStockOnly)
+        {
+            _query.LowStockOnly = false;
+        }
+
+        var result = await AdminInventoryService.GetAsync(_query);
+        if (QueryFailureNotifier.TryNotifyFailure(result, "Inventory", showToast: false))
+        {
+            _page = null;
+            _loadError = FeedbackMessageResolver.ResolveQueryFailure(result, "We couldn't load inventory right now. Please try again.");
+        }
+        else
+        {
+            _page = result.Data;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        _query.PageNumber = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _query = new AdminInventoryQuery();
+        await LoadAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        _query.PageNumber = Math.Max(1, _query.PageNumber - 1);
+        await LoadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        _query.PageNumber += 1;
+        await LoadAsync();
+    }
+
+    private void OpenProductStock(AdminInventoryItem item)
+    {
+        _editingProductId = item.ProductId;
+        _editingProductName = item.ProductName;
+        _productQuantity = item.Quantity;
+        _showProductStock = true;
+    }
+
+    private void OpenVariantStock(AdminInventoryVariant variant)
+    {
+        _editingVariantId = variant.VariantId;
+        _editingVariantLabel = string.IsNullOrWhiteSpace(variant.Sku) ? $"{variant.SizeScale} {variant.SizeValue}" : variant.Sku;
+        _variantStock = variant.Stock;
+        _showVariantStock = true;
+    }
+
+    private async Task SaveProductStockAsync()
+    {
+        if (_editingProductId == Guid.Empty || _isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var result = await AdminInventoryService.UpdateProductStockAsync(_editingProductId, new UpdateProductStock { Quantity = _productQuantity });
+            ShowToast(result, "Product stock saved.");
+            if (result.Success)
+            {
+                _showProductStock = false;
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task SaveVariantStockAsync()
+    {
+        if (_editingVariantId == Guid.Empty || _isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var result = await AdminInventoryService.UpdateVariantStockAsync(_editingVariantId, new UpdateVariantStock { Stock = _variantStock });
+            ShowToast(result, "Variant stock saved.");
+            if (result.Success)
+            {
+                _showVariantStock = false;
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void ShowToast<TPayload>(ServiceResponse<TPayload> result, string successFallback)
+    {
+        ToastService.ShowToast(
+            result.Success ? Shared.Toast.ToastLevel.Success : Shared.Toast.ToastLevel.Error,
+            FeedbackMessageResolver.ResolveMutation(result, successFallback),
+            "Inventory",
+            result.Success ? Shared.Toast.ToastIcon.Success : Shared.Toast.ToastIcon.Error);
+    }
+
+    private static RenderFragment StockBadge(bool outOfStock, bool lowStock) => builder =>
+    {
+        var css = outOfStock
+            ? "rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700"
+            : lowStock
+                ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800"
+                : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700";
+        var label = outOfStock ? "Out" : lowStock ? "Low" : "OK";
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", css);
+        builder.AddContent(2, label);
+        builder.CloseElement();
+    };
+}

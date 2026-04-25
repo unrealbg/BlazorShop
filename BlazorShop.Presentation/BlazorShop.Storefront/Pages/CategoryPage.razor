@@ -1,0 +1,128 @@
+@page "/category/{Slug}"
+@using BlazorShop.Application.Diagnostics
+@inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
+@inject ILogger<CategoryPage> Logger
+
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
+
+@if (_isServiceUnavailable)
+{
+    <ServiceUnavailableState Title="Category temporarily unavailable"
+                             Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+}
+else if (_isNotFound)
+{
+    <NotFoundState Title="Category not found"
+                   Message="We couldn't find a published category for this address." />
+}
+else if (_categoryPage is not null)
+{
+    <section class="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
+        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-4" />
+
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Category</p>
+                    <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-neutral-900">@_categoryPage.Category.Name</h1>
+                    @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.MetaDescription))
+                    {
+                        <p class="mt-4 max-w-3xl text-base leading-7 text-neutral-700">@_categoryPage.Category.MetaDescription</p>
+                    }
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 shadow">@_categoryPage.Products.Count items</span>
+                    <a href="@StorefrontRoutes.Home" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Back to Home</a>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">New Releases</a>
+                <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 text-sm font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">Today's Deals</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+        <ProductGrid Products="_categoryPage.Products"
+                     EmptyMessage="No products are available in this category right now." />
+    </section>
+
+    <SeoContentSection Title="@CategorySeoContentTitle"
+                       Eyebrow="Category Guide"
+                       Content="@_categoryPage.Category.SeoContent" />
+}
+
+@code {
+    private GetCategoryPage? _categoryPage;
+    private bool _isNotFound;
+    private bool _isServiceUnavailable;
+    private SeoMetadataDto _metadata = new();
+    private IReadOnlyList<StorefrontBreadcrumbItem> _breadcrumbs = [];
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    private string CategorySeoContentTitle => _categoryPage is null
+        ? string.Empty
+        : $"More about {_categoryPage.Category.Name}";
+
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var routePath = StorefrontRoutes.Category(Slug);
+        var categoryPageResult = await ApiClient.GetPublishedCategoryBySlugAsync(Slug);
+
+        if (categoryPageResult.IsServiceUnavailable)
+        {
+            _categoryPage = null;
+            _isNotFound = false;
+            _isServiceUnavailable = true;
+            _breadcrumbs = [];
+            _structuredData = StorefrontStructuredDataDocument.Empty;
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            SeoRuntimeLogger.PublicCategoryServiceUnavailable(Logger, routePath, Slug);
+
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
+                "Category temporarily unavailable",
+                routePath,
+                "The storefront is running, but the catalog API is not reachable right now.");
+            return;
+        }
+
+        _categoryPage = categoryPageResult.Value;
+
+        if (_categoryPage is null)
+        {
+            _isNotFound = true;
+            _isServiceUnavailable = false;
+            _breadcrumbs = [];
+            _structuredData = StorefrontStructuredDataDocument.Empty;
+            StorefrontResponseHeaders.ApplyNotFound(HttpContext);
+            SeoRuntimeLogger.PublicCategoryNotFound(Logger, routePath, Slug);
+
+            _metadata = await SeoComposer.ComposeNotFoundPageAsync(
+                "Category not found",
+                routePath,
+                "We couldn't find a published category for this address.");
+            return;
+        }
+
+        _isNotFound = false;
+        _isServiceUnavailable = false;
+        SeoRuntimeLogger.PublicCategoryResolved(Logger, routePath, Slug, _categoryPage.Category.Id);
+        _breadcrumbs =
+        [
+            new StorefrontBreadcrumbItem("Home", StorefrontRoutes.Home),
+            new StorefrontBreadcrumbItem(_categoryPage.Category.Name ?? "Category"),
+        ];
+        _metadata = await SeoComposer.ComposeCategoryPageAsync(_categoryPage.Category);
+        _structuredData = await StructuredDataComposer.ComposeCategoryPageAsync(_categoryPage.Category);
+    }
+}

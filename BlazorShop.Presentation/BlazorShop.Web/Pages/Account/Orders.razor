@@ -1,0 +1,187 @@
+@page "/account/orders"
+@page "/account/orders/{Id:guid}"
+@using BlazorShop.Web.Services
+
+<PageTitle>Orders</PageTitle>
+
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-8">
+        <p class="bs-section-kicker">Orders</p>
+        <h1 class="bs-section-title mt-3">@(SelectedOrder is null ? "Order history" : $"Order {SelectedOrder.Reference}")</h1>
+        <p class="bs-section-copy mt-4">Review your signed-in order history here. Cart and checkout entry remain on the storefront, while confirmed orders stay in your account.</p>
+    </header>
+
+    @if (_loading)
+    {
+        <div class="bs-panel mt-8 px-6 py-10 text-center text-slate-600">Loading orders...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="mt-8 rounded border border-red-200 bg-red-50 px-6 py-6 text-center text-sm text-red-700">
+            <div>@_errorMessage</div>
+            <div class="mt-4">
+                <button type="button" class="bs-button bs-button-primary" @onclick="RetryLoadAsync">Retry</button>
+            </div>
+        </div>
+    }
+    else if (SelectedOrder is not null)
+    {
+        <div class="mt-8 space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <a href="/account/orders" class="bs-button bs-button-secondary">Back to all orders</a>
+                <span class="bs-chip-solid">@SelectedOrder.ShippingStatus</span>
+            </div>
+
+            <article class="bs-panel p-6">
+                <div class="grid gap-4 text-sm text-slate-600 md:grid-cols-4">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Reference</div>
+                        <div class="mt-2 font-semibold text-slate-950">@SelectedOrder.Reference</div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Created</div>
+                        <div class="mt-2 font-semibold text-slate-950">@SelectedOrder.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</div>
+                        <div class="mt-2 font-semibold text-slate-950">@SelectedOrder.Status</div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total</div>
+                        <div class="mt-2 font-semibold text-slate-950">€ @SelectedOrder.TotalAmount.ToString("F2")</div>
+                    </div>
+                </div>
+
+                <div class="bs-table-shell mt-6 overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-left">
+                                <th class="px-4 py-3">Product</th>
+                                <th class="px-4 py-3">Qty</th>
+                                <th class="px-4 py-3">Unit (€)</th>
+                                <th class="px-4 py-3">Total (€)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 bg-white">
+                            @foreach (var line in SelectedOrder.Lines)
+                            {
+                                <tr>
+                                    <td class="px-4 py-3">@line.ProductName</td>
+                                    <td class="px-4 py-3">@line.Quantity</td>
+                                    <td class="px-4 py-3">@line.UnitPrice.ToString("F2")</td>
+                                    <td class="px-4 py-3">@line.LineTotal.ToString("F2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-6 text-sm text-slate-600">
+                    @if (!string.IsNullOrWhiteSpace(SelectedOrder.TrackingUrl))
+                    {
+                        <a class="font-semibold text-sky-700 hover:text-sky-800" href="@SelectedOrder.TrackingUrl" target="_blank" rel="noopener">Track shipment</a>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(SelectedOrder.TrackingNumber))
+                    {
+                        <span>Tracking number: <span class="font-semibold text-slate-950">@SelectedOrder.TrackingNumber</span></span>
+                    }
+                    else
+                    {
+                        <span>Tracking details are not available yet.</span>
+                    }
+                </div>
+            </article>
+        </div>
+    }
+    else if (_orders.Count == 0)
+    {
+        <div class="bs-panel mt-8 px-6 py-10 text-center">
+            <h2 class="text-2xl font-bold text-slate-950">No orders yet</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Once you complete checkout from the storefront, your confirmed orders will appear here.</p>
+        </div>
+    }
+    else
+    {
+        <div class="mt-8 space-y-4">
+            @foreach (var order in _orders)
+            {
+                <article class="bs-panel p-6">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h2 class="text-xl font-bold text-slate-950">@order.Reference</h2>
+                                <span class="bs-chip">@order.ShippingStatus</span>
+                            </div>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">Placed @order.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
+                        </div>
+
+                        <div class="text-sm text-slate-600 lg:text-right">
+                            <div>Total: <span class="font-semibold text-slate-950">€ @order.TotalAmount.ToString("F2")</span></div>
+                            <div class="mt-2 flex flex-wrap gap-2 lg:justify-end">
+                                <a href="@($"/account/orders/{order.Id}")" class="bs-button bs-button-primary">View details</a>
+                                @if (!string.IsNullOrWhiteSpace(order.TrackingUrl))
+                                {
+                                    <a href="@order.TrackingUrl" target="_blank" rel="noopener" class="bs-button bs-button-secondary">Track shipment</a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        @foreach (var line in order.Lines.Take(3))
+                        {
+                            <div class="bs-panel-soft px-4 py-3 text-sm text-slate-700">
+                                <div class="font-semibold text-slate-950">@line.ProductName</div>
+                                <div class="mt-1">Qty: @line.Quantity</div>
+                                <div class="mt-1">Line total: € @line.LineTotal.ToString("F2")</div>
+                            </div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private readonly List<GetOrder> _orders = [];
+    private bool _loading = true;
+    private string? _errorMessage;
+
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private GetOrder? SelectedOrder => Id.HasValue
+        ? _orders.FirstOrDefault(order => order.Id == Id.Value)
+        : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+        _orders.Clear();
+
+        var client = await HttpClientHelper.GetPrivateClientAsync();
+        var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
+        var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+        var ordersResult = await ApiCallHelper.GetQueryResult<IEnumerable<GetOrder>>(
+            http,
+            "We couldn't load your orders right now. Please try again.");
+
+        if (QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders", showToast: false))
+        {
+            _errorMessage = FeedbackMessageResolver.ResolveQueryFailure(ordersResult, "We couldn't load your orders right now. Please try again.");
+            _loading = false;
+            return;
+        }
+
+        _orders.AddRange((ordersResult.Data ?? []).OrderByDescending(order => order.CreatedOn));
+
+        _loading = false;
+    }
+
+    private Task RetryLoadAsync()
+    {
+        return OnParametersSetAsync();
+    }
+}

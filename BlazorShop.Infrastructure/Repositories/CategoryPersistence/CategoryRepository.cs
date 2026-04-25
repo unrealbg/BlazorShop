@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Infrastructure.Repositories.CategoryPersistence
 {
+    using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.CategoryPersistence;
     using BlazorShop.Domain.Entities;
     using BlazorShop.Infrastructure.Data;
@@ -25,6 +26,62 @@
                                .ToListAsync();
 
             return products.Count > 0 ? products : [];
+        }
+
+        public async Task<IEnumerable<Category>> GetPublishedCategoriesAsync()
+        {
+            var categories = await _context.Categories
+                .AsNoTracking()
+                .Where(category => category.IsPublished && category.Slug != null && category.Slug != string.Empty)
+                .OrderBy(category => category.Name)
+                .ToListAsync();
+
+            return categories.Count > 0 ? categories : [];
+        }
+
+        public async Task<IReadOnlyList<PublishedCategorySitemapEntryReadModel>> GetPublishedCategorySitemapEntriesAsync()
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .Where(category => category.IsPublished && category.Slug != null && category.Slug != string.Empty)
+                .OrderBy(category => category.Name)
+                .Select(category => new PublishedCategorySitemapEntryReadModel
+                {
+                    Slug = category.Slug!,
+                    LastModifiedUtc = category.Products!
+                        .Where(product => product.IsPublished
+                            && product.PublishedOn != null
+                            && product.Slug != null
+                            && product.Slug != string.Empty)
+                        .Max(product => product.PublishedOn),
+                })
+                .ToListAsync();
+        }
+
+        public async Task<Category?> GetPublishedCategoryByIdAsync(Guid id)
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(category => category.Id == id
+                    && category.IsPublished
+                    && category.Slug != null
+                    && category.Slug != string.Empty);
+        }
+
+        public async Task<Category?> GetPublishedCategoryBySlugAsync(string slug)
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(category => category.IsPublished
+                    && category.Slug == slug);
+        }
+
+        public async Task<bool> CategorySlugExistsAsync(string slug, Guid? excludedCategoryId = null)
+        {
+            return await _context.Categories
+                .AsNoTracking()
+                .AnyAsync(category => category.Slug == slug
+                    && (!excludedCategoryId.HasValue || category.Id != excludedCategoryId.Value));
         }
     }
 }

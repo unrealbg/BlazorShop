@@ -8,6 +8,8 @@
     {
         Task<QueryResult<IEnumerable<GetCategory>>> GetAllAsync();
 
+        Task<QueryResult<IEnumerable<GetCategory>>> GetAllForAdminAsync();
+
         Task<QueryResult<GetCategory>> GetByIdAsync(Guid id);
 
         Task<ServiceResponse> AddAsync(CreateCategory category);

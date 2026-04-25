@@ -42,15 +42,20 @@ jobs:
           BLAZORSHOP_DB_PASSWORD: ci-db-password
           BLAZORSHOP_JWT_KEY: ci-jwt-signing-key-which-is-long-enough
           BLAZORSHOP_STRIPE_SECRET_KEY: sk_test_placeholder
+          BLAZORSHOP_API_BASE_URL: https://api.shop.example.com
+          BLAZORSHOP_CLIENT_APP_BASE_URL: https://account.shop.example.com
+          BLAZORSHOP_STOREFRONT_BASE_URL: https://shop.example.com
           BLAZORSHOP_EMAIL_FROM: shop@example.com
           BLAZORSHOP_EMAIL_SMTP_SERVER: smtp.example.com
           BLAZORSHOP_EMAIL_USERNAME: ci@example.com
           BLAZORSHOP_EMAIL_PASSWORD: ci-email-password
-          BLAZORSHOP_PUBLIC_BASE_URL: https://shop.example.com
         run: docker compose -f compose.production.yml config
 
       - name: Build API container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.API/Dockerfile -t blazorshop-api:ci .
+
+      - name: Build Storefront container image
+        run: docker build -f BlazorShop.Presentation/BlazorShop.Storefront/Dockerfile -t blazorshop-storefront:ci .
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .

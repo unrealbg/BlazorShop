@@ -1,0 +1,48 @@
+@if (!string.IsNullOrWhiteSpace(Metadata.Title))
+{
+    <PageTitle>@Metadata.Title</PageTitle>
+}
+
+<HeadContent>
+    @if (!string.IsNullOrWhiteSpace(Metadata.MetaDescription))
+    {
+        <meta name="description" content="@Metadata.MetaDescription" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Metadata.CanonicalUrl))
+    {
+        <link rel="canonical" href="@Metadata.CanonicalUrl" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Metadata.OgTitle))
+    {
+        <meta property="og:title" content="@Metadata.OgTitle" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Metadata.OgDescription))
+    {
+        <meta property="og:description" content="@Metadata.OgDescription" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Metadata.OgImage))
+    {
+        <meta property="og:image" content="@Metadata.OgImage" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Metadata.SiteName))
+    {
+        <meta property="og:site_name" content="@Metadata.SiteName" />
+    }
+
+    <meta name="robots" content="@(Metadata.RobotsIndex ? "index" : "noindex"),@(Metadata.RobotsFollow ? "follow" : "nofollow")" />
+
+    <JsonLdScript Document="StructuredData" />
+</HeadContent>
+
+@code {
+    [Parameter, EditorRequired]
+    public SeoMetadataDto Metadata { get; set; } = new();
+
+    [Parameter]
+    public StorefrontStructuredDataDocument? StructuredData { get; set; }
+}

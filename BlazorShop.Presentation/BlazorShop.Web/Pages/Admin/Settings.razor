@@ -1,0 +1,238 @@
+@page "/admin/settings"
+@inject IAdminSettingsService AdminSettingsService
+
+<PageTitle>Admin Settings</PageTitle>
+
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel bs-page-hero p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h1 class="mt-2 text-2xl font-bold text-slate-950">Settings</h1>
+            </div>
+            <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="LoadAsync" disabled="@_isLoading">Refresh</button>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+            @foreach (var tab in Enum.GetValues<SettingsTab>())
+            {
+                <button type="button" class="bs-tab-button @(_activeTab == tab ? "bs-tab-button-active" : string.Empty)" @onclick="() => _activeTab = tab">@TabLabel(tab)</button>
+            }
+        </div>
+    </header>
+
+    @if (_isLoading)
+    {
+        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading settings...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+            <div>@_loadError</div>
+            <button class="bs-button bs-button-primary mt-4" @onclick="LoadAsync">Retry</button>
+        </div>
+    }
+    else
+    {
+        <div class="bs-panel mt-6 p-6">
+            @switch (_activeTab)
+            {
+                case SettingsTab.Store:
+                    <EditForm Model="_store" OnValidSubmit="SaveStoreAsync">
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Store name</label><InputText @bind-Value="_store.StoreName" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support email</label><InputText @bind-Value="_store.StoreSupportEmail" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support phone</label><InputText @bind-Value="_store.StoreSupportPhone" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Default currency</label><InputText @bind-Value="_store.DefaultCurrency" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Default culture</label><InputText @bind-Value="_store.DefaultCulture" /></div>
+                            <label class="flex items-center gap-3 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
+                                <InputCheckbox @bind-Value="_store.MaintenanceModeEnabled" class="h-4 w-4" />
+                                <span>Maintenance mode</span>
+                            </label>
+                            <div class="lg:col-span-2">
+                                <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Maintenance message</label><InputTextArea @bind-Value="_store.MaintenanceMessage" class="min-h-28" /></div>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button class="bs-button bs-button-primary disabled:opacity-60" disabled="@_isSaving" type="submit">@(_isSaving ? "Saving..." : "Save Store")</button>
+                        </div>
+                    </EditForm>
+                    break;
+                case SettingsTab.Orders:
+                    <EditForm Model="_orders" OnValidSubmit="SaveOrdersAsync">
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <label class="flex items-center gap-3 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 opacity-70">
+                                <input type="checkbox" class="h-4 w-4" checked="@_orders.AllowGuestCheckout" disabled />
+                                <span>Guest checkout</span>
+                            </label>
+                            <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Default shipping status</label>
+                                <InputSelect @bind-Value="_orders.DefaultShippingStatus">
+                                    <option>PendingShipment</option>
+                                    <option>Shipped</option>
+                                    <option>InTransit</option>
+                                    <option>OutForDelivery</option>
+                                    <option>Delivered</option>
+                                </InputSelect>
+                            </div>
+                            <label class="flex items-center gap-3 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
+                                <InputCheckbox @bind-Value="_orders.AutoConfirmPaidOrders" class="h-4 w-4" />
+                                <span>Auto-confirm paid orders</span>
+                            </label>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Order reference prefix</label><InputText @bind-Value="_orders.OrderReferencePrefix" /></div>
+                        </div>
+                        <div class="mt-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Guest checkout is disabled because checkout currently requires a signed-in account.</div>
+                        <div class="mt-6 flex justify-end">
+                            <button class="bs-button bs-button-primary disabled:opacity-60" disabled="@_isSaving" type="submit">@(_isSaving ? "Saving..." : "Save Orders")</button>
+                        </div>
+                    </EditForm>
+                    break;
+                case SettingsTab.Notifications:
+                    <EditForm Model="_notifications" OnValidSubmit="SaveNotificationsAsync">
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SMTP host</label><InputText @bind-Value="_notifications.SmtpHost" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From email</label><InputText @bind-Value="_notifications.SmtpFromEmail" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From display name</label><InputText @bind-Value="_notifications.SmtpFromDisplayName" /></div>
+                            <div class="rounded border border-slate-200 px-4 py-3 text-sm">
+                                <div class="font-semibold text-slate-900">Secrets</div>
+                                <div class="mt-1 text-slate-600">@(_settings.Notifications.SecretsConfigured ? "Configured outside the admin API." : "No SMTP secret is configured.")</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">SMTP passwords and API secrets are never returned by this admin API.</div>
+                        <div class="mt-6 flex justify-end">
+                            <button class="bs-button bs-button-primary disabled:opacity-60" disabled="@_isSaving" type="submit">@(_isSaving ? "Saving..." : "Save Notifications")</button>
+                        </div>
+                    </EditForm>
+                    break;
+                case SettingsTab.System:
+                    <dl class="grid grid-cols-1 gap-4 text-sm lg:grid-cols-2">
+                        <div class="bs-panel-soft p-4"><dt class="font-semibold text-slate-600">Environment</dt><dd class="mt-1 text-slate-950">@_settings.System.RuntimeEnvironment</dd></div>
+                        <div class="bs-panel-soft p-4"><dt class="font-semibold text-slate-600">Framework</dt><dd class="mt-1 text-slate-950">@_settings.System.FrameworkDescription</dd></div>
+                        <div class="bs-panel-soft p-4"><dt class="font-semibold text-slate-600">Updated</dt><dd class="mt-1 text-slate-950">@_settings.System.UpdatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd></div>
+                        <div class="bs-panel-soft p-4"><dt class="font-semibold text-slate-600">Updated by</dt><dd class="mt-1 break-all text-slate-950">@(_settings.System.UpdatedByUserId ?? "-")</dd></div>
+                    </dl>
+                    break;
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private SettingsTab _activeTab = SettingsTab.Store;
+    private AdminSettingsModel _settings = new();
+    private UpdateStoreSettings _store = new();
+    private UpdateOrderSettings _orders = new();
+    private UpdateNotificationSettings _notifications = new();
+    private bool _isLoading;
+    private bool _isSaving;
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        var result = await AdminSettingsService.GetAsync();
+        if (QueryFailureNotifier.TryNotifyFailure(result, "Settings", showToast: false))
+        {
+            _loadError = FeedbackMessageResolver.ResolveQueryFailure(result, "We couldn't load admin settings right now. Please try again.");
+            _isLoading = false;
+            return;
+        }
+
+        _settings = result.Data ?? new AdminSettingsModel();
+        _store = new UpdateStoreSettings
+        {
+            StoreName = _settings.Store.StoreName,
+            StoreSupportEmail = _settings.Store.StoreSupportEmail,
+            StoreSupportPhone = _settings.Store.StoreSupportPhone,
+            DefaultCurrency = _settings.Store.DefaultCurrency,
+            DefaultCulture = _settings.Store.DefaultCulture,
+            MaintenanceModeEnabled = _settings.Store.MaintenanceModeEnabled,
+            MaintenanceMessage = _settings.Store.MaintenanceMessage,
+        };
+        _orders = new UpdateOrderSettings
+        {
+            AllowGuestCheckout = false,
+            DefaultShippingStatus = _settings.Orders.DefaultShippingStatus,
+            AutoConfirmPaidOrders = _settings.Orders.AutoConfirmPaidOrders,
+            OrderReferencePrefix = _settings.Orders.OrderReferencePrefix,
+        };
+        _notifications = new UpdateNotificationSettings
+        {
+            SmtpHost = _settings.Notifications.SmtpHost,
+            SmtpFromEmail = _settings.Notifications.SmtpFromEmail,
+            SmtpFromDisplayName = _settings.Notifications.SmtpFromDisplayName,
+        };
+
+        _isLoading = false;
+    }
+
+    private async Task SaveStoreAsync()
+    {
+        await SaveAsync(() => AdminSettingsService.UpdateStoreAsync(_store), payload => _settings.Store = payload);
+    }
+
+    private async Task SaveOrdersAsync()
+    {
+        await SaveAsync(() => AdminSettingsService.UpdateOrdersAsync(_orders), payload => _settings.Orders = payload);
+    }
+
+    private async Task SaveNotificationsAsync()
+    {
+        await SaveAsync(() => AdminSettingsService.UpdateNotificationsAsync(_notifications), payload => _settings.Notifications = payload);
+    }
+
+    private async Task SaveAsync<TPayload>(Func<Task<ServiceResponse<TPayload>>> action, Action<TPayload> applyPayload)
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var result = await action();
+            if (result.Success && result.Payload is not null)
+            {
+                applyPayload(result.Payload);
+            }
+
+            ToastService.ShowToast(
+                result.Success ? Shared.Toast.ToastLevel.Success : Shared.Toast.ToastLevel.Error,
+                FeedbackMessageResolver.ResolveMutation(result),
+                "Settings",
+                result.Success ? Shared.Toast.ToastIcon.Success : Shared.Toast.ToastIcon.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static string TabLabel(SettingsTab tab)
+    {
+        return tab switch
+        {
+            SettingsTab.Store => "Store",
+            SettingsTab.Orders => "Orders",
+            SettingsTab.Notifications => "Notifications",
+            SettingsTab.System => "System",
+            _ => tab.ToString(),
+        };
+    }
+
+    private enum SettingsTab
+    {
+        Store,
+        Orders,
+        Notifications,
+        System,
+    }
+}

@@ -86,6 +86,33 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
         }
 
         [Fact]
+        public async Task ConfirmOrder_Returns_ServiceResponse()
+        {
+            // Arrange
+            var carts = new List<ProcessCart>
+            {
+                new ProcessCart { ProductId = Guid.NewGuid(), Quantity = 1 }
+            };
+
+            var httpResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            this._httpClientHelperMock
+                .Setup(x => x.GetPrivateClientAsync())
+                .ReturnsAsync(new HttpClient());
+            this._apiCallHelperMock
+                .Setup(x => x.ApiCallTypeCall<IEnumerable<ProcessCart>>(It.IsAny<ApiCall>()))
+                .ReturnsAsync(httpResponse);
+            this._apiCallHelperMock
+                .Setup(x => x.GetServiceResponse<ServiceResponse>(httpResponse))
+                .ReturnsAsync(new ServiceResponse());
+
+            // Act
+            var result = await this._cartService.ConfirmOrder(carts, "Paid");
+
+            // Assert
+            Assert.NotNull(result);
+        }
+
+        [Fact]
         public async Task GetOrderItemsAsync_Returns_OrderItems()
         {
             // Arrange

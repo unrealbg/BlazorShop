@@ -41,7 +41,7 @@
         /// <param name="form">Image file to upload (multipart/form-data)</param>
         /// <returns>A message and the URL of the uploaded file.</returns>
         [HttpPost("image")]
-        [Authorize(Roles = "User, Admin")]
+        [Authorize(Roles = "Admin")]
         [RequestSizeLimit(MaxFileSizeBytes)]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadFile([FromForm] ImageUploadForm form)

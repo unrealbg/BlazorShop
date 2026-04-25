@@ -1,0 +1,19 @@
+@implements IAsyncDisposable
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticationSessionSyncService AuthenticationSessionSyncService
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AuthenticationSessionSyncService.InitializeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await AuthenticationSessionSyncService.DisposeAsync();
+    }
+}

@@ -62,7 +62,7 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.True(result.Success);
             Assert.Equal("https://checkout.stripe.com/session/test", result.Message);
             Assert.NotNull(capturedOptions);
-            Assert.Equal("https://shop.example.com/payment-success", capturedOptions!.SuccessUrl);
+            Assert.Equal("https://shop.example.com/payment-success?pm=card", capturedOptions!.SuccessUrl);
             Assert.Equal("https://shop.example.com/payment-cancel", capturedOptions.CancelUrl);
         }
 

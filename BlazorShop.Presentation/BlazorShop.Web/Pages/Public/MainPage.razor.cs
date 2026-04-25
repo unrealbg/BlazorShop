@@ -2,6 +2,7 @@
 {
     using System.Text.Json;
 
+    using BlazorShop.Web.Services.Contracts;
     using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Category;
@@ -14,6 +15,7 @@
     public partial class MainPage
     {
         private IEnumerable<GetProduct> _productsByCategory = [];
+        private StorefrontSeoMetadata _seoMetadata = new();
 
         private List<ProcessCart> _myCarts = new();
 
@@ -27,11 +29,22 @@
         [Parameter]
         public string CategoryId { get; set; } = string.Empty;
 
+        [Inject]
+        private IStorefrontSeoService StorefrontSeoService { get; set; } = default!;
+
         public GetCategory SelectedCategory { get; set; } = new();
 
         protected override async Task OnParametersSetAsync()
         {
+            _seoMetadata = await BuildFallbackMetadataAsync();
+
             if (string.IsNullOrEmpty(this.CategoryId))
+            {
+                this.NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            if (!Guid.TryParse(this.CategoryId, out var categoryId))
             {
                 this.NavigationManager.NavigateTo("/");
                 return;
@@ -44,7 +57,6 @@
                 _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? new List<ProcessCart>();
             }
 
-            var categoryId = Guid.Parse(this.CategoryId);
             var categoryResult = await this.CategoryService.GetByIdAsync(categoryId);
             if (this.QueryFailureNotifier.TryNotifyFailure(categoryResult, "Categories") || categoryResult.Data is null)
             {
@@ -54,6 +66,13 @@
             }
 
             this.SelectedCategory = categoryResult.Data;
+            _seoMetadata = await this.StorefrontSeoService.BuildAsync(new StorefrontSeoMetadataBuildRequest
+            {
+                PageTitle = $"{this.SelectedCategory.Name} Products",
+                RelativePath = $"/main/products/category/{this.CategoryId}",
+                FallbackMetaDescription = $"Browse {this.SelectedCategory.Name} products in the BlazorShop app.",
+                PageSeo = StorefrontSeoPageData.FromCategory(this.SelectedCategory),
+            });
 
             var productsResult = await this.CategoryService.GetProductsByCategoryAsync(categoryId);
             if (this.QueryFailureNotifier.TryNotifyFailure(productsResult, "Products"))
@@ -151,6 +170,18 @@
         public ValueTask DisposeAsync()
         {
             return ValueTask.CompletedTask;
+        }
+
+        private Task<StorefrontSeoMetadata> BuildFallbackMetadataAsync()
+        {
+            return this.StorefrontSeoService.BuildAsync(new StorefrontSeoMetadataBuildRequest
+            {
+                PageTitle = "Category Products",
+                RelativePath = string.IsNullOrWhiteSpace(this.CategoryId)
+                    ? "/main/products/category"
+                    : $"/main/products/category/{this.CategoryId}",
+                FallbackMetaDescription = "Browse products by category in the BlazorShop app.",
+            });
         }
     }
 }

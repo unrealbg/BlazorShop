@@ -77,6 +77,238 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
             Assert.Equal(25m, result.Variants.Single().Price);
         }
 
+        [Fact]
+        public async Task GetPublishedProductDetailsByIdAsync_ReturnsNullForDraftProduct()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, Guid.NewGuid());
+
+            var draftProduct = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Draft Product",
+                Description = "Draft",
+                Image = "/img/draft.png",
+                Price = 30m,
+                Quantity = 1,
+                CategoryId = featuredCategoryId,
+                Slug = "draft-product",
+                IsPublished = false,
+                PublishedOn = null,
+                CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+            };
+
+            context.Products.Add(draftProduct);
+            await context.SaveChangesAsync();
+
+            var publishedProductId = await context.Products
+                .Where(product => product.Name == "Product 5")
+                .Select(product => product.Id)
+                .SingleAsync();
+            var repository = new ProductReadRepository(context);
+
+            var publishedResult = await repository.GetPublishedProductDetailsByIdAsync(publishedProductId);
+            var draftResult = await repository.GetPublishedProductDetailsByIdAsync(draftProduct.Id);
+
+            Assert.NotNull(publishedResult);
+            Assert.Equal("Product 5", publishedResult!.Name);
+            Assert.Null(draftResult);
+        }
+
+        [Fact]
+        public async Task GetPublishedCatalogPageAsync_ExcludesDraftProductsAndProductsWithoutSlugs()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            var otherCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, otherCategoryId);
+
+            context.Products.AddRange(
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Draft Product",
+                    Description = "Draft",
+                    Image = "/img/draft.png",
+                    Price = 30m,
+                    Quantity = 1,
+                    CategoryId = featuredCategoryId,
+                    Slug = "draft-product",
+                    IsPublished = false,
+                    PublishedOn = null,
+                    CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Slugless Product",
+                    Description = "Slugless",
+                    Image = "/img/slugless.png",
+                    Price = 31m,
+                    Quantity = 1,
+                    CategoryId = otherCategoryId,
+                    Slug = null,
+                    IsPublished = true,
+                    PublishedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+                    CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+                });
+
+            await context.SaveChangesAsync();
+
+            var repository = new ProductReadRepository(context);
+
+            var result = await repository.GetPublishedCatalogPageAsync(new ProductCatalogQuery
+            {
+                PageNumber = 1,
+                PageSize = 20,
+                SortBy = ProductCatalogSortBy.Newest,
+            });
+
+            Assert.Equal(5, result.TotalCount);
+            Assert.All(result.Items, item => Assert.False(string.IsNullOrWhiteSpace(item.Slug)));
+            Assert.DoesNotContain(result.Items, item => item.Name == "Draft Product");
+            Assert.DoesNotContain(result.Items, item => item.Name == "Slugless Product");
+        }
+
+        [Fact]
+        public async Task GetPublishedProductBySlugAsync_ReturnsOnlyPublishedProduct()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, Guid.NewGuid());
+            context.Products.Add(new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Draft Product",
+                Description = "Draft",
+                Image = "/img/draft.png",
+                Price = 35m,
+                Quantity = 2,
+                CategoryId = featuredCategoryId,
+                Slug = "draft-product",
+                IsPublished = false,
+                PublishedOn = null,
+                CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+            });
+            await context.SaveChangesAsync();
+
+            var repository = new ProductReadRepository(context);
+
+            var publishedResult = await repository.GetPublishedProductBySlugAsync("product-5");
+            var draftResult = await repository.GetPublishedProductBySlugAsync("draft-product");
+
+            Assert.NotNull(publishedResult);
+            Assert.Equal("Product 5", publishedResult!.Name);
+            Assert.NotNull(publishedResult.Category);
+            Assert.Single(publishedResult.Variants);
+            Assert.Null(draftResult);
+        }
+
+        [Fact]
+        public async Task GetPublishedProductsByCategoryAsync_ReturnsOnlyPublishedProductsWithSlugs()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, Guid.NewGuid());
+
+            context.Products.AddRange(
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Featured Draft",
+                    Description = "Draft",
+                    Image = "/img/draft.png",
+                    Price = 15m,
+                    Quantity = 1,
+                    CategoryId = featuredCategoryId,
+                    Slug = "featured-draft",
+                    IsPublished = false,
+                    PublishedOn = null,
+                    CreatedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Featured Slugless",
+                    Description = "No slug",
+                    Image = "/img/no-slug.png",
+                    Price = 16m,
+                    Quantity = 1,
+                    CategoryId = featuredCategoryId,
+                    Slug = null,
+                    IsPublished = true,
+                    PublishedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                    CreatedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                });
+
+            await context.SaveChangesAsync();
+            var repository = new ProductReadRepository(context);
+
+            var result = await repository.GetPublishedProductsByCategoryAsync(featuredCategoryId);
+
+            Assert.Equal(3, result.Count);
+            Assert.All(result, item => Assert.Equal(featuredCategoryId, item.CategoryId));
+            Assert.All(result, item => Assert.False(string.IsNullOrWhiteSpace(item.Slug)));
+            Assert.DoesNotContain(result, item => item.Name == "Featured Draft");
+            Assert.DoesNotContain(result, item => item.Name == "Featured Slugless");
+        }
+
+        [Fact]
+        public async Task GetPublishedProductSitemapEntriesAsync_ReturnsOnlyPublishedProductsWithSlugRoutesAndLastModified()
+        {
+            await using var context = CreateContext();
+            var featuredCategoryId = Guid.NewGuid();
+            await SeedProductsAsync(context, featuredCategoryId, Guid.NewGuid());
+
+            context.Products.AddRange(
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Draft Product",
+                    Description = "Draft",
+                    Image = "/img/draft.png",
+                    Price = 20m,
+                    Quantity = 2,
+                    CategoryId = featuredCategoryId,
+                    Slug = "draft-product",
+                    IsPublished = false,
+                    PublishedOn = null,
+                    CreatedOn = new DateTime(2026, 4, 15, 0, 0, 0, DateTimeKind.Utc),
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Slugless Product",
+                    Description = "No slug",
+                    Image = "/img/no-slug.png",
+                    Price = 21m,
+                    Quantity = 2,
+                    CategoryId = featuredCategoryId,
+                    Slug = null,
+                    IsPublished = true,
+                    PublishedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                    CreatedOn = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc),
+                });
+
+            await context.SaveChangesAsync();
+
+            var repository = new ProductReadRepository(context);
+
+            var result = await repository.GetPublishedProductSitemapEntriesAsync();
+
+            Assert.Equal(5, result.Count);
+            Assert.All(result, entry => Assert.False(string.IsNullOrWhiteSpace(entry.Slug)));
+            Assert.DoesNotContain(result, entry => entry.Slug == "draft-product");
+            Assert.All(result, entry => Assert.True(entry.LastModifiedUtc > DateTime.MinValue));
+            Assert.Equal(
+                new DateTime(2026, 4, 10, 0, 0, 0, DateTimeKind.Utc),
+                result[0].LastModifiedUtc);
+            Assert.Equal(
+                new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc),
+                result[^1].LastModifiedUtc);
+        }
+
         private static AppDbContext CreateContext()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -89,8 +321,8 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
         private static async Task SeedProductsAsync(AppDbContext context, Guid featuredCategoryId, Guid otherCategoryId)
         {
             context.Categories.AddRange(
-                new Category { Id = featuredCategoryId, Name = "Featured" },
-                new Category { Id = otherCategoryId, Name = "Other" });
+                new Category { Id = featuredCategoryId, Name = "Featured", Slug = "featured", IsPublished = true },
+                new Category { Id = otherCategoryId, Name = "Other", Slug = "other", IsPublished = true });
 
             var product1 = new Product
             {
@@ -101,6 +333,9 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
                 Price = 10m,
                 Quantity = 10,
                 CategoryId = featuredCategoryId,
+                Slug = "product-1",
+                IsPublished = true,
+                PublishedOn = new DateTime(2026, 4, 10, 0, 0, 0, DateTimeKind.Utc),
                 CreatedOn = new DateTime(2026, 4, 10, 0, 0, 0, DateTimeKind.Utc)
             };
 
@@ -113,6 +348,9 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
                 Price = 11m,
                 Quantity = 9,
                 CategoryId = otherCategoryId,
+                Slug = "product-2",
+                IsPublished = true,
+                PublishedOn = new DateTime(2026, 4, 11, 0, 0, 0, DateTimeKind.Utc),
                 CreatedOn = new DateTime(2026, 4, 11, 0, 0, 0, DateTimeKind.Utc)
             };
 
@@ -125,6 +363,9 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
                 Price = 12m,
                 Quantity = 8,
                 CategoryId = featuredCategoryId,
+                Slug = "product-3",
+                IsPublished = true,
+                PublishedOn = new DateTime(2026, 4, 12, 0, 0, 0, DateTimeKind.Utc),
                 CreatedOn = new DateTime(2026, 4, 12, 0, 0, 0, DateTimeKind.Utc)
             };
 
@@ -137,6 +378,9 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
                 Price = 13m,
                 Quantity = 7,
                 CategoryId = otherCategoryId,
+                Slug = "product-4",
+                IsPublished = true,
+                PublishedOn = new DateTime(2026, 4, 13, 0, 0, 0, DateTimeKind.Utc),
                 CreatedOn = new DateTime(2026, 4, 13, 0, 0, 0, DateTimeKind.Utc)
             };
 
@@ -149,6 +393,9 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
                 Price = 14m,
                 Quantity = 6,
                 CategoryId = featuredCategoryId,
+                Slug = "product-5",
+                IsPublished = true,
+                PublishedOn = new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc),
                 CreatedOn = new DateTime(2026, 4, 14, 0, 0, 0, DateTimeKind.Utc)
             };
 

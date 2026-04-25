@@ -2,6 +2,8 @@
 {
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Services.Contracts;
+    using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Application.Services.Payment;
@@ -10,6 +12,7 @@
     using BlazorShop.Domain.Contracts.CategoryPersistence;
     using BlazorShop.Domain.Contracts.Newsletters;
     using BlazorShop.Domain.Contracts.Payment;
+    using BlazorShop.Domain.Contracts.Seo;
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Configuration;
     using BlazorShop.Infrastructure.Data;
@@ -19,7 +22,9 @@
     using BlazorShop.Infrastructure.Repositories.CategoryPersistence;
     using BlazorShop.Infrastructure.Repositories.Newsletters;
     using BlazorShop.Infrastructure.Repositories.Payment;
+    using BlazorShop.Infrastructure.Repositories.Seo;
     using BlazorShop.Infrastructure.Services;
+    using BlazorShop.Infrastructure.Services.Admin;
 
     using Microsoft.AspNetCore.Authentication.JwtBearer;
     using Microsoft.AspNetCore.Builder;
@@ -52,7 +57,6 @@
             services.AddDefaultIdentity<AppUser>(
                 opt =>
                     {
-                        opt.SignIn.RequireConfirmedEmail = true;
                         opt.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
                         opt.Lockout.AllowedForNewUsers = true;
                         opt.Lockout.MaxFailedAccessAttempts = 5;
@@ -101,6 +105,15 @@
             services.AddScoped<IOrderTrackingService, OrderTrackingService>();
             services.AddScoped<IOrderQueryService, OrderQueryService>();
             services.AddScoped<INewsletterSubscriberRepository, NewsletterSubscriberRepository>();
+            services.AddScoped<ISeoSettingsRepository, SeoSettingsRepository>();
+            services.AddScoped<ISeoRedirectRepository, SeoRedirectRepository>();
+            services.AddScoped<IApplicationTransactionManager, ApplicationTransactionManager>();
+            services.AddHttpContextAccessor();
+            services.AddScoped<IAdminAuditService, AdminAuditService>();
+            services.AddScoped<IAdminUserService, AdminUserService>();
+            services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+            services.AddScoped<IAdminInventoryService, AdminInventoryService>();
+            services.AddScoped<IAdminOrderService, AdminOrderService>();
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 

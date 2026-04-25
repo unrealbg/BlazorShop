@@ -14,11 +14,14 @@
     public partial class HeaderBoxComponent : IAsyncDisposable
     {
         private bool _isAdmin;
-        private bool _isUser;
+        private bool _isAuthenticated;
         private int _cartCount;
 
         [CascadingParameter]
         private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+        [Inject]
+        private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
 
         [Inject]
         private IJSRuntime Js { get; set; } = default!;
@@ -26,22 +29,29 @@
         private IJSObjectReference? _module;
         private DotNetObjectReference<HeaderBoxComponent>? _selfRef;
 
-        private string UserEmail = string.Empty;
-
         protected override async Task OnInitializedAsync()
         {
-            var user = (await this.AuthState).User;
-
-            _isAdmin = user.IsInRole(Constant.Administration.AdminRole);
-            _isUser = user.Identity?.IsAuthenticated ?? false;
-
-            var emailClaim = user.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email);
-            if (emailClaim != null)
-            {
-                this.UserEmail = emailClaim.Value;
-            }
+            AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+            await ApplyAuthenticationStateAsync(await this.AuthState);
 
             await LoadCartCountAsync();
+        }
+
+        private Task ApplyAuthenticationStateAsync(AuthenticationState authenticationState)
+        {
+            var user = authenticationState.User;
+            _isAdmin = user.IsInRole(Constant.Administration.AdminRole);
+            _isAuthenticated = user.Identity?.IsAuthenticated ?? false;
+            return Task.CompletedTask;
+        }
+
+        private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await ApplyAuthenticationStateAsync(await authenticationStateTask);
+                StateHasChanged();
+            });
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -111,6 +121,8 @@
 
         public async ValueTask DisposeAsync()
         {
+            AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+
             try
             {
                 if (_module is not null)

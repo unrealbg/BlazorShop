@@ -1,0 +1,47 @@
+@page "/privacy"
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
+
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
+
+<section class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+    <div class="rounded-2xl bg-white/80 p-6 shadow sm:p-8">
+        <header>
+            <h1 class="text-3xl font-extrabold tracking-tight text-neutral-900">Privacy Policy</h1>
+            <p class="mt-4 text-sm leading-7 text-neutral-700">BlazorShop respects customer privacy and limits public storefront pages to the information required for catalog discovery and support.</p>
+        </header>
+
+        <div class="mt-8 space-y-4 text-sm leading-7 text-neutral-700">
+            <section class="rounded-2xl border border-neutral-200 bg-white/70 p-5">
+                <h2 class="text-xl font-bold text-neutral-900">Information we collect</h2>
+                <p class="mt-2">Account details, order information, newsletter subscriptions, and basic storefront usage data may be processed to deliver and improve the service.</p>
+            </section>
+            <section class="rounded-2xl border border-neutral-200 bg-white/70 p-5">
+                <h2 class="text-xl font-bold text-neutral-900">How we use it</h2>
+                <p class="mt-2">We use that information to provide catalog pages, process purchases, send operational emails, and improve the customer experience.</p>
+            </section>
+        </div>
+    </div>
+</section>
+
+@code {
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "Privacy Policy",
+            StorefrontRoutes.Privacy,
+            "Review how BlazorShop handles customer information, browsing data, and storefront privacy expectations.");
+        var structuredDataTask = StructuredDataComposer.ComposeWebPageAsync(
+            "Privacy Policy",
+            StorefrontRoutes.Privacy,
+            "Review how BlazorShop handles customer information, browsing data, and storefront privacy expectations.");
+
+        await Task.WhenAll(metadataTask, structuredDataTask);
+
+        _metadata = await metadataTask;
+        _structuredData = await structuredDataTask;
+    }
+}

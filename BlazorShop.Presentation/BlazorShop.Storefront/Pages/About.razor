@@ -1,0 +1,53 @@
+@page "/about-us"
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
+
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
+
+<section class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+    <div class="rounded-2xl bg-white/80 p-6 shadow sm:p-8">
+        <header class="text-center">
+            <h1 class="text-3xl font-extrabold tracking-tight text-neutral-900">About BlazorShop</h1>
+            <p class="mt-4 text-base leading-7 text-neutral-700">
+                BlazorShop is a layered .NET commerce application. This storefront surface focuses on server-rendered product and category pages so public catalog content is available on stable, SEO-capable routes.
+            </p>
+        </header>
+
+        <div class="mt-8 grid gap-6 md:grid-cols-2">
+            <div class="rounded-2xl border border-neutral-200 bg-white/70 p-6">
+                <h2 class="text-lg font-bold text-neutral-900">What changed</h2>
+                <p class="mt-3 text-sm leading-6 text-neutral-700">
+                    Public category and product discovery now lives on route-based pages backed by published-only slug lookups. Admin and legacy interactive flows still remain available in the existing client app.
+                </p>
+            </div>
+            <div class="rounded-2xl border border-neutral-200 bg-white/70 p-6">
+                <h2 class="text-lg font-bold text-neutral-900">Why it matters</h2>
+                <p class="mt-3 text-sm leading-6 text-neutral-700">
+                    Search engines and social crawlers can now read real HTML responses for the main storefront pages instead of relying on modal-only product details and client-side head updates.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    private SeoMetadataDto _metadata = new();
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var metadataTask = SeoComposer.ComposeStaticPageAsync(
+            "About Us",
+            StorefrontRoutes.About,
+            "Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience.");
+        var structuredDataTask = StructuredDataComposer.ComposeWebPageAsync(
+            "About Us",
+            StorefrontRoutes.About,
+            "Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience.");
+
+        await Task.WhenAll(metadataTask, structuredDataTask);
+
+        _metadata = await metadataTask;
+        _structuredData = await structuredDataTask;
+    }
+}

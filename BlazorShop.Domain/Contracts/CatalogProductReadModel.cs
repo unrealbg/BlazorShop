@@ -4,6 +4,8 @@ namespace BlazorShop.Domain.Contracts
     {
         public Guid Id { get; init; }
 
+        public string? Slug { get; init; }
+
         public string? Name { get; init; }
 
         public string? Description { get; init; }
@@ -15,6 +17,10 @@ namespace BlazorShop.Domain.Contracts
         public DateTime CreatedOn { get; init; }
 
         public Guid CategoryId { get; init; }
+
+        public string? CategoryName { get; init; }
+
+        public string? CategorySlug { get; init; }
 
         public bool HasVariants { get; init; }
     }

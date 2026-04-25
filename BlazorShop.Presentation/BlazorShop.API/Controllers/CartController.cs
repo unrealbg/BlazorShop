@@ -47,7 +47,29 @@
         [Authorize(Roles = "User")]
         public async Task<IActionResult> SaveCheckout(IEnumerable<CreateOrderItem> orderItems)
         {
-            var result = await _cartService.SaveCheckoutHistoryAsync(orderItems);
+            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return this.Unauthorized("User ID is invalid or not found.");
+            }
+
+            var result = await _cartService.SaveCheckoutHistoryAsync(userId, orderItems);
+            return result.Success ? this.Ok(result) : this.BadRequest(result);
+        }
+
+        [HttpPost("confirm-order")]
+        [Authorize(Roles = "User, Admin")]
+        public async Task<IActionResult> ConfirmOrder(IEnumerable<ProcessCart> carts, [FromQuery] string? status = null)
+        {
+            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return this.Unauthorized("User ID is invalid or not found.");
+            }
+
+            var result = await _cartService.ConfirmOrderAsync(carts, userId, status);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 
@@ -100,7 +122,7 @@
             }
 
             var result = await _orderQueryService.GetOrdersForUserAsync(userId);
-            return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
+            return this.Ok(result);
         }
 
         /// <summary>
@@ -126,8 +148,8 @@
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateTracking(Guid orderId, UpdateTrackingRequest dto)
         {
-            await _trackingService.UpdateTrackingAsync(orderId, dto.Carrier, dto.TrackingNumber, dto.TrackingUrl);
-            return NoContent();
+            var updated = await _trackingService.UpdateTrackingAsync(orderId, dto.Carrier, dto.TrackingNumber, dto.TrackingUrl);
+            return updated ? this.NoContent() : this.NotFound();
         }
 
         /// <summary>
@@ -140,8 +162,8 @@
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateShippingStatus(Guid orderId, UpdateShippingStatusRequest dto)
         {
-            await _trackingService.UpdateShippingStatusAsync(orderId, dto.ShippingStatus, dto.ShippedOn, dto.DeliveredOn);
-            return NoContent();
+            var updated = await _trackingService.UpdateShippingStatusAsync(orderId, dto.ShippingStatus, dto.ShippedOn, dto.DeliveredOn);
+            return updated ? this.NoContent() : this.NotFound();
         }
     }
 }

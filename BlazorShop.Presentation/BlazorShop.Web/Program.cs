@@ -36,9 +36,25 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IApiCallHelper, ApiCallHelper>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
+            builder.Services.AddScoped<IProductSeoService, ProductSeoService>();
+            builder.Services.AddScoped<ICategorySeoService, CategorySeoService>();
+            builder.Services.AddScoped<ISeoSettingsService, SeoSettingsService>();
+            builder.Services.AddScoped<ISeoRedirectService, SeoRedirectService>();
+            builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+            builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+            builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
+            builder.Services.AddScoped<IAdminInventoryService, AdminInventoryService>();
+            builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
+            builder.Services.AddScoped<IAuthenticatedClientStateCleaner, AuthenticatedClientStateCleaner>();
+            builder.Services.AddScoped<IAuthenticationSessionRefresher, AuthenticationSessionRefresher>();
+            builder.Services.AddScoped<IAuthenticationSessionBootstrapper, AuthenticationSessionBootstrapper>();
+            builder.Services.AddScoped<IAuthenticationSessionEventPublisher, AuthenticationSessionEventPublisher>();
+            builder.Services.AddScoped<IAuthenticationSessionSyncService, AuthenticationSessionSyncService>();
+            builder.Services.AddSingleton<IStorefrontSeoMetadataBuilder, StorefrontSeoMetadataBuilder>();
+            builder.Services.AddScoped<IStorefrontSeoService, StorefrontSeoService>();
             builder.Services.AddScoped<BrowserCredentialsHandler>();
             builder.Services.AddScoped<RefreshTokenHandler>();
             builder.Services.AddHttpClient(
@@ -58,12 +74,15 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IProductRecommendationService, ProductRecommendationService>();
             builder.Services.AddSingleton<IToastService, ToastService>();
             builder.Services.AddSingleton<INotificationService, NotificationService>();
+            builder.Services.AddSingleton<IPublicStorefrontUrlResolver, PublicStorefrontUrlResolver>();
             builder.Services.AddScoped<INewsletterService, NewsletterService>();
             builder.Services.AddScoped<IMetricsClient, MetricsClient>();
             builder.Services.AddScoped<IAppJsInterop, AppJsInterop>();
             builder.Services.AddScoped<IQueryFailureNotifier, QueryFailureNotifier>();
 
-            await builder.Build().RunAsync();
+            var host = builder.Build();
+            await host.Services.GetRequiredService<IAuthenticationSessionBootstrapper>().RestoreAsync();
+            await host.RunAsync();
         }
 
         private static async Task<Uri> ResolveApiBaseAddressAsync(WebAssemblyHostBuilder builder)

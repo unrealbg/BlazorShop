@@ -1,0 +1,342 @@
+@page "/product/{Slug}"
+@using BlazorShop.Application.Diagnostics
+@inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+@inject IStorefrontStructuredDataComposer StructuredDataComposer
+@inject ILogger<ProductPage> Logger
+
+<SeoHead Metadata="_metadata" StructuredData="_structuredData" />
+
+@if (_isServiceUnavailable)
+{
+    <ServiceUnavailableState Title="Product temporarily unavailable"
+                             Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+}
+else if (_isNotFound)
+{
+    <NotFoundState Title="Product not found"
+                   Message="We couldn't find a published product for this address." />
+}
+else if (_product is not null)
+{
+    <section class="mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-4" />
+
+        <div class="grid gap-8 lg:grid-cols-[1fr_1fr]">
+            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-6 shadow-lg">
+                <div class="relative aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-50">
+                    <img src="@_product.Image" alt="@_product.Name" class="absolute inset-0 h-full w-full object-contain" />
+                </div>
+            </div>
+
+            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+                @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug))
+                {
+                    <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500 hover:text-neutral-900">@_product.Category.Name</a>
+                }
+                else if (!string.IsNullOrWhiteSpace(_product.Category?.Name))
+                {
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">@_product.Category.Name</p>
+                }
+
+                @if (IsFreshArrival)
+                {
+                    <div class="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]">
+                        <span class="inline-block rounded bg-green-600/90 px-2 py-0.5 text-white">New</span>
+                    </div>
+                }
+
+                <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-neutral-900">@_product.Name</h1>
+                <div class="mt-5">
+                    <div class="text-sm text-neutral-500">@PrimaryPriceLabel</div>
+                    <div class="mt-1 text-4xl font-black text-neutral-900">€ @_product.Price</div>
+                </div>
+
+                <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-neutral-600">
+                    <span class="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 font-semibold text-neutral-700">@VariantSummary</span>
+                </div>
+
+                <p class="mt-6 text-base leading-7 text-neutral-700">@_product.Description</p>
+
+                <div id="purchase" class="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-5">
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Add to Cart</p>
+                    <p class="mt-2 text-sm leading-6 text-neutral-700">@PurchaseMessage</p>
+
+                    @if (_product.Variants.Any())
+                    {
+                        <div class="mt-4">
+                            <label for="product-variant-select" class="block text-sm font-semibold text-neutral-900">Choose a variant</label>
+                            <select id="product-variant-select"
+                                    class="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black/10"
+                                    data-storefront-variant-select>
+                                <option value="">Select a size</option>
+                                @foreach (var variant in _product.Variants)
+                                {
+                                    <option value="@variant.Id"
+                                            data-size-value="@variant.SizeValue"
+                                            data-unit-price="@VariantPriceValue(variant)">
+                                        @VariantOptionLabel(variant)
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <button type="button"
+                                class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600"
+                                data-storefront-add-to-cart
+                                data-default-label="Add to Cart"
+                                data-success-label="Added"
+                                data-product-id="@_product.Id"
+                                data-product-name="@_product.Name"
+                                data-unit-price="@BaseUnitPriceValue"
+                                data-variant-select="@(_product.Variants.Any() ? "#product-variant-select" : null)"
+                                data-feedback-target="#product-cart-feedback">
+                            Add to Cart
+                        </button>
+
+                        <a href="@CartUrl" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">
+                            View Cart
+                        </a>
+                    </div>
+
+                    <p id="product-cart-feedback" class="mt-3 text-sm font-medium text-emerald-700" aria-live="polite"></p>
+                </div>
+
+                @if (_product.Variants.Any())
+                {
+                    <div class="mt-8">
+                        <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Available Variants</h2>
+                        <ul class="mt-4 grid gap-3 sm:grid-cols-2">
+                            @foreach (var variant in _product.Variants)
+                            {
+                                <li class="rounded-2xl border border-neutral-200 bg-neutral-50/80 px-4 py-3 text-sm text-neutral-700">
+                                    <div class="font-semibold text-neutral-900">@variant.SizeValue</div>
+                                    <div class="mt-1">@ScaleLabel(variant.SizeScale)</div>
+                                    <div class="mt-2 font-semibold text-neutral-900">€ @(variant.Price ?? _product.Price)</div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <div class="mt-8 flex flex-wrap gap-3">
+                    @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
+                    {
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">
+                            Back to @_product.Category.Name
+                        </a>
+                    }
+
+                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">
+                        Browse New Releases
+                    </a>
+
+                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">
+                        See Today's Deals
+                    </a>
+                </div>
+
+                <div class="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
+                    Questions about sizing, delivery, or returns? Visit <a href="@StorefrontRoutes.CustomerService" class="font-semibold underline">Customer Service</a> before you place your order.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <SeoContentSection Title="@ProductSeoContentTitle"
+                       Eyebrow="Product Details"
+                       Content="@_product.SeoContent" />
+
+    <section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Keep Exploring</p>
+
+            @if (_relatedProducts.Count > 0)
+            {
+                <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">More from @_product.Category?.Name</h2>
+                <div class="mt-8">
+                    <ProductGrid Products="_relatedProducts" EmptyMessage="No additional related products are available right now." />
+                </div>
+            }
+            else
+            {
+                <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">Keep browsing the public catalog</h2>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
+                    {
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">
+                            Explore @_product.Category.Name
+                        </a>
+                    }
+
+                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">
+                        Browse New Releases
+                    </a>
+
+                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">
+                        See Today's Deals
+                    </a>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private SeoMetadataDto _metadata = new();
+    private bool _isNotFound;
+    private bool _isServiceUnavailable;
+    private GetProduct? _product;
+    private IReadOnlyList<StorefrontBreadcrumbItem> _breadcrumbs = [];
+    private IReadOnlyList<GetCatalogProduct> _relatedProducts = [];
+    private StorefrontStructuredDataDocument _structuredData = StorefrontStructuredDataDocument.Empty;
+
+    private bool IsFreshArrival => _product is not null && DateTime.UtcNow.Subtract(_product.CreatedOn).TotalDays <= 7;
+
+    private string PrimaryPriceLabel => _product?.Variants.Any() == true ? "From" : "Price";
+
+    private string VariantSummary => _product?.Variants.Any() == true
+        ? string.Concat(_product.Variants.Count(), " options")
+        : "Single option";
+
+    private string CartUrl => StorefrontRoutes.Cart;
+
+    private string PurchaseMessage => _product?.Variants.Any() == true
+        ? "Choose a size, add it to your cart, and review it in the storefront cart before checkout."
+        : "Add this item now and review it in the storefront cart before checkout.";
+
+    private string BaseUnitPriceValue => (_product?.Price ?? 0m).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string ProductSeoContentTitle => _product?.Name is { Length: > 0 } productName
+        ? $"More about {productName}"
+        : string.Empty;
+
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var routePath = StorefrontRoutes.Product(Slug);
+        var productResult = await ApiClient.GetPublishedProductBySlugAsync(Slug);
+
+        if (productResult.IsServiceUnavailable)
+        {
+            _product = null;
+            _isNotFound = false;
+            _isServiceUnavailable = true;
+            _breadcrumbs = [];
+            _relatedProducts = [];
+            _structuredData = StorefrontStructuredDataDocument.Empty;
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            SeoRuntimeLogger.PublicProductServiceUnavailable(Logger, routePath, Slug);
+
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync(
+                "Product temporarily unavailable",
+                routePath,
+                "The storefront is running, but the catalog API is not reachable right now.");
+            return;
+        }
+
+        _product = productResult.Value;
+
+        if (_product is null)
+        {
+            _isNotFound = true;
+            _isServiceUnavailable = false;
+            _breadcrumbs = [];
+            _relatedProducts = [];
+            _structuredData = StorefrontStructuredDataDocument.Empty;
+            StorefrontResponseHeaders.ApplyNotFound(HttpContext);
+            SeoRuntimeLogger.PublicProductNotFound(Logger, routePath, Slug);
+
+            _metadata = await SeoComposer.ComposeNotFoundPageAsync(
+                "Product not found",
+                routePath,
+                "We couldn't find a published product for this address.");
+            return;
+        }
+
+        _isNotFound = false;
+        _isServiceUnavailable = false;
+        SeoRuntimeLogger.PublicProductResolved(Logger, routePath, Slug, _product.Id);
+        _breadcrumbs = BuildBreadcrumbs(_product);
+
+        var metadataTask = SeoComposer.ComposeProductPageAsync(_product);
+        var structuredDataTask = StructuredDataComposer.ComposeProductPageAsync(_product);
+        var relatedProductsTask = GetRelatedProductsAsync(_product);
+
+        await Task.WhenAll(metadataTask, structuredDataTask, relatedProductsTask);
+
+        _metadata = await metadataTask;
+        _structuredData = await structuredDataTask;
+        _relatedProducts = await relatedProductsTask;
+    }
+
+    private static IReadOnlyList<StorefrontBreadcrumbItem> BuildBreadcrumbs(GetProduct product)
+    {
+        var breadcrumbs = new List<StorefrontBreadcrumbItem>
+        {
+            new("Home", StorefrontRoutes.Home),
+        };
+
+        if (!string.IsNullOrWhiteSpace(product.Category?.Slug) && !string.IsNullOrWhiteSpace(product.Category?.Name))
+        {
+            breadcrumbs.Add(new StorefrontBreadcrumbItem(product.Category.Name, StorefrontRoutes.Category(product.Category.Slug)));
+        }
+
+        breadcrumbs.Add(new StorefrontBreadcrumbItem(product.Name ?? "Product"));
+
+        return breadcrumbs;
+    }
+
+    private async Task<IReadOnlyList<GetCatalogProduct>> GetRelatedProductsAsync(GetProduct product)
+    {
+        if (string.IsNullOrWhiteSpace(product.Category?.Slug))
+        {
+            return [];
+        }
+
+        var categoryPageResult = await ApiClient.GetPublishedCategoryBySlugAsync(product.Category.Slug);
+        if (!categoryPageResult.IsSuccess || categoryPageResult.Value is null)
+        {
+            return [];
+        }
+
+        return categoryPageResult.Value.Products
+            .Where(relatedProduct => relatedProduct.Id != product.Id)
+            .Where(relatedProduct => !string.IsNullOrWhiteSpace(relatedProduct.Slug))
+            .Take(3)
+            .ToArray();
+    }
+
+    private static string ScaleLabel(int scale)
+    {
+        return scale switch
+        {
+            1 => "Clothing",
+            2 => "Clothing EU",
+            10 => "Shoes EU",
+            11 => "Shoes US",
+            12 => "Shoes UK",
+            _ => "Variant",
+        };
+    }
+
+    private string VariantPriceValue(GetProductVariant variant)
+    {
+        var price = variant.Price ?? _product?.Price ?? 0m;
+        return price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private string VariantOptionLabel(GetProductVariant variant)
+    {
+        var price = variant.Price ?? _product?.Price ?? 0m;
+        var defaultLabel = variant.IsDefault ? " • Default" : string.Empty;
+        return $"{variant.SizeValue} • {ScaleLabel(variant.SizeScale)} • € {price:0.00}{defaultLabel}";
+    }
+}

@@ -1,0 +1,282 @@
+@page "/account"
+@implements IDisposable
+@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
+@using BlazorShop.Web.Services
+
+<PageTitle>Account Dashboard</PageTitle>
+
+<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="bs-panel p-6 sm:p-8">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+                <p class="bs-section-kicker">Account</p>
+                <h1 class="mt-2 text-3xl font-black tracking-tight text-slate-950">@HeaderTitle</h1>
+                <p class="mt-2 text-sm leading-6 text-slate-600">@HeaderCopy</p>
+            </div>
+
+            <div class="bs-toolbar-cluster">
+                <a href="/account/orders" class="bs-button bs-button-secondary">Orders</a>
+                <a href="/account/notifications" class="bs-button bs-button-ghost">Notifications</a>
+                <a href="/account/checkout" class="bs-button bs-button-primary">Checkout</a>
+                @if (_isAdmin)
+                {
+                    <a href="/admin" class="bs-button bs-button-accent">Admin</a>
+                }
+            </div>
+        </div>
+    </header>
+
+    <div class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+        <section class="bs-panel p-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Recent orders</p>
+                    <h2 class="mt-2 text-2xl font-bold text-slate-950">Latest activity</h2>
+                </div>
+                <a href="/account/orders" class="bs-button bs-button-secondary">Open all orders</a>
+            </div>
+
+            @if (_loadingOrders)
+            {
+                <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">Loading your orders...</div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_ordersError))
+            {
+                <div class="mt-5 rounded-3xl border border-red-200 bg-red-50 px-5 py-8 text-center text-sm text-red-700">
+                    <div>@_ordersError</div>
+                    <button type="button" class="bs-button bs-button-primary mt-4" @onclick="RetryLoadOrdersAsync">Retry</button>
+                </div>
+            }
+            else if (_recentOrders.Count == 0)
+            {
+                <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-8">
+                    <p class="text-lg font-semibold text-slate-950">No orders yet</p>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">Completed storefront checkout will place confirmed orders here for later tracking.</p>
+                    @if (HasPublicStorefrontUrl)
+                    {
+                        <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost mt-4">Open storefront</a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="mt-5 space-y-3">
+                    @foreach (var order in _recentOrders)
+                    {
+                        <article class="rounded-3xl border border-slate-200 bg-white/90 px-5 py-4 shadow-sm shadow-slate-200/60">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <h3 class="text-lg font-bold text-slate-950">@order.Reference</h3>
+                                        <span class="bs-chip">@order.ShippingStatus</span>
+                                    </div>
+                                    <p class="mt-2 text-sm leading-6 text-slate-600">Placed @order.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
+                                </div>
+
+                                <div class="text-sm text-slate-600 lg:text-right">
+                                    <div>Total: <span class="font-semibold text-slate-950">€ @order.TotalAmount.ToString("F2")</span></div>
+                                    <div class="mt-1">Items: <span class="font-semibold text-slate-950">@order.Lines.Sum(line => line.Quantity)</span></div>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
+                                <a href="@($"/account/orders/{order.Id}")" class="bs-button bs-button-primary">View details</a>
+                                @if (!string.IsNullOrWhiteSpace(order.TrackingUrl))
+                                {
+                                    <a href="@order.TrackingUrl" target="_blank" rel="noopener" class="bs-button bs-button-secondary">Track shipment</a>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+        <div class="space-y-4">
+            <section class="bs-panel-soft p-6">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Profile summary</p>
+                        <h2 class="mt-2 text-2xl font-bold text-slate-950">@DisplayName</h2>
+                    </div>
+                    @if (_isAdmin)
+                    {
+                        <span class="bs-chip-accent">Admin enabled</span>
+                    }
+                </div>
+
+                <div class="mt-5 space-y-3 text-sm text-slate-700">
+                    <div class="rounded-2xl border border-white/40 bg-white/80 px-4 py-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Email</div>
+                        <div class="mt-2 font-semibold text-slate-950">@DisplayEmail</div>
+                    </div>
+                    <div class="rounded-2xl border border-white/40 bg-white/80 px-4 py-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Role access</div>
+                        <div class="mt-2 font-semibold text-slate-950">@(_isAdmin ? "Account and admin" : "Account")</div>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex flex-wrap gap-3 text-sm font-semibold">
+                    <a href="/account/profile" class="bs-button bs-button-secondary">Edit profile</a>
+                    <a href="/account/settings" class="bs-button bs-button-ghost">Security settings</a>
+                </div>
+            </section>
+
+            <section class="bs-panel-soft p-6">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Notifications</p>
+                        <h2 class="mt-2 text-2xl font-bold text-slate-950">Inbox status</h2>
+                    </div>
+
+                    @if (NotificationService.UnreadCount > 0)
+                    {
+                        <span class="bs-chip-accent">@NotificationService.UnreadCount unread</span>
+                    }
+                    else
+                    {
+                        <span class="bs-chip">All read</span>
+                    }
+                </div>
+
+                @if (RecentNotifications.Any())
+                {
+                    <div class="mt-5 space-y-3">
+                        @foreach (var notification in RecentNotifications)
+                        {
+                            <div class="rounded-2xl border border-white/40 bg-white/80 px-4 py-4 text-sm">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold text-slate-950">@notification.Heading</div>
+                                        <div class="mt-1 text-slate-600">@notification.Message</div>
+                                    </div>
+                                    @if (!notification.IsRead)
+                                    {
+                                        <span class="bs-chip-accent">New</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="mt-5 text-sm leading-6 text-slate-600">No recent notifications yet.</p>
+                }
+
+                <a href="/account/notifications" class="bs-button bs-button-secondary mt-5">Open inbox</a>
+            </section>
+
+            <section class="bs-panel-soft p-6">
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Actions</p>
+                <div class="mt-5 flex flex-col gap-3 text-sm font-semibold">
+                    <a href="/account/checkout" class="bs-button bs-button-primary">Continue checkout</a>
+                    <a href="/account/orders" class="bs-button bs-button-secondary">Review order history</a>
+                    <a href="/account/settings" class="bs-button bs-button-ghost">Manage account settings</a>
+                    @if (HasPublicStorefrontUrl)
+                    {
+                        <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost">Open storefront</a>
+                    }
+                </div>
+            </section>
+        </div>
+    </div>
+</section>
+
+@code {
+    private readonly List<GetOrder> _recentOrders = [];
+    private bool _loadingOrders = true;
+    private bool _isAdmin;
+    private string _userName = string.Empty;
+    private string _userEmail = string.Empty;
+    private string? _ordersError;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+    private IEnumerable<AppNotification> RecentNotifications => NotificationService.Notifications.Take(3);
+
+    private string DisplayName => string.IsNullOrWhiteSpace(_userName) ? "Account dashboard" : _userName;
+
+    private string DisplayEmail => string.IsNullOrWhiteSpace(_userEmail) ? "No email available" : _userEmail;
+
+    private string HeaderTitle => string.IsNullOrWhiteSpace(_userName) ? "Account dashboard" : $"Welcome back, {_userName}";
+
+    private string HeaderCopy => string.IsNullOrWhiteSpace(_userEmail)
+        ? "Your signed-in routes are ready."
+        : $"Signed in as {_userEmail}. Orders, notifications, settings, and checkout continuation are available here.";
+
+    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
+
+    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+
+    protected override async Task OnInitializedAsync()
+    {
+        NotificationService.OnChange += HandleNotificationsChanged;
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+
+        await LoadUserStateAsync(AuthenticationStateTask);
+
+        await LoadRecentOrdersAsync();
+    }
+
+    private async Task LoadUserStateAsync(Task<AuthenticationState>? authenticationStateTask = null)
+    {
+        var user = authenticationStateTask is null
+            ? (await AuthStateProvider.GetAuthenticationStateAsync()).User
+            : (await authenticationStateTask).User;
+
+        _isAdmin = user.IsInRole(Constant.Administration.AdminRole);
+        _userEmail = user.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Email)?.Value ?? string.Empty;
+        _userName = user.Claims.FirstOrDefault(claim => claim.Type == "FullName")?.Value ?? _userEmail;
+    }
+
+    private async Task LoadRecentOrdersAsync()
+    {
+        _loadingOrders = true;
+        _ordersError = null;
+        _recentOrders.Clear();
+
+        var client = await HttpClientHelper.GetPrivateClientAsync();
+        var api = new ApiCall { Client = client, Route = Constant.Cart.GetUserOrders, Type = Constant.ApiCallType.Get };
+        var http = await ApiCallHelper.ApiCallTypeCall<object>(api);
+        var ordersResult = await ApiCallHelper.GetQueryResult<IEnumerable<GetOrder>>(
+            http,
+            "We couldn't load your dashboard orders right now. Please try again.");
+
+        if (QueryFailureNotifier.TryNotifyFailure(ordersResult, "Orders", showToast: false))
+        {
+            _ordersError = FeedbackMessageResolver.ResolveQueryFailure(ordersResult, "We couldn't load your dashboard orders right now. Please try again.");
+            _loadingOrders = false;
+            return;
+        }
+
+        _recentOrders.AddRange((ordersResult.Data ?? []).OrderByDescending(order => order.CreatedOn).Take(3));
+        _loadingOrders = false;
+    }
+
+    private Task RetryLoadOrdersAsync()
+    {
+        return LoadRecentOrdersAsync();
+    }
+
+    private void HandleNotificationsChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadUserStateAsync(authenticationStateTask);
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnChange -= HandleNotificationsChanged;
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+    }
+}

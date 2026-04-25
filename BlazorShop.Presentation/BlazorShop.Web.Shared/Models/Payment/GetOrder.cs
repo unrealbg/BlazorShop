@@ -30,6 +30,8 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
         public string? CustomerEmail { get; set; }
 
+        public string? AdminNote { get; set; }
+
         public IEnumerable<GetOrderLine> Lines { get; set; } = Array.Empty<GetOrderLine>();
     }
 }

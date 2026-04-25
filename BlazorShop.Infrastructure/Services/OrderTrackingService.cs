@@ -16,10 +16,13 @@ namespace BlazorShop.Infrastructure.Services
             _email = email;
         }
 
-        public async Task UpdateTrackingAsync(Guid orderId, string carrier, string trackingNumber, string trackingUrl)
+        public async Task<bool> UpdateTrackingAsync(Guid orderId, string carrier, string trackingNumber, string trackingUrl)
         {
             var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == orderId);
-            if (order == null) return;
+            if (order == null)
+            {
+                return false;
+            }
 
             order.ShippingCarrier = carrier;
             order.TrackingNumber = trackingNumber;
@@ -34,12 +37,17 @@ namespace BlazorShop.Infrastructure.Services
 <li>Tracking URL: <a href=""{trackingUrl}"">{trackingUrl}</a></li>
 </ul>
 <p>You can always check your order status in the My Orders page.</p>");
+
+            return true;
         }
 
-        public async Task UpdateShippingStatusAsync(Guid orderId, string shippingStatus, DateTime? shippedOn = null, DateTime? deliveredOn = null)
+        public async Task<bool> UpdateShippingStatusAsync(Guid orderId, string shippingStatus, DateTime? shippedOn = null, DateTime? deliveredOn = null)
         {
             var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == orderId);
-            if (order == null) return;
+            if (order == null)
+            {
+                return false;
+            }
 
             order.ShippingStatus = shippingStatus;
             order.ShippedOn = shippedOn ?? order.ShippedOn;
@@ -49,6 +57,8 @@ namespace BlazorShop.Infrastructure.Services
 
             _ = NotifyAsync(order.UserId, "Shipping status updated", $@"<p>Your order <b>{order.Reference}</b> shipping status changed to <b>{shippingStatus}</b>.</p>
 <p>You can track your order in the My Orders page.</p>");
+
+                return true;
         }
 
         private async Task NotifyAsync(string? userId, string subject, string body)

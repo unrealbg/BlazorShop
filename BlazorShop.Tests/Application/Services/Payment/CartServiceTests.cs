@@ -74,44 +74,67 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 {
                     ProductId = Guid.NewGuid(),
                     Quantity = 2,
-                    UserId = "user123"
+                    UserId = "spoofed-user"
                 }
             };
             var mappedData = new List<OrderItem>();
+            List<CreateOrderItem>? capturedItems = null;
             _mapperMock
-                .Setup(m => m.Map<IEnumerable<OrderItem>>(orderItems))
+                .Setup(m => m.Map<IEnumerable<OrderItem>>(It.IsAny<object>()))
+                .Callback<object>(items => capturedItems = ((IEnumerable<CreateOrderItem>)items).ToList())
                 .Returns(mappedData);
             _cartMock
                 .Setup(c => c.SaveCheckoutHistory(mappedData))
                 .ReturnsAsync(1);
 
             // Act
-            var result = await _cartService.SaveCheckoutHistoryAsync(orderItems);
+            var result = await _cartService.SaveCheckoutHistoryAsync("user123", orderItems);
 
             // Assert
             Assert.True(result.Success);
             Assert.Equal("Checkout history saved successfully", result.Message);
+            Assert.NotNull(capturedItems);
+            Assert.Single(capturedItems!);
+            Assert.All(capturedItems!, item => Assert.Equal("user123", item.UserId));
         }
 
         [Fact]
         public async Task SaveCheckoutHistoryAsync_ShouldReturnFailure_WhenHistoryNotSaved()
         {
             // Arrange
-            var orderItems = new List<CreateOrderItem>();
+            var orderItems = new List<CreateOrderItem>
+            {
+                new()
+                {
+                    ProductId = Guid.NewGuid(),
+                    Quantity = 1,
+                    UserId = "other-user",
+                }
+            };
             var mappedData = new List<OrderItem>();
             _mapperMock
-                .Setup(m => m.Map<IEnumerable<OrderItem>>(orderItems))
+                .Setup(m => m.Map<IEnumerable<OrderItem>>(It.IsAny<object>()))
                 .Returns(mappedData);
             _cartMock
                 .Setup(c => c.SaveCheckoutHistory(mappedData))
                 .ReturnsAsync(0);
 
             // Act
-            var result = await _cartService.SaveCheckoutHistoryAsync(orderItems);
+            var result = await _cartService.SaveCheckoutHistoryAsync("user123", orderItems);
 
             // Assert
             Assert.False(result.Success);
             Assert.Equal("Failed to save checkout history", result.Message);
+        }
+
+        [Fact]
+        public async Task SaveCheckoutHistoryAsync_ShouldReturnFailure_WhenUserIdIsMissing()
+        {
+            var result = await _cartService.SaveCheckoutHistoryAsync(string.Empty, Array.Empty<CreateOrderItem>());
+
+            Assert.False(result.Success);
+            Assert.Equal("A signed-in user is required to save checkout history.", result.Message);
+            _cartMock.Verify(cart => cart.SaveCheckoutHistory(It.IsAny<IEnumerable<OrderItem>>()), Times.Never);
         }
 
         [Fact]
@@ -191,6 +214,53 @@ namespace BlazorShop.Tests.Application.Services.Payment
             // Assert
             Assert.False(result.Success);
             Assert.Equal("Invalid payment method", result.Message);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_ShouldPersistRealOrder_ForConfirmedCheckout()
+        {
+            // Arrange
+            var productId = Guid.NewGuid();
+            var carts = new List<ProcessCart>
+            {
+                new ProcessCart
+                {
+                    ProductId = productId,
+                    Quantity = 2,
+                }
+            };
+            var products = new List<Product>
+            {
+                new Product
+                {
+                    Id = productId,
+                    Price = 12.5m,
+                }
+            };
+            Order? createdOrder = null;
+
+            _productReadRepositoryMock
+                .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(products.ToDictionary(product => product.Id));
+
+            _orderRepositoryMock
+                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
+                .Callback<Order>(order => createdOrder = order)
+                .ReturnsAsync(Guid.NewGuid());
+
+            // Act
+            var result = await _cartService.ConfirmOrderAsync(carts, "user-1", "Paid");
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.NotNull(createdOrder);
+            Assert.Equal("user-1", createdOrder!.UserId);
+            Assert.Equal("Paid", createdOrder.Status);
+            Assert.Equal(25m, createdOrder.TotalAmount);
+            Assert.Single(createdOrder.Lines);
+            Assert.Equal(2, createdOrder.Lines.First().Quantity);
+            Assert.Equal(12.5m, createdOrder.Lines.First().UnitPrice);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Once);
         }
 
         [Fact]

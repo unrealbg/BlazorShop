@@ -13,6 +13,7 @@ namespace BlazorShop.API
     using BlazorShop.Infrastructure;
     using BlazorShop.Infrastructure.Data;
 
+    using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Connections;
     using Microsoft.AspNetCore.Builder;
@@ -37,6 +38,7 @@ namespace BlazorShop.API
         {
             var builder = WebApplication.CreateBuilder(args);
             var runtimeSection = builder.Configuration.GetSection(ApiRuntimeOptions.SectionName);
+            var identitySection = builder.Configuration.GetSection(IdentityConfirmationOptions.SectionName);
             var runtimeOptions = runtimeSection.Get<ApiRuntimeOptions>() ?? new ApiRuntimeOptions();
             var allowedCorsOrigins = ResolveAllowedCorsOrigins(runtimeOptions, builder.Configuration);
 
@@ -95,6 +97,19 @@ namespace BlazorShop.API
 
             builder.Services.AddInfrastructure(builder.Configuration);
             builder.Services.AddApplication(builder.Configuration);
+            builder.Services.AddOptions<IdentityConfirmationOptions>()
+                .Bind(identitySection)
+                .ValidateOnStart();
+            builder.Services.Configure<IdentityOptions>(options =>
+            {
+                // Development can relax confirmation requirements for local auth-flow testing.
+                options.SignIn.RequireConfirmedAccount = identitySection.GetValue(
+                    nameof(IdentityConfirmationOptions.RequireConfirmedAccount),
+                    options.SignIn.RequireConfirmedAccount);
+                options.SignIn.RequireConfirmedEmail = identitySection.GetValue(
+                    nameof(IdentityConfirmationOptions.RequireConfirmedEmail),
+                    options.SignIn.RequireConfirmedEmail);
+            });
             builder.Services.AddHealthChecks()
                 .AddCheck<AppDbContextHealthCheck>("database", tags: ["ready"]);
             builder.Services.AddCors(

@@ -13,10 +13,12 @@
     public class CategoryController : ControllerBase
     {
         private readonly ICategoryService _categoryService;
+        private readonly IPublicCatalogService _publicCatalogService;
 
-        public CategoryController(ICategoryService categoryService)
+        public CategoryController(ICategoryService categoryService, IPublicCatalogService publicCatalogService)
         {
             _categoryService = categoryService;
+            _publicCatalogService = publicCatalogService;
         }
 
         /// <summary>
@@ -25,6 +27,14 @@
         /// <returns>List of categories.</returns>
         [HttpGet("all")]
         public async Task<ActionResult<IEnumerable<GetCategory>>> GetAll()
+        {
+            var categories = await _publicCatalogService.GetPublishedCategoriesAsync();
+            return this.Ok(categories);
+        }
+
+        [HttpGet("all/admin")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<IEnumerable<GetCategory>>> GetAllForAdmin()
         {
             var categories = await _categoryService.GetAllAsync();
             return this.Ok(categories);
@@ -38,7 +48,7 @@
         [HttpGet("single/{id}")]
         public async Task<ActionResult<GetCategory>> GetById(Guid id)
         {
-            var category = await _categoryService.GetByIdAsync(id);
+            var category = await _publicCatalogService.GetPublishedCategoryByIdAsync(id);
             return category != null ? this.Ok(category) : this.NotFound();
         }
 
@@ -87,9 +97,15 @@
         /// <param name="categoryId">The ID of the category. </param>
         /// <returns>List of products by category.</returns>
         [HttpGet("products-by-category/{categoryId}")]
-        public async Task<ActionResult<IEnumerable<GetProduct>>> GetProductsByCategory(Guid categoryId)
+        public async Task<ActionResult<IReadOnlyList<GetCatalogProduct>>> GetProductsByCategory(Guid categoryId)
         {
-            var results = await _categoryService.GetProductsByCategoryAsync(categoryId);
+            var category = await _publicCatalogService.GetPublishedCategoryByIdAsync(categoryId);
+            if (category is null)
+            {
+                return this.NotFound();
+            }
+
+            var results = await _publicCatalogService.GetPublishedProductsByCategoryAsync(categoryId);
             return this.Ok(results);
         }
     }

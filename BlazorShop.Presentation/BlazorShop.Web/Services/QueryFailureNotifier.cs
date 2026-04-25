@@ -18,11 +18,16 @@ namespace BlazorShop.Web.Services
             _notificationService = notificationService;
         }
 
-        public bool TryNotifyFailure<T>(QueryResult<T> result, string heading = "Error", ToastPosition position = ToastPosition.TopRight)
+        public bool TryNotifyFailure<T>(QueryResult<T> result, string heading = "Error", ToastPosition position = ToastPosition.TopRight, bool showToast = true)
         {
             if (result.Success)
             {
                 return false;
+            }
+
+            if (!showToast)
+            {
+                return true;
             }
 
             var now = DateTimeOffset.UtcNow;
@@ -38,7 +43,7 @@ namespace BlazorShop.Web.Services
                 Level = ToastLevel.Error,
                 Kind = NotificationKind.General,
                 Heading = heading,
-                Message = result.Message,
+                Message = FeedbackMessageResolver.ResolveQueryFailure(result),
                 IconClass = ToastIcon.Error,
                 Position = position,
             });

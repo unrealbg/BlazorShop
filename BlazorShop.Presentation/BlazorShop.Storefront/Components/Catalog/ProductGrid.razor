@@ -1,0 +1,25 @@
+@if (Products.Count > 0)
+{
+    <ul class="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        @foreach (var product in Products)
+        {
+            <li class="h-full">
+                <ProductCard Product="product" />
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <div class="rounded-md bg-blue-50 px-6 py-5 text-center text-sm text-blue-800 shadow">
+        @EmptyMessage
+    </div>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<GetCatalogProduct> Products { get; set; } = Array.Empty<GetCatalogProduct>();
+
+    [Parameter]
+    public string EmptyMessage { get; set; } = "No products are available right now.";
+}

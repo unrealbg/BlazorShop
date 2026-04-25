@@ -5,7 +5,9 @@
 
     public interface ICartService
     {
-        Task<ServiceResponse> SaveCheckoutHistoryAsync(IEnumerable<CreateOrderItem> orderItems);
+        Task<ServiceResponse> SaveCheckoutHistoryAsync(string userId, IEnumerable<CreateOrderItem> orderItems);
+
+        Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<ProcessCart> carts, string userId, string? status = null);
 
         Task<ServiceResponse> CheckoutAsync(Checkout checkout);
 

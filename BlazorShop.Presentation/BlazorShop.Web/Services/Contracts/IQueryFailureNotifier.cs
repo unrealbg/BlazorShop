@@ -5,6 +5,6 @@ namespace BlazorShop.Web.Services.Contracts
 
     public interface IQueryFailureNotifier
     {
-        bool TryNotifyFailure<T>(QueryResult<T> result, string heading = "Error", ToastPosition position = ToastPosition.TopRight);
+        bool TryNotifyFailure<T>(QueryResult<T> result, string heading = "Error", ToastPosition position = ToastPosition.TopRight, bool showToast = true);
     }
 }

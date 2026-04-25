@@ -1,0 +1,168 @@
+﻿@page "/admin/categories"
+@using BlazorShop.Web.Services
+
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
+    <div class="bs-panel bs-page-hero p-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="bs-section-kicker">Admin</p>
+                <h2 class="mt-2 text-2xl font-bold text-slate-950">Manage categories</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-600">Keep category structure and category-level SEO management inside the admin surface.</p>
+            </div>
+            <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" @onclick="AddCategory" disabled="@(_isCategoriesLoading || IsSavingCategory || IsUpdatingCategory || IsDeletingCategory)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16"/></svg>
+                Add Category
+            </button>
+        </div>
+
+        <div class="bs-table-shell mt-6 overflow-auto max-h-500">
+            @if (_isCategoriesLoading)
+            {
+                <div class="bs-panel-soft mt-6 px-6 py-5 text-center text-sm text-neutral-600">
+                    Loading categories...
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_categoriesError))
+            {
+                <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-center text-sm text-red-700">
+                    <div>@_categoriesError</div>
+                    <div class="mt-4">
+                        <button type="button" class="bs-button bs-button-primary" @onclick="GetCategories">Retry</button>
+                    </div>
+                </div>
+            }
+            else if (_categories.Any())
+            {
+                <table class="min-w-full text-sm">
+                    <thead class="sticky top-0 z-10">
+                        <tr class="bg-slate-50/90 text-left">
+                            <th class="px-3 py-2">Id</th>
+                            <th class="px-3 py-2">Name</th>
+                            <th class="px-3 py-2 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-neutral-200">
+                        @foreach (var category in _categories)
+                        {
+                            <tr>
+                                <td class="px-3 py-2">@category.Id</td>
+                                <td class="px-3 py-2">@category.Name</td>
+                                <td class="px-3 py-2">
+                                    <div class="flex items-center justify-center gap-3">
+                                        <button title="Edit" class="bs-icon-button h-10 w-10 text-sky-700" @onclick="async () => await StartEdit(category)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                        </button>
+                                        <button class="bs-icon-button h-10 w-10 text-red-700" title="Delete" @onclick="() => ConfirmDelete(category.Id)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="bs-panel-soft mt-6 px-6 py-5 text-center font-semibold text-blue-800">
+                    No categories found.
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<!-- Add Category Dialog -->
+<ModalDialog @bind-IsVisible="_showDialog">
+    <Header>
+        <h5 class="text-lg font-semibold">Add New Category</h5>
+    </Header>
+    <Body>
+        <EditForm Model="_category" OnValidSubmit="SaveCategory">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="mb-4 text-sm text-red-700" />
+            <div class="p-2">
+                <FloatingTextInput @bind-Value="_category.Name" Label="Category Name" class="w-full" />
+                <ValidationMessage For="@(() => _category.Name)" />
+            </div>
+            <hr />
+            <div class="flex justify-end gap-2">
+                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsSavingCategory">@(IsSavingCategory ? "Saving..." : "Save")</button>
+                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60" type="button" @onclick="Cancel" disabled="@IsSavingCategory">Cancel</button>
+            </div>
+        </EditForm>
+    </Body>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showEditDialog">
+    <Header>
+        <h5 class="text-lg font-semibold">Edit Category</h5>
+    </Header>
+    <Body>
+        <div class="mb-4 flex flex-wrap gap-2 border-b border-neutral-200 pb-3">
+            <button type="button" class="rounded-full px-4 py-1.5 text-sm font-semibold @(_activeEditTab == CategoryEditorTab.Details ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700")" @onclick="() => _activeEditTab = CategoryEditorTab.Details">Details</button>
+            <button type="button" class="rounded-full px-4 py-1.5 text-sm font-semibold @(_activeEditTab == CategoryEditorTab.Seo ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700")" @onclick="() => _activeEditTab = CategoryEditorTab.Seo">SEO</button>
+        </div>
+
+        @if (_activeEditTab == CategoryEditorTab.Details)
+        {
+            <EditForm Model="_editCategory" OnValidSubmit="UpdateCategoryAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-4 text-sm text-red-700" />
+                <div class="p-2">
+                    <label class="block text-sm text-neutral-700 mb-1">Category Name</label>
+                    <InputText @bind-Value="_editCategory.Name" class="w-full border rounded px-3 py-2" autofocus />
+                    <ValidationMessage For="@(() => _editCategory.Name)" />
+                </div>
+                <hr class="my-4" />
+                <div class="flex justify-end gap-2">
+                    <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsUpdatingCategory">@(IsUpdatingCategory ? "Updating..." : "Update")</button>
+                    <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@IsUpdatingCategory">Cancel</button>
+                </div>
+            </EditForm>
+        }
+        else if (_isCategorySeoLoading)
+        {
+            <div class="bs-panel-soft px-4 py-6 text-sm text-neutral-600">
+                Loading category SEO…
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_categorySeoError))
+        {
+            <div class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+                <div>@_categorySeoError</div>
+                <div class="mt-3 flex gap-2">
+                    <button type="button" class="bs-button bs-button-primary" @onclick="RetryLoadCategorySeoAsync">Retry</button>
+                    <button type="button" class="bs-button bs-button-ghost" @onclick="CancelEdit">Close</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <EditForm Model="_editCategorySeo" OnValidSubmit="SaveCategorySeoAsync">
+                <DataAnnotationsValidator />
+                <div class="space-y-6">
+                    <SeoFieldsEditor Model="_editCategorySeo" />
+                    <div class="flex justify-end gap-2">
+                        <button class="bs-button bs-button-primary disabled:opacity-60" type="submit" disabled="@_isCategorySeoSaving">@(_isCategorySeoSaving ? "Saving..." : "Save SEO")</button>
+                        <button class="bs-button bs-button-ghost disabled:opacity-60" type="button" @onclick="() => _activeEditTab = CategoryEditorTab.Details" disabled="@_isCategorySeoSaving">Back</button>
+                        <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@_isCategorySeoSaving">Close</button>
+                    </div>
+                </div>
+            </EditForm>
+        }
+    </Body>
+</ModalDialog>
+
+<ModalDialog @bind-IsVisible="_showConfirmDeleteDialog">
+    <Header>
+        <h5 class="text-lg font-semibold">Confirm Delete</h5>
+    </Header>
+    <Body>
+        Are you sure you want to delete the category
+    </Body>
+    <Footer>
+        <button class="bs-button bs-button-danger disabled:opacity-60 disabled:cursor-not-allowed" @onclick="DeleteCategoryConfirmed" disabled="@IsDeletingCategory">@(IsDeletingCategory ? "Deleting..." : "Yes, Delete")</button>
+        <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="CancelDelete" disabled="@IsDeletingCategory">Cancel</button>
+    </Footer>
+</ModalDialog>
