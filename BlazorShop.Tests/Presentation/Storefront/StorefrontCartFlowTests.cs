@@ -188,7 +188,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
                     return _baseUrl;
                 }
 
-                if (Uri.TryCreate(relativeOrAbsoluteUrl.Trim(), UriKind.Absolute, out var absoluteUri))
+                if (TryCreateHttpAbsoluteUri(relativeOrAbsoluteUrl, out var absoluteUri))
                 {
                     return absoluteUri.ToString();
                 }
@@ -198,6 +198,12 @@ namespace BlazorShop.Tests.Presentation.Storefront
                     : $"/{relativeOrAbsoluteUrl}";
 
                 return new Uri(new Uri(_baseUrl, UriKind.Absolute), relativePath).ToString();
+            }
+
+            private static bool TryCreateHttpAbsoluteUri(string value, out Uri uri)
+            {
+                return Uri.TryCreate(value.Trim(), UriKind.Absolute, out uri!)
+                    && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
             }
         }
     }

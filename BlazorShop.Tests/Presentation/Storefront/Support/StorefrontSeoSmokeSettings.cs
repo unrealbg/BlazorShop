@@ -105,7 +105,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             var productPath = ReadRequiredRoutePath(getValue, ProductPathEnvironmentVariableName, StorefrontRoutes.Product("metro-runner"));
             var missingPath = ReadRequiredRoutePath(getValue, MissingPathEnvironmentVariableName, StorefrontRoutes.Product("missing-product"));
             var redirectSourcePath = ReadOptionalRoutePath(getValue, RedirectSourcePathEnvironmentVariableName, DefaultRedirectSourcePath);
-            var redirectTargetPath = ReadOptionalRouteOrAbsoluteUrl(getValue, RedirectTargetPathEnvironmentVariableName, DefaultRedirectTargetPath);
+            var redirectTargetPath = ReadOptionalRoutePath(getValue, RedirectTargetPathEnvironmentVariableName, DefaultRedirectTargetPath);
             var redirectExpectedStatusCode = ReadRedirectStatusCode(getValue);
 
             if (string.IsNullOrWhiteSpace(redirectSourcePath) != string.IsNullOrWhiteSpace(redirectTargetPath))
@@ -142,29 +142,12 @@ namespace BlazorShop.Tests.Presentation.Storefront
         public string ResolveExpectedCanonicalUrl(string routePathOrAbsoluteUrl)
         {
             EnsureEnabled();
-
-            if (Uri.TryCreate(routePathOrAbsoluteUrl, UriKind.Absolute, out var absoluteUri))
-            {
-                if (absoluteUri.Scheme != Uri.UriSchemeHttp && absoluteUri.Scheme != Uri.UriSchemeHttps)
-                {
-                    throw new InvalidOperationException($"{RedirectTargetPathEnvironmentVariableName} must use http or https when configured as an absolute URL.");
-                }
-
-                return absoluteUri.ToString();
-            }
-
             return ResolveAbsoluteUrl(routePathOrAbsoluteUrl);
         }
 
         public string ToRequestTarget(string routePathOrAbsoluteUrl)
         {
             EnsureEnabled();
-
-            if (Uri.TryCreate(routePathOrAbsoluteUrl, UriKind.Absolute, out var absoluteUri))
-            {
-                return absoluteUri.ToString();
-            }
-
             var normalizedRoutePath = NormalizeRoutePath(routePathOrAbsoluteUrl, nameof(routePathOrAbsoluteUrl));
             return normalizedRoutePath == StorefrontRoutes.Home
                 ? string.Empty
@@ -208,33 +191,6 @@ namespace BlazorShop.Tests.Presentation.Storefront
             }
 
             return statusCode;
-        }
-
-        private static string? ReadOptionalRouteOrAbsoluteUrl(Func<string, string?> getValue, string environmentVariableName, string defaultValue)
-        {
-            var rawValue = getValue(environmentVariableName);
-            if (rawValue is null)
-            {
-                return defaultValue;
-            }
-
-            if (string.IsNullOrWhiteSpace(rawValue))
-            {
-                return null;
-            }
-
-            var trimmedValue = rawValue.Trim();
-            if (Uri.TryCreate(trimmedValue, UriKind.Absolute, out var absoluteUri))
-            {
-                if (absoluteUri.Scheme != Uri.UriSchemeHttp && absoluteUri.Scheme != Uri.UriSchemeHttps)
-                {
-                    throw new InvalidOperationException($"{environmentVariableName} must use http or https when specified as an absolute URL.");
-                }
-
-                return absoluteUri.ToString();
-            }
-
-            return NormalizeRoutePath(trimmedValue, environmentVariableName);
         }
 
         private static string? ReadOptionalRoutePath(Func<string, string?> getValue, string environmentVariableName, string defaultValue)
@@ -304,19 +260,32 @@ namespace BlazorShop.Tests.Presentation.Storefront
                 throw new InvalidOperationException($"{environmentVariableName} must be a non-empty storefront route path.");
             }
 
-            if (Uri.TryCreate(trimmedValue, UriKind.Absolute, out _))
+            if (HasExplicitUriScheme(trimmedValue) || trimmedValue.StartsWith("//", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException($"{environmentVariableName} must be a storefront route path, not an absolute URL.");
             }
 
             if (!trimmedValue.StartsWith("/", StringComparison.Ordinal))
             {
-                trimmedValue = $"/{trimmedValue}";
+                throw new InvalidOperationException($"{environmentVariableName} must begin with '/'.");
             }
 
             return trimmedValue.Length == 1
                 ? StorefrontRoutes.Home
                 : trimmedValue.TrimEnd('/');
+        }
+
+        private static bool HasExplicitUriScheme(string value)
+        {
+            var trimmedValue = value.Trim();
+            var colonIndex = trimmedValue.IndexOf(':');
+            if (colonIndex <= 0)
+            {
+                return false;
+            }
+
+            var firstPathSeparatorIndex = trimmedValue.IndexOfAny(['/', '?', '#']);
+            return firstPathSeparatorIndex < 0 || colonIndex < firstPathSeparatorIndex;
         }
     }
 }

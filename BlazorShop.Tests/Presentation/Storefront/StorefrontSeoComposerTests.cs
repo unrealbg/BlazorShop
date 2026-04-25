@@ -140,9 +140,18 @@ namespace BlazorShop.Tests.Presentation.Storefront
                     return null;
                 }
 
-                return Uri.TryCreate(relativeOrAbsoluteUrl, UriKind.Absolute, out var absoluteUri)
-                    ? absoluteUri.ToString()
-                    : new Uri(new Uri(ResolveBaseUrl(configuredBaseUrl)!, UriKind.Absolute), relativeOrAbsoluteUrl).ToString();
+                if (TryCreateHttpAbsoluteUri(relativeOrAbsoluteUrl, out var absoluteUri))
+                {
+                    return absoluteUri.ToString();
+                }
+
+                return new Uri(new Uri(ResolveBaseUrl(configuredBaseUrl)!, UriKind.Absolute), relativeOrAbsoluteUrl).ToString();
+            }
+
+            private static bool TryCreateHttpAbsoluteUri(string value, out Uri uri)
+            {
+                return Uri.TryCreate(value.Trim(), UriKind.Absolute, out uri!)
+                    && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
             }
         }
     }
