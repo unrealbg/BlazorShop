@@ -32,6 +32,19 @@ namespace BlazorShop.Tests.Presentation.Storefront
         }
 
         [Fact]
+        public void FromLookup_WhenRoutePathIsAbsolute_Throws()
+        {
+            var exception = Assert.Throws<InvalidOperationException>(() => StorefrontSeoSmokeSettings.FromLookup(name => name switch
+            {
+                StorefrontSeoSmokeSettings.BaseUrlEnvironmentVariableName => "https://shop.example.com",
+                StorefrontSeoSmokeSettings.CategoryPathEnvironmentVariableName => "https://shop.example.com/category/sneakers",
+                _ => null,
+            }));
+
+            Assert.Contains(StorefrontSeoSmokeSettings.CategoryPathEnvironmentVariableName, exception.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void FromLookup_WhenRedirectPairIsBlank_DisablesRedirectSmokeOnly()
         {
             var settings = StorefrontSeoSmokeSettings.FromLookup(name => name switch
