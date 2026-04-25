@@ -6,8 +6,9 @@ namespace BlazorShop.Web.Pages.Admin
     using BlazorShop.Web.Shared.Toast;
 
     using Microsoft.AspNetCore.Components;
+    using Microsoft.AspNetCore.Components.Routing;
 
-    public partial class Seo
+    public partial class Seo : IDisposable
     {
         private SeoAdminTab _activeTab = SeoAdminTab.Settings;
         private UpdateSeoSettings _settings = new();
@@ -37,14 +38,15 @@ namespace BlazorShop.Web.Pages.Admin
 
         protected override async Task OnInitializedAsync()
         {
+            NavigationManager.LocationChanged += HandleLocationChanged;
+            UpdateActiveTabFromCurrentUri();
+
             await Task.WhenAll(LoadSettingsAsync(), LoadRedirectsAsync());
         }
 
         protected override void OnParametersSet()
         {
-            _activeTab = NavigationManager.Uri.EndsWith("/admin/redirects", StringComparison.OrdinalIgnoreCase)
-                ? SeoAdminTab.Redirects
-                : SeoAdminTab.Settings;
+            UpdateActiveTabFromCurrentUri();
         }
 
         private async Task LoadSettingsAsync()
@@ -294,6 +296,33 @@ namespace BlazorShop.Web.Pages.Admin
                 StatusCode = SeoValidationConstraints.PermanentRedirectStatusCode,
                 IsActive = true,
             };
+        }
+
+        private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+        {
+            UpdateActiveTabFromUri(args.Location);
+            StateHasChanged();
+        }
+
+        private void UpdateActiveTabFromCurrentUri()
+        {
+            UpdateActiveTabFromUri(NavigationManager.Uri);
+        }
+
+        private void UpdateActiveTabFromUri(string uri)
+        {
+            var relativePath = NavigationManager.ToBaseRelativePath(uri)
+                .Split('?', '#')[0]
+                .TrimEnd('/');
+
+            _activeTab = string.Equals(relativePath, "admin/redirects", StringComparison.OrdinalIgnoreCase)
+                ? SeoAdminTab.Redirects
+                : SeoAdminTab.Settings;
+        }
+
+        public void Dispose()
+        {
+            NavigationManager.LocationChanged -= HandleLocationChanged;
         }
 
         private enum SeoAdminTab
