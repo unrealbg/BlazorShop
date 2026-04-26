@@ -52,10 +52,7 @@
                 <div class="mt-5 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-8">
                     <p class="text-lg font-semibold text-slate-950">No orders yet</p>
                     <p class="mt-2 text-sm leading-6 text-slate-600">Completed storefront checkout will place confirmed orders here for later tracking.</p>
-                    @if (HasPublicStorefrontUrl)
-                    {
-                        <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost mt-4">Open storefront</a>
-                    }
+                    <a href="@ShopHref" class="bs-button bs-button-ghost mt-4">Open storefront</a>
                 </div>
             }
             else
@@ -79,7 +76,7 @@
                                 </div>
                             </div>
 
-                            <div class="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
+                            <div class="bs-action-row mt-4 text-sm font-semibold">
                                 <a href="@($"/account/orders/{order.Id}")" class="bs-button bs-button-primary">View details</a>
                                 @if (!string.IsNullOrWhiteSpace(order.TrackingUrl))
                                 {
@@ -116,7 +113,7 @@
                     </div>
                 </div>
 
-                <div class="mt-5 flex flex-wrap gap-3 text-sm font-semibold">
+                <div class="bs-action-row mt-5 text-sm font-semibold">
                     <a href="/account/profile" class="bs-button bs-button-secondary">Edit profile</a>
                     <a href="/account/settings" class="bs-button bs-button-ghost">Security settings</a>
                 </div>
@@ -173,10 +170,7 @@
                     <a href="/account/checkout" class="bs-button bs-button-primary">Continue checkout</a>
                     <a href="/account/orders" class="bs-button bs-button-secondary">Review order history</a>
                     <a href="/account/settings" class="bs-button bs-button-ghost">Manage account settings</a>
-                    @if (HasPublicStorefrontUrl)
-                    {
-                        <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost">Open storefront</a>
-                    }
+                    <a href="@ShopHref" class="bs-button bs-button-ghost">Open storefront</a>
                 </div>
             </section>
         </div>
@@ -206,9 +200,7 @@
         ? "Your signed-in routes are ready."
         : $"Signed in as {_userEmail}. Orders, notifications, settings, and checkout continuation are available here.";
 
-    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
-
-    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+    private string ShopHref => StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver);
 
     protected override async Task OnInitializedAsync()
     {

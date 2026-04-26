@@ -5,7 +5,7 @@
 <PageTitle>Account Settings</PageTitle>
 
 <section class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-    <header class="bs-panel bs-page-hero p-8">
+    <header class="bs-panel bs-page-hero p-6 sm:p-8">
         <p class="bs-section-kicker">Account Settings</p>
         <h1 class="bs-section-title mt-3">Security and account access</h1>
         <p class="bs-section-copy mt-4">Use this page for password changes and account actions. Public shopping remains separate on the storefront.</p>
@@ -49,10 +49,7 @@
             <div class="mt-4 flex flex-col gap-3 text-sm font-semibold">
                 <a href="/account/profile" class="bs-button bs-button-secondary">Edit profile</a>
                 <a href="/account/orders" class="bs-button bs-button-secondary">Review orders</a>
-                @if (HasPublicStorefrontUrl)
-                {
-                    <a href="@PublicStorefrontUrl" class="bs-button bs-button-ghost">Open storefront</a>
-                }
+                <a href="@ShopHref" class="bs-button bs-button-ghost">Open storefront</a>
                 <a href="/authentication/logout" class="bs-button bs-button-primary">Sign out</a>
             </div>
         </section>
@@ -64,9 +61,7 @@
     private PasswordChangeModel _changePasswordModel = new();
     private string? _errorMessage;
 
-    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
-
-    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+    private string ShopHref => StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver);
 
     private bool IsChangingPassword => _changePasswordGate.IsRunning;
 

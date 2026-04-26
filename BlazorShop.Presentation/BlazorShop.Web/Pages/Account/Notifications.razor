@@ -5,13 +5,13 @@
 
 <section class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
     <div class="bs-panel overflow-hidden">
-        <div class="bs-page-hero border-b border-neutral-200 px-5 py-5 sm:px-6">
+        <div class="bs-page-hero flex flex-col gap-4 border-b border-neutral-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
             <div>
                 <p class="bs-section-kicker">Notifications</p>
                 <h1 class="mt-3 text-3xl font-black tracking-tight text-slate-950">Account inbox</h1>
                 <p class="mt-3 text-sm leading-6 text-slate-600">Recent in-app updates for sign-in, orders, payments, and important account events.</p>
             </div>
-            <div class="mt-5 flex flex-wrap gap-2 sm:mt-0">
+            <div class="bs-action-row md:justify-end">
                 <button class="bs-button bs-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
                         @onclick="MarkAllAsRead"
                         disabled="@(!HasUnread)">

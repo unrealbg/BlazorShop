@@ -47,7 +47,7 @@
                             <div class="font-semibold text-slate-950">@item.ProductName</div>
                             <div class="text-xs text-slate-500">@item.CategoryName</div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 text-sm">
+                        <div class="bs-action-row text-sm lg:justify-end">
                             @StockBadge(item.IsOutOfStock, item.IsLowStock)
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">Product: @item.Quantity</span>
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">Variants: @item.VariantStock</span>
@@ -58,7 +58,7 @@
                     @if (item.Variants.Any())
                     {
                         <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm">
+                            <table class="bs-table-wide min-w-full text-sm">
                                 <thead>
                                     <tr class="text-left">
                                         <th class="px-3 py-2">SKU</th>

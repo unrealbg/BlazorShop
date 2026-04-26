@@ -29,6 +29,19 @@ namespace BlazorShop.Tests.Presentation.Storefront
         }
 
         [Fact]
+        public async Task StorefrontCssStaticAssetEndpoint_ReturnsStylesheetContent()
+        {
+            using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+            });
+
+            using var response = await client.GetAsync("/css/storefront.css");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
         public async Task IconStaticAssetEndpoint_ReturnsBinaryContent()
         {
             using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions

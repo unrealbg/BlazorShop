@@ -124,7 +124,7 @@
                         </section>
                     </div>
 
-                    <div class="mt-6 flex justify-end">
+                    <div class="bs-action-row mt-6 justify-end">
                         <button class="bs-button bs-button-primary disabled:opacity-60" type="submit" disabled="@_isSettingsSaving">@(_isSettingsSaving ? "Saving Settings..." : "Save Settings")</button>
                     </div>
                 </EditForm>
@@ -137,7 +137,7 @@
                     <div class="text-base font-semibold">Redirect Rules</div>
                     <div class="text-sm text-neutral-600">@_redirects.Count redirect(s) configured.</div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="bs-action-row">
                     <button type="button" class="bs-button bs-button-ghost disabled:opacity-60" @onclick="LoadRedirectsAsync" disabled="@(_isRedirectsLoading || _busyRedirectId.HasValue || _isRedirectSaving || _isRedirectDeleting)">Refresh</button>
                     <button type="button" class="bs-button bs-button-primary disabled:opacity-60" @onclick="OpenCreateRedirectDialog" disabled="@(_isRedirectsLoading || _busyRedirectId.HasValue || _isRedirectSaving || _isRedirectDeleting)">Add Redirect</button>
                 </div>
@@ -161,7 +161,7 @@
             else if (_redirects.Any())
             {
                 <div class="bs-table-shell mt-4 overflow-x-auto">
-                    <table class="min-w-full text-sm">
+                    <table class="bs-table-wide min-w-full text-sm">
                         <thead>
                             <tr class="bg-slate-50/90 text-left">
                                 <th class="px-3 py-2">Old Path</th>
@@ -176,8 +176,8 @@
                             @foreach (var redirect in _redirects)
                             {
                                 <tr>
-                                    <td class="px-3 py-2 font-mono text-xs">@redirect.OldPath</td>
-                                    <td class="px-3 py-2 font-mono text-xs">@redirect.NewPath</td>
+                                    <td class="break-all px-3 py-2 font-mono text-xs">@redirect.OldPath</td>
+                                    <td class="break-all px-3 py-2 font-mono text-xs">@redirect.NewPath</td>
                                     <td class="px-3 py-2">
                                         <span class="rounded-full bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-700">@redirect.StatusCode</span>
                                     </td>
@@ -186,7 +186,7 @@
                                     </td>
                                     <td class="px-3 py-2">@redirect.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                                     <td class="px-3 py-2">
-                                        <div class="flex items-center justify-center gap-3">
+                                        <div class="flex flex-wrap items-center justify-center gap-3">
                                             <button type="button" class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenEditRedirectDialog(redirect)" disabled="@(_busyRedirectId.HasValue || _isRedirectSaving || _isRedirectDeleting)">Edit</button>
                                             @if (redirect.IsActive)
                                             {
@@ -248,7 +248,7 @@
             </div>
 
             <hr class="my-4" />
-            <div class="flex justify-end gap-2">
+            <div class="bs-action-row justify-end">
                 <button class="bs-button bs-button-primary disabled:opacity-60" type="submit" disabled="@_isRedirectSaving">@(_isRedirectSaving ? (_editingRedirectId.HasValue ? "Saving..." : "Creating...") : "Save")</button>
                 <button class="bs-button bs-button-ghost disabled:opacity-60" type="button" @onclick="CancelRedirectEdit" disabled="@_isRedirectSaving">Cancel</button>
             </div>

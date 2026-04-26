@@ -1,40 +1,7 @@
 @inherits LayoutComponentBase
 
-<div class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 to-sky-200 text-neutral-900">
-    <header class="relative border-b border-white/10 bg-neutral-900/95 text-neutral-100 shadow-xl">
-        <div class="clip-diagonal pointer-events-none absolute inset-0 border-b border-white/10 bg-neutral-900/95"></div>
-
-        <div class="relative z-10 mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <a href="@StorefrontRoutes.Home" class="inline-flex flex-col leading-none select-none">
-                <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP</span>
-                <span class="mt-1 text-[10px] text-neutral-400">PUBLIC SHOP</span>
-            </a>
-
-            <nav class="flex flex-wrap items-center gap-2 text-sm font-medium">
-                <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Home</NavLink>
-                <NavLink href="@StorefrontRoutes.NewReleases" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">New Releases</NavLink>
-                <NavLink href="@StorefrontRoutes.TodaysDeals" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Today's Deals</NavLink>
-                <NavLink href="@StorefrontRoutes.About" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">About</NavLink>
-                <NavLink href="@StorefrontRoutes.CustomerService" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Customer Service</NavLink>
-            </nav>
-
-            <div class="flex flex-wrap items-center gap-3 text-sm">
-                <a href="@CartUrl"
-                   class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
-                   aria-label="Open cart"
-                   title="Open cart">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H3"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
-                    <span data-storefront-cart-badge hidden class="absolute -right-2 -top-2 hidden inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow">0</span>
-                    <span class="sr-only">Cart</span>
-                </a>
-
-                <StorefrontAccountMenu />
-
-                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">New Releases</a>
-                <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Today's Deals</a>
-            </div>
-        </div>
-    </header>
+<div class="bs-storefront-shell">
+    <StorefrontHeader />
 
     <div data-storefront-toast-region
          class="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-end px-4 sm:px-6 lg:px-8"
@@ -114,7 +81,3 @@
         </div>
     </footer>
 </div>
-
-@code {
-    private string CartUrl => StorefrontRoutes.Cart;
-}

@@ -54,12 +54,27 @@
                 </div>
             </details>
 
-            @if (HasPublicStorefrontUrl)
-            {
-                <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Back to shop</a>
-            }
+            <a href="@ShopHref" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10" title="Back to shop">Back to shop</a>
             <a href="/account/checkout" class="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Checkout</a>
         </Actions>
+        <MobileActions>
+            <a href="@ShopHref" class="inline-flex items-center rounded-md border border-white/20 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10" title="Back to shop">Shop</a>
+        </MobileActions>
+        <MobilePanelActions>
+            <a href="/account/notifications" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">
+                Notifications@(NotificationService.UnreadCount > 0 ? $" ({NotificationService.UnreadCount})" : string.Empty)
+            </a>
+            <a href="/account/profile" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Profile</a>
+            <a href="/account/settings" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Settings</a>
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <a href="/admin" class="rounded-md px-3 py-2 font-semibold text-amber-300 hover:bg-white/10 hover:text-white">Admin panel</a>
+                </Authorized>
+            </AuthorizeView>
+            <a href="@ShopHref" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Back to shop</a>
+            <a href="/account/checkout" class="rounded-md bg-amber-500 px-3 py-2 font-semibold text-white hover:bg-amber-600">Checkout</a>
+            <a href="/authentication/logout" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Sign out</a>
+        </MobilePanelActions>
     </WorkspaceHeader>
 
     <main class="bs-workspace-page bs-shell-stage flex-1">
@@ -75,9 +90,7 @@
 
     private ElementReference _accountDetails;
 
-    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
-
-    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+    private string ShopHref => StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver);
 
     protected override void OnInitialized()
     {
