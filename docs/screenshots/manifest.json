@@ -1,0 +1,244 @@
+{
+  "generatedAt": "2026-04-26T13:09:04.620Z",
+  "screenshots": [
+    {
+      "file": "account-checkout.jpg",
+      "title": "Account Checkout",
+      "app": "web",
+      "url": "/account/checkout",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "account-dashboard.jpg",
+      "title": "Account Dashboard",
+      "app": "web",
+      "url": "/account",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "account-mobile-menu.jpg",
+      "title": "Account Mobile Menu",
+      "app": "web",
+      "url": "/account",
+      "viewport": "390x900"
+    },
+    {
+      "file": "account-notifications.jpg",
+      "title": "Account Notifications",
+      "app": "web",
+      "url": "/account/notifications",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "account-orders.jpg",
+      "title": "Account Orders",
+      "app": "web",
+      "url": "/account/orders",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "account-profile.jpg",
+      "title": "Account Profile",
+      "app": "web",
+      "url": "/account/profile",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "account-settings.jpg",
+      "title": "Account Settings",
+      "app": "web",
+      "url": "/account/settings",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-audit.jpg",
+      "title": "Admin Audit",
+      "app": "web",
+      "url": "/admin/audit",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-categories.jpg",
+      "title": "Admin Categories",
+      "app": "web",
+      "url": "/admin/categories",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-category-add-modal.jpg",
+      "title": "Admin Add Category Modal",
+      "app": "web",
+      "url": "/admin/categories",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-dashboard.jpg",
+      "title": "Admin Dashboard",
+      "app": "web",
+      "url": "/admin",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-inventory.jpg",
+      "title": "Admin Inventory",
+      "app": "web",
+      "url": "/admin/inventory",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-mobile-menu.jpg",
+      "title": "Admin Mobile Menu",
+      "app": "web",
+      "url": "/admin",
+      "viewport": "390x900"
+    },
+    {
+      "file": "admin-orders.jpg",
+      "title": "Admin Orders",
+      "app": "web",
+      "url": "/admin/orders",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-product-add-modal.jpg",
+      "title": "Admin Add Product Modal",
+      "app": "web",
+      "url": "/admin/products",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-products.jpg",
+      "title": "Admin Products",
+      "app": "web",
+      "url": "/admin/products",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-redirects.jpg",
+      "title": "Admin Redirects",
+      "app": "web",
+      "url": "/admin/redirects",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-seo.jpg",
+      "title": "Admin SEO",
+      "app": "web",
+      "url": "/admin/seo",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-settings.jpg",
+      "title": "Admin Settings",
+      "app": "web",
+      "url": "/admin/settings",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "admin-users.jpg",
+      "title": "Admin Users",
+      "app": "web",
+      "url": "/admin/users",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "auth-login.jpg",
+      "title": "Sign In",
+      "app": "web",
+      "url": "/authentication/login/account",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "auth-register.jpg",
+      "title": "Register",
+      "app": "web",
+      "url": "/authentication/register",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-about.jpg",
+      "title": "Storefront About",
+      "app": "storefront",
+      "url": "/about-us",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-account-menu.jpg",
+      "title": "Storefront Account Menu",
+      "app": "storefront",
+      "url": "/",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-cart.jpg",
+      "title": "Storefront Cart",
+      "app": "storefront",
+      "url": "/my-cart",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-category-sneakers.jpg",
+      "title": "Storefront Category",
+      "app": "storefront",
+      "url": "/category/sneakers",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-customer-service.jpg",
+      "title": "Storefront Customer Service",
+      "app": "storefront",
+      "url": "/customer-service",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-faq.jpg",
+      "title": "Storefront FAQ",
+      "app": "storefront",
+      "url": "/faq",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-home.jpg",
+      "title": "Storefront Home",
+      "app": "storefront",
+      "url": "/",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-mobile-menu.jpg",
+      "title": "Storefront Mobile Menu",
+      "app": "storefront",
+      "url": "/",
+      "viewport": "390x900"
+    },
+    {
+      "file": "storefront-new-releases.jpg",
+      "title": "Storefront New Releases",
+      "app": "storefront",
+      "url": "/new-releases",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-product-metro-runner.jpg",
+      "title": "Storefront Product",
+      "app": "storefront",
+      "url": "/product/metro-runner",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "storefront-todays-deals.jpg",
+      "title": "Storefront Today's Deals",
+      "app": "storefront",
+      "url": "/todays-deals",
+      "viewport": "1440x1100"
+    },
+    {
+      "file": "web-workspace-entry.jpg",
+      "title": "Workspace Access",
+      "app": "web",
+      "url": "/",
+      "viewport": "1440x1100"
+    }
+  ],
+  "skipped": []
+}
