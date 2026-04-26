@@ -53,7 +53,7 @@
                                 <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Maintenance message</label><InputTextArea @bind-Value="_store.MaintenanceMessage" class="min-h-28" /></div>
                             </div>
                         </div>
-                        <div class="mt-6 flex justify-end">
+                        <div class="bs-action-row mt-6 justify-end">
                             <button class="bs-button bs-button-primary disabled:opacity-60" disabled="@_isSaving" type="submit">@(_isSaving ? "Saving..." : "Save Store")</button>
                         </div>
                     </EditForm>
@@ -82,7 +82,7 @@
                             <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Order reference prefix</label><InputText @bind-Value="_orders.OrderReferencePrefix" /></div>
                         </div>
                         <div class="mt-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Guest checkout is disabled because checkout currently requires a signed-in account.</div>
-                        <div class="mt-6 flex justify-end">
+                        <div class="bs-action-row mt-6 justify-end">
                             <button class="bs-button bs-button-primary disabled:opacity-60" disabled="@_isSaving" type="submit">@(_isSaving ? "Saving..." : "Save Orders")</button>
                         </div>
                     </EditForm>
@@ -99,7 +99,7 @@
                             </div>
                         </div>
                         <div class="mt-4 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">SMTP passwords and API secrets are never returned by this admin API.</div>
-                        <div class="mt-6 flex justify-end">
+                        <div class="bs-action-row mt-6 justify-end">
                             <button class="bs-button bs-button-primary disabled:opacity-60" disabled="@_isSaving" type="submit">@(_isSaving ? "Saving..." : "Save Notifications")</button>
                         </div>
                     </EditForm>

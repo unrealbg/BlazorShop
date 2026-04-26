@@ -33,7 +33,7 @@
             }
             else if (_categories.Any())
             {
-                <table class="min-w-full text-sm">
+                <table class="bs-table-compact min-w-full text-sm">
                     <thead class="sticky top-0 z-10">
                         <tr class="bg-slate-50/90 text-left">
                             <th class="px-3 py-2">Id</th>
@@ -86,9 +86,9 @@
                 <ValidationMessage For="@(() => _category.Name)" />
             </div>
             <hr />
-            <div class="flex justify-end gap-2">
-                <button class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsSavingCategory">@(IsSavingCategory ? "Saving..." : "Save")</button>
-                <button class="inline-flex items-center rounded bg-red-600 text-white px-4 py-2 font-semibold hover:bg-red-700 disabled:opacity-60" type="button" @onclick="Cancel" disabled="@IsSavingCategory">Cancel</button>
+            <div class="bs-action-row justify-end">
+                <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsSavingCategory">@(IsSavingCategory ? "Saving..." : "Save")</button>
+                <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="Cancel" disabled="@IsSavingCategory">Cancel</button>
             </div>
         </EditForm>
     </Body>
@@ -115,7 +115,7 @@
                     <ValidationMessage For="@(() => _editCategory.Name)" />
                 </div>
                 <hr class="my-4" />
-                <div class="flex justify-end gap-2">
+                <div class="bs-action-row justify-end">
                     <button class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled="@IsUpdatingCategory">@(IsUpdatingCategory ? "Updating..." : "Update")</button>
                     <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@IsUpdatingCategory">Cancel</button>
                 </div>
@@ -131,7 +131,7 @@
         {
             <div class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
                 <div>@_categorySeoError</div>
-                <div class="mt-3 flex gap-2">
+                <div class="bs-action-row mt-3">
                     <button type="button" class="bs-button bs-button-primary" @onclick="RetryLoadCategorySeoAsync">Retry</button>
                     <button type="button" class="bs-button bs-button-ghost" @onclick="CancelEdit">Close</button>
                 </div>
@@ -143,7 +143,7 @@
                 <DataAnnotationsValidator />
                 <div class="space-y-6">
                     <SeoFieldsEditor Model="_editCategorySeo" />
-                    <div class="flex justify-end gap-2">
+                    <div class="bs-action-row justify-end">
                         <button class="bs-button bs-button-primary disabled:opacity-60" type="submit" disabled="@_isCategorySeoSaving">@(_isCategorySeoSaving ? "Saving..." : "Save SEO")</button>
                         <button class="bs-button bs-button-ghost disabled:opacity-60" type="button" @onclick="() => _activeEditTab = CategoryEditorTab.Details" disabled="@_isCategorySeoSaving">Back</button>
                         <button class="bs-button bs-button-danger disabled:opacity-60" type="button" @onclick="CancelEdit" disabled="@_isCategorySeoSaving">Close</button>
