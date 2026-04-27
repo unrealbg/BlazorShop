@@ -1,67 +1,83 @@
-<header class="bs-storefront-header">
-    <div class="bs-storefront-header__inner">
-        <a href="@StorefrontRoutes.Home" class="bs-storefront-header__brand" aria-label="BlazorShop public shop home">
-            <span class="bs-storefront-header__brand-mark">BLAZORSHOP</span>
-            <span class="bs-storefront-header__brand-label">PUBLIC SHOP</span>
-        </a>
+<header class="bs-storefront-header relative text-neutral-100">
+    <div class="bs-storefront-header__shell">
+        <div class="bs-storefront-header__desktop relative px-4 py-4 sm:px-6 lg:px-8">
+            <a href="@StorefrontRoutes.Home" class="bs-storefront-header__brand" aria-label="BlazorShop public shop home">
+                <span class="bs-storefront-header__brand-mark">BLAZORSHOP</span>
+                <span class="bs-storefront-header__brand-label">PUBLIC SHOP</span>
+            </a>
 
-        <nav class="bs-storefront-header__nav" aria-label="Primary shop navigation">
-            <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="bs-storefront-nav-link" ActiveClass="is-active">Home</NavLink>
-            <NavLink href="@StorefrontRoutes.NewReleases" class="bs-storefront-nav-link" ActiveClass="is-active">New Releases</NavLink>
-            <NavLink href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-nav-link" ActiveClass="is-active">Today's Deals</NavLink>
-            <NavLink href="@StorefrontRoutes.About" class="bs-storefront-nav-link" ActiveClass="is-active">About</NavLink>
-            <NavLink href="@StorefrontRoutes.CustomerService" class="bs-storefront-nav-link" ActiveClass="is-active">Customer Service</NavLink>
-        </nav>
+            <nav class="bs-storefront-header__desktop-nav flex flex-1 flex-wrap items-center gap-2 text-sm font-medium lg:justify-center" aria-label="Primary shop navigation">
+                <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="bs-storefront-nav-link" ActiveClass="is-active">Home</NavLink>
+                <NavLink href="@StorefrontRoutes.NewReleases" class="bs-storefront-nav-link" ActiveClass="is-active">New Releases</NavLink>
+                <NavLink href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-nav-link" ActiveClass="is-active">Today's Deals</NavLink>
+                <NavLink href="@StorefrontRoutes.About" class="bs-storefront-nav-link" ActiveClass="is-active">About</NavLink>
+                <NavLink href="@StorefrontRoutes.CustomerService" class="bs-storefront-nav-link" ActiveClass="is-active">Customer Service</NavLink>
+            </nav>
 
-        <div class="bs-storefront-header__actions" aria-label="Shop actions">
-            @CartLink
-            <StorefrontAccountMenu />
-            <a href="@StorefrontRoutes.NewReleases" class="bs-storefront-pill-button">New Releases</a>
-            <a href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-deal-button">Today's Deals</a>
-        </div>
-
-        <div class="bs-storefront-header__mobile-actions" aria-label="Shop shortcuts">
-            @CartLink
-            <StorefrontAccountMenu />
-        </div>
-
-        <details class="bs-storefront-header__menu">
-            <summary class="bs-storefront-menu-button" aria-label="Open shop navigation">
-                <span class="bs-storefront-menu-button__text">Menu</span>
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 7h16M4 12h16M4 17h16" />
-                </svg>
-            </summary>
-
-            <div class="bs-storefront-header__mobile-panel">
-                <nav class="bs-storefront-header__mobile-nav" aria-label="Mobile shop navigation">
-                    <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="bs-storefront-nav-link" ActiveClass="is-active">Home</NavLink>
-                    <NavLink href="@StorefrontRoutes.NewReleases" class="bs-storefront-nav-link" ActiveClass="is-active">New Releases</NavLink>
-                    <NavLink href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-nav-link" ActiveClass="is-active">Today's Deals</NavLink>
-                    <NavLink href="@StorefrontRoutes.About" class="bs-storefront-nav-link" ActiveClass="is-active">About</NavLink>
-                    <NavLink href="@StorefrontRoutes.CustomerService" class="bs-storefront-nav-link" ActiveClass="is-active">Customer Service</NavLink>
-                </nav>
-
-                <div class="bs-storefront-header__mobile-ctas">
-                    <a href="@StorefrontRoutes.NewReleases" class="bs-storefront-pill-button">New Releases</a>
-                    <a href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-deal-button">Today's Deals</a>
-                </div>
+            <div class="bs-storefront-header__desktop-actions flex shrink-0 flex-wrap items-center gap-3 text-sm" aria-label="Shop actions">
+                <a href="@StorefrontRoutes.Cart"
+                   class="bs-storefront-icon-button"
+                   aria-label="Open cart"
+                   title="Open cart">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 6h15l-1.5 9h-12z" />
+                        <path d="M6 6 5 3H3" />
+                        <circle cx="9" cy="20" r="1" />
+                        <circle cx="18" cy="20" r="1" />
+                    </svg>
+                    <span data-storefront-cart-badge hidden class="bs-storefront-cart-badge">0</span>
+                </a>
+                <StorefrontAccountMenu />
+                <a href="@StorefrontRoutes.NewReleases" class="bs-storefront-pill-button">New Releases</a>
+                <a href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-deal-button">Today's Deals</a>
             </div>
-        </details>
+        </div>
+
+        <div class="bs-storefront-header__mobile relative px-4 py-3 sm:px-6">
+            <a href="@StorefrontRoutes.Home" class="bs-storefront-header__brand" aria-label="BlazorShop public shop home">
+                <span class="bs-storefront-header__brand-mark">BLAZORSHOP</span>
+                <span class="bs-storefront-header__brand-label">PUBLIC SHOP</span>
+            </a>
+
+            <div class="bs-storefront-header__mobile-actions" aria-label="Shop shortcuts">
+                <a href="@StorefrontRoutes.Cart"
+                   class="bs-storefront-icon-button"
+                   aria-label="Open cart"
+                   title="Open cart">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 6h15l-1.5 9h-12z" />
+                        <path d="M6 6 5 3H3" />
+                        <circle cx="9" cy="20" r="1" />
+                        <circle cx="18" cy="20" r="1" />
+                    </svg>
+                    <span data-storefront-cart-badge hidden class="bs-storefront-cart-badge">0</span>
+                </a>
+                <StorefrontAccountMenu />
+            </div>
+
+            <details class="bs-storefront-header__menu">
+                <summary class="bs-storefront-menu-button" aria-label="Open shop navigation">
+                    <span class="bs-storefront-menu-button__text">Menu</span>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7h16M4 12h16M4 17h16" />
+                    </svg>
+                </summary>
+
+                <div class="bs-storefront-header__mobile-panel">
+                    <nav class="bs-storefront-header__mobile-nav" aria-label="Mobile shop navigation">
+                        <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" class="bs-storefront-nav-link" ActiveClass="is-active">Home</NavLink>
+                        <NavLink href="@StorefrontRoutes.NewReleases" class="bs-storefront-nav-link" ActiveClass="is-active">New Releases</NavLink>
+                        <NavLink href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-nav-link" ActiveClass="is-active">Today's Deals</NavLink>
+                        <NavLink href="@StorefrontRoutes.About" class="bs-storefront-nav-link" ActiveClass="is-active">About</NavLink>
+                        <NavLink href="@StorefrontRoutes.CustomerService" class="bs-storefront-nav-link" ActiveClass="is-active">Customer Service</NavLink>
+                    </nav>
+
+                    <div class="bs-storefront-header__mobile-panel-actions">
+                        <a href="@StorefrontRoutes.NewReleases" class="bs-storefront-pill-button">New Releases</a>
+                        <a href="@StorefrontRoutes.TodaysDeals" class="bs-storefront-deal-button">Today's Deals</a>
+                    </div>
+                </div>
+            </details>
+        </div>
     </div>
 </header>
-
-@code {
-    private static RenderFragment CartLink => @<a href="@StorefrontRoutes.Cart"
-           class="bs-storefront-icon-button"
-           aria-label="Open cart"
-           title="Open cart">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 6h15l-1.5 9h-12z" />
-            <path d="M6 6 5 3H3" />
-            <circle cx="9" cy="20" r="1" />
-            <circle cx="18" cy="20" r="1" />
-        </svg>
-        <span data-storefront-cart-badge hidden class="bs-storefront-cart-badge">0</span>
-    </a>;
-}

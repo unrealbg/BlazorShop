@@ -14,43 +14,156 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    border-bottom: 1px solid rgba(14, 116, 144, 0.16);
-    background: rgba(255, 255, 255, 0.88);
-    color: #0f172a;
-    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
-    backdrop-filter: blur(18px);
+    background: transparent;
+    color: #f5f5f5;
+    isolation: isolate;
 }
 
-.bs-storefront-header::before {
+.bs-storefront-header__shell {
+    position: relative;
+    width: 100%;
+    margin: 0 auto;
+    isolation: isolate;
+}
+
+.bs-storefront-header__shell::before {
     content: "";
     position: absolute;
-    inset: 0 0 auto;
-    height: 3px;
-    background: linear-gradient(90deg, #0284c7, #f59e0b 52%, #ec4899);
+    inset: 0;
+    z-index: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(23, 23, 23, 0.98);
+    clip-path: none;
+    pointer-events: none;
+    box-shadow: 0 18px 28px rgba(0, 0, 0, 0.18);
 }
 
-.bs-storefront-header__inner {
+.bs-storefront-header__desktop,
+.bs-storefront-header__mobile {
     position: relative;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    z-index: 1;
+}
+
+.bs-storefront-header__desktop {
+    display: none;
+}
+
+.bs-storefront-header__mobile {
+    display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+}
+
+.bs-storefront-header__mobile-actions {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.bs-storefront-header__mobile-actions a,
+.bs-storefront-header__mobile-actions button,
+.bs-storefront-header__mobile-actions summary {
+    min-height: 2.5rem;
+}
+
+.bs-storefront-header__menu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.bs-storefront-header__menu > summary,
+.bs-storefront-menu-button {
+    display: inline-flex;
+    min-height: 2.5rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 0.75rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.bs-storefront-header__menu > summary::-webkit-details-marker,
+.bs-storefront-menu-button::-webkit-details-marker {
+    display: none;
+}
+
+.bs-storefront-menu-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.bs-storefront-header__mobile-panel {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    right: 0;
+    z-index: 70;
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+    background: rgba(23, 23, 23, 0.98);
+    padding: 0.75rem;
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
+}
+
+.bs-storefront-header__mobile-nav,
+.bs-storefront-header__mobile-panel-actions {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.bs-storefront-header__desktop-actions a,
+.bs-storefront-header__desktop-actions button,
+.bs-storefront-header__desktop-actions summary {
+    min-height: 2.5rem;
+}
+
+.bs-storefront-header__mobile-nav a,
+.bs-storefront-header__mobile-panel-actions a,
+.bs-storefront-header__mobile-panel-actions button,
+.bs-storefront-header__mobile-panel-actions summary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
     width: 100%;
-    max-width: 80rem;
-    margin: 0 auto;
-    padding: 0.85rem 1rem;
+    min-height: 2.5rem;
+}
+
+.bs-storefront-header__mobile-nav a {
+    justify-content: flex-start;
+    padding: 0.65rem 0.75rem;
+}
+
+.bs-storefront-header__mobile-panel-actions {
+    margin-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.75rem;
 }
 
 .bs-storefront-header__brand {
     display: inline-flex;
     min-width: 0;
+    min-height: 2.5rem;
     flex-direction: column;
+    justify-content: center;
     color: inherit;
     line-height: 1;
     text-decoration: none;
 }
 
 .bs-storefront-header__brand-mark {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 0.88rem;
     font-weight: 900;
     letter-spacing: 0.12em;
@@ -58,31 +171,10 @@
 
 .bs-storefront-header__brand-label {
     margin-top: 0.3rem;
-    color: #0284c7;
+    color: #a3a3a3;
     font-size: 0.66rem;
     font-weight: 800;
     letter-spacing: 0.16em;
-}
-
-.bs-storefront-header__nav,
-.bs-storefront-header__actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-}
-
-.bs-storefront-header__nav {
-    justify-content: center;
-}
-
-.bs-storefront-header__actions {
-    justify-content: flex-end;
-}
-
-.bs-storefront-header__mobile-actions,
-.bs-storefront-header__menu {
-    display: none;
 }
 
 .bs-storefront-nav-link {
@@ -90,20 +182,19 @@
     align-items: center;
     justify-content: center;
     min-height: 2.5rem;
-    border-radius: 999px;
+    border-radius: 0.375rem;
     padding: 0.55rem 0.85rem;
-    color: #334155;
+    color: #e5e5e5;
     font-size: 0.9rem;
     font-weight: 700;
     text-decoration: none;
-    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .bs-storefront-nav-link:hover,
 .bs-storefront-nav-link.is-active {
-    background: rgba(14, 165, 233, 0.11);
-    color: #075985;
-    box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.14);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
 }
 
 .bs-storefront-icon-button,
@@ -114,26 +205,25 @@
     align-items: center;
     justify-content: center;
     min-height: 2.5rem;
-    border-radius: 999px;
+    border-radius: 0.375rem;
     font-weight: 800;
     text-decoration: none;
-    transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .bs-storefront-icon-button {
     position: relative;
     width: 2.5rem;
     min-width: 2.5rem;
-    border: 1px solid rgba(2, 132, 199, 0.22);
-    background: rgba(255, 255, 255, 0.88);
-    color: #0f172a;
-    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    box-shadow: none;
 }
 
 .bs-storefront-icon-button:hover {
-    border-color: rgba(2, 132, 199, 0.38);
-    background: #ffffff;
-    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.16);
 }
 
 .bs-storefront-icon-button svg,
@@ -150,21 +240,21 @@
 }
 
 .bs-storefront-pill-button {
-    border: 1px solid rgba(2, 132, 199, 0.22);
-    background: rgba(255, 255, 255, 0.82);
-    color: #075985;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
 }
 
 .bs-storefront-pill-button:hover {
-    background: #ffffff;
-    border-color: rgba(2, 132, 199, 0.36);
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .bs-storefront-deal-button {
-    border: 1px solid rgba(217, 119, 6, 0.24);
+    border: 1px solid rgba(245, 158, 11, 0.86);
     background: #f59e0b;
     color: #ffffff;
-    box-shadow: 0 12px 28px rgba(217, 119, 6, 0.22);
+    box-shadow: none;
 }
 
 .bs-storefront-deal-button:hover {
@@ -185,7 +275,7 @@
     color: #ffffff;
     font-size: 0.64rem;
     font-weight: 900;
-    box-shadow: 0 8px 18px rgba(217, 119, 6, 0.3);
+    box-shadow: none;
 }
 
 .bs-storefront-cart-badge[hidden] {
@@ -196,7 +286,8 @@
     position: relative;
 }
 
-.bs-storefront-account-menu__summary {
+.bs-storefront-account-menu__summary,
+.bs-storefront-menu-button {
     cursor: pointer;
     list-style: none;
 }
@@ -213,15 +304,15 @@
     z-index: 80;
     width: min(18rem, calc(100vw - 2rem));
     overflow: hidden;
-    border: 1px solid rgba(14, 116, 144, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 1rem;
-    background: rgba(255, 255, 255, 0.97);
-    color: #0f172a;
-    box-shadow: 0 26px 60px rgba(15, 23, 42, 0.2);
+    background: rgba(23, 23, 23, 0.98);
+    color: #ffffff;
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
 }
 
 .bs-storefront-account-menu__intro {
-    border-bottom: 1px solid rgba(14, 116, 144, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding: 1rem;
 }
 
@@ -232,7 +323,7 @@
 
 .bs-storefront-account-menu__meta {
     margin-top: 0.35rem;
-    color: #64748b;
+    color: #a3a3a3;
     font-size: 0.78rem;
     line-height: 1.45;
 }
@@ -249,133 +340,27 @@
     align-items: center;
     border-radius: 0.75rem;
     padding: 0.55rem 0.75rem;
-    color: #0f172a;
+    color: #f5f5f5;
     font-size: 0.9rem;
     font-weight: 700;
     text-decoration: none;
 }
 
 .bs-storefront-account-menu__link:hover {
-    background: rgba(14, 165, 233, 0.1);
-    color: #075985;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
 }
 
-@media (min-width: 640px) {
-    .bs-storefront-header__inner {
-        padding-right: 1.5rem;
-        padding-left: 1.5rem;
-    }
+.bs-storefront-header__mobile-actions .bs-storefront-account-menu__panel {
+    position: fixed;
+    top: 4.75rem;
+    right: 1rem;
+    width: min(18rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 5.75rem);
+    overflow-y: auto;
 }
 
-@media (min-width: 1024px) {
-    .bs-storefront-header__inner {
-        padding-right: 2rem;
-        padding-left: 2rem;
-    }
-}
-
-@media (max-width: 920px) {
-    .bs-storefront-nav-link {
-        padding-right: 0.65rem;
-        padding-left: 0.65rem;
-        font-size: 0.84rem;
-    }
-
-    .bs-storefront-pill-button,
-    .bs-storefront-deal-button {
-        padding-right: 0.8rem;
-        padding-left: 0.8rem;
-    }
-}
-
-@media (max-width: 767.98px) {
-    .bs-storefront-header__inner {
-        grid-template-columns: minmax(0, 1fr) auto auto;
-        gap: 0.5rem;
-        padding-top: 0.65rem;
-        padding-bottom: 0.65rem;
-    }
-
-    .bs-storefront-header__brand-mark {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .bs-storefront-header__nav,
-    .bs-storefront-header__actions {
-        display: none;
-    }
-
-    .bs-storefront-header__mobile-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .bs-storefront-header__menu {
-        position: relative;
-        display: block;
-    }
-
-    .bs-storefront-menu-button {
-        gap: 0.45rem;
-        padding: 0 0.85rem;
-        border: 1px solid rgba(2, 132, 199, 0.22);
-        background: rgba(255, 255, 255, 0.9);
-        color: #0f172a;
-        cursor: pointer;
-        font-size: 0.85rem;
-        list-style: none;
-        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
-    }
-
-    .bs-storefront-header__mobile-panel {
-        position: absolute;
-        top: calc(100% + 0.65rem);
-        right: 0;
-        z-index: 70;
-        width: min(20rem, calc(100vw - 2rem));
-        max-height: calc(100vh - 5rem);
-        overflow-y: auto;
-        border: 1px solid rgba(14, 116, 144, 0.16);
-        border-radius: 1rem;
-        background: rgba(255, 255, 255, 0.97);
-        padding: 0.75rem;
-        box-shadow: 0 26px 60px rgba(15, 23, 42, 0.2);
-    }
-
-    .bs-storefront-header__mobile-nav,
-    .bs-storefront-header__mobile-ctas {
-        display: grid;
-        gap: 0.4rem;
-    }
-
-    .bs-storefront-header__mobile-ctas {
-        margin-top: 0.75rem;
-        padding-top: 0.75rem;
-        border-top: 1px solid rgba(14, 116, 144, 0.12);
-    }
-
-    .bs-storefront-header__mobile-nav .bs-storefront-nav-link,
-    .bs-storefront-header__mobile-ctas .bs-storefront-pill-button,
-    .bs-storefront-header__mobile-ctas .bs-storefront-deal-button {
-        justify-content: flex-start;
-        width: 100%;
-        min-height: 2.75rem;
-    }
-
-    .bs-storefront-header__mobile-actions .bs-storefront-account-menu__panel {
-        right: -5rem;
-    }
-}
-
-@media (max-width: 380px) {
-    .bs-storefront-header__inner {
-        padding-right: 0.75rem;
-        padding-left: 0.75rem;
-    }
-
+@media (max-width: 430px) {
     .bs-storefront-header__brand-label,
     .bs-storefront-menu-button__text {
         display: none;
@@ -385,8 +370,42 @@
         width: 2.5rem;
         padding: 0;
     }
+}
 
-    .bs-storefront-header__mobile-actions .bs-storefront-account-menu__panel {
-        right: -3rem;
+@media (max-width: 1120px) {
+    .bs-storefront-nav-link {
+        padding-right: 0.55rem;
+        padding-left: 0.55rem;
+        font-size: 0.8rem;
+    }
+
+    .bs-storefront-pill-button,
+    .bs-storefront-deal-button {
+        padding-right: 0.7rem;
+        padding-left: 0.7rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .bs-storefront-header__shell {
+        width: min(calc(100% - 2rem), 80rem);
+    }
+
+    .bs-storefront-header__shell::before {
+        clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+    }
+
+    .bs-storefront-header__desktop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-right: clamp(4.5rem, 6vw, 5.5rem);
+        padding-left: clamp(4.5rem, 6vw, 5.5rem);
+    }
+
+    .bs-storefront-header__mobile {
+        display: none;
     }
 }
