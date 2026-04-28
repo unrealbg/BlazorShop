@@ -11,6 +11,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
             Assert.Contains("<header class=\"bs-storefront-header relative text-neutral-100\">", markup);
             Assert.Contains("bs-storefront-header__shell", markup);
+            Assert.Contains("bs-storefront-header__desktop relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8", markup);
+            Assert.Contains("bs-storefront-header__mobile relative mx-auto max-w-7xl px-4 py-3 sm:px-6", markup);
             Assert.Contains("bs-storefront-header__desktop", markup);
             Assert.Contains("bs-storefront-header__mobile", markup);
             Assert.DoesNotContain("bs-storefront-header__backdrop", markup);
@@ -64,12 +66,13 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Contains(".bs-storefront-header__desktop", styles);
             Assert.Contains(".bs-storefront-header__mobile", styles);
             Assert.Contains("rgba(23, 23, 23, 0.98)", styles);
-            Assert.Contains("width: min(calc(100% - 2rem), 80rem)", styles);
             Assert.Contains("clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%)", styles);
-            Assert.Contains("padding-left: clamp(4.5rem, 6vw, 5.5rem)", styles);
             Assert.Contains("@media (min-width: 1024px)", styles);
             Assert.Contains("clip-path: none;", styles);
             Assert.DoesNotContain(".bs-storefront-header__backdrop", styles);
+            Assert.DoesNotContain("width: min(calc(100% - 2rem), 80rem)", styles);
+            Assert.DoesNotContain("padding-left: clamp", styles);
+            Assert.DoesNotContain("padding-right: clamp", styles);
             Assert.DoesNotContain("inset: 0 auto 0 50%", styles);
             Assert.DoesNotContain("transform: translateX(-50%)", styles);
             Assert.DoesNotContain("bs-header-shell", styles);

@@ -22,7 +22,6 @@
 .bs-storefront-header__shell {
     position: relative;
     width: 100%;
-    margin: 0 auto;
     isolation: isolate;
 }
 
@@ -35,7 +34,7 @@
     background: rgba(23, 23, 23, 0.98);
     clip-path: none;
     pointer-events: none;
-    box-shadow: 0 18px 28px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 .bs-storefront-header__desktop,
@@ -388,10 +387,6 @@
 }
 
 @media (min-width: 1024px) {
-    .bs-storefront-header__shell {
-        width: min(calc(100% - 2rem), 80rem);
-    }
-
     .bs-storefront-header__shell::before {
         clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
     }
@@ -401,8 +396,6 @@
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding-right: clamp(4.5rem, 6vw, 5.5rem);
-        padding-left: clamp(4.5rem, 6vw, 5.5rem);
     }
 
     .bs-storefront-header__mobile {
