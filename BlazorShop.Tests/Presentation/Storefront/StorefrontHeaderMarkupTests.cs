@@ -60,7 +60,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
         {
             var styles = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/wwwroot/css/storefront.css");
 
-            Assert.Contains("background: transparent", styles);
+            Assert.Contains("--bs-storefront-page-background:", styles);
+            Assert.Contains("--bs-storefront-header-surround-background: #f8fbfc", styles);
+            Assert.Contains("background: var(--bs-storefront-page-background)", styles);
+            Assert.Contains("background: var(--bs-storefront-header-surround-background)", styles);
             Assert.Contains(".bs-storefront-header__shell", styles);
             Assert.Contains(".bs-storefront-header__shell::before", styles);
             Assert.Contains(".bs-storefront-header__desktop", styles);
@@ -73,6 +76,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.DoesNotContain("width: min(calc(100% - 2rem), 80rem)", styles);
             Assert.DoesNotContain("padding-left: clamp", styles);
             Assert.DoesNotContain("padding-right: clamp", styles);
+            Assert.DoesNotContain("background-attachment: fixed", styles);
             Assert.DoesNotContain("inset: 0 auto 0 50%", styles);
             Assert.DoesNotContain("transform: translateX(-50%)", styles);
             Assert.DoesNotContain("bs-header-shell", styles);
@@ -81,6 +85,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.DoesNotContain("linear-gradient(135deg", styles);
             Assert.DoesNotContain("box-shadow: 0 14px 30px", styles);
             Assert.DoesNotContain("box-shadow: 0 20px 48px", styles);
+            Assert.DoesNotContain("box-shadow: 0 20px 25px", styles);
         }
 
         [Fact]
