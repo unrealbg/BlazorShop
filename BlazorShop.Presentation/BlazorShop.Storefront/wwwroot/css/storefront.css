@@ -1,9 +1,7 @@
 .bs-storefront-shell {
-    --bs-storefront-page-background:
-        radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 32rem),
-        radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 26rem),
-        linear-gradient(180deg, #f8fbff 0%, #e8f6ff 54%, #f7fbff 100%);
-    --bs-storefront-header-surround-background: #f8fbfc;
+    --bs-storefront-surface-background:
+        linear-gradient(180deg, #f8fafb 0%, #eef2f4 52%, #f7f9fa 100%);
+    --bs-storefront-page-background: var(--bs-storefront-surface-background);
 
     min-height: 100vh;
     display: flex;
@@ -13,11 +11,16 @@
     background: var(--bs-storefront-page-background);
 }
 
+.bs-storefront-main {
+    flex: 1 1 auto;
+    background: var(--bs-storefront-page-background);
+}
+
 .bs-storefront-header {
     position: sticky;
     top: 0;
     z-index: 50;
-    background: var(--bs-storefront-header-surround-background);
+    background: transparent;
     color: #f5f5f5;
     isolation: isolate;
 }
@@ -25,7 +28,7 @@
 .bs-storefront-header__shell {
     position: relative;
     width: 100%;
-    background: var(--bs-storefront-header-surround-background);
+    background: transparent;
     isolation: isolate;
 }
 
