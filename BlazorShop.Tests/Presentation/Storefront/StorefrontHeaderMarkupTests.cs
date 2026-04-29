@@ -60,10 +60,14 @@ namespace BlazorShop.Tests.Presentation.Storefront
         {
             var styles = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/wwwroot/css/storefront.css");
 
-            Assert.Contains("--bs-storefront-page-background:", styles);
-            Assert.Contains("--bs-storefront-header-surround-background: #f8fbfc", styles);
-            Assert.Contains("background: var(--bs-storefront-page-background)", styles);
-            Assert.Contains("background: var(--bs-storefront-header-surround-background)", styles);
+            Assert.Contains("--bs-storefront-surface-background:", styles);
+            Assert.Contains("--bs-storefront-page-background: var(--bs-storefront-surface-background);", styles);
+            Assert.DoesNotContain("--bs-storefront-header-surround-background", styles);
+            Assert.Contains(".bs-storefront-main", styles);
+            Assert.Contains("background: var(--bs-storefront-page-background);", styles);
+            Assert.DoesNotContain("radial-gradient(circle at top left", styles);
+            Assert.DoesNotContain("radial-gradient(circle at top right", styles);
+            Assert.Contains("background: transparent;", styles);
             Assert.Contains(".bs-storefront-header__shell", styles);
             Assert.Contains(".bs-storefront-header__shell::before", styles);
             Assert.Contains(".bs-storefront-header__desktop", styles);
@@ -94,9 +98,19 @@ namespace BlazorShop.Tests.Presentation.Storefront
             var markup = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/Components/Layout/MainLayout.razor");
 
             Assert.Contains("<StorefrontHeader />", markup);
+            Assert.Contains("<main class=\"bs-storefront-main flex-1\">", markup);
             Assert.DoesNotContain("WorkspaceHeader", markup);
             Assert.DoesNotContain("Back to shop", markup);
             Assert.DoesNotContain("clip-diagonal", markup);
+        }
+
+        [Fact]
+        public void StorefrontNotFoundPage_UsesNonFileCatchAllRoute()
+        {
+            var markup = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/Pages/NotFoundPage.razor");
+
+            Assert.Contains("@page \"/{*Path:nonfile}\"", markup);
+            Assert.Contains("<NotFoundState", markup);
         }
 
         [Theory]

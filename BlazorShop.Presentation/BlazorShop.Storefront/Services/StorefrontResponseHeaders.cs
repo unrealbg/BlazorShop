@@ -78,8 +78,18 @@ namespace BlazorShop.Storefront.Services
 
         private static void ApplyError(HttpResponse response, int statusCode, bool includeRetryAfter)
         {
-            response.StatusCode = statusCode;
-            ApplyErrorHeadersForStatus(response, includeRetryAfter);
+            if (response.HasStarted)
+            {
+                return;
+            }
+
+            response.OnStarting(static state =>
+            {
+                var options = ((HttpResponse Response, int StatusCode, bool IncludeRetryAfter))state;
+                options.Response.StatusCode = options.StatusCode;
+                ApplyErrorHeadersForStatus(options.Response, options.IncludeRetryAfter);
+                return Task.CompletedTask;
+            }, (response, statusCode, includeRetryAfter));
         }
 
         private static void ApplyErrorHeadersForStatus(HttpResponse response)
