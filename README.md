@@ -157,103 +157,180 @@ Runtime notes:
 - Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, `docs/storefront.production.appsettings.example.json`, and `compose.production.yml`
 
 ## Screenshots
+Generated from the local seeded development stack. Source files live in
+`docs/screenshots/`, with route and viewport metadata in
+`docs/screenshots/manifest.json`.
+
+### Public Storefront
 <table>
   <tr>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/20.png" width="150" alt="Sign Up screen"/><br>
-      <small>Sign Up</small>
+      <img src="docs/screenshots/storefront-home.jpg" width="260" alt="Public storefront home page"/><br>
+      <small>Storefront Home</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/19.png" width="150" alt="Sign In screen"/><br>
+      <img src="docs/screenshots/storefront-new-releases.jpg" width="260" alt="Public storefront new releases page"/><br>
+      <small>New Releases</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/storefront-todays-deals.jpg" width="260" alt="Public storefront today's deals page"/><br>
+      <small>Today's Deals</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/storefront-category-sneakers.jpg" width="260" alt="Public storefront category page"/><br>
+      <small>Category</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/storefront-product-metro-runner.jpg" width="260" alt="Public storefront product detail page"/><br>
+      <small>Product Detail</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/storefront-cart.jpg" width="260" alt="Public storefront cart page"/><br>
+      <small>Cart</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/storefront-about.jpg" width="260" alt="Public storefront about page"/><br>
+      <small>About</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/storefront-customer-service.jpg" width="260" alt="Public storefront customer service page"/><br>
+      <small>Customer Service</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/storefront-faq.jpg" width="260" alt="Public storefront FAQ page"/><br>
+      <small>FAQ</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/storefront-account-menu.jpg" width="260" alt="Public storefront account menu"/><br>
+      <small>Account Menu</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/storefront-mobile-menu.jpg" width="150" alt="Public storefront mobile menu"/><br>
+      <small>Mobile Menu</small>
+    </td>
+  </tr>
+</table>
+
+### Account and Access
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/web-workspace-entry.jpg" width="260" alt="Workspace access entry page"/><br>
+      <small>Workspace Access</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/auth-login.jpg" width="260" alt="Sign in page"/><br>
       <small>Sign In</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/21.png" width="150" alt="Subscribe to newsletter"/><br>
-      <small>Subscribe to Newsletter</small>
+      <img src="docs/screenshots/auth-register.jpg" width="260" alt="Register page"/><br>
+      <small>Register</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/1.png" width="150" alt="Home page"/><br>
-      <small>Home</small>
+      <img src="docs/screenshots/account-dashboard.jpg" width="260" alt="Customer account dashboard"/><br>
+      <small>Account Dashboard</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/2.png" width="150" alt="Profile page"/><br>
+      <img src="docs/screenshots/account-orders.jpg" width="260" alt="Customer account orders page"/><br>
+      <small>Orders</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/account-notifications.jpg" width="260" alt="Customer account notifications page"/><br>
+      <small>Notifications</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/account-profile.jpg" width="260" alt="Customer account profile page"/><br>
       <small>Profile</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/3.png" width="150" alt="Orders list"/><br>
+      <img src="docs/screenshots/account-settings.jpg" width="260" alt="Customer account settings page"/><br>
+      <small>Settings</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/account-checkout.jpg" width="260" alt="Customer account checkout page"/><br>
+      <small>Checkout</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/account-mobile-menu.jpg" width="150" alt="Customer account mobile menu"/><br>
+      <small>Mobile Menu</small>
+    </td>
+  </tr>
+</table>
+
+### Admin Operations
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/admin-dashboard.jpg" width="260" alt="Admin operations dashboard"/><br>
+      <small>Dashboard</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/admin-products.jpg" width="260" alt="Admin products page"/><br>
+      <small>Products</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/admin-product-add-modal.jpg" width="260" alt="Admin add product modal"/><br>
+      <small>Add Product Modal</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/admin-categories.jpg" width="260" alt="Admin categories page"/><br>
+      <small>Categories</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/admin-category-add-modal.jpg" width="260" alt="Admin add category modal"/><br>
+      <small>Add Category Modal</small>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/admin-inventory.jpg" width="260" alt="Admin inventory page"/><br>
+      <small>Inventory</small>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/admin-orders.jpg" width="260" alt="Admin orders page"/><br>
       <small>Orders</small>
     </td>
-  </tr>
-  <tr>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/4.png" width="150" alt="Cart page"/><br>
-      <small>Cart</small>
+      <img src="docs/screenshots/admin-users.jpg" width="260" alt="Admin users page"/><br>
+      <small>Users</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/5.png" width="150" alt="Product quick view modal"/><br>
-      <small>Product Quick View</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/6.png" width="150" alt="Latest products section"/><br>
-      <small>Latest Products</small>
+      <img src="docs/screenshots/admin-seo.jpg" width="260" alt="Admin SEO page"/><br>
+      <small>SEO</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/7.png" width="150" alt="Choose payment method dialog"/><br>
-      <small>Choose Payment Method</small>
+      <img src="docs/screenshots/admin-redirects.jpg" width="260" alt="Admin redirects page"/><br>
+      <small>Redirects</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/8.png" width="150" alt="Bank transfer instructions"/><br>
-      <small>Bank Transfer Instructions</small>
+      <img src="docs/screenshots/admin-settings.jpg" width="260" alt="Admin settings page"/><br>
+      <small>Settings</small>
     </td>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/9.png" width="150" alt="Stripe checkout page"/><br>
-      <small>Stripe Checkout</small>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/10.png" width="150" alt="Admin dashboard"/><br>
-      <small>Admin Dashboard</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/11.png" width="150" alt="Manage products"/><br>
-      <small>Manage Products</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/15.png" width="150" alt="Manage orders"/><br>
-      <small>Manage Orders</small>
+      <img src="docs/screenshots/admin-audit.jpg" width="260" alt="Admin audit page"/><br>
+      <small>Audit</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/12.png" width="150" alt="Manage categories"/><br>
-      <small>Manage Categories</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/13.png" width="150" alt="Add product form"/><br>
-      <small>Add Product</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/14.png" width="150" alt="Add variants modal"/><br>
-      <small>Add Variants</small>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/16.png" width="150" alt="Edit tracking modal"/><br>
-      <small>Edit Tracking</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/18.png" width="150" alt="Browse by category menu"/><br>
-      <small>Browse by Category</small>
-    </td>
-    <td align="center">
-      <img src="https://www.unrealbg.com/blazorshop/17.png" width="150" alt="Search suggestions"/><br>
-      <small>Search Suggestions</small>
+      <img src="docs/screenshots/admin-mobile-menu.jpg" width="150" alt="Admin mobile menu"/><br>
+      <small>Mobile Menu</small>
     </td>
   </tr>
 </table>

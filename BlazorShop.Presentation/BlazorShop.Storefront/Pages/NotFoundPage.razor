@@ -1,3 +1,4 @@
+@page "/{*Path:nonfile}"
 @inject IStorefrontSeoComposer SeoComposer
 @inject IHttpContextAccessor HttpContextAccessor
 
@@ -8,6 +9,9 @@
 
 @code {
     private SeoMetadataDto _metadata = new();
+
+    [Parameter]
+    public string? Path { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

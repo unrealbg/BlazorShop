@@ -18,10 +18,7 @@
             <NavLink href="/admin/audit" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Audit</NavLink>
         </PrimaryNavigation>
         <Actions>
-            @if (HasPublicStorefrontUrl)
-            {
-                <a href="@PublicStorefrontUrl" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10">Back to shop</a>
-            }
+            <a href="@ShopHref" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10" title="Back to shop">Back to shop</a>
             <details class="relative">
                 <summary class="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Admin menu">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4" /><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
@@ -40,6 +37,14 @@
                 </div>
             </details>
         </Actions>
+        <MobileActions>
+            <a href="@ShopHref" class="inline-flex items-center rounded-md border border-white/20 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10" title="Back to shop">Shop</a>
+        </MobileActions>
+        <MobilePanelActions>
+            <a href="@ShopHref" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Back to shop</a>
+            <a href="/account" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Account</a>
+            <a href="/authentication/logout" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Sign out</a>
+        </MobilePanelActions>
     </WorkspaceHeader>
 
     <main class="bs-workspace-page bs-shell-stage flex-1">
@@ -50,7 +55,5 @@
 </div>
 
 @code {
-    private string? PublicStorefrontUrl => StorefrontUrlResolver.Resolve();
-
-    private bool HasPublicStorefrontUrl => !string.IsNullOrWhiteSpace(PublicStorefrontUrl);
+    private string ShopHref => StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver);
 }

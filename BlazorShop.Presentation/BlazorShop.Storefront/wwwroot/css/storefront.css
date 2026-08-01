@@ -1,0 +1,411 @@
+.bs-storefront-shell {
+    --bs-storefront-surface-background:
+        linear-gradient(180deg, #f8fafb 0%, #eef2f4 52%, #f7f9fa 100%);
+    --bs-storefront-page-background: var(--bs-storefront-surface-background);
+
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    color: #172033;
+    background: var(--bs-storefront-page-background);
+}
+
+.bs-storefront-main {
+    flex: 1 1 auto;
+    background: var(--bs-storefront-page-background);
+}
+
+.bs-storefront-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: transparent;
+    color: #f5f5f5;
+    isolation: isolate;
+}
+
+.bs-storefront-header__shell {
+    position: relative;
+    width: 100%;
+    background: transparent;
+    isolation: isolate;
+}
+
+.bs-storefront-header__shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(23, 23, 23, 0.98);
+    clip-path: none;
+    pointer-events: none;
+    box-shadow: none;
+}
+
+.bs-storefront-header__desktop,
+.bs-storefront-header__mobile {
+    position: relative;
+    z-index: 1;
+}
+
+.bs-storefront-header__desktop {
+    display: none;
+}
+
+.bs-storefront-header__mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.bs-storefront-header__mobile-actions {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.bs-storefront-header__mobile-actions a,
+.bs-storefront-header__mobile-actions button,
+.bs-storefront-header__mobile-actions summary {
+    min-height: 2.5rem;
+}
+
+.bs-storefront-header__menu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.bs-storefront-header__menu > summary,
+.bs-storefront-menu-button {
+    display: inline-flex;
+    min-height: 2.5rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 0.75rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.bs-storefront-header__menu > summary::-webkit-details-marker,
+.bs-storefront-menu-button::-webkit-details-marker {
+    display: none;
+}
+
+.bs-storefront-menu-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.bs-storefront-header__mobile-panel {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    right: 0;
+    z-index: 70;
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+    background: rgba(23, 23, 23, 0.98);
+    padding: 0.75rem;
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
+}
+
+.bs-storefront-header__mobile-nav,
+.bs-storefront-header__mobile-panel-actions {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.bs-storefront-header__desktop-actions a,
+.bs-storefront-header__desktop-actions button,
+.bs-storefront-header__desktop-actions summary {
+    min-height: 2.5rem;
+}
+
+.bs-storefront-header__mobile-nav a,
+.bs-storefront-header__mobile-panel-actions a,
+.bs-storefront-header__mobile-panel-actions button,
+.bs-storefront-header__mobile-panel-actions summary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 2.5rem;
+}
+
+.bs-storefront-header__mobile-nav a {
+    justify-content: flex-start;
+    padding: 0.65rem 0.75rem;
+}
+
+.bs-storefront-header__mobile-panel-actions {
+    margin-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.75rem;
+}
+
+.bs-storefront-header__brand {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 2.5rem;
+    flex-direction: column;
+    justify-content: center;
+    color: inherit;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.bs-storefront-header__brand-mark {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.88rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+}
+
+.bs-storefront-header__brand-label {
+    margin-top: 0.3rem;
+    color: #a3a3a3;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+}
+
+.bs-storefront-nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    border-radius: 0.375rem;
+    padding: 0.55rem 0.85rem;
+    color: #e5e5e5;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.bs-storefront-nav-link:hover,
+.bs-storefront-nav-link.is-active {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+}
+
+.bs-storefront-icon-button,
+.bs-storefront-pill-button,
+.bs-storefront-deal-button,
+.bs-storefront-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    border-radius: 0.375rem;
+    font-weight: 800;
+    text-decoration: none;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.bs-storefront-icon-button {
+    position: relative;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    box-shadow: none;
+}
+
+.bs-storefront-icon-button:hover {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.bs-storefront-icon-button svg,
+.bs-storefront-menu-button svg {
+    width: 1.2rem;
+    height: 1.2rem;
+}
+
+.bs-storefront-pill-button,
+.bs-storefront-deal-button {
+    padding: 0.55rem 1rem;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+.bs-storefront-pill-button {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+}
+
+.bs-storefront-pill-button:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.bs-storefront-deal-button {
+    border: 1px solid rgba(245, 158, 11, 0.86);
+    background: #f59e0b;
+    color: #ffffff;
+    box-shadow: none;
+}
+
+.bs-storefront-deal-button:hover {
+    background: #d97706;
+}
+
+.bs-storefront-cart-badge {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.35rem;
+    display: inline-flex;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #f59e0b;
+    color: #ffffff;
+    font-size: 0.64rem;
+    font-weight: 900;
+    box-shadow: none;
+}
+
+.bs-storefront-cart-badge[hidden] {
+    display: none;
+}
+
+.bs-storefront-account-menu {
+    position: relative;
+}
+
+.bs-storefront-account-menu__summary,
+.bs-storefront-menu-button {
+    cursor: pointer;
+    list-style: none;
+}
+
+.bs-storefront-account-menu__summary::-webkit-details-marker,
+.bs-storefront-menu-button::-webkit-details-marker {
+    display: none;
+}
+
+.bs-storefront-account-menu__panel {
+    position: absolute;
+    top: calc(100% + 0.65rem);
+    right: 0;
+    z-index: 80;
+    width: min(18rem, calc(100vw - 2rem));
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+    background: rgba(23, 23, 23, 0.98);
+    color: #ffffff;
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
+}
+
+.bs-storefront-account-menu__intro {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+}
+
+.bs-storefront-account-menu__title {
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.bs-storefront-account-menu__meta {
+    margin-top: 0.35rem;
+    color: #a3a3a3;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.bs-storefront-account-menu__links {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.5rem;
+}
+
+.bs-storefront-account-menu__link {
+    display: flex;
+    min-height: 2.5rem;
+    align-items: center;
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    color: #f5f5f5;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.bs-storefront-account-menu__link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.bs-storefront-header__mobile-actions .bs-storefront-account-menu__panel {
+    position: fixed;
+    top: 4.75rem;
+    right: 1rem;
+    width: min(18rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 5.75rem);
+    overflow-y: auto;
+}
+
+@media (max-width: 430px) {
+    .bs-storefront-header__brand-label,
+    .bs-storefront-menu-button__text {
+        display: none;
+    }
+
+    .bs-storefront-menu-button {
+        width: 2.5rem;
+        padding: 0;
+    }
+}
+
+@media (max-width: 1120px) {
+    .bs-storefront-nav-link {
+        padding-right: 0.55rem;
+        padding-left: 0.55rem;
+        font-size: 0.8rem;
+    }
+
+    .bs-storefront-pill-button,
+    .bs-storefront-deal-button {
+        padding-right: 0.7rem;
+        padding-left: 0.7rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .bs-storefront-header__shell::before {
+        clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+    }
+
+    .bs-storefront-header__desktop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .bs-storefront-header__mobile {
+        display: none;
+    }
+}

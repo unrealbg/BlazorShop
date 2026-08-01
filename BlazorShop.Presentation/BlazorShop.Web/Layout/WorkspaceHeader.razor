@@ -1,19 +1,51 @@
-<header class="relative text-neutral-100">
-    <div aria-hidden="true" class="pointer-events-none absolute inset-0 clip-diagonal border-b border-white/10 bg-neutral-900/95 shadow-xl"></div>
+<header class="bs-workspace-header relative text-neutral-100">
+    <div aria-hidden="true" class="bs-workspace-header__backdrop pointer-events-none absolute inset-0 border-b border-white/10 shadow-xl"></div>
 
-    <div class="relative mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-        <a href="@BrandHref" class="inline-flex shrink-0 flex-col leading-none select-none">
-            <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP</span>
-            <span class="mt-1 text-[10px] text-neutral-400">@ModeLabel</span>
-        </a>
+    <div class="bs-workspace-header__desktop relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        @BrandContent
 
-        <nav class="flex flex-1 flex-wrap items-center gap-2 text-sm font-medium lg:justify-center">
+        <nav class="bs-workspace-header__desktop-nav flex flex-1 flex-wrap items-center gap-2 text-sm font-medium lg:justify-center">
             @PrimaryNavigation
         </nav>
 
-        <div class="flex shrink-0 flex-wrap items-center gap-3 text-sm">
+        <div class="bs-workspace-header__desktop-actions flex shrink-0 flex-wrap items-center gap-3 text-sm">
             @Actions
         </div>
+    </div>
+
+    <div class="bs-workspace-header__mobile relative mx-auto max-w-7xl px-4 py-3 sm:px-6">
+        @BrandContent
+
+        @if (MobileActions != null)
+        {
+            <div class="bs-workspace-header__mobile-actions">
+                @MobileActions
+            </div>
+        }
+
+        <details class="bs-workspace-header__menu">
+            <summary class="bs-workspace-header__menu-button" aria-label="Workspace navigation">
+                <span>Menu</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+            </summary>
+
+            <div class="bs-workspace-header__mobile-panel">
+                <nav class="bs-workspace-header__mobile-nav">
+                    @PrimaryNavigation
+                </nav>
+
+                <div class="bs-workspace-header__mobile-panel-actions">
+                    @if (MobilePanelActions != null)
+                    {
+                        @MobilePanelActions
+                    }
+                    else
+                    {
+                        @Actions
+                    }
+                </div>
+            </div>
+        </details>
     </div>
 </header>
 
@@ -29,4 +61,15 @@
 
     [Parameter, EditorRequired]
     public RenderFragment Actions { get; set; } = default!;
+
+    [Parameter]
+    public RenderFragment? MobileActions { get; set; }
+
+    [Parameter]
+    public RenderFragment? MobilePanelActions { get; set; }
+
+    private RenderFragment BrandContent => @<a href="@BrandHref" class="bs-workspace-header__brand inline-flex shrink-0 flex-col leading-none select-none">
+        <span class="text-sm font-extrabold tracking-wider">BLAZORSHOP</span>
+        <span class="mt-1 text-[10px] text-neutral-400">@ModeLabel</span>
+    </a>;
 }

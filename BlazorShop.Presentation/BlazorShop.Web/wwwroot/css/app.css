@@ -483,3 +483,287 @@ code { color: #c02d76; }
     0%, 80%, 100% { transform: scale(0); }
     40% { transform: scale(1); }
 }
+
+/* Workspace responsive hardening */
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.bs-product-shell,
+.bs-workspace-page {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.bs-workspace-page,
+.bs-workspace-page > section,
+.bs-panel,
+.bs-panel-soft,
+.bs-table-shell,
+.bs-modal-shell {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.bs-table-shell {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.bs-table-shell table {
+    min-width: 42rem;
+}
+
+.bs-table-wide {
+    min-width: 62rem !important;
+}
+
+.bs-table-compact {
+    min-width: 34rem !important;
+}
+
+.bs-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.bs-mobile-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.bs-workspace-header__desktop {
+    display: none;
+}
+
+.bs-workspace-header__backdrop {
+    background: rgba(23, 23, 23, 0.98);
+    clip-path: none;
+}
+
+.bs-workspace-header__mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.bs-workspace-header__brand {
+    min-width: 0;
+    min-height: 2.5rem;
+    justify-content: center;
+}
+
+.bs-workspace-header__mobile-actions {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.bs-workspace-header__mobile-actions a,
+.bs-workspace-header__mobile-actions button,
+.bs-workspace-header__mobile-actions summary {
+    min-height: 2.5rem;
+}
+
+.bs-workspace-header__menu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.bs-workspace-header__menu > summary,
+.bs-workspace-header__menu-button {
+    display: inline-flex;
+    min-height: 2.5rem;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 0.75rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.bs-workspace-header__menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.bs-workspace-header__menu-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.bs-workspace-header__mobile-panel {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    right: 0;
+    z-index: 40;
+    width: min(24rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+    background: rgba(23, 23, 23, 0.98);
+    padding: 0.75rem;
+    box-shadow: 0 24px 52px rgba(0, 0, 0, 0.32);
+}
+
+.bs-workspace-header__mobile-nav,
+.bs-workspace-header__mobile-panel-actions {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.bs-workspace-header__desktop-actions a,
+.bs-workspace-header__desktop-actions button,
+.bs-workspace-header__desktop-actions summary {
+    min-height: 2.5rem;
+}
+
+.bs-workspace-header__mobile-nav a,
+.bs-workspace-header__mobile-panel-actions a,
+.bs-workspace-header__mobile-panel-actions button,
+.bs-workspace-header__mobile-panel-actions summary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 2.5rem;
+    width: 100%;
+}
+
+.bs-workspace-header__mobile-nav a {
+    justify-content: flex-start;
+    padding: 0.65rem 0.75rem;
+}
+
+.bs-workspace-header__mobile-panel-actions {
+    margin-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.75rem;
+}
+
+.bs-workspace-header__mobile-panel-actions > details,
+.bs-workspace-header__mobile-panel-actions > a,
+.bs-workspace-header__mobile-panel-actions > button {
+    width: 100%;
+}
+
+.bs-workspace-header__mobile-panel-actions details > .absolute {
+    position: static;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.bs-modal-shell {
+    width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+.bs-modal-body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.bs-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+@media (max-width: 639.98px) {
+    .bs-workspace-page > section {
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .bs-workspace-page .bs-panel,
+    .bs-workspace-page .bs-panel-soft {
+        border-radius: 0.875rem;
+    }
+
+    body .admin-panel {
+        min-height: auto !important;
+    }
+
+    .bs-action-row,
+    .bs-mobile-stack {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .bs-action-row > .bs-button,
+    .bs-action-row > a,
+    .bs-action-row > button,
+    .bs-mobile-stack > .bs-button,
+    .bs-mobile-stack > a,
+    .bs-mobile-stack > button {
+        width: 100%;
+    }
+
+    .bs-workspace-page .bs-toolbar-cluster {
+        flex-direction: column;
+        align-items: stretch !important;
+        width: 100%;
+    }
+
+    .bs-workspace-page .bs-toolbar-cluster > input,
+    .bs-workspace-page .bs-toolbar-cluster > select,
+    .bs-workspace-page .bs-toolbar-cluster > .bs-button,
+    .bs-workspace-page .bs-toolbar-cluster > button,
+    .bs-workspace-page .bs-toolbar-cluster > a {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .bs-modal-shell {
+        margin-left: 1rem !important;
+        margin-right: 1rem !important;
+    }
+
+    .bs-modal-body,
+    .bs-modal-footer {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    .bs-modal-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .bs-modal-footer .bs-button,
+    .bs-modal-footer button,
+    .bs-modal-footer a {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    .bs-workspace-header__backdrop {
+        clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+    }
+
+    .bs-workspace-header__desktop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .bs-workspace-header__mobile {
+        display: none;
+    }
+}

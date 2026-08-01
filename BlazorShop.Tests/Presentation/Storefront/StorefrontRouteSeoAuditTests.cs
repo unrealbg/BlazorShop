@@ -104,7 +104,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
             using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory);
 
             using var response = await client.GetAsync(path);
-            var document = await StorefrontHtmlAuditDocument.CreateAsync(response);
+            var html = await response.Content.ReadAsStringAsync();
+            var document = StorefrontHtmlAuditDocument.Create(html);
 
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
             Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
@@ -112,6 +113,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl?.ToString());
             Assert.True(response.Headers.TryGetValues("X-Robots-Tag", out var robotsHeaderValues));
             Assert.Contains("noindex, nofollow", robotsHeaderValues);
+            Assert.Contains("bs-storefront-header", html);
             Assert.True(
                 document.RobotsMetaContent is null || string.Equals(document.RobotsMetaContent, "noindex,nofollow", StringComparison.Ordinal),
                 $"Unexpected 404 robots meta value '{document.RobotsMetaContent}'.");
