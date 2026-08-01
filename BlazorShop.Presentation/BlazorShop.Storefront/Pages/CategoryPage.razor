@@ -19,29 +19,29 @@ else if (_isNotFound)
 }
 else if (_categoryPage is not null)
 {
-    <section class="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
+    <section class="mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 sm:pt-10 lg:px-8">
         <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-4" />
 
-        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-5 shadow-lg sm:p-8">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Category</p>
-                    <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-neutral-900">@_categoryPage.Category.Name</h1>
+                    <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">@_categoryPage.Category.Name</h1>
                     @if (!string.IsNullOrWhiteSpace(_categoryPage.Category.MetaDescription))
                     {
                         <p class="mt-4 max-w-3xl text-base leading-7 text-neutral-700">@_categoryPage.Category.MetaDescription</p>
                     }
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="grid grid-cols-2 items-center gap-3 sm:flex sm:flex-wrap">
                     <span class="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 shadow">@_categoryPage.Products.Count items</span>
-                    <a href="@StorefrontRoutes.Home" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">Back to Home</a>
+                    <a href="@StorefrontRoutes.Home" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto">Back to Home</a>
                 </div>
             </div>
 
-            <div class="mt-6 flex flex-wrap gap-3">
-                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">New Releases</a>
-                <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 text-sm font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">Today's Deals</a>
+            <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-3 py-2 text-sm font-semibold text-white hover:bg-neutral-800 sm:w-auto sm:px-4">New Releases</a>
+                <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-white px-3 py-2 text-sm font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100 sm:w-auto sm:px-4">Today's Deals</a>
             </div>
         </div>
     </section>

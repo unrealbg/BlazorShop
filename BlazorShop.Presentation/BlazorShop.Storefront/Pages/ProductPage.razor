@@ -19,17 +19,17 @@ else if (_isNotFound)
 }
 else if (_product is not null)
 {
-    <section class="mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+    <section class="mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-6 sm:pt-10 lg:px-8">
         <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-4" />
 
-        <div class="grid gap-8 lg:grid-cols-[1fr_1fr]">
-            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-6 shadow-lg">
+        <div class="grid gap-5 sm:gap-8 lg:grid-cols-[1fr_1fr]">
+            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-4 shadow-lg sm:p-6">
                 <div class="relative aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-50">
                     <img src="@_product.Image" alt="@_product.Name" class="absolute inset-0 h-full w-full object-contain" />
                 </div>
             </div>
 
-            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-5 shadow-lg sm:p-8">
                 @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug))
                 {
                     <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500 hover:text-neutral-900">@_product.Category.Name</a>
@@ -46,10 +46,10 @@ else if (_product is not null)
                     </div>
                 }
 
-                <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-neutral-900">@_product.Name</h1>
+                <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">@_product.Name</h1>
                 <div class="mt-5">
                     <div class="text-sm text-neutral-500">@PrimaryPriceLabel</div>
-                    <div class="mt-1 text-4xl font-black text-neutral-900">€ @_product.Price</div>
+                    <div class="mt-1 text-3xl font-black text-neutral-900 sm:text-4xl">€ @_product.Price</div>
                 </div>
 
                 <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-neutral-600">
@@ -58,7 +58,7 @@ else if (_product is not null)
 
                 <p class="mt-6 text-base leading-7 text-neutral-700">@_product.Description</p>
 
-                <div id="purchase" class="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-5">
+                <div id="purchase" class="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 sm:p-5">
                     <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Add to Cart</p>
                     <p class="mt-2 text-sm leading-6 text-neutral-700">@PurchaseMessage</p>
 
@@ -82,9 +82,9 @@ else if (_product is not null)
                         </div>
                     }
 
-                    <div class="mt-4 flex flex-wrap gap-3">
+                    <div class="mt-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                         <button type="button"
-                                class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600"
+                                class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-3 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto sm:px-4"
                                 data-storefront-add-to-cart
                                 data-default-label="Add to Cart"
                                 data-success-label="Added"
@@ -96,7 +96,7 @@ else if (_product is not null)
                             Add to Cart
                         </button>
 
-                        <a href="@CartUrl" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">
+                        <a href="@CartUrl" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-3 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto sm:px-4">
                             View Cart
                         </a>
                     </div>
@@ -121,19 +121,19 @@ else if (_product is not null)
                     </div>
                 }
 
-                <div class="mt-8 flex flex-wrap gap-3">
+                <div class="mt-8 grid gap-3 sm:flex sm:flex-wrap">
                     @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
                     {
-                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto">
                             Back to @_product.Category.Name
                         </a>
                     }
 
-                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">
+                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto">
                         Browse New Releases
                     </a>
 
-                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">
+                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100 sm:w-auto">
                         See Today's Deals
                     </a>
                 </div>
@@ -150,7 +150,7 @@ else if (_product is not null)
                        Content="@_product.SeoContent" />
 
     <section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
-        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-5 shadow-lg sm:p-8">
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Keep Exploring</p>
 
             @if (_relatedProducts.Count > 0)
@@ -163,19 +163,19 @@ else if (_product is not null)
             else
             {
                 <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">Keep browsing the public catalog</h2>
-                <div class="mt-6 flex flex-wrap gap-3">
+                <div class="mt-6 grid gap-3 sm:flex sm:flex-wrap">
                     @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
                     {
-                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto">
                             Explore @_product.Category.Name
                         </a>
                     }
 
-                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">
+                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto">
                         Browse New Releases
                     </a>
 
-                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100">
+                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100 sm:w-auto">
                         See Today's Deals
                     </a>
                 </div>

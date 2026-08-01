@@ -366,6 +366,27 @@
     overflow-y: auto;
 }
 
+@media (max-width: 1023.98px) {
+    .bs-storefront-header__brand,
+    .bs-storefront-header__mobile-actions a,
+    .bs-storefront-header__mobile-actions button,
+    .bs-storefront-header__mobile-actions summary,
+    .bs-storefront-header__menu > summary,
+    .bs-storefront-header__mobile-nav a,
+    .bs-storefront-header__mobile-panel-actions a,
+    .bs-storefront-header__mobile-panel-actions button,
+    .bs-storefront-header__mobile-panel-actions summary,
+    .bs-storefront-account-menu__link {
+        min-height: 2.75rem;
+    }
+
+    .bs-storefront-icon-button,
+    .bs-storefront-menu-button {
+        width: 2.75rem;
+        min-width: 2.75rem;
+    }
+}
+
 @media (max-width: 430px) {
     .bs-storefront-header__brand-label,
     .bs-storefront-menu-button__text {
@@ -373,7 +394,7 @@
     }
 
     .bs-storefront-menu-button {
-        width: 2.5rem;
+        width: 2.75rem;
         padding: 0;
     }
 }

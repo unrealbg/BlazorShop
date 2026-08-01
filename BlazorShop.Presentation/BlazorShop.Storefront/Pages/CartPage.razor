@@ -8,14 +8,14 @@
     <meta name="robots" content="noindex,nofollow" />
 </HeadContent>
 
-<section class="mx-auto max-w-7xl px-4 pb-12 pt-10 sm:px-6 lg:px-8">
+<section class="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6 sm:pt-10 lg:px-8">
     <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div class="flex-1 space-y-4">
-            <header class="rounded-3xl border border-neutral-200/70 bg-white/90 p-8 shadow-lg">
+            <header class="rounded-3xl border border-neutral-200/70 bg-white/90 p-5 shadow-lg sm:p-8">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Storefront Cart</p>
-                        <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-neutral-900">My Cart</h1>
+                        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">My Cart</h1>
                         <p class="mt-3 max-w-2xl text-base leading-7 text-neutral-700">Review the items you picked from the public storefront before you continue to checkout.</p>
                     </div>
 
@@ -36,12 +36,12 @@
 
             @if (Lines.Count == 0)
             {
-                <div class="rounded-3xl border border-dashed border-neutral-300 bg-white/80 px-6 py-10 text-center shadow-sm">
+                <div class="rounded-3xl border border-dashed border-neutral-300 bg-white/80 px-5 py-8 text-center shadow-sm sm:px-6 sm:py-10">
                     <h2 class="text-2xl font-bold text-neutral-900">Your cart is empty</h2>
                     <p class="mx-auto mt-3 max-w-xl text-base leading-7 text-neutral-700">Add products from the storefront and they will appear here for review before checkout.</p>
-                    <div class="mt-6 flex flex-wrap justify-center gap-3">
-                        <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800">Shop New Releases</a>
-                        <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">See Today's Deals</a>
+                    <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-center">
+                        <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-3 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto sm:px-4">Shop New Releases</a>
+                        <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-3 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto sm:px-4">See Today's Deals</a>
                     </div>
                 </div>
             }
@@ -50,7 +50,7 @@
                 <div class="space-y-4">
                     @foreach (var line in Lines)
                     {
-                        <article class="rounded-3xl border border-neutral-200/70 bg-white/95 p-5 shadow-md">
+                        <article class="rounded-3xl border border-neutral-200/70 bg-white/95 p-4 shadow-md sm:p-5">
                             <div class="flex flex-col gap-4 sm:flex-row">
                                 <div class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-neutral-50 ring-1 ring-black/5">
                                     @if (!string.IsNullOrWhiteSpace(line.ImageUrl))
@@ -112,7 +112,7 @@
 
                                         @if (!string.IsNullOrWhiteSpace(line.ProductUrl))
                                         {
-                                            <a href="@line.ProductUrl" class="inline-flex items-center justify-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">View Product</a>
+                                            <a href="@line.ProductUrl" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 lg:w-auto">View Product</a>
                                         }
 
                                         <button type="button"
@@ -121,7 +121,7 @@
                                                 data-variant-id="@line.VariantId"
                                                 data-product-name="@line.DisplayName"
                                                 data-size-value="@line.SizeValue"
-                                                class="inline-flex items-center justify-center rounded bg-white px-4 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50">
+                                                class="inline-flex min-h-11 w-full items-center justify-center rounded bg-white px-4 py-2 text-sm font-semibold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50 lg:w-auto">
                                             Remove
                                         </button>
                                     </div>
@@ -134,7 +134,7 @@
         </div>
 
         <aside class="w-full lg:sticky lg:top-6 lg:max-w-sm">
-            <div class="rounded-3xl border border-neutral-200/70 bg-white/95 p-6 shadow-lg">
+            <div class="rounded-3xl border border-neutral-200/70 bg-white/95 p-5 shadow-lg sm:p-6">
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Order Summary</p>
                 <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">Ready for checkout</h2>
 

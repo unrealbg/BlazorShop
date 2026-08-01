@@ -33,8 +33,8 @@
 
     <footer class="border-t border-white/10 bg-neutral-900 text-neutral-100">
         <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-            <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
+            <div class="grid grid-cols-2 gap-8 lg:grid-cols-4">
+                <div class="col-span-2 lg:col-span-1">
                     <div class="text-lg font-extrabold tracking-wider">BLAZORSHOP</div>
                     <p class="mt-1 text-sm text-neutral-300">PUBLIC SHOP</p>
                     <p class="mt-3 text-sm text-neutral-400">Quality products, fair prices, and route-based public shopping pages.</p>
@@ -60,19 +60,19 @@
                     </ul>
                 </div>
 
-                <div>
+                <div class="col-span-2 lg:col-span-1">
                     <div class="text-sm font-semibold uppercase text-neutral-300">Featured</div>
                     <p class="mt-3 text-sm leading-6 text-neutral-400">Browse fresh arrivals, featured deals, and published product pages across the shop.</p>
                     <div class="mt-4 flex flex-wrap gap-3">
-                        <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900 hover:bg-white">Shop New</a>
-                        <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex items-center rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">View Deals</a>
+                        <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 items-center justify-center rounded bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900 hover:bg-white">Shop New</a>
+                        <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 items-center justify-center rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">View Deals</a>
                     </div>
                 </div>
             </div>
 
             <div class="mt-8 border-t border-white/10 pt-4 text-xs text-neutral-400 sm:flex sm:items-center sm:justify-between">
                 <p>© @DateTime.UtcNow.Year BlazorShop. All rights reserved.</p>
-                <div class="mt-3 flex justify-center gap-4 sm:mt-0">
+                <div class="mt-3 flex flex-wrap justify-start gap-4 sm:mt-0">
                     <a href="@StorefrontRoutes.Privacy" class="hover:text-white/80">Privacy</a>
                     <a href="@StorefrontRoutes.Terms" class="hover:text-white/80">Terms</a>
                     <a href="@StorefrontRoutes.CustomerService" class="hover:text-white/80">Customer Service</a>

@@ -14,7 +14,7 @@
 }
 else
 {
-    <section class="mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
+    <section class="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 sm:pt-10 lg:px-8">
         <div class="text-center">
             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Shop Categories</p>
             <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900">Browse by Category</h2>
@@ -23,7 +23,7 @@ else
 
         @if (FeaturedCategories.Count > 0)
         {
-            <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-3">
                 @for (var index = 0; index < FeaturedCategories.Count; index++)
                 {
                     var category = FeaturedCategories[index];
@@ -47,7 +47,7 @@ else
             </div>
 
             <div class="mt-6 flex justify-center">
-                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">See New Releases</a>
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 items-center justify-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">See New Releases</a>
             </div>
         }
         else
@@ -59,19 +59,19 @@ else
     </section>
 
     <section id="latest" class="relative z-[1]">
-        <div class="mx-auto max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 sm:pb-12 sm:pt-8 lg:px-8">
             <div class="text-center">
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Catalog</p>
                 <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900">Latest Products</h2>
                 <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Fresh products, clear prices, and direct links into the catalog.</p>
             </div>
 
-            <div class="mt-8">
+            <div class="mt-6 sm:mt-8">
                 <ProductGrid Products="_latestProducts" EmptyMessage="No published products are available yet." />
             </div>
 
             <div class="mt-8 flex justify-center">
-                <a href="@StorefrontRoutes.NewReleases" class="inline-flex items-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">See All New Releases</a>
+                <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">See All New Releases</a>
             </div>
         </div>
     </section>
