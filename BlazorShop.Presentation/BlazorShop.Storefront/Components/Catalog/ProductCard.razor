@@ -1,5 +1,5 @@
 <article class="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200/70 bg-white/95 shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl">
-    <div class="p-6">
+    <div class="p-5 sm:p-6">
         <div class="flex items-start justify-between gap-3">
             <div>
                 @if (!string.IsNullOrWhiteSpace(Product.CategoryName))
@@ -58,12 +58,12 @@
         <p class="mt-4 text-sm leading-6 text-neutral-700">@Truncate(Product.Description)</p>
     </div>
 
-    <div class="mt-auto border-t border-neutral-100 px-6 py-4 text-sm">
-        <div class="flex flex-wrap gap-2">
+    <div class="mt-auto border-t border-neutral-100 px-5 py-4 text-sm sm:px-6">
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             @if (CanAddDirectly)
             {
                 <button type="button"
-                        class="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white transition hover:bg-amber-600"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-amber-500 px-3 py-2 font-semibold text-white transition hover:bg-amber-600 sm:w-auto sm:px-4"
                         data-storefront-add-to-cart
                         data-default-label="Add to Cart"
                         data-success-label="Added"
@@ -75,14 +75,14 @@
             }
             else if (!string.IsNullOrWhiteSpace(ProductPurchaseUrl))
             {
-                <a href="@ProductPurchaseUrl" class="inline-flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 font-semibold text-white transition hover:bg-amber-600">
+                <a href="@ProductPurchaseUrl" class="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-amber-500 px-3 py-2 font-semibold text-white transition hover:bg-amber-600 sm:w-auto sm:px-4">
                     Add to Cart
                 </a>
             }
 
             @if (!string.IsNullOrWhiteSpace(ProductUrl))
             {
-                <a href="@ProductUrl" class="inline-flex items-center justify-center rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-800">
+                <a href="@ProductUrl" class="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-neutral-900 px-3 py-2 font-medium text-white hover:bg-neutral-800 sm:w-auto sm:px-4">
                     View Product
                 </a>
             }

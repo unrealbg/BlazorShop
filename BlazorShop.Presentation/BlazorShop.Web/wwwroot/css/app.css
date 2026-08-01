@@ -683,6 +683,16 @@ body {
 }
 
 @media (max-width: 639.98px) {
+    .bs-button,
+    .bs-icon-button {
+        min-height: 44px !important;
+    }
+
+    .bs-icon-button {
+        width: 44px;
+        height: 44px;
+    }
+
     .bs-workspace-page > section {
         padding-top: 1.5rem;
         padding-bottom: 1.5rem;
@@ -748,6 +758,20 @@ body {
     .bs-modal-footer a {
         width: 100%;
         margin-left: 0 !important;
+    }
+}
+
+@media (max-width: 1023.98px) {
+    .bs-workspace-header__brand,
+    .bs-workspace-header__mobile-actions a,
+    .bs-workspace-header__mobile-actions button,
+    .bs-workspace-header__mobile-actions summary,
+    .bs-workspace-header__menu > summary,
+    .bs-workspace-header__mobile-nav a,
+    .bs-workspace-header__mobile-panel-actions a,
+    .bs-workspace-header__mobile-panel-actions button,
+    .bs-workspace-header__mobile-panel-actions summary {
+        min-height: 44px !important;
     }
 }
 
