@@ -13,6 +13,7 @@ COPY BlazorShop.ServiceDefaults/BlazorShop.ServiceDefaults.csproj BlazorShop.Ser
 RUN dotnet restore BlazorShop.Presentation/BlazorShop.Storefront/BlazorShop.Storefront.csproj
 
 COPY BlazorShop.Presentation/BlazorShop.Storefront/ BlazorShop.Presentation/BlazorShop.Storefront/
+COPY BlazorShop.Presentation/BlazorShop.Web/wwwroot/ BlazorShop.Presentation/BlazorShop.Web/wwwroot/
 COPY BlazorShop.Presentation/BlazorShop.Web.Shared/ BlazorShop.Presentation/BlazorShop.Web.Shared/
 COPY BlazorShop.Application/ BlazorShop.Application/
 COPY BlazorShop.Domain/ BlazorShop.Domain/

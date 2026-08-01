@@ -33,10 +33,15 @@ namespace BlazorShop.API
         private const string ClientCorsPolicyName = "ClientOrigins";
         private const string PublicApiRateLimitPolicyName = "PublicApi";
         private const string AuthApiRateLimitPolicyName = "AuthApi";
+        private const string SeedSampleCatalogCommand = "--seed-sample-catalog";
 
         public static void Main(string[] args)
         {
-            var builder = WebApplication.CreateBuilder(args);
+            var seedSampleCatalogOnly = args.Contains(SeedSampleCatalogCommand, StringComparer.OrdinalIgnoreCase);
+            var hostArgs = args
+                .Where(arg => !string.Equals(arg, SeedSampleCatalogCommand, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var builder = WebApplication.CreateBuilder(hostArgs);
             var runtimeSection = builder.Configuration.GetSection(ApiRuntimeOptions.SectionName);
             var identitySection = builder.Configuration.GetSection(IdentityConfirmationOptions.SectionName);
             var runtimeOptions = runtimeSection.Get<ApiRuntimeOptions>() ?? new ApiRuntimeOptions();
@@ -161,11 +166,17 @@ namespace BlazorShop.API
 
                 DatabaseMigrationBootstrapper.MigrateAsync(app.Services).GetAwaiter().GetResult();
 
-                if (app.Environment.IsDevelopment())
+                if (app.Environment.IsDevelopment() || seedSampleCatalogOnly)
                 {
                     using var scope = app.Services.CreateScope();
                     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     DevelopmentCatalogSeeder.SeedAsync(dbContext).GetAwaiter().GetResult();
+                }
+
+                if (seedSampleCatalogOnly)
+                {
+                    Log.Logger.Information("Sample catalog seed completed successfully.");
+                    return;
                 }
 
                 if (!app.Environment.IsDevelopment() && runtimeOptions.Security.EnableHsts)
