@@ -57,6 +57,22 @@ namespace BlazorShop.Tests.Infrastructure.Configuration
             Assert.True(result.Succeeded);
         }
 
+        [Fact]
+        public void Validate_WhenProductionAndEmailIsDisabled_AllowsMissingValues()
+        {
+            var validator = CreateValidator(Environments.Production);
+
+            var result = validator.Validate(
+                name: null,
+                new EmailSettings
+                {
+                    Enabled = false,
+                    Port = 0
+                });
+
+            Assert.True(result.Succeeded);
+        }
+
         private static EmailSettingsOptionsValidator CreateValidator(string environmentName)
         {
             var hostEnvironment = new Mock<IHostEnvironment>();

@@ -63,6 +63,36 @@ app.Use(async (context, next) =>
     StorefrontResponseHeaders.RegisterErrorStatusHeaders(context);
     await next();
 });
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var response = statusCodeContext.HttpContext.Response;
+    var (title, heading, message) = response.StatusCode switch
+    {
+        StatusCodes.Status404NotFound => ("Page not found", "Page not found", "The page you requested could not be found."),
+        StatusCodes.Status503ServiceUnavailable => ("Service unavailable", "Temporarily unavailable", "Please try again in a few minutes."),
+        _ => ("Request error", "Request error", "The request could not be completed."),
+    };
+
+    response.ContentType = "text/html; charset=utf-8";
+    await response.WriteAsync($$"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <meta name="robots" content="noindex,nofollow">
+          <title>{{title}} | BlazorShop</title>
+        </head>
+        <body>
+          <main>
+            <h1>{{heading}}</h1>
+            <p>{{message}}</p>
+            <p><a href="/">Return to the shop</a></p>
+          </main>
+        </body>
+        </html>
+        """);
+});
 app.UseAntiforgery();
 app.MapDefaultEndpoints();
 app.MapGet(StorefrontRoutes.SignIn, (IStorefrontClientAppUrlResolver clientAppUrlResolver) =>

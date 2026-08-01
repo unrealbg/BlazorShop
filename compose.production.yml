@@ -26,14 +26,17 @@ services:
       Jwt__Issuer: ${BLAZORSHOP_API_BASE_URL:?BLAZORSHOP_API_BASE_URL is required}
       Jwt__Audience: ${BLAZORSHOP_API_BASE_URL:?BLAZORSHOP_API_BASE_URL is required}
       ClientApp__BaseUrl: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
+      Identity__RequireConfirmedAccount: ${BLAZORSHOP_REQUIRE_CONFIRMED_ACCOUNT:-true}
+      Identity__RequireConfirmedEmail: ${BLAZORSHOP_REQUIRE_CONFIRMED_EMAIL:-true}
       Stripe__SecretKey: ${BLAZORSHOP_STRIPE_SECRET_KEY}
-      EmailSettings__From: "${BLAZORSHOP_EMAIL_FROM:?BLAZORSHOP_EMAIL_FROM is required}"
+      EmailSettings__Enabled: ${BLAZORSHOP_EMAIL_ENABLED:-true}
+      EmailSettings__From: "${BLAZORSHOP_EMAIL_FROM:-}"
       EmailSettings__DisplayName: ${BLAZORSHOP_EMAIL_DISPLAY_NAME:-BlazorShop}
-      EmailSettings__SmtpServer: "${BLAZORSHOP_EMAIL_SMTP_SERVER:?BLAZORSHOP_EMAIL_SMTP_SERVER is required}"
+      EmailSettings__SmtpServer: "${BLAZORSHOP_EMAIL_SMTP_SERVER:-}"
       EmailSettings__Port: ${BLAZORSHOP_EMAIL_SMTP_PORT:-587}
       EmailSettings__UseSsl: ${BLAZORSHOP_EMAIL_USE_SSL:-true}
-      EmailSettings__Username: "${BLAZORSHOP_EMAIL_USERNAME:?BLAZORSHOP_EMAIL_USERNAME is required}"
-      EmailSettings__Password: "${BLAZORSHOP_EMAIL_PASSWORD:?BLAZORSHOP_EMAIL_PASSWORD is required}"
+      EmailSettings__Username: "${BLAZORSHOP_EMAIL_USERNAME:-}"
+      EmailSettings__Password: "${BLAZORSHOP_EMAIL_PASSWORD:-}"
       Runtime__Cors__AllowedOrigins__0: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
       Runtime__ForwardedHeaders__Enabled: true
       Runtime__ForwardedHeaders__KnownProxies__0: 172.30.0.10
@@ -50,6 +53,7 @@ services:
         condition: service_healthy
     volumes:
       - blazorshop-uploads-data:/app/uploads
+      - blazorshop-data-protection-keys:/root/.aspnet/DataProtection-Keys
     networks:
       - blazorshop
 
@@ -73,6 +77,8 @@ services:
     build:
       context: .
       dockerfile: BlazorShop.Presentation/BlazorShop.Web/Dockerfile
+    environment:
+      BLAZORSHOP_STOREFRONT_BASE_URL: ${BLAZORSHOP_STOREFRONT_BASE_URL:?BLAZORSHOP_STOREFRONT_BASE_URL is required}
     depends_on:
       - api
     ports:
@@ -84,6 +90,7 @@ services:
 volumes:
   blazorshop-postgres-data:
   blazorshop-uploads-data:
+  blazorshop-data-protection-keys:
 
 networks:
   blazorshop:

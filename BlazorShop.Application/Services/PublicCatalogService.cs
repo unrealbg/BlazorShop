@@ -36,21 +36,19 @@ namespace BlazorShop.Application.Services
 
         public async Task<GetPublicCatalogSitemap> GetPublishedSitemapAsync()
         {
-            var categoryTask = _categoryRepository.GetPublishedCategorySitemapEntriesAsync();
-            var productTask = _productReadRepository.GetPublishedProductSitemapEntriesAsync();
-
-            await Task.WhenAll(categoryTask, productTask);
+            var categories = await _categoryRepository.GetPublishedCategorySitemapEntriesAsync();
+            var products = await _productReadRepository.GetPublishedProductSitemapEntriesAsync();
 
             return new GetPublicCatalogSitemap
             {
-                Categories = categoryTask.Result
+                Categories = categories
                     .Select(category => new GetCategorySitemapEntry
                     {
                         Slug = category.Slug,
                         LastModifiedUtc = category.LastModifiedUtc,
                     })
                     .ToArray(),
-                Products = productTask.Result
+                Products = products
                     .Select(product => new GetProductSitemapEntry
                     {
                         Slug = product.Slug,

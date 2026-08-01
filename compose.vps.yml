@@ -1,0 +1,8 @@
+services:
+  storefront:
+    ports: !override
+      - "127.0.0.1:18081:8080"
+
+  web:
+    ports: !override
+      - "127.0.0.1:18082:80"

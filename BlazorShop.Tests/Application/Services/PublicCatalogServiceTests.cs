@@ -84,6 +84,36 @@ namespace BlazorShop.Tests.Application.Services
             _productReadRepository.Verify(repository => repository.GetPublishedProductsByCategoryAsync(It.IsAny<Guid>()), Times.Never);
         }
 
+        [Fact]
+        public async Task GetPublishedSitemapAsync_WaitsForCategoryQueryBeforeStartingProductQuery()
+        {
+            var categoryCompletion = new TaskCompletionSource<IReadOnlyList<PublishedCategorySitemapEntryReadModel>>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _categoryRepository
+                .Setup(repository => repository.GetPublishedCategorySitemapEntriesAsync())
+                .Returns(categoryCompletion.Task);
+            _productReadRepository
+                .Setup(repository => repository.GetPublishedProductSitemapEntriesAsync())
+                .ReturnsAsync([]);
+
+            var service = CreateService();
+            var resultTask = service.GetPublishedSitemapAsync();
+
+            _productReadRepository.Verify(
+                repository => repository.GetPublishedProductSitemapEntriesAsync(),
+                Times.Never);
+
+            categoryCompletion.SetResult([]);
+            var result = await resultTask;
+
+            Assert.Empty(result.Categories);
+            Assert.Empty(result.Products);
+            _productReadRepository.Verify(
+                repository => repository.GetPublishedProductSitemapEntriesAsync(),
+                Times.Once);
+        }
+
         private PublicCatalogService CreateService()
         {
             return new PublicCatalogService(

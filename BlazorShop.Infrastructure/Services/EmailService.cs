@@ -23,6 +23,15 @@
 
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
+            if (!_emailSettings.Enabled)
+            {
+                _logger.LogWarning(
+                    "Email delivery is disabled. Skipping message to {ToEmail} with subject {Subject}",
+                    toEmail,
+                    subject);
+                return;
+            }
+
             var email = new MimeMessage();
             email.From.Add(new MailboxAddress(_emailSettings.DisplayName, _emailSettings.From));
             email.To.Add(MailboxAddress.Parse(toEmail));

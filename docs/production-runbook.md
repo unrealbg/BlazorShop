@@ -82,6 +82,7 @@ ClientApp__BaseUrl=https://account.shop.example.com
 Identity__RequireConfirmedAccount=true
 Identity__RequireConfirmedEmail=true
 Stripe__SecretKey=<secret>
+EmailSettings__Enabled=true
 EmailSettings__From=shop@example.com
 EmailSettings__DisplayName=BlazorShop
 EmailSettings__SmtpServer=smtp.example.com
@@ -124,9 +125,11 @@ Outside `Development`, the storefront now fails startup unless:
 - `ClientApp:BaseUrl` is configured as an absolute URL, or Aspire service discovery provides `Services:adminclient:*`
 - `PublicUrl:BaseUrl` is configured as an absolute URL
 
-In the standard production build, email is not optional. Account confirmation and newsletter flows depend on a working SMTP sender configuration. Outside `Development`, the API fails startup when `EmailSettings:From`, `SmtpServer`, `Username`, or `Password` are blank or still placeholder values.
+Email delivery is enabled by default. Account confirmation and newsletter flows depend on a working SMTP sender configuration. Outside `Development`, the API fails startup when email is enabled and `EmailSettings:From`, `SmtpServer`, `Username`, or `Password` are blank or still placeholder values.
 
-If you deploy with an appsettings override file instead of environment variables, treat these email keys as required in production:
+For an initial deployment that intentionally has no outbound mail, set `EmailSettings:Enabled=false` and also set `Identity:RequireConfirmedAccount=false` and `Identity:RequireConfirmedEmail=false`. Disabled delivery is logged and messages are skipped. Re-enable confirmation requirements when SMTP is configured.
+
+If you deploy with an appsettings override file instead of environment variables, treat these email keys as required in production whenever `EmailSettings:Enabled` is `true`:
 
 - `EmailSettings:From`
 - `EmailSettings:SmtpServer`
@@ -179,6 +182,9 @@ Required environment variables before startup:
 - `BLAZORSHOP_API_BASE_URL`
 - `BLAZORSHOP_CLIENT_APP_BASE_URL`
 - `BLAZORSHOP_STOREFRONT_BASE_URL`
+
+When `BLAZORSHOP_EMAIL_ENABLED=true` (the default), these are also required by application startup validation:
+
 - `BLAZORSHOP_EMAIL_FROM`
 - `BLAZORSHOP_EMAIL_SMTP_SERVER`
 - `BLAZORSHOP_EMAIL_USERNAME`
@@ -186,9 +192,12 @@ Required environment variables before startup:
 
 Optional compose overrides:
 
+- `BLAZORSHOP_EMAIL_ENABLED`
 - `BLAZORSHOP_EMAIL_DISPLAY_NAME`
 - `BLAZORSHOP_EMAIL_SMTP_PORT`
 - `BLAZORSHOP_EMAIL_USE_SSL`
+- `BLAZORSHOP_REQUIRE_CONFIRMED_ACCOUNT`
+- `BLAZORSHOP_REQUIRE_CONFIRMED_EMAIL`
 
 Start the stack with:
 
@@ -196,7 +205,15 @@ Start the stack with:
 docker compose -f compose.production.yml up -d --build
 ```
 
-The production compose file now uses required-variable expansion for the SMTP sender settings. That means `docker compose -f compose.production.yml config` and `docker compose -f compose.production.yml up` fail immediately if any required SMTP environment variable is unset or blank.
+To load the bundled sample catalog once after PostgreSQL and the API are healthy, run:
+
+```powershell
+docker compose -f compose.production.yml run --rm api --seed-sample-catalog
+```
+
+The command applies pending EF Core migrations, upserts the sample categories and products, and exits without starting the HTTP server. It is safe to rerun, but it intentionally restores the bundled sample values for matching sample records.
+
+The API validates SMTP sender settings on startup when email delivery is enabled, so an incomplete mail configuration fails closed.
 
 Notes:
 
@@ -204,6 +221,7 @@ Notes:
 - The `storefront` container is the public SSR shopping surface. Its `PublicUrl:BaseUrl` must match the real public storefront origin and its `ClientApp:BaseUrl` must match the authenticated client origin.
 - The Web container fronts the API under its own origin and proxies `/api` and `/uploads` to the API container.
 - `compose.production.yml` mounts a named volume at `/app/uploads`, so uploaded files survive API container replacement.
+- ASP.NET Core data-protection keys are stored in the `blazorshop-data-protection-keys` volume so protected cookies and tokens survive API container replacement.
 - The API resolves uploads under `<content-root>/uploads`; in the production API image the content root is `/app`, so the runtime upload path is exactly `/app/uploads`.
 - The bundled Web container is intentionally HTTP-only inside the private Docker network; put TLS termination, HSTS, and port 80 to 443 redirects on the public edge in front of it.
 - The compose example fixes the trusted proxy to the Web container IP `172.30.0.10`.
