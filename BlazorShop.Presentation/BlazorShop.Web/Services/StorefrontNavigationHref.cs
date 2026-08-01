@@ -4,7 +4,7 @@ namespace BlazorShop.Web.Services
 
     public static class StorefrontNavigationHref
     {
-        public const string LocalStorefrontFallback = "/";
+        public const string LocalStorefrontFallback = "/storefront";
 
         public static string ResolveShopHref(IPublicStorefrontUrlResolver resolver)
         {

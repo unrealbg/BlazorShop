@@ -108,6 +108,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
             var document = StorefrontHtmlAuditDocument.Create(html);
 
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+            Assert.NotEmpty(document.Html);
             Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl?.ToString());
             Assert.True(response.Headers.TryGetValues("X-Robots-Tag", out var robotsHeaderValues));
             Assert.Contains("noindex, nofollow", robotsHeaderValues);

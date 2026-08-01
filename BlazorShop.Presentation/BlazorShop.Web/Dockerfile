@@ -28,7 +28,7 @@ RUN dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj 
 
 FROM ${NGINX_IMAGE} AS final
 
-COPY BlazorShop.Presentation/BlazorShop.Web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY BlazorShop.Presentation/BlazorShop.Web/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
 
 EXPOSE 80

@@ -24,7 +24,7 @@ namespace BlazorShop.Tests.Presentation.Services
 
             var result = StorefrontNavigationHref.ResolveShopHref(resolver);
 
-            Assert.Equal("/", result);
+            Assert.Equal("/storefront", result);
         }
 
         [Fact]
@@ -34,7 +34,7 @@ namespace BlazorShop.Tests.Presentation.Services
 
             var result = StorefrontNavigationHref.ResolveShopHref(resolver);
 
-            Assert.Equal("/", result);
+            Assert.Equal("/storefront", result);
         }
 
         private sealed class StubPublicStorefrontUrlResolver : IPublicStorefrontUrlResolver

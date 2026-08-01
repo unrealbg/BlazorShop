@@ -2,6 +2,8 @@
 {
     public class EmailSettings
     {
+        public bool Enabled { get; set; } = true;
+
         public string From { get; set; } = string.Empty;         
 
         public string DisplayName { get; set; } = string.Empty; 

@@ -18,7 +18,7 @@ namespace BlazorShop.Infrastructure.Configuration
 
         public ValidateOptionsResult Validate(string? name, EmailSettings options)
         {
-            if (_hostEnvironment.IsDevelopment())
+            if (_hostEnvironment.IsDevelopment() || !options.Enabled)
             {
                 return ValidateOptionsResult.Success;
             }

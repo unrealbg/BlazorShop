@@ -16,6 +16,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
         private StorefrontHtmlAuditDocument(string html)
         {
+            Html = html;
             _linkTags = ExtractStartTags(html, "link");
             _metaTags = ExtractStartTags(html, "meta");
             _anchorTags = ExtractStartTags(html, "a");
@@ -51,6 +52,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
             .ToArray();
 
         public bool HasAnyOpenGraphTags => OpenGraphProperties.Count > 0;
+
+        public string Html { get; }
 
         public IReadOnlyList<string> InternalAnchorHrefs => AnchorHrefs
             .Where(value => value.StartsWith("/", StringComparison.Ordinal))
