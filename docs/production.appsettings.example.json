@@ -15,6 +15,7 @@
     "RequireConfirmedEmail": true
   },
   "Stripe": {
+    "Enabled": false,
     "SecretKey": "<set-in-secret-store-or-env>",
     "WebhookSecret": "<set-in-secret-store-or-env>"
   },

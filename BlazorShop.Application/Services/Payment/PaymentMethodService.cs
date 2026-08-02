@@ -3,8 +3,11 @@
     using AutoMapper;
 
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts.Payment;
+
+    using Microsoft.Extensions.Options;
 
     public class PaymentMethodService : IPaymentMethodService
     {
@@ -12,11 +15,16 @@
 
         private readonly IPaymentMethod _paymentMethod;
         private readonly IMapper _mapper;
+        private readonly StripeOptions _stripeOptions;
 
-        public PaymentMethodService(IPaymentMethod paymentMethod, IMapper mapper)
+        public PaymentMethodService(
+            IPaymentMethod paymentMethod,
+            IMapper mapper,
+            IOptions<StripeOptions> stripeOptions)
         {
             this._paymentMethod = paymentMethod;
             this._mapper = mapper;
+            this._stripeOptions = stripeOptions.Value;
         }
 
         public async Task<IEnumerable<GetPaymentMethod>> GetPaymentMethodsAsync()
@@ -30,6 +38,8 @@
 
             var supportedMethods = methods
                 .Where(method => !DisabledPaymentMethodNames.Contains(method.Name, StringComparer.OrdinalIgnoreCase))
+                .Where(method => this._stripeOptions.Enabled
+                    || !string.Equals(method.Name, "Credit Card", StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             if (supportedMethods.Count == 0)

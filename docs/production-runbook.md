@@ -81,6 +81,7 @@ Jwt__Audience=https://api.shop.example.com
 ClientApp__BaseUrl=https://account.shop.example.com
 Identity__RequireConfirmedAccount=true
 Identity__RequireConfirmedEmail=true
+Stripe__Enabled=false
 Stripe__SecretKey=<secret>
 Stripe__WebhookSecret=<secret>
 EmailSettings__Enabled=true
@@ -179,11 +180,11 @@ Required environment variables before startup:
 
 - `BLAZORSHOP_DB_PASSWORD`
 - `BLAZORSHOP_JWT_KEY`
-- `BLAZORSHOP_STRIPE_SECRET_KEY`
-- `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`
 - `BLAZORSHOP_API_BASE_URL`
 - `BLAZORSHOP_CLIENT_APP_BASE_URL`
 - `BLAZORSHOP_STOREFRONT_BASE_URL`
+
+Card payments are disabled by default, which is appropriate for a demonstration deployment. Set `BLAZORSHOP_STRIPE_ENABLED=true` only when Stripe is intentionally enabled; in that case, `BLAZORSHOP_STRIPE_SECRET_KEY` and `BLAZORSHOP_STRIPE_WEBHOOK_SECRET` must also be populated from Stripe.
 
 When `BLAZORSHOP_EMAIL_ENABLED=true` (the default), these are also required by application startup validation:
 
@@ -446,8 +447,8 @@ The GitHub Actions workflow `ci` runs the `build-test` job, which already covers
 9. Verify that a browser preflight request from the public web origin succeeds against a public API endpoint.
 10. Verify that public traffic is throttled as expected while authenticated flows still work.
 11. Upload a test image and confirm it still exists after an API container restart.
-12. Register `https://<api-host>/api/stripe/webhook` in Stripe for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`; store its signing secret in `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`.
-13. Complete a Stripe test checkout and verify that the pending order becomes `Paid` only after the signed webhook is received.
+12. If Stripe is enabled, register `https://<api-host>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`; store its signing secret in `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`.
+13. If Stripe is enabled, complete a Stripe test checkout and verify that the pending order becomes `Paid` only after the signed webhook is received.
 
 ## GitHub Branch Protection
 
