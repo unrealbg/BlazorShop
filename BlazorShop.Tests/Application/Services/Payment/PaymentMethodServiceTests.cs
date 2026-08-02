@@ -6,9 +6,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
     using System.Threading.Tasks;
     using AutoMapper;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Payment;
     using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Domain.Entities.Payment;
+    using Microsoft.Extensions.Options;
     using Moq;
     using Xunit;
 
@@ -25,7 +27,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             _paymentMethodService = new PaymentMethodService(
                 _paymentMethodMock.Object,
-                _mapperMock.Object);
+                _mapperMock.Object,
+                Options.Create(new StripeOptions { Enabled = true }));
         }
 
         [Fact]
@@ -98,6 +101,41 @@ namespace BlazorShop.Tests.Application.Services.Payment
             // Assert
             Assert.Empty(result);
             _mapperMock.Verify(m => m.Map<IEnumerable<GetPaymentMethod>>(It.IsAny<IEnumerable<PaymentMethod>>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task GetPaymentMethodsAsync_ShouldHideCreditCard_WhenStripeIsDisabled()
+        {
+            // Arrange
+            var paymentMethods = new List<PaymentMethod>
+            {
+                new PaymentMethod { Id = Guid.NewGuid(), Name = "Credit Card" },
+                new PaymentMethod { Id = Guid.NewGuid(), Name = "Cash on Delivery" },
+                new PaymentMethod { Id = Guid.NewGuid(), Name = "Bank Transfer" }
+            };
+            var supportedMethods = paymentMethods.Where(paymentMethod => paymentMethod.Name != "Credit Card").ToList();
+            var mappedMethods = supportedMethods
+                .Select(paymentMethod => new GetPaymentMethod { Id = paymentMethod.Id, Name = paymentMethod.Name })
+                .ToList();
+            var paymentMethodService = new PaymentMethodService(
+                _paymentMethodMock.Object,
+                _mapperMock.Object,
+                Options.Create(new StripeOptions { Enabled = false }));
+
+            _paymentMethodMock
+                .Setup(pm => pm.GetPaymentMethodsAsync())
+                .ReturnsAsync(paymentMethods);
+            _mapperMock
+                .Setup(m => m.Map<IEnumerable<GetPaymentMethod>>(supportedMethods))
+                .Returns(mappedMethods);
+
+            // Act
+            var result = await paymentMethodService.GetPaymentMethodsAsync();
+
+            // Assert
+            Assert.DoesNotContain(result, paymentMethod => paymentMethod.Name == "Credit Card");
+            Assert.Contains(result, paymentMethod => paymentMethod.Name == "Cash on Delivery");
+            Assert.Contains(result, paymentMethod => paymentMethod.Name == "Bank Transfer");
         }
     }
 }

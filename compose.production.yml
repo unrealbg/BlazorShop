@@ -28,8 +28,9 @@ services:
       ClientApp__BaseUrl: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
       Identity__RequireConfirmedAccount: ${BLAZORSHOP_REQUIRE_CONFIRMED_ACCOUNT:-true}
       Identity__RequireConfirmedEmail: ${BLAZORSHOP_REQUIRE_CONFIRMED_EMAIL:-true}
-      Stripe__SecretKey: ${BLAZORSHOP_STRIPE_SECRET_KEY}
-      Stripe__WebhookSecret: ${BLAZORSHOP_STRIPE_WEBHOOK_SECRET:?BLAZORSHOP_STRIPE_WEBHOOK_SECRET is required}
+      Stripe__Enabled: ${BLAZORSHOP_STRIPE_ENABLED:-false}
+      Stripe__SecretKey: "${BLAZORSHOP_STRIPE_SECRET_KEY:-}"
+      Stripe__WebhookSecret: "${BLAZORSHOP_STRIPE_WEBHOOK_SECRET:-}"
       EmailSettings__Enabled: ${BLAZORSHOP_EMAIL_ENABLED:-true}
       EmailSettings__From: "${BLAZORSHOP_EMAIL_FROM:-}"
       EmailSettings__DisplayName: ${BLAZORSHOP_EMAIL_DISPLAY_NAME:-BlazorShop}
