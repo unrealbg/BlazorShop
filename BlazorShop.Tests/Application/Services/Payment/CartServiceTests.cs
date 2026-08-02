@@ -163,6 +163,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 }
             };
             var totalAmount = 10m;
+            var orderId = Guid.NewGuid();
+            Order? createdOrder = null;
             _productReadRepositoryMock
                 .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
                 .ReturnsAsync(products.ToDictionary(product => product.Id));
@@ -177,8 +179,16 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     }
                 });
             _paymentServiceMock
-                .Setup(s => s.Pay(totalAmount, products, checkout.Carts))
+                .Setup(s => s.Pay(totalAmount, products, checkout.Carts, orderId))
                 .ReturnsAsync(new ServiceResponse(true, "Payment successful"));
+            _orderRepositoryMock
+                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
+                .Callback<Order>(order =>
+                {
+                    order.Id = orderId;
+                    createdOrder = order;
+                })
+                .ReturnsAsync(orderId);
 
             // Act
             var result = await _cartService.CheckoutAsync(checkout);
@@ -186,6 +196,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
             // Assert
             Assert.True(result.Success);
             Assert.Equal("Payment successful", result.Message);
+            Assert.NotNull(createdOrder);
+            Assert.Equal(PaymentOrderStatus.PendingPayment, createdOrder!.Status);
+            _paymentServiceMock.Verify(
+                service => service.Pay(totalAmount, products, checkout.Carts, createdOrder.Id),
+                Times.Once);
         }
 
         [Fact]
@@ -249,13 +264,14 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 .ReturnsAsync(Guid.NewGuid());
 
             // Act
-            var result = await _cartService.ConfirmOrderAsync(carts, "user-1", "Paid");
+            var result = await _cartService.ConfirmOrderAsync(carts, "user-1");
 
             // Assert
             Assert.True(result.Success);
             Assert.NotNull(createdOrder);
             Assert.Equal("user-1", createdOrder!.UserId);
-            Assert.Equal("Paid", createdOrder.Status);
+            Assert.Equal("Pending", createdOrder.Status);
+            Assert.StartsWith("COD-", createdOrder.Reference, StringComparison.Ordinal);
             Assert.Equal(25m, createdOrder.TotalAmount);
             Assert.Single(createdOrder.Lines);
             Assert.Equal(2, createdOrder.Lines.First().Quantity);

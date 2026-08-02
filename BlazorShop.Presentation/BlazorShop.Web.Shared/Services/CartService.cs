@@ -35,12 +35,12 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
-        public async Task<ServiceResponse> ConfirmOrder(IEnumerable<ProcessCart> carts, string status)
+        public async Task<ServiceResponse> ConfirmOrder(IEnumerable<ProcessCart> carts)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();
             var apiCallModel = new ApiCall
             {
-                Route = $"{Constant.Cart.ConfirmOrder}?status={Uri.EscapeDataString(status)}",
+                Route = Constant.Cart.ConfirmOrder,
                 Type = Constant.ApiCallType.Post,
                 Client = privateClient,
                 Id = null!,

@@ -1,0 +1,63 @@
+name: release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag to receive the artifacts
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release-artifacts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore BlazorShop.sln
+
+      - name: Test
+        run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-restore --verbosity normal
+
+      - name: Publish deployable applications
+        run: |
+          dotnet publish BlazorShop.Presentation/BlazorShop.API/BlazorShop.API.csproj --configuration Release --no-restore --output artifacts/api
+          dotnet publish BlazorShop.Presentation/BlazorShop.Storefront/BlazorShop.Storefront.csproj --configuration Release --no-restore --output artifacts/storefront
+          dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj --configuration Release --no-restore --output artifacts/account
+
+      - name: Package release artifacts
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          SAFE_TAG="$(printf '%s' "$RELEASE_TAG" | tr -c 'A-Za-z0-9._-' '-')"
+          mkdir -p release-assets
+          tar -C artifacts/api -czf "$GITHUB_WORKSPACE/release-assets/blazorshop-api-${SAFE_TAG}.tar.gz" .
+          tar -C artifacts/storefront -czf "$GITHUB_WORKSPACE/release-assets/blazorshop-storefront-${SAFE_TAG}.tar.gz" .
+          tar -C artifacts/account -czf "$GITHUB_WORKSPACE/release-assets/blazorshop-account-${SAFE_TAG}.tar.gz" .
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: blazorshop-${{ github.run_id }}
+          path: release-assets/*.tar.gz
+          if-no-files-found: error
+
+      - name: Attach artifacts to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release upload "$RELEASE_TAG" release-assets/*.tar.gz --clobber

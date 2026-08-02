@@ -106,7 +106,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 .ReturnsAsync(new ServiceResponse());
 
             // Act
-            var result = await this._cartService.ConfirmOrder(carts, "Paid");
+            var result = await this._cartService.ConfirmOrder(carts);
 
             // Assert
             Assert.NotNull(result);

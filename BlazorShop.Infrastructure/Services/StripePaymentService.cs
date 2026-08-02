@@ -27,7 +27,11 @@
             _logger = logger;
         }
 
-        public async Task<ServiceResponse> Pay(decimal totalAmount, IEnumerable<Product> cartProducts, IEnumerable<ProcessCart> carts)
+        public async Task<ServiceResponse> Pay(
+            decimal totalAmount,
+            IEnumerable<Product> cartProducts,
+            IEnumerable<ProcessCart> carts,
+            Guid orderId)
         {
             try
             {
@@ -59,8 +63,20 @@
                     PaymentMethodTypes = ["card"],
                     LineItems = lineItems,
                     Mode = "payment",
-                    SuccessUrl = this.BuildClientUrl("payment-success?pm=card"),
-                    CancelUrl = this.BuildClientUrl("payment-cancel"),
+                    ClientReferenceId = orderId.ToString("D"),
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["order_id"] = orderId.ToString("D"),
+                    },
+                    PaymentIntentData = new SessionPaymentIntentDataOptions
+                    {
+                        Metadata = new Dictionary<string, string>
+                        {
+                            ["order_id"] = orderId.ToString("D"),
+                        },
+                    },
+                    SuccessUrl = this.BuildClientUrl("payment-success?pm=card&session_id={CHECKOUT_SESSION_ID}"),
+                    CancelUrl = this.BuildClientUrl($"payment-cancel?order_id={orderId:D}"),
                 };
 
                 var session = await _checkoutSessionService.CreateAsync(opt);

@@ -20,6 +20,13 @@ namespace BlazorShop.Infrastructure.Repositories.Payment
             return order.Id;
         }
 
+        public async Task<Order?> GetByIdAsync(Guid orderId)
+        {
+            return await _context.Orders
+                .Include(order => order.Lines)
+                .FirstOrDefaultAsync(order => order.Id == orderId);
+        }
+
         public async Task<Order?> GetByReferenceAsync(string reference)
         {
             return await _context.Orders.Include(o => o.Lines).FirstOrDefaultAsync(o => o.Reference == reference);
@@ -31,6 +38,19 @@ namespace BlazorShop.Infrastructure.Repositories.Payment
             if (order == null) return 0;
             order.Status = status;
             return await _context.SaveChangesAsync();
+        }
+
+        public async Task<int> UpdatePaymentStatusAsync(Guid orderId, string status)
+        {
+            var query = _context.Orders
+                .Where(order => order.Id == orderId && order.Status != status);
+
+            if (!string.Equals(status, PaymentOrderStatus.Paid, StringComparison.Ordinal))
+            {
+                query = query.Where(order => order.Status != PaymentOrderStatus.Paid);
+            }
+
+            return await query.ExecuteUpdateAsync(setters => setters.SetProperty(order => order.Status, status));
         }
 
         public async Task<List<Order>> GetByUserIdAsync(string userId)

@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Web.Components.Header
 {
+    using BlazorShop.Web.Components.Search;
     using BlazorShop.Web.Shared.Models.Product;
 
     using Microsoft.AspNetCore.Components;
@@ -122,7 +123,7 @@
             var p = _matches[index];
             _query = p.Name ?? _query;
             _isOpen = false;
-            this.NavigationManager.NavigateTo($"search-result/{Uri.EscapeDataString(_query)}");
+            this.NavigationManager.NavigateTo(SearchCatalogUrl.Build(_query, ProductCatalogSortBy.NameAscending));
         }
 
         private void NavigateToQuery()
@@ -130,7 +131,7 @@
             var q = _query?.Trim();
             if (!string.IsNullOrWhiteSpace(q))
             {
-                this.NavigationManager.NavigateTo($"search-result/{Uri.EscapeDataString(q)}");
+                this.NavigationManager.NavigateTo(SearchCatalogUrl.Build(q, ProductCatalogSortBy.NameAscending));
             }
         }
     }

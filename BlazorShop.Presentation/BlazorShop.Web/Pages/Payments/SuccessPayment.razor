@@ -29,6 +29,10 @@
     [SupplyParameterFromQuery(Name = "pm")]
     public string? PaymentMethod { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "session_id")]
+    public string? StripeSessionId { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         var isBankTransfer = Bt.GetValueOrDefault() == 1;
@@ -65,28 +69,35 @@
                                 return;
                             }
 
-                            var orderStatus = normalizedPaymentMethod == "cod"
-                                ? "Pending"
-                                : "Paid";
-
-                            var confirmResult = await CartService.ConfirmOrder(list, orderStatus);
-
-                            if (confirmResult.Success)
+                            if (normalizedPaymentMethod == "cod")
                             {
-                                NotificationService.NotifySuccess(
-                                    "Your order was placed successfully.",
-                                    "Order placed",
-                                    NotificationKind.Order,
-                                    link: "/account/orders");
+                                var confirmResult = await CartService.ConfirmOrder(list);
+
+                                if (confirmResult.Success)
+                                {
+                                    NotificationService.NotifySuccess(
+                                        "Your order was placed successfully.",
+                                        "Order placed",
+                                        NotificationKind.Order,
+                                        link: "/account/orders");
+                                }
+                                else
+                                {
+                                    NotificationService.NotifyWarning(
+                                        "We could not finalize the order record right now.",
+                                        "Order update",
+                                        NotificationKind.Order,
+                                        link: "/account/orders");
+                                    return;
+                                }
                             }
                             else
                             {
-                                NotificationService.NotifyWarning(
-                                    "Your payment completed, but we could not finalize the order record right now.",
-                                    "Order update",
-                                    NotificationKind.Order,
+                                NotificationService.NotifySuccess(
+                                    "Stripe accepted your payment. The signed webhook is finalizing your order status.",
+                                    "Payment received",
+                                    NotificationKind.Payment,
                                     link: "/account/orders");
-                                return;
                             }
                         }
                         else

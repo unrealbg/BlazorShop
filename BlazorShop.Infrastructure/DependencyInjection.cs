@@ -2,6 +2,7 @@
 {
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Application.Services.Contracts.Logging;
@@ -100,6 +101,8 @@
             services.AddScoped<IPaymentMethod, PaymentMethodRepository>();
             services.AddScoped<IStripeCheckoutSessionService, StripeCheckoutSessionService>();
             services.AddScoped<IPaymentService, StripePaymentService>();
+            services.AddSingleton<IStripeWebhookEventParser, StripeWebhookEventParser>();
+            services.AddScoped<IStripeWebhookService, StripeWebhookService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<IOrderTrackingService, OrderTrackingService>();
@@ -125,7 +128,10 @@
             // Add memory cache for recommendations
             services.AddMemoryCache();
 
-            Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
+            services.AddOptions<StripeOptions>()
+                .Bind(config.GetSection(StripeOptions.SectionName));
+
+            Stripe.StripeConfiguration.ApiKey = config[$"{StripeOptions.SectionName}:SecretKey"];
 
             services.AddSingleton<IValidateOptions<EmailSettings>, EmailSettingsOptionsValidator>();
             services.AddOptions<EmailSettings>()

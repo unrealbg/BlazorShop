@@ -60,7 +60,7 @@
 
         [HttpPost("confirm-order")]
         [Authorize(Roles = "User, Admin")]
-        public async Task<IActionResult> ConfirmOrder(IEnumerable<ProcessCart> carts, [FromQuery] string? status = null)
+        public async Task<IActionResult> ConfirmOrder(IEnumerable<ProcessCart> carts)
         {
             var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -69,7 +69,7 @@
                 return this.Unauthorized("User ID is invalid or not found.");
             }
 
-            var result = await _cartService.ConfirmOrderAsync(carts, userId, status);
+            var result = await _cartService.ConfirmOrderAsync(carts, userId);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 

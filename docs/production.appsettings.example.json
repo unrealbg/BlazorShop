@@ -15,7 +15,8 @@
     "RequireConfirmedEmail": true
   },
   "Stripe": {
-    "SecretKey": "<set-in-secret-store-or-env>"
+    "SecretKey": "<set-in-secret-store-or-env>",
+    "WebhookSecret": "<set-in-secret-store-or-env>"
   },
   "EmailSettings": {
     "From": "<required-sender-address>",
