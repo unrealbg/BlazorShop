@@ -58,12 +58,4 @@ function init() {
   });
 }
 
-window.blz = Object.freeze({
-  showLoader,
-  hideLoader,
-  setLoaderText,
-  setLoaderProgress,
-  wireErrorUi,
-});
-
 init();

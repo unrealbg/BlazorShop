@@ -9,6 +9,7 @@
         Task<ServiceResponse> Pay(
             decimal totalAmount,
             IEnumerable<Product> cartProducts,
-            IEnumerable<ProcessCart> carts);
+            IEnumerable<ProcessCart> carts,
+            Guid orderId);
     }
 }

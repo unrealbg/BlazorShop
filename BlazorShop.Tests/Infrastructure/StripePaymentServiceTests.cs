@@ -28,11 +28,13 @@ namespace BlazorShop.Tests.Infrastructure
                 .ThrowsAsync(new InvalidOperationException("Sensitive Stripe error details"));
 
             var paymentService = CreatePaymentService(sessionService.Object, logger.Object);
+            var orderId = Guid.NewGuid();
 
             var result = await paymentService.Pay(
                 25m,
                 [new Product { Id = productId, Name = "Camera", Description = "Mirrorless", Price = 25m }],
-                [new ProcessCart { ProductId = productId, Quantity = 1 }]);
+                [new ProcessCart { ProductId = productId, Quantity = 1 }],
+                orderId);
 
             Assert.False(result.Success);
             Assert.Equal("Unable to initialize the card payment session. Please try again later.", result.Message);
@@ -53,17 +55,24 @@ namespace BlazorShop.Tests.Infrastructure
                 .ReturnsAsync(new Session { Url = "https://checkout.stripe.com/session/test" });
 
             var paymentService = CreatePaymentService(sessionService.Object, logger.Object);
+            var orderId = Guid.NewGuid();
 
             var result = await paymentService.Pay(
                 25m,
                 [new Product { Id = productId, Name = "Camera", Description = "Mirrorless", Price = 25m }],
-                [new ProcessCart { ProductId = productId, Quantity = 1 }]);
+                [new ProcessCart { ProductId = productId, Quantity = 1 }],
+                orderId);
 
             Assert.True(result.Success);
             Assert.Equal("https://checkout.stripe.com/session/test", result.Message);
             Assert.NotNull(capturedOptions);
-            Assert.Equal("https://shop.example.com/payment-success?pm=card", capturedOptions!.SuccessUrl);
-            Assert.Equal("https://shop.example.com/payment-cancel", capturedOptions.CancelUrl);
+            Assert.Equal(
+                "https://shop.example.com/payment-success?pm=card&session_id={CHECKOUT_SESSION_ID}",
+                capturedOptions!.SuccessUrl);
+            Assert.Equal($"https://shop.example.com/payment-cancel?order_id={orderId:D}", capturedOptions.CancelUrl);
+            Assert.Equal(orderId.ToString("D"), capturedOptions.ClientReferenceId);
+            Assert.Equal(orderId.ToString("D"), capturedOptions.Metadata["order_id"]);
+            Assert.Equal(orderId.ToString("D"), capturedOptions.PaymentIntentData.Metadata["order_id"]);
         }
 
         private static StripePaymentService CreatePaymentService(

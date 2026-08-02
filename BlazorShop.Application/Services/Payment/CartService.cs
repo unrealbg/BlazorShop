@@ -76,14 +76,14 @@
             return result > 0 ? new ServiceResponse(true, "Checkout history saved successfully") : new ServiceResponse(false, "Failed to save checkout history");
         }
 
-        public async Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<ProcessCart> carts, string userId, string? status = null)
+        public async Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<ProcessCart> carts, string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
                 return new ServiceResponse(false, "A signed-in user is required to confirm the order.");
             }
 
-            return await CreateOrderAsync(carts, userId, status ?? "Paid", "ORD");
+            return await CreateOrderAsync(carts, userId, "Pending", "COD");
         }
 
         public async Task<ServiceResponse> CheckoutAsync(Checkout checkout)
@@ -104,7 +104,31 @@
 
             if (creditCardId.HasValue && checkout.PaymentMethodId == creditCardId.Value)
             {
-                return await _paymentService.Pay(totalAmount, products, checkout.Carts);
+                var pendingOrder = await CreateOrderAsync(
+                    checkout.Carts,
+                    userId,
+                    PaymentOrderStatus.PendingPayment,
+                    "STRIPE");
+
+                if (!pendingOrder.Success || !pendingOrder.Id.HasValue)
+                {
+                    return pendingOrder;
+                }
+
+                var paymentResult = await _paymentService.Pay(
+                    totalAmount,
+                    products,
+                    checkout.Carts,
+                    pendingOrder.Id.Value);
+
+                if (!paymentResult.Success)
+                {
+                    await _orderRepository.UpdatePaymentStatusAsync(
+                        pendingOrder.Id.Value,
+                        PaymentOrderStatus.PaymentFailed);
+                }
+
+                return paymentResult;
             }
             if (payPalId.HasValue && checkout.PaymentMethodId == payPalId.Value)
             {
@@ -219,7 +243,7 @@
 
             await _orderRepository.CreateAsync(order);
 
-            return new ServiceResponse(true, "Order saved successfully")
+            return new ServiceResponse(true, "Order saved successfully", order.Id)
             {
                 Payload = new
                 {
