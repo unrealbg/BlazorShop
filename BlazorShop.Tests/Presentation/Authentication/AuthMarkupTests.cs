@@ -31,6 +31,20 @@ namespace BlazorShop.Tests.Presentation.Authentication
             Assert.Contains("min-height: 44px !important;", styles);
         }
 
+        [Fact]
+        public void WebShell_VersionsAssetsAndRevalidatesStaticFiles()
+        {
+            var index = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Web/wwwroot/index.html");
+            var nginx = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Web/nginx.conf");
+
+            Assert.Contains("css/site.css?v=mobile-20260801", index);
+            Assert.Contains("css/app.css?v=mobile-20260801", index);
+            Assert.Contains("js/app.js?v=mobile-20260801", index);
+            Assert.Contains("location = /index.html", nginx);
+            Assert.Contains("location ~* \\.(css|js)$", nginx);
+            Assert.Contains("Cache-Control \"no-cache\"", nginx);
+        }
+
         private static string ReadRepositoryFile(string relativePath)
         {
             return File.ReadAllText(Path.Combine(FindRepositoryRoot(), relativePath));

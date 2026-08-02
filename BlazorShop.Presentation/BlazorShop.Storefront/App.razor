@@ -1,16 +1,28 @@
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostEnvironment
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="icon" type="image/png" href="icon-192.png" />
-    <link rel="stylesheet" href="css/site.css" />
-    <link rel="stylesheet" href="css/storefront.css" />
+    <link rel="icon" type="image/png" href="@VersionedAsset("icon-192.png")" />
+    <link rel="stylesheet" href="@VersionedAsset("css/site.css")" />
+    <link rel="stylesheet" href="@VersionedAsset("css/storefront.css")" />
     <HeadOutlet />
 </head>
 <body>
     <Routes />
-    <script src="js/storefrontCommerce.js"></script>
+    <script src="@VersionedAsset("js/storefrontCommerce.js")"></script>
 </body>
 </html>
+
+@code {
+    private string VersionedAsset(string path)
+    {
+        var fileInfo = HostEnvironment.WebRootFileProvider.GetFileInfo(path);
+        return fileInfo.Exists
+            ? $"{path}?v={fileInfo.LastModified.UtcDateTime.Ticks:x}"
+            : path;
+    }
+}

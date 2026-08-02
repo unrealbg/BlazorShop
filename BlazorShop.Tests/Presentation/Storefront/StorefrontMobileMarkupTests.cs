@@ -11,11 +11,22 @@ namespace BlazorShop.Tests.Presentation.Storefront
             var home = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/Pages/Home.razor");
 
             Assert.Contains("py-10 text-center sm:py-14", hero);
-            Assert.Contains("text-[2rem]", hero);
+            Assert.Contains("text-3xl", hero);
             Assert.Contains("grid grid-cols-2 gap-3", hero);
             Assert.Contains("min-h-11 w-full", hero);
             Assert.Contains("pb-8 pt-8", home);
             Assert.Contains("mt-6 grid gap-4 sm:mt-8", home);
+        }
+
+        [Fact]
+        public void StorefrontApp_VersionsBrowserCachedAssets()
+        {
+            var app = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/App.razor");
+
+            Assert.Contains("VersionedAsset(\"css/site.css\")", app);
+            Assert.Contains("VersionedAsset(\"css/storefront.css\")", app);
+            Assert.Contains("VersionedAsset(\"js/storefrontCommerce.js\")", app);
+            Assert.Contains("fileInfo.LastModified.UtcDateTime.Ticks", app);
         }
 
         [Fact]
