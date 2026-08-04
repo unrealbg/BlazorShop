@@ -85,6 +85,28 @@
             return await _apiCallHelper.GetServiceResponse<LoginResponse>(result);
         }
 
+        public async Task<DemoSessionModel> StartDemoSession(string role)
+        {
+            var client = _httpClientHelper.GetPublicClient();
+
+            try
+            {
+                using var response = await client.PostAsJsonAsync(Constant.Authentication.StartDemo, new { role });
+                var result = await response.Content.ReadFromJsonAsync<DemoSessionModel>();
+
+                if (result is not null)
+                {
+                    return result;
+                }
+
+                return new DemoSessionModel { Message = "Unable to start the demo workspace." };
+            }
+            catch (Exception)
+            {
+                return new DemoSessionModel { Message = "Unable to connect to the demo service." };
+            }
+        }
+
         public async Task<QueryResult<LoginResponse>> ReviveToken()
         {
             var client = _httpClientHelper.GetPublicClient();
@@ -114,9 +136,20 @@
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
 
-            return result is null || !result.IsSuccessStatusCode
+            var logoutResult = result is null || !result.IsSuccessStatusCode
                 ? _apiCallHelper.ConnectionError()
                 : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+
+            try
+            {
+                await client.DeleteAsync(Constant.Authentication.EndDemo);
+            }
+            catch (Exception)
+            {
+                // Local authentication cleanup still runs when the optional demo reset call is unavailable.
+            }
+
+            return logoutResult;
         }
 
         public async Task<ServiceResponse> ChangePassword(PasswordChangeModel changePasswordDto)

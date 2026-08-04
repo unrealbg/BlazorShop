@@ -43,32 +43,63 @@
         {
             await _loginGate.RunAsync(async () =>
             {
-                _message = string.Empty;
-                _alertType = string.Empty;
-                await InvokeAsync(StateHasChanged);
+                await ResetStatusAsync();
+                await CompleteLoginAsync();
+            });
+        }
 
-                var result = await this.AuthenticationService.LoginUser(this.User);
+        private async Task StartDemo(string role)
+        {
+            await _loginGate.RunAsync(async () =>
+            {
+                await ResetStatusAsync();
 
-                if (!result.Success)
+                var demoSession = await this.AuthenticationService.StartDemoSession(role);
+                if (!demoSession.Success)
                 {
-                    _message = string.IsNullOrWhiteSpace(result.Message) ? "Unable to sign you in right now." : result.Message;
+                    _message = string.IsNullOrWhiteSpace(demoSession.Message)
+                        ? "Unable to start the demo workspace."
+                        : demoSession.Message;
                     _alertType = "danger";
                     return;
                 }
 
-                await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
-
-                (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
-                await this.SessionEventPublisher.PublishSignedInAsync();
-
-                var authState = await this.AuthStateProvider.GetAuthenticationStateAsync();
-                var targetRoute = ResolveTargetRoute(authState.User);
-                var inboxLink = targetRoute.StartsWith('/') ? targetRoute : $"/{targetRoute}";
-                var successMessage = string.IsNullOrWhiteSpace(result.Message) ? "You have signed in successfully." : result.Message;
-
-                this.NotificationService.NotifySuccess(successMessage, "Signed in", NotificationKind.Authentication, link: inboxLink);
-                this.NavigationManager.NavigateTo(targetRoute);
+                User.Email = demoSession.Email;
+                User.Password = demoSession.Password;
+                await CompleteLoginAsync();
             });
+        }
+
+        private async Task CompleteLoginAsync()
+        {
+            var result = await this.AuthenticationService.LoginUser(this.User);
+
+            if (!result.Success)
+            {
+                _message = string.IsNullOrWhiteSpace(result.Message) ? "Unable to sign you in right now." : result.Message;
+                _alertType = "danger";
+                return;
+            }
+
+            await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
+
+            (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
+            await this.SessionEventPublisher.PublishSignedInAsync();
+
+            var authState = await this.AuthStateProvider.GetAuthenticationStateAsync();
+            var targetRoute = ResolveTargetRoute(authState.User);
+            var inboxLink = targetRoute.StartsWith('/') ? targetRoute : $"/{targetRoute}";
+            var successMessage = string.IsNullOrWhiteSpace(result.Message) ? "You have signed in successfully." : result.Message;
+
+            this.NotificationService.NotifySuccess(successMessage, "Signed in", NotificationKind.Authentication, link: inboxLink);
+            this.NavigationManager.NavigateTo(targetRoute);
+        }
+
+        private async Task ResetStatusAsync()
+        {
+            _message = string.Empty;
+            _alertType = string.Empty;
+            await InvokeAsync(StateHasChanged);
         }
 
         private string ResolveTargetRoute(ClaimsPrincipal user)

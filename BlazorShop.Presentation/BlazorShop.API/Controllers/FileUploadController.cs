@@ -2,6 +2,8 @@
 {
     using BlazorShop.API.Validation;
     using BlazorShop.Application.DTOs;
+    using BlazorShop.Application.Services.Contracts.Demo;
+    using BlazorShop.Infrastructure.Demo;
 
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Http;
@@ -12,6 +14,8 @@
     public class FileUploadController : ControllerBase
     {
         private readonly IWebHostEnvironment _environment;
+        private readonly IDemoRequestContext? _demoRequestContext;
+        private readonly IDemoSessionManager? _demoSessionManager;
 
         private const long MaxFileSizeBytes = 5 * 1024 * 1024;
         private static readonly Dictionary<string, string> AllowedExtensionsByContentType = new(StringComparer.OrdinalIgnoreCase)
@@ -23,9 +27,14 @@
             ["image/bmp"] = ".bmp"
         };
 
-        public FileUploadController(IWebHostEnvironment environment)
+        public FileUploadController(
+            IWebHostEnvironment environment,
+            IDemoRequestContext? demoRequestContext = null,
+            IDemoSessionManager? demoSessionManager = null)
         {
             _environment = environment;
+            _demoRequestContext = demoRequestContext;
+            _demoSessionManager = demoSessionManager;
         }
 
         public sealed class ImageUploadForm
@@ -71,7 +80,11 @@
                 }
             }
 
-            var uploadsPath = Path.Combine(_environment.ContentRootPath, "uploads");
+            var relativeUploadsPath = _demoRequestContext?.IsDemo == true
+                && !string.IsNullOrWhiteSpace(_demoRequestContext.SessionId)
+                    ? Path.Combine("demo", _demoRequestContext.SessionId)
+                    : string.Empty;
+            var uploadsPath = Path.Combine(_environment.ContentRootPath, "uploads", relativeUploadsPath);
             Directory.CreateDirectory(uploadsPath);
 
             var uniqueName = $"{Guid.NewGuid():N}{safeExt}";
@@ -82,11 +95,20 @@
                 await file.CopyToAsync(stream, HttpContext.RequestAborted);
             }
 
+            if (_demoRequestContext?.IsDemo == true && !string.IsNullOrWhiteSpace(_demoRequestContext.SessionId))
+            {
+                _demoSessionManager?.RegisterUploadedFile(_demoRequestContext.SessionId, filePath);
+            }
+
+            var relativeFileUrl = string.IsNullOrWhiteSpace(relativeUploadsPath)
+                ? uniqueName
+                : $"{relativeUploadsPath.Replace(Path.DirectorySeparatorChar, '/')}/{uniqueName}";
+
             string fileUrl;
 #if DEBUG
-            fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueName}";
+            fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{relativeFileUrl}";
 #else
-            fileUrl = $"/uploads/{uniqueName}";
+            fileUrl = $"/uploads/{relativeFileUrl}";
 #endif
 
             return this.Ok(new FileUploadResponse(true, "File uploaded successfully.", fileUrl));

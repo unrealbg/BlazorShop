@@ -19,6 +19,8 @@ builder.AddServiceDefaults();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<DemoOptions>(builder.Configuration.GetSection(DemoOptions.SectionName));
+builder.Services.AddTransient<StorefrontDemoSessionHandler>();
 builder.Services.AddSingleton<IValidateOptions<StorefrontApiOptions>, StorefrontApiOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<ClientAppOptions>, StorefrontClientAppOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<StorefrontPublicUrlOptions>, StorefrontPublicUrlOptionsValidator>();
@@ -44,12 +46,12 @@ builder.Services.AddHttpClient<IStorefrontSessionResolver, StorefrontSessionReso
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
     client.BaseAddress = ResolveApiBaseAddress(configuration);
-});
+}).AddHttpMessageHandler<StorefrontDemoSessionHandler>();
 builder.Services.AddHttpClient<StorefrontApiClient>((serviceProvider, client) =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
     client.BaseAddress = ResolveApiBaseAddress(configuration);
-});
+}).AddHttpMessageHandler<StorefrontDemoSessionHandler>();
 
 var app = builder.Build();
 

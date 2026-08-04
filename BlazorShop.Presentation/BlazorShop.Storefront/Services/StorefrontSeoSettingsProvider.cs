@@ -1,9 +1,11 @@
 namespace BlazorShop.Storefront.Services
 {
     using BlazorShop.Application.DTOs.Seo;
+    using BlazorShop.Application.Options;
     using BlazorShop.Storefront.Services.Contracts;
 
     using Microsoft.Extensions.Caching.Memory;
+    using Microsoft.Extensions.Options;
 
     public class StorefrontSeoSettingsProvider : IStorefrontSeoSettingsProvider
     {
@@ -12,17 +14,28 @@ namespace BlazorShop.Storefront.Services
         private readonly StorefrontApiClient _apiClient;
         private readonly IConfiguration _configuration;
         private readonly IMemoryCache _memoryCache;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly DemoOptions _demoOptions;
 
-        public StorefrontSeoSettingsProvider(StorefrontApiClient apiClient, IConfiguration configuration, IMemoryCache memoryCache)
+        public StorefrontSeoSettingsProvider(
+            StorefrontApiClient apiClient,
+            IConfiguration configuration,
+            IMemoryCache memoryCache,
+            IHttpContextAccessor httpContextAccessor,
+            IOptions<DemoOptions> demoOptions)
         {
             _apiClient = apiClient;
             _configuration = configuration;
             _memoryCache = memoryCache;
+            _httpContextAccessor = httpContextAccessor;
+            _demoOptions = demoOptions.Value;
         }
 
         public async Task<SeoSettingsDto?> GetAsync(CancellationToken cancellationToken = default)
         {
-            if (_memoryCache.TryGetValue(CacheKey, out SeoSettingsDto? cachedSettings))
+            var isDemoRequest = _httpContextAccessor.HttpContext?.Request.Cookies.ContainsKey(_demoOptions.CookieName) == true;
+
+            if (!isDemoRequest && _memoryCache.TryGetValue(CacheKey, out SeoSettingsDto? cachedSettings))
             {
                 return cachedSettings;
             }
@@ -31,7 +44,10 @@ namespace BlazorShop.Storefront.Services
             if (!settingsResult.IsSuccess || settingsResult.Value is null)
             {
                 var fallbackSettings = CreateFallbackSettings();
-                _memoryCache.Set(CacheKey, fallbackSettings, TimeSpan.FromMinutes(5));
+                if (!isDemoRequest)
+                {
+                    _memoryCache.Set(CacheKey, fallbackSettings, TimeSpan.FromMinutes(5));
+                }
                 return fallbackSettings;
             }
 
@@ -55,7 +71,10 @@ namespace BlazorShop.Storefront.Services
                 XUrl = settings.XUrl,
             };
 
-            _memoryCache.Set(CacheKey, mappedSettings, TimeSpan.FromMinutes(5));
+            if (!isDemoRequest)
+            {
+                _memoryCache.Set(CacheKey, mappedSettings, TimeSpan.FromMinutes(5));
+            }
             return mappedSettings;
         }
 
