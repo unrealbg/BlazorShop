@@ -4,6 +4,7 @@
 
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Entities.Identity;
+    using BlazorShop.Application.Services.Contracts.Demo;
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.AspNetCore.Identity;
@@ -15,17 +16,20 @@
         private readonly SignInManager<AppUser> _signInManager;
         private readonly IAppRoleManager _roleManager;
         private readonly AppDbContext _context;
+        private readonly IDemoRequestContext _demoRequestContext;
 
         public AppUserManager(
             IAppRoleManager roleManager,
             UserManager<AppUser> userManager,
             SignInManager<AppUser> signInManager,
-            AppDbContext context)
+            AppDbContext context,
+            IDemoRequestContext demoRequestContext)
         {
             _roleManager = roleManager;
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
+            _demoRequestContext = demoRequestContext;
         }
 
         public async Task<bool> CreateUserAsync(AppUser user)
@@ -100,6 +104,11 @@
                     new Claim(ClaimTypes.NameIdentifier, user!.Id),
                     new Claim(ClaimTypes.Role, roleName!)
                 ];
+
+            if (_demoRequestContext.IsDemo && !string.IsNullOrWhiteSpace(_demoRequestContext.SessionId))
+            {
+                claims.Add(new Claim(DemoSessionConstants.ClaimType, _demoRequestContext.SessionId));
+            }
 
             return claims;
         }

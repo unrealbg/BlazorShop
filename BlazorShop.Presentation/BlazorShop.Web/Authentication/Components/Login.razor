@@ -27,6 +27,23 @@
         }
 
         <div class="mx-auto max-w-lg">
+          <div class="mb-7 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5">
+            <p class="text-xs font-bold uppercase tracking-[0.2em] text-sky-700">Isolated demo workspace</p>
+            <h2 class="mt-2 text-xl font-black text-slate-950">Try the complete application</h2>
+            <p class="mt-2 text-sm leading-6 text-slate-700">Each button creates a private 30-minute sandbox. Products, orders, users, settings, and uploads reset on logout or expiry.</p>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <button type="button" class="bs-button bs-button-secondary w-full justify-center disabled:opacity-60" disabled="@IsSubmitting" @onclick='() => StartDemo("User")'>Customer demo</button>
+              <button type="button" class="bs-button bs-button-primary w-full justify-center disabled:opacity-60" disabled="@IsSubmitting" @onclick='() => StartDemo("Admin")'>Administrator demo</button>
+            </div>
+
+            <div class="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+              <div><span class="font-semibold">Customer:</span> demo.user@blazorshop.local</div>
+              <div><span class="font-semibold">Admin:</span> demo.admin@blazorshop.local</div>
+              <div class="sm:col-span-2"><span class="font-semibold">Password:</span> Demo123!</div>
+            </div>
+          </div>
+
           <EditForm Model="User" OnValidSubmit="LoginUser">
             <DataAnnotationsValidator />
             <ValidationSummary class="mb-5 text-sm text-red-700" />

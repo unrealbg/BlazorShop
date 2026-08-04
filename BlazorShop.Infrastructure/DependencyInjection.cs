@@ -17,6 +17,7 @@
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Configuration;
     using BlazorShop.Infrastructure.Data;
+    using BlazorShop.Infrastructure.Demo;
     using BlazorShop.Infrastructure.ExceptionsMiddleware;
     using BlazorShop.Infrastructure.Repositories;
     using BlazorShop.Infrastructure.Repositories.Authentication;
@@ -40,16 +41,47 @@
     {
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
         {
+            services.AddOptions<DemoOptions>()
+                .Bind(config.GetSection(DemoOptions.SectionName))
+                .Validate(options => options.LifetimeMinutes is >= 5 and <= 120, "Demo:LifetimeMinutes must be between 5 and 120.")
+                .Validate(options => options.MaxConcurrentSessions is >= 1 and <= 100, "Demo:MaxConcurrentSessions must be between 1 and 100.")
+                .Validate(options => !string.IsNullOrWhiteSpace(options.CookieName), "Demo:CookieName is required.")
+                .Validate(options => !string.IsNullOrWhiteSpace(options.HeaderName), "Demo:HeaderName is required.")
+                .Validate(options => !options.Enabled
+                    || (!string.IsNullOrWhiteSpace(options.CustomerEmail)
+                        && !string.IsNullOrWhiteSpace(options.AdminEmail)
+                        && !string.IsNullOrWhiteSpace(options.Password)),
+                    "Demo credentials are required when demo mode is enabled.")
+                .ValidateOnStart();
+
+            services.AddSingleton<DemoRequestContext>();
+            services.AddSingleton<BlazorShop.Application.Services.Contracts.Demo.IDemoRequestContext>(
+                serviceProvider => serviceProvider.GetRequiredService<DemoRequestContext>());
+            services.AddSingleton<IDemoSessionManager, DemoSessionManager>();
+            services.AddHostedService<DemoSessionCleanupService>();
+
             services.AddDbContext<AppDbContext>(
-                opt => opt
-                    .UseNpgsql(
+                (serviceProvider, options) =>
+                {
+                    var demoSession = serviceProvider.GetRequiredService<DemoRequestContext>().Current;
+
+                    if (demoSession is not null)
+                    {
+                        options.UseNpgsql(
+                            demoSession.Connection,
+                            false,
+                            npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName));
+                        return;
+                    }
+
+                    options.UseNpgsql(
                         config.GetConnectionString("DefaultConnection"),
                         npgsqlOptions =>
-                            {
-                                npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
-                                npgsqlOptions.EnableRetryOnFailure();
-                            })
-            );
+                        {
+                            npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                            npgsqlOptions.EnableRetryOnFailure();
+                        });
+                });
 
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             services.AddScoped<IProductReadRepository, ProductReadRepository>();

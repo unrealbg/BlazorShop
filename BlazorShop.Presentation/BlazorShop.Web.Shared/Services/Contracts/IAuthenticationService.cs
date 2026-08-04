@@ -9,6 +9,8 @@
 
         Task<LoginResponse> LoginUser(LoginUser user);
 
+        Task<DemoSessionModel> StartDemoSession(string role);
+
         Task<QueryResult<LoginResponse>> ReviveToken();
 
         Task<ServiceResponse> Logout();

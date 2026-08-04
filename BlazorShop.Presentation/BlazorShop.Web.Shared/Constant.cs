@@ -48,6 +48,8 @@
             public const string ChangePassword = "authentication/change-password";
             public const string ConfirmEmail = "authentication/confirm-email";
             public const string UpdateProfile = "authentication/update-profile";
+            public const string StartDemo = "demo/sessions";
+            public const string EndDemo = "demo/session";
         }
 
         public static class ApiCallType

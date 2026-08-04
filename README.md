@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml)
 
-BlazorShop is an open-source e-commerce application built on .NET 10 with an ASP.NET Core Web API backend, a server-rendered Blazor Web App public storefront, and an existing Blazor WebAssembly client for admin and legacy interactive flows. It follows a clean, layered architecture and provides a ready-to-extend foundation for real online stores.
+BlazorShop is an open-source e-commerce application built on .NET 10 with an ASP.NET Core Web API backend, a server-rendered Blazor Web App storefront, and a Blazor WebAssembly workspace for customer and administrator flows. It follows a clean, layered architecture and includes an isolated production demo that can be explored without changing shared data.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -31,6 +31,7 @@ BlazorShop delivers a modern shopping experience with a server-rendered public s
   - ASP.NET Core Identity, JWT access tokens + refresh flow
   - Email confirmation, password change, profile update
   - Role-based access (Admin/User)
+  - Isolated customer and administrator demo sessions with reset-on-logout/expiry behavior
   - Note: The first registered user becomes Admin; next users get User role.
 - Catalog Management
   - Categories, products, product variants (size/stock), image upload
@@ -56,6 +57,7 @@ BlazorShop delivers a modern shopping experience with a server-rendered public s
 - Developer Experience
   - OpenAPI/Swagger, Serilog logging, unit tests, GitHub Actions CI
   - Modern UI (Tailwind-style classes), toast notifications, Chart.js
+  - Production Docker Compose deployment with separate Storefront, Web, API, and PostgreSQL services
 
 ## Technologies Used
 - .NET 10, ASP.NET Core Web API
@@ -117,7 +119,7 @@ Tip: keep secrets out of source control via `dotnet user-secrets` for the API pr
 
    ```bash
    dotnet run --project BlazorShop.Presentation/BlazorShop.API
-  dotnet run --project BlazorShop.Presentation/BlazorShop.Storefront
+   dotnet run --project BlazorShop.Presentation/BlazorShop.Storefront
    dotnet run --project BlazorShop.Presentation/BlazorShop.Web
    ```
 
@@ -128,7 +130,7 @@ Default dev URLs (may vary by environment):
 - The Storefront and Web clients call the API at https://localhost:7094/api/ by default unless overridden in configuration.
 
 Runtime notes:
-- Standalone Storefront still serves its own static assets such as `/css/site.css` and `/icon-192.png`.
+- Standalone Storefront still serves its own static assets such as `/css/site.css` and `/favicon.svg`.
 - Standalone and AppHost Storefront runs now expose crawl documents at `/sitemap.xml` and `/robots.txt` for the published public route surface.
 - With the API unavailable, static informational Storefront pages such as `/about-us`, `/privacy`, `/faq`, and `/terms` still return `200`, while catalog-backed routes such as `/`, `/new-releases`, `/todays-deals`, `/category/{slug}`, and `/product/{slug}` return `503`.
 - With the API available, Storefront slug routes return `200` for published content and `404` for unknown slugs.
@@ -157,7 +159,7 @@ Runtime notes:
 - Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, `docs/storefront.production.appsettings.example.json`, and `compose.production.yml`
 
 ## Screenshots
-Generated from the local seeded development stack. Source files live in
+Captured from the live production demo on 4 August 2026. Source files live in
 `docs/screenshots/`, with route and viewport metadata in
 `docs/screenshots/manifest.json`.
 
@@ -165,53 +167,53 @@ Generated from the local seeded development stack. Source files live in
 <table>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/storefront-home.jpg" width="260" alt="Public storefront home page"/><br>
+      <img src="docs/screenshots/storefront-home.png" width="260" alt="Public storefront home page"/><br>
       <small>Storefront Home</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-new-releases.jpg" width="260" alt="Public storefront new releases page"/><br>
+      <img src="docs/screenshots/storefront-new-releases.png" width="260" alt="Public storefront new releases page"/><br>
       <small>New Releases</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-todays-deals.jpg" width="260" alt="Public storefront today's deals page"/><br>
+      <img src="docs/screenshots/storefront-todays-deals.png" width="260" alt="Public storefront today's deals page"/><br>
       <small>Today's Deals</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/storefront-category-sneakers.jpg" width="260" alt="Public storefront category page"/><br>
+      <img src="docs/screenshots/storefront-category-sneakers.png" width="260" alt="Public storefront category page"/><br>
       <small>Category</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-product-metro-runner.jpg" width="260" alt="Public storefront product detail page"/><br>
+      <img src="docs/screenshots/storefront-product-metro-runner.png" width="260" alt="Public storefront product detail page"/><br>
       <small>Product Detail</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-cart.jpg" width="260" alt="Public storefront cart page"/><br>
+      <img src="docs/screenshots/storefront-cart.png" width="260" alt="Public storefront cart page"/><br>
       <small>Cart</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/storefront-about.jpg" width="260" alt="Public storefront about page"/><br>
+      <img src="docs/screenshots/storefront-about.png" width="260" alt="Public storefront about page"/><br>
       <small>About</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-customer-service.jpg" width="260" alt="Public storefront customer service page"/><br>
+      <img src="docs/screenshots/storefront-customer-service.png" width="260" alt="Public storefront customer service page"/><br>
       <small>Customer Service</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-faq.jpg" width="260" alt="Public storefront FAQ page"/><br>
+      <img src="docs/screenshots/storefront-faq.png" width="260" alt="Public storefront FAQ page"/><br>
       <small>FAQ</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/storefront-account-menu.jpg" width="260" alt="Public storefront account menu"/><br>
+      <img src="docs/screenshots/storefront-account-menu.png" width="260" alt="Public storefront account menu"/><br>
       <small>Account Menu</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/storefront-mobile-menu.jpg" width="150" alt="Public storefront mobile menu"/><br>
+      <img src="docs/screenshots/storefront-mobile-menu.png" width="150" alt="Public storefront mobile menu"/><br>
       <small>Mobile Menu</small>
     </td>
   </tr>
@@ -221,49 +223,49 @@ Generated from the local seeded development stack. Source files live in
 <table>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/web-workspace-entry.jpg" width="260" alt="Workspace access entry page"/><br>
+      <img src="docs/screenshots/web-workspace-entry.png" width="260" alt="Workspace access entry page"/><br>
       <small>Workspace Access</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/auth-login.jpg" width="260" alt="Sign in page"/><br>
+      <img src="docs/screenshots/auth-login.png" width="260" alt="Sign in page"/><br>
       <small>Sign In</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/auth-register.jpg" width="260" alt="Register page"/><br>
+      <img src="docs/screenshots/auth-register.png" width="260" alt="Register page"/><br>
       <small>Register</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/account-dashboard.jpg" width="260" alt="Customer account dashboard"/><br>
+      <img src="docs/screenshots/account-dashboard.png" width="260" alt="Customer account dashboard"/><br>
       <small>Account Dashboard</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/account-orders.jpg" width="260" alt="Customer account orders page"/><br>
+      <img src="docs/screenshots/account-orders.png" width="260" alt="Customer account orders page"/><br>
       <small>Orders</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/account-notifications.jpg" width="260" alt="Customer account notifications page"/><br>
+      <img src="docs/screenshots/account-notifications.png" width="260" alt="Customer account notifications page"/><br>
       <small>Notifications</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/account-profile.jpg" width="260" alt="Customer account profile page"/><br>
+      <img src="docs/screenshots/account-profile.png" width="260" alt="Customer account profile page"/><br>
       <small>Profile</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/account-settings.jpg" width="260" alt="Customer account settings page"/><br>
+      <img src="docs/screenshots/account-settings.png" width="260" alt="Customer account settings page"/><br>
       <small>Settings</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/account-checkout.jpg" width="260" alt="Customer account checkout page"/><br>
+      <img src="docs/screenshots/account-checkout.png" width="260" alt="Customer account checkout page"/><br>
       <small>Checkout</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/account-mobile-menu.jpg" width="150" alt="Customer account mobile menu"/><br>
+      <img src="docs/screenshots/account-mobile-menu.png" width="150" alt="Customer account mobile menu"/><br>
       <small>Mobile Menu</small>
     </td>
   </tr>
@@ -273,63 +275,63 @@ Generated from the local seeded development stack. Source files live in
 <table>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/admin-dashboard.jpg" width="260" alt="Admin operations dashboard"/><br>
+      <img src="docs/screenshots/admin-dashboard.png" width="260" alt="Admin operations dashboard"/><br>
       <small>Dashboard</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-products.jpg" width="260" alt="Admin products page"/><br>
+      <img src="docs/screenshots/admin-products.png" width="260" alt="Admin products page"/><br>
       <small>Products</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-product-add-modal.jpg" width="260" alt="Admin add product modal"/><br>
+      <img src="docs/screenshots/admin-product-add-modal.png" width="260" alt="Admin add product modal"/><br>
       <small>Add Product Modal</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/admin-categories.jpg" width="260" alt="Admin categories page"/><br>
+      <img src="docs/screenshots/admin-categories.png" width="260" alt="Admin categories page"/><br>
       <small>Categories</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-category-add-modal.jpg" width="260" alt="Admin add category modal"/><br>
+      <img src="docs/screenshots/admin-category-add-modal.png" width="260" alt="Admin add category modal"/><br>
       <small>Add Category Modal</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-inventory.jpg" width="260" alt="Admin inventory page"/><br>
+      <img src="docs/screenshots/admin-inventory.png" width="260" alt="Admin inventory page"/><br>
       <small>Inventory</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/admin-orders.jpg" width="260" alt="Admin orders page"/><br>
+      <img src="docs/screenshots/admin-orders.png" width="260" alt="Admin orders page"/><br>
       <small>Orders</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-users.jpg" width="260" alt="Admin users page"/><br>
+      <img src="docs/screenshots/admin-users.png" width="260" alt="Admin users page"/><br>
       <small>Users</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-seo.jpg" width="260" alt="Admin SEO page"/><br>
+      <img src="docs/screenshots/admin-seo.png" width="260" alt="Admin SEO page"/><br>
       <small>SEO</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/admin-redirects.jpg" width="260" alt="Admin redirects page"/><br>
+      <img src="docs/screenshots/admin-redirects.png" width="260" alt="Admin redirects page"/><br>
       <small>Redirects</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-settings.jpg" width="260" alt="Admin settings page"/><br>
+      <img src="docs/screenshots/admin-settings.png" width="260" alt="Admin settings page"/><br>
       <small>Settings</small>
     </td>
     <td align="center">
-      <img src="docs/screenshots/admin-audit.jpg" width="260" alt="Admin audit page"/><br>
+      <img src="docs/screenshots/admin-audit.png" width="260" alt="Admin audit page"/><br>
       <small>Audit</small>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/admin-mobile-menu.jpg" width="150" alt="Admin mobile menu"/><br>
+      <img src="docs/screenshots/admin-mobile-menu.png" width="150" alt="Admin mobile menu"/><br>
       <small>Mobile Menu</small>
     </td>
   </tr>
@@ -352,7 +354,16 @@ Generated from the local seeded development stack. Source files live in
 4. Push and open a Pull Request.
 
 ## Demo
-Live demo: https://shop.unrealbg.com
+
+- Public storefront: https://shop.unrealbg.com
+- Customer and admin workspace: https://account.unrealbg.com
+- Customer demo: `demo.user@blazorshop.local`
+- Administrator demo: `demo.admin@blazorshop.local`
+- Shared demo password: `Demo123!`
+
+Use the **Customer demo** or **Administrator demo** button on the sign-in page. Each button creates a private sandbox for that browser session. The sandbox starts with the published catalog and its own users, orders, settings, audit events, and uploads. Changes are visible in both the workspace and storefront for that session, but never reach the shared production tables.
+
+Demo sessions use a secure cross-subdomain cookie and a session-bound JWT, expire after 30 minutes of inactivity, and are deleted immediately on sign-out. Temporary uploaded files are removed with the session. Card payments remain disabled in the public demo; the non-card checkout paths can be explored safely.
 
 ## License
 MIT License. See the LICENSE file for details.

@@ -7,6 +7,7 @@ namespace BlazorShop.API
     using System.Threading.RateLimiting;
 
     using BlazorShop.API.HealthChecks;
+    using BlazorShop.API.Demo;
     using BlazorShop.API.Options;
     using BlazorShop.Application;
     using BlazorShop.Application.Options;
@@ -214,6 +215,8 @@ namespace BlazorShop.API
                 app.UseStaticFiles(CreateUploadsStaticFileOptions(uploadsPath));
 
                 app.UseInfrastructure();
+
+                app.UseMiddleware<DemoSessionMiddleware>();
 
                 app.UseAuthentication();
                 app.UseAuthorization();

@@ -31,6 +31,10 @@ services:
       Stripe__Enabled: ${BLAZORSHOP_STRIPE_ENABLED:-false}
       Stripe__SecretKey: "${BLAZORSHOP_STRIPE_SECRET_KEY:-}"
       Stripe__WebhookSecret: "${BLAZORSHOP_STRIPE_WEBHOOK_SECRET:-}"
+      Demo__Enabled: ${BLAZORSHOP_DEMO_ENABLED:-true}
+      Demo__LifetimeMinutes: ${BLAZORSHOP_DEMO_LIFETIME_MINUTES:-30}
+      Demo__MaxConcurrentSessions: ${BLAZORSHOP_DEMO_MAX_CONCURRENT_SESSIONS:-20}
+      Demo__CookieDomain: ${BLAZORSHOP_DEMO_COOKIE_DOMAIN:-.unrealbg.com}
       EmailSettings__Enabled: ${BLAZORSHOP_EMAIL_ENABLED:-true}
       EmailSettings__From: "${BLAZORSHOP_EMAIL_FROM:-}"
       EmailSettings__DisplayName: ${BLAZORSHOP_EMAIL_DISPLAY_NAME:-BlazorShop}
@@ -68,6 +72,8 @@ services:
       Api__BaseUrl: http://api:8080/api/
       ClientApp__BaseUrl: ${BLAZORSHOP_CLIENT_APP_BASE_URL:?BLAZORSHOP_CLIENT_APP_BASE_URL is required}
       PublicUrl__BaseUrl: ${BLAZORSHOP_STOREFRONT_BASE_URL:?BLAZORSHOP_STOREFRONT_BASE_URL is required}
+      Demo__CookieName: blazorshop-demo-session
+      Demo__HeaderName: X-BlazorShop-Demo-Session
     depends_on:
       - api
     ports:
