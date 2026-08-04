@@ -135,7 +135,7 @@
         {
             // Вземане на всички поръчки (чрез новата услуга)
             var result = await _orderQueryService.GetAllAsync();
-            return result.Any() ? this.Ok(result) : this.NotFound();
+            return this.Ok(result);
         }
 
         /// <summary>

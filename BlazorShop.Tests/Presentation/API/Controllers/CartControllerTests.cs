@@ -117,6 +117,26 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         }
 
         [Fact]
+        public async Task GetAllOrders_ReturnsOkEmptyCollection_WhenThereAreNoOrders()
+        {
+            var cartService = new Mock<ICartService>();
+            var orderQueryService = new Mock<IOrderQueryService>();
+            var trackingService = new Mock<IOrderTrackingService>();
+
+            orderQueryService
+                .Setup(service => service.GetAllAsync())
+                .ReturnsAsync(Array.Empty<GetOrder>());
+
+            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object);
+
+            var result = await controller.GetAllOrders();
+
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var payload = Assert.IsAssignableFrom<IEnumerable<GetOrder>>(okResult.Value);
+            Assert.Empty(payload);
+        }
+
+        [Fact]
         public async Task UpdateTracking_ReturnsNotFound_WhenOrderDoesNotExist()
         {
             var cartService = new Mock<ICartService>();
