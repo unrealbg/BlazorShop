@@ -2,12 +2,14 @@
 
 [![CI](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml/badge.svg)](https://github.com/unrealbg/BlazorShop/actions/workflows/ci.yml)
 
-BlazorShop is an open-source e-commerce application built on .NET 10 with an ASP.NET Core Web API backend, a server-rendered Blazor Web App storefront, and a Blazor WebAssembly workspace for customer and administrator flows. It follows a clean, layered architecture and includes an isolated production demo that can be explored without changing shared data.
+BlazorShop is an open-source, opinionated .NET 10 e-commerce starter and reference application built with ASP.NET Core, Blazor, PostgreSQL, and Microsoft Aspire. It combines a server-rendered public storefront, a Blazor WebAssembly customer/admin workspace, an ASP.NET Core Web API, production Docker deployment, and an isolated live demo.
 
 ## Table of Contents
 - [Introduction](#introduction)
 - [Who Is It For?](#who-is-it-for)
+- [Project Status](#project-status)
 - [Features](#features)
+- [Current Limitations](#current-limitations)
 - [Technologies Used](#technologies-used)
 - [Requirements](#requirements)
 - [Getting Started](#getting-started)
@@ -20,32 +22,54 @@ BlazorShop is an open-source e-commerce application built on .NET 10 with an ASP
 - [Acknowledgements](#acknowledgements)
 
 ## Introduction
-BlazorShop delivers a modern shopping experience with a server-rendered public storefront, a secure ASP.NET Core Web API backend, and a separate Blazor WebAssembly client that continues to host admin tooling and legacy interactive storefront flows. It includes product catalog, cart, checkout with multiple payment methods, order tracking, admin tooling, and more.
+BlazorShop is designed as both a working shop application and a reusable reference for modern .NET commerce projects. It provides a server-rendered public storefront, a secure ASP.NET Core Web API backend, and a separate Blazor WebAssembly workspace for customer and administrator flows.
+
+The repository includes catalog management, product variants, cart and checkout, Stripe/Cash on Delivery/Bank Transfer payment flows, order tracking, SEO tooling, an operational admin area, PostgreSQL persistence, Aspire orchestration, observability, CI, and production Docker deployment.
 
 ### Who Is It For?
-- Small/medium businesses looking to bootstrap an online shop on .NET.
-- Developers exploring Blazor WebAssembly, ASP.NET Core, and clean architecture.
+- Developers looking for a practical .NET 10 / Blazor e-commerce starter or reference architecture.
+- Small/medium businesses that want to bootstrap a .NET-based online shop and adapt it to their own requirements.
+- Developers exploring ASP.NET Core, Blazor Web App, Blazor WebAssembly, EF Core, PostgreSQL, Aspire, and layered application architecture in a non-trivial project.
+
+## Project Status
+BlazorShop is functional and deployed as a live demo. The project is currently undergoing a focused commerce-core and production-hardening pass before treating the current architecture as a stronger reusable production starter.
+
+Current high-priority work:
+- #87 — secure administrator bootstrap
+- #88 — preserve product variants through checkout and orders
+- #89 — immutable order-line snapshots
+- #90 — atomic inventory reservation and stock management
+- #91 — authoritative server-side, order-first checkout
+- #92 — checkout idempotency
+- #93 — Stripe reconciliation and webhook idempotency
+- #94 — separate order/payment/fulfillment lifecycle states
+- #95 — remove the legacy `CheckoutOrderItems` persistence path
+
+Additional production/UX work remains tracked in GitHub Issues. The issue tracker is treated as the current implementation backlog; README features describe what exists on `master`, not planned functionality.
 
 ## Features
 - Authentication & Authorization
-  - ASP.NET Core Identity, JWT access tokens + refresh flow
+  - ASP.NET Core Identity, JWT access tokens, refresh-token flow
   - Email confirmation, password change, profile update
   - Role-based access (Admin/User)
+  - Lockout and guarded administrative user-management flows
   - Isolated customer and administrator demo sessions with reset-on-logout/expiry behavior
-  - Note: The first registered user becomes Admin; next users get User role.
 - Catalog Management
-  - Categories, products, product variants (size/stock), image upload
+  - Categories, products, product variants, SKU/size/stock data, image upload
   - Product search/typeahead UI
+  - Admin inventory overview with low/out-of-stock filtering and product/variant stock updates
 - Public SEO Storefront
   - Server-rendered product and category routes (`/product/{slug}` and `/category/{slug}`)
   - Published-only public catalog exposure and route-based metadata rendering
+  - `/sitemap.xml` and `/robots.txt` for the published route surface
 - Cart & Checkout
-  - Persistent cart (cookie), quantity updates, totals
+  - Persistent cart, quantity updates, totals
   - Multiple payment methods: Stripe (card), Cash on Delivery, Bank Transfer
   - Bank transfer instructions via email with order reference
 - Orders & Tracking
-  - Save checkout history; admin order list
-  - Update shipping status, carrier tracking number and URL
+  - Persistent orders/order lines and customer order history
+  - Admin order management
+  - Shipping status, carrier tracking number and tracking URL updates
 - Newsletter
   - Email subscription with welcome email
 - Admin Area
@@ -53,33 +77,51 @@ BlazorShop delivers a modern shopping experience with a server-rendered public s
   - User role editing, lock/unlock, email confirmation, password-change requirement flag, and guarded admin safety checks
   - Operational store/order/notification settings without exposing SMTP passwords or API secrets
   - Admin audit trail for sensitive catalog, SEO, redirect, order, user, settings, and inventory operations
-  - Inventory overview with low/out-of-stock filtering and product/variant stock updates
-- Developer Experience
-  - OpenAPI/Swagger, Serilog logging, unit tests, GitHub Actions CI
-  - Modern UI (Tailwind-style classes), toast notifications, Chart.js
+- Developer Experience & Operations
+  - OpenAPI/Swagger and Serilog logging
+  - OpenTelemetry logging, metrics, and tracing with optional OTLP export
+  - Microsoft Aspire AppHost orchestration and service discovery
+  - Standard server-side HTTP resilience defaults and health checks
+  - Automated unit/service/infrastructure tests and GitHub Actions CI
+  - Modern UI with Tailwind-style classes, toast notifications, and Chart.js
   - Production Docker Compose deployment with separate Storefront, Web, API, and PostgreSQL services
+  - Configurable CORS, rate limiting, forwarded headers, HSTS/HTTPS behavior, and refresh-token cookie policy
+
+## Current Limitations
+These are known areas being actively hardened; see the linked issues for the source-of-truth acceptance criteria.
+
+- **Administrator bootstrap (#87):** on the current `master`, the first registered user on a clean database becomes Admin. This is a known security limitation and is being replaced with an explicit deployment/bootstrap mechanism. Do not expose a fresh production deployment to public registration before creating/securing the intended administrator.
+- **Variant/order integrity (#88, #89):** the commerce contracts and historical order snapshots are being strengthened so the exact purchased variant/SKU is authoritative throughout checkout and order history.
+- **Inventory concurrency (#90):** atomic reservation/decrement behavior is still being implemented to prevent overselling under concurrent checkout.
+- **Checkout lifecycle (#91, #92):** checkout is being moved to a fully authoritative server-side, order-first and idempotent flow.
+- **Stripe reconciliation (#93):** webhook signatures are validated, while persistent provider-event idempotency plus amount/currency reconciliation are still being hardened.
+- **Legacy checkout history (#95):** `Orders`/`OrderLines` are the direction of travel, but the older `CheckoutOrderItems` persistence path still exists and is scheduled for removal.
 
 ## Technologies Used
 - .NET 10, ASP.NET Core Web API
 - Blazor Web App (server-rendered public storefront)
-- Blazor WebAssembly (existing admin and legacy interactive client)
+- Blazor WebAssembly (customer/admin workspace and existing interactive client)
 - Entity Framework Core 10 + PostgreSQL
-- ASP.NET Core Identity (email confirmation enabled)
+- ASP.NET Core Identity
 - AutoMapper, FluentValidation
 - Serilog
+- OpenTelemetry
+- Microsoft Aspire AppHost / ServiceDefaults
 - Stripe integration
 - Swashbuckle (Swagger/OpenAPI)
-- xUnit, Moq (tests)
-- Microsoft Aspire AppHost (local orchestrator)
+- xUnit, Moq and ASP.NET Core/Aspire testing infrastructure
+- Docker / Docker Compose
 
 ## Requirements
-- .NET 10 SDK or later
+- .NET 10 SDK compatible with the repository `global.json`
+  - The repository currently pins SDK `10.0.107` with `rollForward: latestPatch`.
 - Docker Desktop or another compatible container runtime (recommended for `BlazorShop.AppHost` and `compose.production.yml`)
-- PostgreSQL if you run the API outside the AppHost-provisioned database
-- Modern browser (WebAssembly capable)
-- Optional: API keys and SMTP for payments/emails
-  - Stripe Secret Key
+- PostgreSQL if you run the API outside the AppHost-provisioned or Docker Compose database
+- Modern WebAssembly-capable browser for the Web workspace
+- Optional external configuration depending on enabled features:
+  - Stripe Secret Key + Webhook Secret
   - SMTP credentials
+  - Bank-transfer account details
 
 ## Getting Started
 1) Clone the repository
@@ -89,33 +131,44 @@ BlazorShop delivers a modern shopping experience with a server-rendered public s
    cd BlazorShop
    ```
 
-2) Configure the API (appsettings or user-secrets)
-- File: `BlazorShop.Presentation/BlazorShop.API/appsettings.json`
-- Keys you may need to set/update:
-  - `ConnectionStrings:DefaultConnection`
-  - `Jwt: Key, Issuer, Audience`
-  - `Stripe: SecretKey`
-  - `BankTransfer: Iban, Beneficiary, BankName, AdditionalInfo`
-  - `EmailSettings: From, DisplayName, SmtpServer, Port, UseSsl, Username, Password`
+2) Configure the API
 
-Tip: keep secrets out of source control via `dotnet user-secrets` for the API project.
+For local development, use `appsettings` overrides and preferably `dotnet user-secrets` for secrets.
+
+- API configuration: `BlazorShop.Presentation/BlazorShop.API/appsettings.json`
+- Production reference: `docs/production.appsettings.example.json`
+- Storefront production reference: `docs/storefront.production.appsettings.example.json`
+
+Core values commonly required:
+- `ConnectionStrings:DefaultConnection`
+- `Jwt:Key`, `Jwt:Issuer`, `Jwt:Audience`
+- `Stripe:Enabled`, `Stripe:SecretKey`, `Stripe:WebhookSecret`
+- `BankTransfer:Iban`, `BankTransfer:Beneficiary`, `BankTransfer:BankName`, `BankTransfer:AdditionalInfo`
+- `EmailSettings:From`, `DisplayName`, `SmtpServer`, `Port`, `UseSsl`, `Username`, `Password`
+
+Production configuration also includes Identity confirmation requirements and runtime settings for CORS, forwarded headers, health endpoints, HSTS/HTTPS behavior, refresh-token cookies, and rate limiting. Use the production example/runbook rather than copying local-development defaults into production.
+
+Tip: keep secrets out of source control via environment variables, deployment secrets, or `dotnet user-secrets` for local development.
 
 3) Database
-- The API applies EF Core migrations automatically on startup.
-- Or apply manually from the solution root:
+
+The API currently applies EF Core migrations automatically on startup.
+
+You can also apply migrations manually from the solution root:
 
    ```bash
    dotnet ef database update --project BlazorShop.Infrastructure --startup-project BlazorShop.Presentation/BlazorShop.API
    ```
 
-4) Run the app (pick one)
-- Using the AppHost (recommended local orchestrator):
+4) Run the app
+
+Using the AppHost is the recommended local orchestration path:
 
    ```bash
    dotnet run --project BlazorShop.AppHost
    ```
 
-- Run projects separately (two or three terminals, depending on what you need):
+Or run projects separately:
 
    ```bash
    dotnet run --project BlazorShop.Presentation/BlazorShop.API
@@ -124,39 +177,47 @@ Tip: keep secrets out of source control via `dotnet user-secrets` for the API pr
    ```
 
 Default dev URLs (may vary by environment):
-- API: https://localhost:7094  
-- Storefront: ASP.NET Core Kestrel/AppHost-assigned URL  
-- Web: https://localhost:7258  
-- The Storefront and Web clients call the API at https://localhost:7094/api/ by default unless overridden in configuration.
+- API: https://localhost:7094
+- Storefront: ASP.NET Core Kestrel/AppHost-assigned URL
+- Web: https://localhost:7258
+- The Storefront and Web clients call the API at `https://localhost:7094/api/` by default unless overridden in configuration.
 
 Runtime notes:
-- Standalone Storefront still serves its own static assets such as `/css/site.css` and `/favicon.svg`.
-- Standalone and AppHost Storefront runs now expose crawl documents at `/sitemap.xml` and `/robots.txt` for the published public route surface.
+- Standalone Storefront serves its own static assets such as `/css/site.css` and `/favicon.svg`.
+- Standalone and AppHost Storefront runs expose crawl documents at `/sitemap.xml` and `/robots.txt` for the published public route surface.
 - With the API unavailable, static informational Storefront pages such as `/about-us`, `/privacy`, `/faq`, and `/terms` still return `200`, while catalog-backed routes such as `/`, `/new-releases`, `/todays-deals`, `/category/{slug}`, and `/product/{slug}` return `503`.
 - With the API available, Storefront slug routes return `200` for published content and `404` for unknown slugs.
-- AppHost remains the easiest way to verify the full local stack because it runs API + Storefront + Web together.
+- AppHost is the easiest way to verify the full local stack because it runs API + Storefront + Web together and exposes the Aspire development experience.
 
 5) Tests
 
    ```bash
-    dotnet test BlazorShop.sln -c Release
+   dotnet test BlazorShop.sln -c Release
    ```
+
+The existing automated test suite covers application services, authentication, payment/cart behavior, repositories/infrastructure and migration/model consistency. Browser E2E coverage is tracked separately in #37.
 
 ## Project Structure
 - **BlazorShop.Domain** – Core entities and contracts
-- **BlazorShop.Application** – DTOs, services, validations
-- **BlazorShop.Infrastructure** – EF Core, repositories, Identity, email, payments, logging
-- **BlazorShop.Presentation/BlazorShop.API** – ASP.NET Core Web API controllers and configuration
+- **BlazorShop.Application** – DTOs, application services, validations
+- **BlazorShop.Infrastructure** – EF Core, repositories, Identity, email, payments, persistence/infrastructure services
+- **BlazorShop.Presentation/BlazorShop.API** – ASP.NET Core Web API controllers and runtime configuration
 - **BlazorShop.Presentation/BlazorShop.Storefront** – Server-rendered Blazor Web App public storefront
-- **BlazorShop.Presentation/BlazorShop.Web** – Existing Blazor WebAssembly admin and legacy interactive client
-- **BlazorShop.Presentation/BlazorShop.Web.Shared** – Shared models/services used by the Web client
-- **BlazorShop.AppHost** – Local orchestrator (Microsoft Aspire) to run API + Storefront + Web together
-- **BlazorShop.Tests** – Unit tests
+- **BlazorShop.Presentation/BlazorShop.Web** – Blazor WebAssembly customer/admin workspace and existing interactive client
+- **BlazorShop.Presentation/BlazorShop.Web.Shared** – Shared Web client models/services
+- **BlazorShop.AppHost** – Microsoft Aspire local orchestrator for API + Storefront + Web + PostgreSQL
+- **BlazorShop.ServiceDefaults** – Shared Aspire defaults for telemetry, health checks, service discovery, and HTTP resilience
+- **BlazorShop.Tests** – Automated unit/service/infrastructure tests
 
 ## API & Docs
-- Swagger UI available when API runs in Development at `/swagger`
-- CORS is configuration-driven; localhost origins work out of the box in Development
-- Production deployment reference: `docs/production-runbook.md`, `docs/production.appsettings.example.json`, `docs/storefront.production.appsettings.example.json`, and `compose.production.yml`
+- Swagger UI is available when the API runs in Development at `/swagger`.
+- CORS is configuration-driven; loopback origins are allowed for Development while production origins are explicit.
+- Health endpoints, rate limiting, forwarded headers, HSTS/HTTPS behavior and refresh-token cookie policy are configuration-driven.
+- Production deployment references:
+  - `docs/production-runbook.md`
+  - `docs/production.appsettings.example.json`
+  - `docs/storefront.production.appsettings.example.json`
+  - `compose.production.yml`
 
 ## Screenshots
 Captured from the live production demo on 4 August 2026. Source files live in
@@ -352,6 +413,8 @@ Captured from the live production demo on 4 August 2026. Source files live in
    ```
 
 4. Push and open a Pull Request.
+
+When contributing against an existing issue, use its acceptance criteria as the implementation scope and keep unrelated refactors out of the same PR where possible.
 
 ## Demo
 
