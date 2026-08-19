@@ -1,0 +1,7 @@
+/* Storefront header consistency fixes. Loaded after polish.css. */
+.navline a:nth-child(3){gap:3px}
+.navline a:nth-child(3)::before,.navline a:nth-child(3)::after{content:none!important;display:none!important}
+.navline a:nth-child(3) .nav-chevron{display:inline-block;width:6px;height:6px;margin-left:1px;border-right:1.4px solid currentColor;border-bottom:1.4px solid currentColor;transform:rotate(45deg) translateY(-1px);transform-origin:center}
+.top-actions .wishlist-link{opacity:.62;cursor:default}
+.top-actions .wishlist-link:hover{color:inherit}
+@media(max-width:640px){.navline a:nth-child(3){gap:2px}}
