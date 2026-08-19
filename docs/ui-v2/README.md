@@ -32,14 +32,24 @@ Open `prototype.html` first. It links the complete prototype journey and the com
 - `account-order.html` — customer order detail and lifecycle timeline
 
 ### Admin
-- `admin-dashboard.html` — admin shell/dashboard
+- `admin-dashboard.html` — dashboard and overview metrics
 - `admin-products.html` — products, filters, table and editor patterns
+- `admin-categories.html` — category CRUD and category-level SEO
 - `admin-orders.html` — payment/fulfillment/order state management
-- `admin-settings.html` — operational settings and audit patterns
+- `admin-users.html` — user search, roles, lock/email/password/deactivation operations
+- `admin-inventory.html` — product and variant stock operations
+- `admin-seo.html` — global SEO and organization metadata
+- `admin-redirects.html` — redirect rule governance for the `/admin/redirects` route
+- `admin-settings.html` — Store, Orders, Notifications and System settings patterns
+- `admin-audit.html` — audit search, table and detail/metadata inspection
+
+The admin prototype intentionally mirrors the complete current admin route surface. `SEO` and `Redirects` are separate prototype screens even though production currently implements both routes in the same `Seo.razor` component.
 
 ### Shared
 - `components.html` — design-system reference and UI states
-- `styles.css` — responsive visual tokens and component styles
+- `styles.css` — base responsive visual tokens and component styles
+- `polish.css` — refined storefront/admin visual layer
+- `consistency.css` — storefront header consistency fixes used by public/customer screens
 
 ## Functional mapping
 
@@ -50,6 +60,8 @@ Planned-but-not-yet-implemented capabilities such as Wishlist and Reviews are vi
 The commerce screens are designed to accommodate the v2 Commerce Core work (#88-#95): variant-aware cart lines, immutable order snapshots, inventory reservation, server-authoritative checkout, idempotency and explicit payment/order/fulfillment states.
 
 Shipping/billing address UI is included as a forward-compatible visual pattern, but it must not be wired into production until the corresponding commerce/domain capability exists.
+
+The inventory prototype documents today's product/variant stock UI, but the production v2 implementation must follow the authoritative inventory model selected by #90 rather than preserve two competing stock sources.
 
 ## Implementation rule
 
