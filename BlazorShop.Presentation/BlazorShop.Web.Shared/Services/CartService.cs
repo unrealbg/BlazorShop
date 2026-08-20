@@ -5,6 +5,7 @@
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Services.Contracts;
 
+    using System.Net;
     using System.Net.Http.Json;
 
     public class CartService : ICartService
@@ -36,7 +37,10 @@
             var response = await _apiCallHelper.GetMutationResponse<CheckoutResult>(
                 result,
                 "Checkout could not be completed. Please try again.");
-            if (response.Success && response.Payload is not null)
+            var terminalAttempt = response.Success && response.Payload is not null
+                || result.StatusCode == HttpStatusCode.BadRequest
+                    && response.ResponseType == ServiceResponseType.ValidationError;
+            if (terminalAttempt)
             {
                 await _checkoutAttemptStore.ClearAsync(attempt.IdempotencyKey);
             }

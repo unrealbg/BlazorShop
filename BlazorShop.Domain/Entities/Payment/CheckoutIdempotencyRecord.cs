@@ -26,6 +26,10 @@ namespace BlazorShop.Domain.Entities.Payment
 
         public DateTime? LeaseExpiresOn { get; set; }
 
+        public DateTime? ProviderInitializationStartedOn { get; set; }
+
+        public string? ProviderInitializationJson { get; set; }
+
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedOn { get; set; } = DateTime.UtcNow;

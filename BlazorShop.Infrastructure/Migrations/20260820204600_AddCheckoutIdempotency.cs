@@ -27,6 +27,8 @@ namespace BlazorShop.Infrastructure.Migrations
                     OutcomeVersion = table.Column<int>(type: "integer", nullable: false),
                     LeaseOwnerId = table.Column<Guid>(type: "uuid", nullable: true),
                     LeaseExpiresOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ProviderInitializationStartedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ProviderInitializationJson = table.Column<string>(type: "jsonb", nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
                     UpdatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
                     CompletedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),

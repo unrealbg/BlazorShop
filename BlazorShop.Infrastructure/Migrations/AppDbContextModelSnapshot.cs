@@ -419,6 +419,12 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.Property<Guid>("PaymentMethodId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ProviderInitializationJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ProviderInitializationStartedOn")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("RequestFingerprint")
                         .IsRequired()
                         .HasMaxLength(64)

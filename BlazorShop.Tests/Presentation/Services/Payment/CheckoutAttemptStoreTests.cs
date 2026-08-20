@@ -81,6 +81,33 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
         }
 
         [Fact]
+        public async Task ConcurrentSameIntentGetOrCreate_ReturnsOneKey()
+        {
+            string? sessionValue = null;
+            var storage = new Mock<IBrowserSessionStorageService>();
+            storage.Setup(service => service.GetAsync(It.IsAny<string>()))
+                .Returns(async () =>
+                {
+                    await Task.Delay(50);
+                    return sessionValue;
+                });
+            storage.Setup(service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<string, string>((_, value) => sessionValue = value)
+                .Returns(Task.CompletedTask);
+            var store = new CheckoutAttemptStore(storage.Object);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+
+            var attempts = await Task.WhenAll(
+                store.GetOrCreateAsync(checkout),
+                store.GetOrCreateAsync(checkout));
+
+            Assert.Equal(attempts[0].IdempotencyKey, attempts[1].IdempotencyKey);
+            storage.Verify(
+                service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()),
+                Times.Once);
+        }
+
+        [Fact]
         public async Task AmbiguousTransportFailure_KeepsSamePendingAttempt()
         {
             var key = Guid.NewGuid();
@@ -102,6 +129,107 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
 
             attempts.Verify(store => store.GetOrCreateAsync(checkout), Times.Exactly(2));
             attempts.Verify(store => store.ClearAsync(It.IsAny<Guid>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task Timeout_KeepsSamePendingAttempt()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var store = new CheckoutAttemptStore(storage.Object);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var observed = new ConcurrentQueue<string>();
+            var client = new HttpClient(new AsyncStubHandler((request, _) =>
+            {
+                observed.Enqueue(Assert.Single(request.Headers.GetValues("Idempotency-Key")));
+                throw new TaskCanceledException("Timed out");
+            }))
+            {
+                BaseAddress = new Uri("https://shop.test/api/"),
+            };
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync()).ReturnsAsync(client);
+            var service = new CartService(clients.Object, new ApiCallHelper(), store);
+
+            await Assert.ThrowsAsync<TaskCanceledException>(() => service.Checkout(checkout));
+            await Assert.ThrowsAsync<TaskCanceledException>(() => service.Checkout(checkout));
+
+            Assert.Equal(2, observed.Count);
+            Assert.Single(observed.Distinct());
+        }
+
+        [Fact]
+        public async Task InProgressConflict_KeepsSamePendingAttempt()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var store = new CheckoutAttemptStore(storage.Object);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var observed = new ConcurrentQueue<string>();
+            var client = new HttpClient(new AsyncStubHandler((request, _) =>
+            {
+                observed.Enqueue(Assert.Single(request.Headers.GetValues("Idempotency-Key")));
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict)
+                {
+                    Content = JsonContent.Create(new ServiceResponse<CheckoutResult>(
+                        false,
+                        "Checkout is still processing. Retry with the same Idempotency-Key.")
+                    {
+                        ResponseType = ServiceResponseType.Conflict,
+                    }),
+                });
+            }))
+            {
+                BaseAddress = new Uri("https://shop.test/api/"),
+            };
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync()).ReturnsAsync(client);
+            var service = new CartService(clients.Object, new ApiCallHelper(), store);
+
+            await service.Checkout(checkout);
+            await service.Checkout(checkout);
+
+            Assert.Equal(2, observed.Count);
+            Assert.Single(observed.Distinct());
+        }
+
+        [Fact]
+        public async Task TerminalFailure_ClearsAttemptSoNextSubmitUsesFreshKey()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            storage.Setup(service => service.RemoveAsync(It.IsAny<string>()))
+                .Callback<string>(_ => sessionValue = null)
+                .Returns(Task.CompletedTask);
+            var store = new CheckoutAttemptStore(storage.Object);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var observed = new ConcurrentQueue<string>();
+            var client = new HttpClient(new AsyncStubHandler((request, _) =>
+            {
+                observed.Enqueue(Assert.Single(request.Headers.GetValues("Idempotency-Key")));
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = JsonContent.Create(new ServiceResponse<CheckoutResult>(
+                        false,
+                        "Provider rejected checkout")
+                    {
+                        ResponseType = ServiceResponseType.ValidationError,
+                    }),
+                });
+            }))
+            {
+                BaseAddress = new Uri("https://shop.test/api/"),
+            };
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync()).ReturnsAsync(client);
+            var service = new CartService(clients.Object, new ApiCallHelper(), store);
+
+            await service.Checkout(checkout);
+            await service.Checkout(checkout);
+
+            Assert.Equal(2, observed.Count);
+            Assert.Equal(2, observed.Distinct().Count());
+            storage.Verify(service => service.RemoveAsync(It.IsAny<string>()), Times.Exactly(2));
         }
 
         [Fact]
@@ -156,6 +284,8 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             storage.Setup(service => service.GetAsync(It.IsAny<string>())).ReturnsAsync(read);
             storage.Setup(service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()))
                 .Callback<string, string>((_, value) => write(value))
+                .Returns(Task.CompletedTask);
+            storage.Setup(service => service.RemoveAsync(It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
             return storage;
         }

@@ -19,6 +19,7 @@ namespace BlazorShop.Infrastructure.Data.Configurations
                 .HasConversion<string>()
                 .HasMaxLength(32);
             builder.Property(record => record.OutcomeJson).HasColumnType("jsonb");
+            builder.Property(record => record.ProviderInitializationJson).HasColumnType("jsonb");
             builder.Property(record => record.CreatedOn).HasDefaultValueSql("CURRENT_TIMESTAMP");
             builder.Property(record => record.UpdatedOn).HasDefaultValueSql("CURRENT_TIMESTAMP");
 

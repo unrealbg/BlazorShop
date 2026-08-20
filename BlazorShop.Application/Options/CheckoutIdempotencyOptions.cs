@@ -11,5 +11,7 @@ namespace BlazorShop.Application.Options
         public int DuplicateWaitMilliseconds { get; set; } = 2000;
 
         public int PollMilliseconds { get; set; } = 50;
+
+        public int ProviderRecoveryWindowHours { get; set; } = 23;
     }
 }

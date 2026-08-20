@@ -15,6 +15,7 @@ namespace BlazorShop.Web.Shared.Services
         private const string StorageKey = "blazorshop.checkout.pending";
         private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
         private readonly IBrowserSessionStorageService _sessionStorage;
+        private readonly SemaphoreSlim _gate = new(1, 1);
 
         public CheckoutAttemptStore(IBrowserSessionStorageService sessionStorage)
         {
@@ -24,24 +25,40 @@ namespace BlazorShop.Web.Shared.Services
         public async Task<CheckoutAttempt> GetOrCreateAsync(Checkout checkout)
         {
             var signature = CreateIntentSignature(checkout);
-            var stored = await ReadAsync();
-            if (stored is not null
-                && string.Equals(stored.IntentSignature, signature, StringComparison.Ordinal))
+            await _gate.WaitAsync();
+            try
             {
-                return stored;
-            }
+                var stored = await ReadAsync();
+                if (stored is not null
+                    && string.Equals(stored.IntentSignature, signature, StringComparison.Ordinal))
+                {
+                    return stored;
+                }
 
-            var attempt = new CheckoutAttempt(Guid.NewGuid(), signature);
-            await _sessionStorage.SetAsync(StorageKey, JsonSerializer.Serialize(attempt, SerializerOptions));
-            return attempt;
+                var attempt = new CheckoutAttempt(Guid.NewGuid(), signature);
+                await _sessionStorage.SetAsync(StorageKey, JsonSerializer.Serialize(attempt, SerializerOptions));
+                return attempt;
+            }
+            finally
+            {
+                _gate.Release();
+            }
         }
 
         public async Task ClearAsync(Guid completedKey)
         {
-            var stored = await ReadAsync();
-            if (stored?.IdempotencyKey == completedKey)
+            await _gate.WaitAsync();
+            try
             {
-                await _sessionStorage.RemoveAsync(StorageKey);
+                var stored = await ReadAsync();
+                if (stored?.IdempotencyKey == completedKey)
+                {
+                    await _sessionStorage.RemoveAsync(StorageKey);
+                }
+            }
+            finally
+            {
+                _gate.Release();
             }
         }
 

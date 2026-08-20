@@ -2,6 +2,7 @@ namespace BlazorShop.Application.Services.Payment
 {
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Authentication;
@@ -16,6 +17,7 @@ namespace BlazorShop.Application.Services.Payment
     public sealed class CheckoutOrchestrator : ICheckoutOrchestrator
     {
         private const int OutcomeVersion = 1;
+        private const int StripeInitializationVersion = 1;
         private readonly IProductReadRepository _productReadRepository;
         private readonly IPaymentMethodService _paymentMethodService;
         private readonly IPaymentService _paymentService;
@@ -25,6 +27,8 @@ namespace BlazorShop.Application.Services.Payment
         private readonly IOrderRepository _orderRepository;
         private readonly IEmailService _emailService;
         private readonly BankTransferSettings _bankTransferSettings;
+        private readonly ClientAppOptions _clientAppOptions;
+        private readonly CheckoutIdempotencyOptions _idempotencyOptions;
         private readonly ILogger<CheckoutOrchestrator> _logger;
 
         public CheckoutOrchestrator(
@@ -37,6 +41,8 @@ namespace BlazorShop.Application.Services.Payment
             IOrderRepository orderRepository,
             IEmailService emailService,
             IOptions<BankTransferSettings> bankTransferOptions,
+            IOptions<ClientAppOptions> clientAppOptions,
+            IOptions<CheckoutIdempotencyOptions> idempotencyOptions,
             ILogger<CheckoutOrchestrator> logger)
         {
             _productReadRepository = productReadRepository;
@@ -48,6 +54,8 @@ namespace BlazorShop.Application.Services.Payment
             _orderRepository = orderRepository;
             _emailService = emailService;
             _bankTransferSettings = bankTransferOptions.Value;
+            _clientAppOptions = clientAppOptions.Value;
+            _idempotencyOptions = idempotencyOptions.Value;
             _logger = logger;
         }
 
@@ -204,7 +212,7 @@ namespace BlazorShop.Application.Services.Payment
 
             if (paymentKind == CheckoutPaymentKind.Stripe)
             {
-                return await InitializeStripeAsync(order, resolution.Lines, claim, cancellationToken);
+                return await InitializeStripeAsync(order, claim, cancellationToken);
             }
 
             return await CompleteLocalPaymentAsync(
@@ -222,7 +230,6 @@ namespace BlazorShop.Application.Services.Payment
             CheckoutIdempotencyClaim claim,
             CancellationToken cancellationToken)
         {
-            var lines = RestoreResolvedLines(order);
             if (paymentKind == CheckoutPaymentKind.Stripe)
             {
                 var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
@@ -237,7 +244,7 @@ namespace BlazorShop.Application.Services.Payment
                         cancellationToken);
                 }
 
-                return await InitializeStripeAsync(order, lines, claim, cancellationToken);
+                return await InitializeStripeAsync(order, claim, cancellationToken);
             }
 
             var outcome = _idempotencyStore.ReadOutcome(claim.Record)
@@ -290,22 +297,60 @@ namespace BlazorShop.Application.Services.Payment
 
         private async Task<CheckoutExecutionResult> InitializeStripeAsync(
             Order order,
-            IReadOnlyCollection<ResolvedCartLine> lines,
             CheckoutIdempotencyClaim claim,
             CancellationToken cancellationToken)
         {
-            if (!await _idempotencyStore.MarkLocalCommittedAsync(
+            var providerInitialization = await _idempotencyStore.PrepareProviderInitializationAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,
-                cancellationToken))
+                CreateStripeInitialization(order),
+                cancellationToken);
+            if (providerInitialization is null)
             {
                 return CheckoutExecutionResult.InProgress();
             }
 
+            var initialization = providerInitialization.Initialization;
+            if (initialization.OrderId != order.Id
+                || !string.Equals(initialization.OrderReference, order.Reference, StringComparison.Ordinal))
+            {
+                var invalidSnapshot = CreateFailureOutcome(
+                    "Card payment initialization could not be recovered safely. Start a new checkout attempt.");
+                if (!await _idempotencyStore.SetPendingOutcomeAsync(
+                    claim.Record.Id,
+                    claim.LeaseOwnerId,
+                    invalidSnapshot,
+                    cancellationToken))
+                {
+                    return CheckoutExecutionResult.InProgress();
+                }
+
+                return await CompensateStripeFailureAsync(
+                    order,
+                    claim,
+                    invalidSnapshot,
+                    cancellationToken);
+            }
+
+            if (DateTime.UtcNow >= providerInitialization.StartedOn
+                .AddHours(_idempotencyOptions.ProviderRecoveryWindowHours))
+            {
+                var expired = CreateFailureOutcome(
+                    "The safe card-payment recovery window expired. Start a new checkout with a new Idempotency-Key.");
+                if (!await _idempotencyStore.SetPendingOutcomeAsync(
+                    claim.Record.Id,
+                    claim.LeaseOwnerId,
+                    expired,
+                    cancellationToken))
+                {
+                    return CheckoutExecutionResult.InProgress();
+                }
+
+                return await CompensateStripeFailureAsync(order, claim, expired, cancellationToken);
+            }
+
             var paymentResult = await _paymentService.Pay(
-                lines,
-                order.Id,
-                order.Reference,
+                initialization,
                 $"blazorshop-checkout-{claim.Record.Id:N}",
                 cancellationToken);
 
@@ -526,18 +571,54 @@ namespace BlazorShop.Application.Services.Payment
                 }).ToList(),
             };
 
-        private static IReadOnlyList<ResolvedCartLine> RestoreResolvedLines(Order order) =>
-            order.Lines.Select(line => new ResolvedCartLine(
-                line.ProductId,
-                line.ProductVariantId,
-                line.Quantity,
-                line.UnitPrice,
-                line.ProductNameSnapshot,
-                null,
-                line.SkuSnapshot,
-                Enum.TryParse<SizeScale>(line.SizeScaleSnapshot, out var sizeScale) ? sizeScale : null,
-                line.SizeValueSnapshot,
-                line.ColorSnapshot)).ToArray();
+        private StripeCheckoutInitialization CreateStripeInitialization(Order order)
+        {
+            var lines = order.Lines
+                .OrderBy(line => line.ProductId)
+                .ThenBy(line => line.ProductVariantId)
+                .Select(line => new StripeCheckoutLineItem(
+                    line.ProductId,
+                    line.ProductVariantId,
+                    line.ProductNameSnapshot,
+                    BuildStripeDescription(line),
+                    line.Quantity,
+                    (long)decimal.Round(
+                        line.UnitPrice * 100,
+                        0,
+                        MidpointRounding.AwayFromZero),
+                    "eur"))
+                .ToArray();
+            return new StripeCheckoutInitialization(
+                StripeInitializationVersion,
+                order.Id,
+                order.Reference,
+                ["card"],
+                "payment",
+                lines,
+                BuildClientUrl(
+                    $"payment-success?pm=card&order_id={order.Id:D}&reference={Uri.EscapeDataString(order.Reference)}&session_id={{CHECKOUT_SESSION_ID}}"),
+                BuildClientUrl($"payment-cancel?order_id={order.Id:D}"));
+        }
+
+        private static string? BuildStripeDescription(OrderLine line)
+        {
+            var details = new[]
+                {
+                    string.IsNullOrWhiteSpace(line.SkuSnapshot) ? null : $"SKU: {line.SkuSnapshot}",
+                    string.IsNullOrWhiteSpace(line.SizeValueSnapshot)
+                        ? null
+                        : string.IsNullOrWhiteSpace(line.SizeScaleSnapshot)
+                            ? $"Size: {line.SizeValueSnapshot}"
+                            : $"Size: {line.SizeScaleSnapshot} {line.SizeValueSnapshot}",
+                    string.IsNullOrWhiteSpace(line.ColorSnapshot) ? null : $"Color: {line.ColorSnapshot}",
+                }
+                .Where(value => value is not null)
+                .ToArray();
+            return details.Length == 0 ? null : string.Join(", ", details);
+        }
+
+        private string BuildClientUrl(string path) =>
+            $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
 
         private BankTransferInfo BuildBankTransferInfo(Order order) => new()
         {

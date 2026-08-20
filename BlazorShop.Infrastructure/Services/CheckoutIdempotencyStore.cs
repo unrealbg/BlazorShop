@@ -94,14 +94,18 @@ namespace BlazorShop.Infrastructure.Services
                     cancellationToken) == 1;
         }
 
-        public async Task<bool> MarkLocalCommittedAsync(
+        public async Task<CheckoutProviderInitialization?> PrepareProviderInitializationAsync(
             Guid recordId,
             Guid leaseOwnerId,
+            StripeCheckoutInitialization proposedInitialization,
             CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
+            var serializedInitialization = JsonSerializer.Serialize(
+                proposedInitialization,
+                SerializerOptions);
             await using var db = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            return await db.CheckoutIdempotencyRecords
+            var updated = await db.CheckoutIdempotencyRecords
                 .Where(record => record.Id == recordId
                     && record.LeaseOwnerId == leaseOwnerId
                     && (record.State == CheckoutIdempotencyState.Processing
@@ -109,9 +113,38 @@ namespace BlazorShop.Infrastructure.Services
                 .ExecuteUpdateAsync(
                     setters => setters
                         .SetProperty(record => record.State, CheckoutIdempotencyState.LocalCommitted)
+                        .SetProperty(
+                            record => record.ProviderInitializationStartedOn,
+                            record => record.ProviderInitializationStartedOn ?? now)
+                        .SetProperty(
+                            record => record.ProviderInitializationJson,
+                            record => record.ProviderInitializationJson ?? serializedInitialization)
                         .SetProperty(record => record.UpdatedOn, now)
                         .SetProperty(record => record.LeaseExpiresOn, now.AddSeconds(_options.LeaseSeconds)),
-                    cancellationToken) == 1;
+                    cancellationToken);
+            if (updated != 1)
+            {
+                return null;
+            }
+
+            var record = await db.CheckoutIdempotencyRecords
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == recordId, cancellationToken);
+            if (!record.ProviderInitializationStartedOn.HasValue
+                || string.IsNullOrWhiteSpace(record.ProviderInitializationJson))
+            {
+                throw new InvalidOperationException(
+                    "The checkout provider initialization snapshot was not persisted.");
+            }
+
+            var initialization = JsonSerializer.Deserialize<StripeCheckoutInitialization>(
+                record.ProviderInitializationJson,
+                SerializerOptions)
+                ?? throw new InvalidOperationException(
+                    "The checkout provider initialization snapshot is invalid.");
+            return new CheckoutProviderInitialization(
+                record.ProviderInitializationStartedOn.Value,
+                initialization);
         }
 
         public async Task<bool> CompleteAsync(

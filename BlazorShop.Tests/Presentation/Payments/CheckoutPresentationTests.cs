@@ -36,6 +36,15 @@ namespace BlazorShop.Tests.Presentation.Payments
         }
 
         [Fact]
+        public void Cart_GuardsQueuedPaymentClicksBeforeStartingAnotherCheckout()
+        {
+            var cart = ReadRepositoryFile(
+                "BlazorShop.Presentation/BlazorShop.Web/Pages/Payments/Cart.razor.cs");
+
+            Assert.Contains("paymentMethod is null || _processingMethodId.HasValue", cart);
+        }
+
+        [Fact]
         public void SuccessPage_IsPresentationOnlyAndCannotCreateAnotherOrder()
         {
             var success = ReadRepositoryFile(

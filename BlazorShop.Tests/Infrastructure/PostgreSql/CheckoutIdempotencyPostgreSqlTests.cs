@@ -1,6 +1,7 @@
 namespace BlazorShop.Tests.Infrastructure.PostgreSql
 {
     using System.Collections.Concurrent;
+    using System.Text.Json;
 
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
@@ -266,9 +267,21 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             var key = Guid.NewGuid();
             var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
             var sessions = new ConcurrentDictionary<string, string>();
+            var providerRequests = new ConcurrentDictionary<string, string>();
             var attempts = 0;
             var provider = new RecordingPaymentService(call =>
             {
+                var request = JsonSerializer.Serialize(call.Initialization);
+                if (providerRequests.TryGetValue(call.ProviderIdempotencyKey, out var existingRequest)
+                    && !string.Equals(existingRequest, request, StringComparison.Ordinal))
+                {
+                    return Task.FromResult(new PaymentInitializationResult(
+                        false,
+                        ErrorMessage: "Idempotency parameters did not match",
+                        FailureKind: PaymentInitializationFailureKind.Definitive));
+                }
+
+                providerRequests.TryAdd(call.ProviderIdempotencyKey, request);
                 var url = sessions.GetOrAdd(
                     call.ProviderIdempotencyKey,
                     value => $"https://checkout.stripe.test/{value}");
@@ -291,10 +304,136 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Single(sessions);
             Assert.Equal(2, provider.Calls.Count);
             Assert.Single(provider.Calls.Select(call => call.ProviderIdempotencyKey).Distinct());
+            Assert.Single(provider.Calls.Select(call => JsonSerializer.Serialize(call.Initialization)).Distinct());
+            Assert.Null(Assert.Single(provider.Calls.First().Initialization.Lines).Description);
             await using var assertionContext = _database.CreateContext();
             Assert.Equal(1, await assertionContext.Orders.CountAsync());
             Assert.Equal(1, await assertionContext.InventoryReservations.CountAsync());
             Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            var record = await assertionContext.CheckoutIdempotencyRecords.SingleAsync();
+            Assert.NotNull(record.ProviderInitializationStartedOn);
+            Assert.NotNull(record.ProviderInitializationJson);
+        }
+
+        [Fact]
+        public async Task StripeMultiLineRecovery_UsesStableSnapshotAndDeterministicOrdering()
+        {
+            await _database.ResetDatabaseAsync();
+            var firstProductId = await SeedProductAsync(quantity: 2);
+            var secondProductId = await SeedProductAsync(quantity: 2);
+            var orderedIds = new[] { firstProductId, secondProductId }.Order().ToArray();
+            var checkout = new Checkout
+            {
+                PaymentMethodId = PaymentMethodIds.CreditCard,
+                Carts =
+                [
+                    new CartLineRequest(orderedIds[1], null, 1),
+                    new CartLineRequest(orderedIds[0], null, 1),
+                ],
+            };
+            var attempts = 0;
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                Interlocked.Increment(ref attempts) == 1
+                    ? new PaymentInitializationResult(
+                        false,
+                        ErrorMessage: "Response lost",
+                        FailureKind: PaymentInitializationFailureKind.Ambiguous)
+                    : new PaymentInitializationResult(true, "https://checkout.stripe.test/stable")));
+            var key = Guid.NewGuid();
+
+            Assert.Equal(
+                CheckoutExecutionStatus.InProgress,
+                (await ExecuteAsync(checkout, "customer-1", key, provider)).Status);
+            Assert.True((await ExecuteAsync(checkout, "customer-1", key, provider)).Success);
+
+            var calls = provider.Calls.ToArray();
+            Assert.Equal(2, calls.Length);
+            Assert.Equal(
+                JsonSerializer.Serialize(calls[0].Initialization),
+                JsonSerializer.Serialize(calls[1].Initialization));
+            Assert.Equal(
+                orderedIds,
+                calls[0].Initialization.Lines.Select(line => line.ProductId).ToArray());
+        }
+
+        [Fact]
+        public async Task StripeVariantRecovery_UsesIdenticalPersistedVariantParameters()
+        {
+            await _database.ResetDatabaseAsync();
+            var (productId, variantId) = await SeedVariantProductAsync(stock: 2);
+            var checkout = new Checkout
+            {
+                PaymentMethodId = PaymentMethodIds.CreditCard,
+                Carts = [new CartLineRequest(productId, variantId, 1)],
+            };
+            var attempts = 0;
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                Interlocked.Increment(ref attempts) == 1
+                    ? new PaymentInitializationResult(
+                        false,
+                        ErrorMessage: "Response lost",
+                        FailureKind: PaymentInitializationFailureKind.Ambiguous)
+                    : new PaymentInitializationResult(true, "https://checkout.stripe.test/variant")));
+            var key = Guid.NewGuid();
+
+            Assert.Equal(
+                CheckoutExecutionStatus.InProgress,
+                (await ExecuteAsync(checkout, "customer-1", key, provider)).Status);
+            Assert.True((await ExecuteAsync(checkout, "customer-1", key, provider)).Success);
+
+            var calls = provider.Calls.ToArray();
+            Assert.Equal(2, calls.Length);
+            Assert.Equal(
+                JsonSerializer.Serialize(calls[0].Initialization),
+                JsonSerializer.Serialize(calls[1].Initialization));
+            var line = Assert.Single(calls[0].Initialization.Lines);
+            Assert.Equal(variantId, line.ProductVariantId);
+            Assert.Equal("SKU: TEST-VARIANT, Size: ShoesUS 10, Color: Black", line.Description);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(1, (await assertionContext.ProductVariants.FindAsync(variantId))!.Stock);
+        }
+
+        [Fact]
+        public async Task StripeRecoveryAfterProviderWindow_StopsProviderAndReleasesInventoryOnce()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var provider = new RecordingPaymentService(_ => Task.FromResult(new PaymentInitializationResult(
+                false,
+                ErrorMessage: "Response lost",
+                FailureKind: PaymentInitializationFailureKind.Ambiguous)));
+            var key = Guid.NewGuid();
+
+            var ambiguous = await ExecuteAsync(checkout, "customer-1", key, provider);
+            Assert.Equal(CheckoutExecutionStatus.InProgress, ambiguous.Status);
+            await using (var expiryContext = _database.CreateContext())
+            {
+                await expiryContext.CheckoutIdempotencyRecords.ExecuteUpdateAsync(setters => setters
+                    .SetProperty(
+                        record => record.ProviderInitializationStartedOn,
+                        DateTime.UtcNow.AddHours(-24))
+                    .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
+            }
+
+            var expired = await ExecuteAsync(checkout, "customer-1", key, provider);
+            var replay = await ExecuteAsync(checkout, "customer-1", key, provider);
+
+            Assert.False(expired.Success);
+            Assert.Contains("recovery window expired", expired.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.False(replay.Success);
+            Assert.True(replay.IsReplay);
+            Assert.Single(provider.Calls);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(2, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await assertionContext.Orders.SingleAsync()).Status);
+            Assert.Equal(
+                InventoryReservationStatus.Released,
+                (await assertionContext.InventoryReservations.SingleAsync()).Status);
+            var record = await assertionContext.CheckoutIdempotencyRecords.SingleAsync();
+            Assert.Equal(CheckoutIdempotencyState.Failed, record.State);
+            Assert.NotNull(record.ProviderInitializationStartedOn);
+            Assert.NotNull(record.ProviderInitializationJson);
         }
 
         [Fact]
@@ -446,6 +585,11 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     Beneficiary = "Blazor Shop",
                     BankName = "Test Bank",
                 }),
+                Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
+                Options.Create(new CheckoutIdempotencyOptions
+                {
+                    ProviderRecoveryWindowHours = 23,
+                }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
             return await orchestrator.CheckoutAsync(checkout, userId, key);
         }
@@ -458,6 +602,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 LeaseSeconds = 5,
                 DuplicateWaitMilliseconds = 5000,
                 PollMilliseconds = 20,
+                ProviderRecoveryWindowHours = 23,
             }));
 
         private async Task<Guid> SeedProductAsync(int quantity)
@@ -481,6 +626,40 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             context.Products.Add(product);
             await context.SaveChangesAsync();
             return product.Id;
+        }
+
+        private async Task<(Guid ProductId, Guid VariantId)> SeedVariantProductAsync(int stock)
+        {
+            await using var context = _database.CreateContext();
+            var category = await context.Categories.FirstOrDefaultAsync();
+            if (category is null)
+            {
+                category = new Category { Id = Guid.NewGuid(), Name = "Idempotency" };
+                context.Categories.Add(category);
+            }
+
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = $"VariantProduct-{Guid.NewGuid():N}",
+                Price = 5m,
+                Quantity = 0,
+                CategoryId = category.Id,
+            };
+            var variant = new ProductVariant
+            {
+                Id = Guid.NewGuid(),
+                ProductId = product.Id,
+                Sku = "TEST-VARIANT",
+                SizeScale = SizeScale.ShoesUS,
+                SizeValue = "10",
+                Price = 25m,
+                Stock = stock,
+                Color = "Black",
+            };
+            context.AddRange(product, variant);
+            await context.SaveChangesAsync();
+            return (product.Id, variant.Id);
         }
 
         private static Checkout CreateCheckout(Guid paymentMethodId, Guid productId, int quantity) => new()
@@ -518,22 +697,18 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             public ConcurrentQueue<ProviderCall> Calls { get; } = new();
 
             public async Task<PaymentInitializationResult> Pay(
-                IReadOnlyCollection<ResolvedCartLine> lines,
-                Guid orderId,
-                string orderReference,
+                StripeCheckoutInitialization initialization,
                 string providerIdempotencyKey,
                 CancellationToken cancellationToken = default)
             {
-                var call = new ProviderCall(lines, orderId, orderReference, providerIdempotencyKey);
+                var call = new ProviderCall(initialization, providerIdempotencyKey);
                 Calls.Enqueue(call);
                 return await _handler(call);
             }
         }
 
         private sealed record ProviderCall(
-            IReadOnlyCollection<ResolvedCartLine> Lines,
-            Guid OrderId,
-            string OrderReference,
+            StripeCheckoutInitialization Initialization,
             string ProviderIdempotencyKey);
     }
 }

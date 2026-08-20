@@ -209,9 +209,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 .ReturnsAsync([new GetPaymentMethod { Id = PaymentMethodIds.CreditCard, Name = "Credit Card" }]);
             var payment = new Mock<IPaymentService>();
             payment.Setup(service => service.Pay(
-                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
-                    It.IsAny<Guid>(),
-                    It.IsAny<string>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
                     It.IsAny<string>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new PaymentInitializationResult(
@@ -234,6 +232,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 new OrderRepository(context),
                 Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings()),
+                Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
+                Options.Create(new CheckoutIdempotencyOptions()),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
 
             var result = await orchestrator.CheckoutAsync(
@@ -336,28 +336,24 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await using var context = _database.CreateContext();
             var payment = new Mock<IPaymentService>();
             payment.Setup(service => service.Pay(
-                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
-                    It.IsAny<Guid>(),
-                    It.IsAny<string>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
                     It.IsAny<string>(),
                     It.IsAny<CancellationToken>()))
                 .Returns(async (
-                    IReadOnlyCollection<ResolvedCartLine> lines,
-                    Guid orderId,
-                    string reference,
+                    StripeCheckoutInitialization initialization,
                     string _,
                     CancellationToken _) =>
                 {
                     await using var providerContext = _database.CreateContext();
-                    var persistedOrder = await providerContext.Orders.FindAsync(orderId);
+                    var persistedOrder = await providerContext.Orders.FindAsync(initialization.OrderId);
                     Assert.NotNull(persistedOrder);
                     Assert.Equal(PaymentOrderStatus.PendingPayment, persistedOrder.Status);
-                    Assert.Equal(reference, persistedOrder.Reference);
+                    Assert.Equal(initialization.OrderReference, persistedOrder.Reference);
                     Assert.Equal(
                         InventoryReservationStatus.Reserved,
                         (await providerContext.InventoryReservations.SingleAsync(
-                            item => item.OrderId == orderId)).Status);
-                    Assert.Equal(10m, Assert.Single(lines).UnitPrice);
+                            item => item.OrderId == initialization.OrderId)).Status);
+                    Assert.Equal(1000, Assert.Single(initialization.Lines).UnitAmount);
                     return new PaymentInitializationResult(true, "https://checkout.stripe.test/session");
                 });
             var orchestrator = CreateCheckoutOrchestrator(
@@ -799,6 +795,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     Beneficiary = "Blazor Shop",
                     BankName = "Test Bank",
                 }),
+                Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
+                Options.Create(new CheckoutIdempotencyOptions()),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
         }
 

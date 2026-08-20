@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorShop.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260820195239_AddCheckoutIdempotency")]
+    [Migration("20260820204600_AddCheckoutIdempotency")]
     partial class AddCheckoutIdempotency
     {
         /// <inheritdoc />
@@ -421,6 +421,12 @@ namespace BlazorShop.Infrastructure.Migrations
 
                     b.Property<Guid>("PaymentMethodId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderInitializationJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ProviderInitializationStartedOn")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RequestFingerprint")
                         .IsRequired()

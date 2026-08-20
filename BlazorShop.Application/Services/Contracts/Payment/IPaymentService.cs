@@ -4,9 +4,7 @@
     public interface IPaymentService
     {
         Task<PaymentInitializationResult> Pay(
-            IReadOnlyCollection<ResolvedCartLine> lines,
-            Guid orderId,
-            string orderReference,
+            StripeCheckoutInitialization initialization,
             string providerIdempotencyKey,
             CancellationToken cancellationToken = default);
     }

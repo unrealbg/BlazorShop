@@ -18,9 +18,10 @@ namespace BlazorShop.Application.Services.Contracts.Payment
             PersistedCheckoutOutcome outcome,
             CancellationToken cancellationToken = default);
 
-        Task<bool> MarkLocalCommittedAsync(
+        Task<CheckoutProviderInitialization?> PrepareProviderInitializationAsync(
             Guid recordId,
             Guid leaseOwnerId,
+            StripeCheckoutInitialization proposedInitialization,
             CancellationToken cancellationToken = default);
 
         Task<bool> CompleteAsync(

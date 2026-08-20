@@ -224,7 +224,7 @@
 
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
         {
-            if (paymentMethod is null)
+            if (paymentMethod is null || _processingMethodId.HasValue)
             {
                 return;
             }

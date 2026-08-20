@@ -176,6 +176,9 @@
                 .Validate(options => options.LeaseSeconds > 0, "CheckoutIdempotency:LeaseSeconds must be positive.")
                 .Validate(options => options.DuplicateWaitMilliseconds >= 0, "CheckoutIdempotency:DuplicateWaitMilliseconds cannot be negative.")
                 .Validate(options => options.PollMilliseconds > 0, "CheckoutIdempotency:PollMilliseconds must be positive.")
+                .Validate(
+                    options => options.ProviderRecoveryWindowHours is > 0 and <= 23,
+                    "CheckoutIdempotency:ProviderRecoveryWindowHours must be between 1 and 23.")
                 .ValidateOnStart();
 
             Stripe.StripeConfiguration.ApiKey = config[$"{StripeOptions.SectionName}:SecretKey"];
