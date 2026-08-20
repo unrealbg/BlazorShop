@@ -37,10 +37,8 @@
             var response = await _apiCallHelper.GetMutationResponse<CheckoutResult>(
                 result,
                 "Checkout could not be completed. Please try again.");
-            var terminalAttempt = response.Success && response.Payload is not null
-                || result.StatusCode == HttpStatusCode.BadRequest
-                    && response.ResponseType == ServiceResponseType.ValidationError;
-            if (terminalAttempt)
+            if (result.StatusCode == HttpStatusCode.BadRequest
+                && response.ResponseType == ServiceResponseType.ValidationError)
             {
                 await _checkoutAttemptStore.ClearAsync(attempt.IdempotencyKey);
             }

@@ -73,7 +73,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             Assert.NotNull(result);
             Assert.Same(checkoutResult, result.Payload);
             Assert.Equal(idempotencyKey.ToString("D"), sentKey);
-            this._checkoutAttemptStoreMock.Verify(store => store.ClearAsync(idempotencyKey), Times.Once);
+            this._checkoutAttemptStoreMock.Verify(store => store.ClearAsync(idempotencyKey), Times.Never);
         }
 
         [Fact]

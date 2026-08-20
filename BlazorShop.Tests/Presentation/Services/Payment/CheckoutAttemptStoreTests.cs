@@ -5,7 +5,9 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
     using System.Net.Http.Json;
 
     using BlazorShop.Domain.Contracts.Payment;
+    using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.BrowserStorage.Contracts;
+    using BlazorShop.Web.Shared.CookieStorage.Contracts;
     using BlazorShop.Web.Shared.Helper;
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
@@ -105,6 +107,75 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             storage.Verify(
                 service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()),
                 Times.Once);
+        }
+
+        [Fact]
+        public async Task SuccessfulCheckoutThenClientCrash_SameIntentReusesCompletedKeyAfterReload()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var observed = new ConcurrentQueue<string>();
+            var client = CreateSuccessfulCheckoutClient(observed);
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync()).ReturnsAsync(client);
+            var service = new CartService(
+                clients.Object,
+                new ApiCallHelper(),
+                new CheckoutAttemptStore(storage.Object));
+
+            Assert.True((await service.Checkout(checkout)).Success);
+            var afterReload = await new CheckoutAttemptStore(storage.Object).GetOrCreateAsync(checkout);
+
+            Assert.Equal(Assert.Single(observed), afterReload.IdempotencyKey.ToString("D"));
+            storage.Verify(service => service.RemoveAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SuccessfulCheckoutWhenCartCleanupFails_SameIntentStillReusesCompletedKey()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var cookieStorage = new Mock<IBrowserCookieStorageService>();
+            cookieStorage.Setup(service => service.RemoveAsync(Constant.Cart.Name))
+                .ThrowsAsync(new InvalidOperationException("Cart cookie cleanup failed"));
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var observed = new ConcurrentQueue<string>();
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync())
+                .ReturnsAsync(CreateSuccessfulCheckoutClient(observed));
+            var store = new CheckoutAttemptStore(storage.Object);
+            var service = new CartService(clients.Object, new ApiCallHelper(), store);
+
+            Assert.True((await service.Checkout(checkout)).Success);
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => cookieStorage.Object.RemoveAsync(Constant.Cart.Name));
+            var retained = await store.GetOrCreateAsync(checkout);
+
+            Assert.Equal(Assert.Single(observed), retained.IdempotencyKey.ToString("D"));
+            storage.Verify(service => service.RemoveAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SuccessfulCheckoutThenMaterialIntentChange_GeneratesNewKeyNaturally()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var productId = Guid.NewGuid();
+            var checkout = CreateCheckout(Guid.NewGuid(), productId, 1);
+            var observed = new ConcurrentQueue<string>();
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync())
+                .ReturnsAsync(CreateSuccessfulCheckoutClient(observed));
+            var store = new CheckoutAttemptStore(storage.Object);
+            var service = new CartService(clients.Object, new ApiCallHelper(), store);
+
+            Assert.True((await service.Checkout(checkout)).Success);
+            var changed = await store.GetOrCreateAsync(
+                CreateCheckout(checkout.PaymentMethodId, productId, 2));
+
+            Assert.NotEqual(Assert.Single(observed), changed.IdempotencyKey.ToString("D"));
+            storage.Verify(service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Exactly(2));
         }
 
         [Fact]
@@ -272,8 +343,30 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 new[] { firstKey.ToString("D"), secondKey.ToString("D") }.Order(StringComparer.Ordinal),
                 observed.Order(StringComparer.Ordinal));
             Assert.False(client.DefaultRequestHeaders.Contains("Idempotency-Key"));
-            attempts.Verify(store => store.ClearAsync(firstKey), Times.Once);
-            attempts.Verify(store => store.ClearAsync(secondKey), Times.Once);
+            attempts.Verify(store => store.ClearAsync(firstKey), Times.Never);
+            attempts.Verify(store => store.ClearAsync(secondKey), Times.Never);
+        }
+
+        private static HttpClient CreateSuccessfulCheckoutClient(ConcurrentQueue<string> observed)
+        {
+            return new HttpClient(new AsyncStubHandler((request, _) =>
+            {
+                observed.Enqueue(Assert.Single(request.Headers.GetValues("Idempotency-Key")));
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new ServiceResponse<CheckoutResult>(true)
+                    {
+                        Payload = new CheckoutResult(
+                            Guid.NewGuid(),
+                            "TEST",
+                            CheckoutStatus.Confirmed,
+                            CheckoutPaymentKind.CashOnDelivery),
+                    }),
+                });
+            }))
+            {
+                BaseAddress = new Uri("https://shop.test/api/"),
+            };
         }
 
         private static Mock<IBrowserSessionStorageService> CreateStorage(
