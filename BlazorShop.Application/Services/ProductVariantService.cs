@@ -47,6 +47,11 @@ namespace BlazorShop.Application.Services
                 return new ServiceResponse(false, "Variant not found");
             }
 
+            if (variant.ProductId != existingVariant.ProductId)
+            {
+                return new ServiceResponse(false, "A product variant cannot be moved to another product");
+            }
+
             var currentStock = existingVariant.Stock;
             _mapper.Map(variant, existingVariant);
             existingVariant.Stock = currentStock;

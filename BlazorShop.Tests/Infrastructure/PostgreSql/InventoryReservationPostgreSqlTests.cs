@@ -337,6 +337,61 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         }
 
         [Fact]
+        public async Task ReservedVariant_GenericUpdateCannotChangeItsProduct()
+        {
+            await _database.ResetDatabaseAsync();
+            var (productAId, variantId) = await SeedVariantProductAsync(stock: 5, name: "Product A");
+            var productBId = await SeedProductAsync(quantity: 0, name: "Product B");
+            var order = CreateOrder(productAId, variantId, 1);
+            Assert.True((await ReserveAsync(order)).Success);
+
+            await using var adminContext = _database.CreateContext();
+            var existingVariant = await adminContext.ProductVariants
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == variantId);
+            var service = new BlazorShop.Application.Services.ProductVariantService(
+                new GenericRepository<ProductVariant>(adminContext),
+                new ProductInventoryTopologyRepository(_database.CreateContextFactory()),
+                AutoMapperTestFactory.CreateMapper());
+
+            var update = await service.UpdateAsync(new UpdateProductVariant
+            {
+                Id = existingVariant.Id,
+                ProductId = productBId,
+                Sku = existingVariant.Sku,
+                SizeScale = (int)existingVariant.SizeScale,
+                SizeValue = existingVariant.SizeValue,
+                Price = existingVariant.Price,
+                Stock = 99,
+                Color = existingVariant.Color,
+                IsDefault = existingVariant.IsDefault,
+            });
+
+            Assert.False(update.Success);
+            Assert.Equal("A product variant cannot be moved to another product", update.Message);
+            adminContext.ChangeTracker.Clear();
+            var reservedVariant = await adminContext.ProductVariants.FindAsync(variantId);
+            Assert.NotNull(reservedVariant);
+            Assert.Equal(productAId, reservedVariant.ProductId);
+            Assert.Equal(4, reservedVariant.Stock);
+
+            Assert.True((await TransitionAsync(
+                order.Id,
+                PaymentOrderStatus.Cancelled,
+                InventoryReservationStatus.Released)).Success);
+            Assert.True((await TransitionAsync(
+                order.Id,
+                PaymentOrderStatus.Cancelled,
+                InventoryReservationStatus.Released)).Success);
+
+            adminContext.ChangeTracker.Clear();
+            var releasedVariant = await adminContext.ProductVariants.FindAsync(variantId);
+            Assert.NotNull(releasedVariant);
+            Assert.Equal(productAId, releasedVariant.ProductId);
+            Assert.Equal(5, releasedVariant.Stock);
+        }
+
+        [Fact]
         public async Task DeleteLastVariant_LeavesProductQuantityNonSellable()
         {
             await _database.ResetDatabaseAsync();

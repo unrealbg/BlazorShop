@@ -73,7 +73,8 @@
             this.CreateMap<CreateProductVariant, ProductVariant>()
                 .ForMember(dest => dest.Stock, opt => opt.Ignore());
             this.CreateMap<UpdateProductVariant, ProductVariant>()
-                .ForMember(dest => dest.Stock, opt => opt.Ignore());
+                .ForMember(dest => dest.Stock, opt => opt.Ignore())
+                .ForMember(dest => dest.ProductId, opt => opt.Ignore());
             this.CreateMap<ProductVariant, GetProductVariant>();
 
             this.CreateMap<CreateUser, AppUser>();
