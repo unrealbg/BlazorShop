@@ -198,24 +198,6 @@ namespace BlazorShop.Infrastructure.Services.Admin
 
         private async Task<IReadOnlyList<GetOrder>> MapOrdersAsync(IReadOnlyCollection<Order> orders)
         {
-            var productIds = orders.SelectMany(order => order.Lines).Select(line => line.ProductId).Distinct().ToArray();
-            var productNames = await _db.Products
-                .AsNoTracking()
-                .Where(product => productIds.Contains(product.Id))
-                .Select(product => new { product.Id, product.Name })
-                .ToDictionaryAsync(product => product.Id, product => product.Name ?? string.Empty);
-
-            var variantIds = orders
-                .SelectMany(order => order.Lines)
-                .Where(line => line.ProductVariantId.HasValue)
-                .Select(line => line.ProductVariantId!.Value)
-                .Distinct()
-                .ToArray();
-            var variants = await _db.ProductVariants
-                .AsNoTracking()
-                .Where(variant => variantIds.Contains(variant.Id))
-                .ToDictionaryAsync(variant => variant.Id);
-
             var userIds = orders.Select(order => order.UserId).Where(userId => !string.IsNullOrWhiteSpace(userId)).Distinct().ToArray();
             var users = await _db.Users
                 .AsNoTracking()
@@ -245,17 +227,18 @@ namespace BlazorShop.Infrastructure.Services.Admin
                     AdminNote = order.AdminNote,
                     Lines = order.Lines.Select(line =>
                     {
-                        variants.TryGetValue(line.ProductVariantId ?? Guid.Empty, out var variant);
                         return new GetOrderLine
                         {
                             ProductId = line.ProductId,
                             VariantId = line.ProductVariantId,
                             Quantity = line.Quantity,
                             UnitPrice = line.UnitPrice,
-                            ProductName = productNames.TryGetValue(line.ProductId, out var productName) ? productName : string.Empty,
-                            Sku = variant?.Sku,
-                            SizeValue = variant?.SizeValue,
-                            Color = variant?.Color,
+                            LineTotal = line.LineTotal,
+                            ProductName = line.ProductNameSnapshot,
+                            Sku = line.SkuSnapshot,
+                            SizeScale = line.SizeScaleSnapshot,
+                            SizeValue = line.SizeValueSnapshot,
+                            Color = line.ColorSnapshot,
                         };
                     }),
                 };

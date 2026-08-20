@@ -30,7 +30,7 @@ namespace BlazorShop.Tests.Infrastructure
             var orderId = Guid.NewGuid();
 
             var result = await paymentService.Pay(
-                [new ResolvedCartLine(productId, null, 1, 25m, "Camera", "Mirrorless", null, null, null)],
+                [new ResolvedCartLine(productId, null, 1, 25m, "Camera", "Mirrorless", null, null, null, null)],
                 orderId);
 
             Assert.False(result.Success);
@@ -56,7 +56,7 @@ namespace BlazorShop.Tests.Infrastructure
             var orderId = Guid.NewGuid();
 
             var result = await paymentService.Pay(
-                [new ResolvedCartLine(productId, variantId, 2, 39.95m, "Camera", "Mirrorless", "CAM-BLK", "One Size", "Black")],
+                [new ResolvedCartLine(productId, variantId, 2, 39.95m, "Camera", "Mirrorless", "CAM-BLK", null, "One Size", "Black")],
                 orderId);
 
             Assert.True(result.Success);

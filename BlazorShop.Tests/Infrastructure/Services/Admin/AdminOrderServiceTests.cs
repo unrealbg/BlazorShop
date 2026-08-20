@@ -47,23 +47,26 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
         }
 
         [Fact]
-        public async Task GetByIdAsync_ReturnsSelectedVariantDetails()
+        public async Task GetByIdAsync_UsesPurchaseSnapshotsAfterCatalogMutationAndRemoval()
         {
             await using var context = CreateContext();
             var category = new Category { Id = Guid.NewGuid(), Name = "Shoes" };
             var product = new Product
             {
                 Id = Guid.NewGuid(),
-                Name = "Runner",
+                Name = "Original Runner",
+                Price = 80m,
                 CategoryId = category.Id,
             };
             var variant = new ProductVariant
             {
                 Id = Guid.NewGuid(),
                 ProductId = product.Id,
-                Sku = "RUN-42-BLK",
-                SizeValue = "42",
+                Sku = "ORIGINAL-SKU",
+                SizeScale = SizeScale.ShoesUS,
+                SizeValue = "10",
                 Color = "Black",
+                Price = 95m,
                 Stock = 3,
             };
             var order = new Order
@@ -77,8 +80,14 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
                     {
                         ProductId = product.Id,
                         ProductVariantId = variant.Id,
+                        ProductNameSnapshot = "Original Runner",
+                        SkuSnapshot = "ORIGINAL-SKU",
+                        SizeScaleSnapshot = "ShoesUS",
+                        SizeValueSnapshot = "10",
+                        ColorSnapshot = "Black",
                         Quantity = 1,
                         UnitPrice = 95m,
+                        LineTotal = 95m,
                     },
                 ],
             };
@@ -86,14 +95,40 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
             await context.SaveChangesAsync();
             var service = CreateService(context);
 
-            var result = await service.GetByIdAsync(order.Id);
+            product.Name = "Renamed Runner";
+            product.Price = 1m;
+            variant.Sku = "CHANGED-SKU";
+            variant.SizeScale = SizeScale.ShoesUK;
+            variant.SizeValue = "10";
+            variant.Color = "White";
+            variant.Price = 1m;
+            await context.SaveChangesAsync();
 
+            var resultAfterMutation = await service.GetByIdAsync(order.Id);
+
+            AssertSnapshot(resultAfterMutation, variant.Id);
+
+            context.ProductVariants.Remove(variant);
+            context.Products.Remove(product);
+            await context.SaveChangesAsync();
+
+            var resultAfterRemoval = await service.GetByIdAsync(order.Id);
+
+            AssertSnapshot(resultAfterRemoval, variant.Id);
+        }
+
+        private static void AssertSnapshot(ServiceResponse<GetOrder> result, Guid variantId)
+        {
             Assert.True(result.Success);
             var line = Assert.Single(result.Payload!.Lines);
-            Assert.Equal(variant.Id, line.VariantId);
-            Assert.Equal("RUN-42-BLK", line.Sku);
-            Assert.Equal("42", line.SizeValue);
+            Assert.Equal(variantId, line.VariantId);
+            Assert.Equal("Original Runner", line.ProductName);
+            Assert.Equal("ORIGINAL-SKU", line.Sku);
+            Assert.Equal("ShoesUS", line.SizeScale);
+            Assert.Equal("10", line.SizeValue);
             Assert.Equal("Black", line.Color);
+            Assert.Equal(95m, line.UnitPrice);
+            Assert.Equal(95m, line.LineTotal);
         }
 
         private static AdminOrderService CreateService(AppDbContext context)

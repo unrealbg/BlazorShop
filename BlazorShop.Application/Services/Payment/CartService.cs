@@ -233,8 +233,14 @@
                     {
                         ProductId = line.ProductId,
                         ProductVariantId = line.VariantId,
+                        ProductNameSnapshot = line.ProductName,
+                        SkuSnapshot = line.Sku,
+                        SizeScaleSnapshot = line.SizeScale?.ToString(),
+                        SizeValueSnapshot = line.SizeValue,
+                        ColorSnapshot = line.Color,
                         Quantity = line.Quantity,
                         UnitPrice = line.UnitPrice,
+                        LineTotal = line.LineTotal,
                     })
                     .ToList(),
             };
@@ -383,6 +389,7 @@
                     product.Name ?? "Product",
                     product.Description,
                     variant?.Sku,
+                    variant?.SizeScale,
                     variant?.SizeValue,
                     variant?.Color));
             }

@@ -10,6 +10,8 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
         public string? Sku { get; set; }
 
+        public string? SizeScale { get; set; }
+
         public string? SizeValue { get; set; }
 
         public string? Color { get; set; }
@@ -18,7 +20,7 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
         public decimal UnitPrice { get; set; }
 
-        public decimal LineTotal => UnitPrice * Quantity;
+        public decimal LineTotal { get; set; }
 
         public string? VariantLabel
         {
@@ -27,7 +29,7 @@ namespace BlazorShop.Web.Shared.Models.Payment
                 var details = new[]
                     {
                         string.IsNullOrWhiteSpace(Sku) ? null : $"SKU {Sku}",
-                        string.IsNullOrWhiteSpace(SizeValue) ? null : $"Size {SizeValue}",
+                        GetSizeLabel(),
                         string.IsNullOrWhiteSpace(Color) ? null : Color,
                     }
                     .Where(value => value is not null)
@@ -35,6 +37,24 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
                 return details.Length == 0 ? null : string.Join(" · ", details);
             }
+        }
+
+        private string? GetSizeLabel()
+        {
+            if (string.IsNullOrWhiteSpace(SizeValue))
+            {
+                return null;
+            }
+
+            return SizeScale switch
+            {
+                "ClothingAlpha" => $"Clothing {SizeValue}",
+                "ClothingNumericEU" or "ShoesEU" => $"EU {SizeValue}",
+                "ShoesUS" => $"US {SizeValue}",
+                "ShoesUK" => $"UK {SizeValue}",
+                null or "" or "Unknown" => $"Size {SizeValue}",
+                _ => $"{SizeScale} {SizeValue}",
+            };
         }
     }
 }
