@@ -32,11 +32,14 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 CheckoutStatus.Confirmed,
                 CheckoutPaymentKind.CashOnDelivery);
             var orchestrator = new Mock<ICheckoutOrchestrator>();
+            var idempotencyKey = Guid.NewGuid();
             orchestrator.Setup(service => service.CheckoutAsync(
                     checkout,
                     "authenticated-user",
+                    idempotencyKey,
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ServiceResponse<CheckoutResult>(true) { Payload = typedResult });
+                .ReturnsAsync(CheckoutExecutionResult.Succeeded(
+                    new ServiceResponse<CheckoutResult>(true) { Payload = typedResult }));
             var controller = new CartController(
                 Mock.Of<ICartService>(),
                 orchestrator.Object,
@@ -56,7 +59,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 },
             };
 
-            var result = await controller.Checkout(checkout, CancellationToken.None);
+            var result = await controller.Checkout(checkout, idempotencyKey.ToString("D"), CancellationToken.None);
 
             var ok = Assert.IsType<OkObjectResult>(result);
             var response = Assert.IsType<ServiceResponse<CheckoutResult>>(ok.Value);
@@ -67,6 +70,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             orchestrator.Verify(service => service.CheckoutAsync(
                 checkout,
                 "authenticated-user",
+                idempotencyKey,
                 It.IsAny<CancellationToken>()), Times.Once);
         }
 
@@ -94,13 +98,77 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 Carts = [],
             };
 
-            var result = await controller.Checkout(checkout, CancellationToken.None);
+            var result = await controller.Checkout(checkout, Guid.NewGuid().ToString("D"), CancellationToken.None);
 
             Assert.IsType<UnauthorizedObjectResult>(result);
             orchestrator.Verify(service => service.CheckoutAsync(
                 It.IsAny<Checkout>(),
                 It.IsAny<string>(),
+                It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("not-a-guid")]
+        [InlineData("00000000-0000-0000-0000-000000000000")]
+        public async Task Checkout_RejectsMissingOrMalformedIdempotencyKeyBeforeOrchestration(string? key)
+        {
+            var orchestrator = new Mock<ICheckoutOrchestrator>();
+            var controller = CreateAuthenticatedController(orchestrator.Object);
+
+            var result = await controller.Checkout(
+                new Checkout
+                {
+                    PaymentMethodId = PaymentMethodIds.CashOnDelivery,
+                    Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
+                },
+                key,
+                CancellationToken.None);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+            orchestrator.Verify(service => service.CheckoutAsync(
+                It.IsAny<Checkout>(),
+                It.IsAny<string>(),
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task Checkout_MapsFingerprintConflictAndMarksTerminalReplay()
+        {
+            var checkout = new Checkout
+            {
+                PaymentMethodId = PaymentMethodIds.CashOnDelivery,
+                Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
+            };
+            var key = Guid.NewGuid();
+            var orchestrator = new Mock<ICheckoutOrchestrator>();
+            orchestrator.SetupSequence(service => service.CheckoutAsync(
+                    checkout,
+                    "authenticated-user",
+                    key,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(CheckoutExecutionResult.Conflict("Different intent"))
+                .ReturnsAsync(CheckoutExecutionResult.Succeeded(
+                    new ServiceResponse<CheckoutResult>(true)
+                    {
+                        Payload = new CheckoutResult(
+                            Guid.NewGuid(),
+                            "COD-REPLAY",
+                            CheckoutStatus.Confirmed,
+                            CheckoutPaymentKind.CashOnDelivery),
+                    },
+                    isReplay: true));
+            var controller = CreateAuthenticatedController(orchestrator.Object);
+
+            var conflict = await controller.Checkout(checkout, key.ToString("B"), CancellationToken.None);
+            var replay = await controller.Checkout(checkout, key.ToString("D"), CancellationToken.None);
+
+            Assert.IsType<ConflictObjectResult>(conflict);
+            Assert.IsType<OkObjectResult>(replay);
+            Assert.Equal("true", controller.Response.Headers["Idempotency-Replayed"]);
         }
 
         [Fact]
@@ -130,6 +198,28 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
             Assert.Equal("User ID is invalid or not found.", unauthorized.Value);
             cartService.Verify(service => service.SaveCheckoutHistoryAsync(It.IsAny<string>(), It.IsAny<IEnumerable<CreateOrderItem>>()), Times.Never);
+        }
+
+        private static CartController CreateAuthenticatedController(ICheckoutOrchestrator orchestrator)
+        {
+            return new CartController(
+                Mock.Of<ICartService>(),
+                orchestrator,
+                Mock.Of<IOrderQueryService>(),
+                Mock.Of<IOrderTrackingService>())
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [
+                            new Claim(ClaimTypes.NameIdentifier, "authenticated-user"),
+                        ],
+                        authenticationType: "TestAuth")),
+                    },
+                },
+            };
         }
 
         [Fact]

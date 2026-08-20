@@ -9,6 +9,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Services;
+    using BlazorShop.Web.Shared.Services.Contracts;
     using BlazorShop.Domain.Contracts.Payment;
 
     using Moq;
@@ -19,13 +20,18 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
     {
         private readonly Mock<IHttpClientHelper> _httpClientHelperMock;
         private readonly Mock<IApiCallHelper> _apiCallHelperMock;
+        private readonly Mock<ICheckoutAttemptStore> _checkoutAttemptStoreMock;
         private readonly CartService _cartService;
 
         public CartServiceTests()
         {
             this._httpClientHelperMock = new Mock<IHttpClientHelper>();
             this._apiCallHelperMock = new Mock<IApiCallHelper>();
-            this._cartService = new CartService(this._httpClientHelperMock.Object, this._apiCallHelperMock.Object);
+            this._checkoutAttemptStoreMock = new Mock<ICheckoutAttemptStore>();
+            this._cartService = new CartService(
+                this._httpClientHelperMock.Object,
+                this._apiCallHelperMock.Object,
+                this._checkoutAttemptStoreMock.Object);
         }
 
         [Fact]
@@ -38,20 +44,26 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
                 Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
             };
 
-            var httpResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            var idempotencyKey = Guid.NewGuid();
+            string? sentKey = null;
+            var handler = new StubHttpMessageHandler(request =>
+            {
+                sentKey = request.Headers.GetValues("Idempotency-Key").Single();
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            });
             this._httpClientHelperMock
                 .Setup(x => x.GetPrivateClientAsync())
-                .ReturnsAsync(new HttpClient());
-            this._apiCallHelperMock
-                .Setup(x => x.ApiCallTypeCall<Checkout>(It.IsAny<ApiCall>()))
-                .ReturnsAsync(httpResponse);
+                .ReturnsAsync(new HttpClient(handler) { BaseAddress = new Uri("https://shop.test/api/") });
+            this._checkoutAttemptStoreMock
+                .Setup(store => store.GetOrCreateAsync(checkout))
+                .ReturnsAsync(new CheckoutAttempt(idempotencyKey, "signature"));
             var checkoutResult = new CheckoutResult(
                 Guid.NewGuid(),
                 "COD-TEST",
                 CheckoutStatus.Confirmed,
                 CheckoutPaymentKind.CashOnDelivery);
             this._apiCallHelperMock
-                .Setup(x => x.GetMutationResponse<CheckoutResult>(httpResponse, It.IsAny<string>()))
+                .Setup(x => x.GetMutationResponse<CheckoutResult>(It.IsAny<HttpResponseMessage>(), It.IsAny<string>()))
                 .ReturnsAsync(new ServiceResponse<CheckoutResult>(true) { Payload = checkoutResult });
 
             // Act
@@ -60,6 +72,8 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             // Assert
             Assert.NotNull(result);
             Assert.Same(checkoutResult, result.Payload);
+            Assert.Equal(idempotencyKey.ToString("D"), sentKey);
+            this._checkoutAttemptStoreMock.Verify(store => store.ClearAsync(idempotencyKey), Times.Once);
         }
 
         [Fact]
@@ -252,6 +266,20 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Null(result.Data);
+        }
+
+        private sealed class StubHttpMessageHandler : HttpMessageHandler
+        {
+            private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
+
+            public StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
+            {
+                _handler = handler;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken) => Task.FromResult(_handler(request));
         }
     }
 }

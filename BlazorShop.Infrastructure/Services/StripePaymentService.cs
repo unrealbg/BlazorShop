@@ -27,7 +27,9 @@
         public async Task<PaymentInitializationResult> Pay(
             IReadOnlyCollection<ResolvedCartLine> lines,
             Guid orderId,
-            string orderReference)
+            string orderReference,
+            string providerIdempotencyKey,
+            CancellationToken cancellationToken = default)
         {
             try
             {
@@ -74,16 +76,57 @@
                     CancelUrl = this.BuildClientUrl($"payment-cancel?order_id={orderId:D}"),
                 };
 
-                var session = await _checkoutSessionService.CreateAsync(opt);
+                var session = await _checkoutSessionService.CreateAsync(
+                    opt,
+                    providerIdempotencyKey,
+                    cancellationToken);
 
                 return new PaymentInitializationResult(true, session.Url);
             }
-            catch (Exception ex)
+            catch (Stripe.StripeException ex) when (
+                string.Equals(ex.StripeError?.Type, "api_connection_error", StringComparison.Ordinal))
             {
-                _logger.LogError(ex, "Failed to create Stripe checkout session.");
+                _logger.LogWarning(ex, "Stripe checkout-session creation had an ambiguous connection failure.");
                 return new PaymentInitializationResult(
                     false,
-                    ErrorMessage: "Unable to initialize the card payment session. Please try again later.");
+                    ErrorMessage: "Card payment initialization is still uncertain. Retry with the same checkout key.",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous);
+            }
+            catch (Stripe.StripeException ex)
+            {
+                _logger.LogError(ex, "Stripe rejected checkout-session creation.");
+                return new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Unable to initialize the card payment session. Please start a new checkout attempt.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "Stripe checkout-session creation had an ambiguous transport failure.");
+                return new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Card payment initialization is still uncertain. Retry with the same checkout key.",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "Stripe checkout-session creation timed out with an ambiguous result.");
+                return new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Card payment initialization is still uncertain. Retry with the same checkout key.",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Stripe checkout-session creation ended with an ambiguous result.");
+                return new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Card payment initialization is still uncertain. Retry with the same checkout key.",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous);
             }
         }
 

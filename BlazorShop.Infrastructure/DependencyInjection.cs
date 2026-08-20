@@ -140,6 +140,7 @@
             services.AddScoped<IStripeWebhookService, StripeWebhookService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<ICheckoutIdempotencyStore, CheckoutIdempotencyStore>();
             services.AddScoped<IInventoryReservationService>(serviceProvider =>
                 new InventoryReservationService(
                     serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>()));
@@ -168,6 +169,14 @@
 
             services.AddOptions<StripeOptions>()
                 .Bind(config.GetSection(StripeOptions.SectionName));
+
+            services.AddOptions<CheckoutIdempotencyOptions>()
+                .Bind(config.GetSection(CheckoutIdempotencyOptions.SectionName))
+                .Validate(options => options.RetentionDays >= 7, "CheckoutIdempotency:RetentionDays must be at least 7.")
+                .Validate(options => options.LeaseSeconds > 0, "CheckoutIdempotency:LeaseSeconds must be positive.")
+                .Validate(options => options.DuplicateWaitMilliseconds >= 0, "CheckoutIdempotency:DuplicateWaitMilliseconds cannot be negative.")
+                .Validate(options => options.PollMilliseconds > 0, "CheckoutIdempotency:PollMilliseconds must be positive.")
+                .ValidateOnStart();
 
             Stripe.StripeConfiguration.ApiKey = config[$"{StripeOptions.SectionName}:SecretKey"];
 

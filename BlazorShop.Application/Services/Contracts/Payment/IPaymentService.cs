@@ -6,6 +6,8 @@
         Task<PaymentInitializationResult> Pay(
             IReadOnlyCollection<ResolvedCartLine> lines,
             Guid orderId,
-            string orderReference);
+            string orderReference,
+            string providerIdempotencyKey,
+            CancellationToken cancellationToken = default);
     }
 }

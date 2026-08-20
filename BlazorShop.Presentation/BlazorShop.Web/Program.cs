@@ -68,6 +68,7 @@ namespace BlazorShop.Web
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<ICartService, CartService>();
+            builder.Services.AddScoped<ICheckoutAttemptStore, CheckoutAttemptStore>();
             builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
             builder.Services.AddScoped<IFileUploadService, FileUploadService>();
             builder.Services.AddScoped<IProductVariantService, ProductVariantService>();

@@ -5,9 +5,10 @@ namespace BlazorShop.Application.Services.Contracts.Payment
 
     public interface ICheckoutOrchestrator
     {
-        Task<ServiceResponse<CheckoutResult>> CheckoutAsync(
+        Task<CheckoutExecutionResult> CheckoutAsync(
             Checkout checkout,
             string userId,
+            Guid idempotencyKey,
             CancellationToken cancellationToken = default);
     }
 }

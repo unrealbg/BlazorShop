@@ -23,7 +23,10 @@ namespace BlazorShop.Tests.Infrastructure
             var productId = Guid.NewGuid();
 
             sessionService
-                .Setup(service => service.CreateAsync(It.IsAny<SessionCreateOptions>(), It.IsAny<CancellationToken>()))
+                .Setup(service => service.CreateAsync(
+                    It.IsAny<SessionCreateOptions>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("Sensitive Stripe error details"));
 
             var paymentService = CreatePaymentService(sessionService.Object, logger.Object);
@@ -32,10 +35,12 @@ namespace BlazorShop.Tests.Infrastructure
             var result = await paymentService.Pay(
                 [new ResolvedCartLine(productId, null, 1, 25m, "Camera", "Mirrorless", null, null, null, null)],
                 orderId,
-                "STRIPE-FAIL");
+                "STRIPE-FAIL",
+                "provider-key");
 
             Assert.False(result.Success);
-            Assert.Equal("Unable to initialize the card payment session. Please try again later.", result.ErrorMessage);
+            Assert.Contains("uncertain", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(PaymentInitializationFailureKind.Ambiguous, result.FailureKind);
             Assert.DoesNotContain("Sensitive Stripe error details", result.ErrorMessage, StringComparison.Ordinal);
             Assert.Null(result.RedirectUrl);
         }
@@ -50,8 +55,11 @@ namespace BlazorShop.Tests.Infrastructure
             SessionCreateOptions? capturedOptions = null;
 
             sessionService
-                .Setup(service => service.CreateAsync(It.IsAny<SessionCreateOptions>(), It.IsAny<CancellationToken>()))
-                .Callback<SessionCreateOptions, CancellationToken>((options, _) => capturedOptions = options)
+                .Setup(service => service.CreateAsync(
+                    It.IsAny<SessionCreateOptions>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<SessionCreateOptions, string, CancellationToken>((options, _, _) => capturedOptions = options)
                 .ReturnsAsync(new Session { Url = "https://checkout.stripe.com/session/test" });
 
             var paymentService = CreatePaymentService(sessionService.Object, logger.Object);
@@ -60,7 +68,8 @@ namespace BlazorShop.Tests.Infrastructure
             var result = await paymentService.Pay(
                 [new ResolvedCartLine(productId, variantId, 2, 39.95m, "Camera", "Mirrorless", "CAM-BLK", null, "One Size", "Black")],
                 orderId,
-                "STRIPE-TEST-1");
+                "STRIPE-TEST-1",
+                "provider-key");
 
             Assert.True(result.Success);
             Assert.Equal("https://checkout.stripe.com/session/test", result.RedirectUrl);
@@ -77,6 +86,10 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.Equal(2, lineItem.Quantity);
             Assert.Equal("Camera", lineItem.PriceData.ProductData.Name);
             Assert.Contains("CAM-BLK", lineItem.PriceData.ProductData.Description);
+            sessionService.Verify(service => service.CreateAsync(
+                It.IsAny<SessionCreateOptions>(),
+                "provider-key",
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         private static StripePaymentService CreatePaymentService(

@@ -6,9 +6,15 @@ namespace BlazorShop.Infrastructure.Services
     {
         private readonly SessionService _sessionService = new();
 
-        public Task<Session> CreateAsync(SessionCreateOptions options, CancellationToken cancellationToken = default)
+        public Task<Session> CreateAsync(
+            SessionCreateOptions options,
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
         {
-            return _sessionService.CreateAsync(options, null, cancellationToken);
+            return _sessionService.CreateAsync(
+                options,
+                new Stripe.RequestOptions { IdempotencyKey = idempotencyKey },
+                cancellationToken);
         }
     }
 }

@@ -6,6 +6,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.DTOs.Product;
     using BlazorShop.Application.DTOs.Product.ProductVariant;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Application.Services.Payment;
     using BlazorShop.Domain.Contracts;
@@ -15,6 +16,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Domain.Entities.Payment;
     using BlazorShop.Infrastructure.Repositories;
+    using BlazorShop.Infrastructure.Repositories.Payment;
     using BlazorShop.Infrastructure.Services;
     using BlazorShop.Tests.TestUtilities;
 
@@ -209,8 +211,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             payment.Setup(service => service.Pay(
                     It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
                     It.IsAny<Guid>(),
-                    It.IsAny<string>()))
-                .ReturnsAsync(new PaymentInitializationResult(false, ErrorMessage: "Stripe unavailable"));
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Stripe unavailable",
+                    FailureKind: PaymentInitializationFailureKind.Definitive));
             var users = new Mock<IAppUserManager>();
             users.Setup(manager => manager.GetUserByIdAsync("user-1"))
                 .ReturnsAsync(new AppUser { Id = "user-1", Email = "user@example.com" });
@@ -221,6 +228,10 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 payment.Object,
                 users.Object,
                 inventory,
+                new CheckoutIdempotencyStore(
+                    _database.CreateContextFactory(),
+                    Options.Create(new CheckoutIdempotencyOptions())),
+                new OrderRepository(context),
                 Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings()),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
@@ -231,7 +242,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     PaymentMethodId = PaymentMethodIds.CreditCard,
                     Carts = [new CartLineRequest(productId, null, 1)],
                 },
-                "user-1");
+                "user-1",
+                Guid.NewGuid());
 
             Assert.False(result.Success);
             context.ChangeTracker.Clear();
@@ -258,7 +270,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     PaymentMethodId = PaymentMethodIds.CashOnDelivery,
                     Carts = [new CartLineRequest(productId, null, 1)],
                 },
-                "customer-1");
+                "customer-1",
+                Guid.NewGuid());
 
             Assert.True(result.Success);
             Assert.NotNull(result.Payload);
@@ -302,7 +315,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     PaymentMethodId = PaymentMethodIds.BankTransfer,
                     Carts = [new CartLineRequest(productId, null, 1)],
                 },
-                "customer-1");
+                "customer-1",
+                Guid.NewGuid());
 
             Assert.True(result.Success);
             Assert.NotNull(result.Payload?.BankTransfer);
@@ -324,8 +338,15 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             payment.Setup(service => service.Pay(
                     It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
                     It.IsAny<Guid>(),
-                    It.IsAny<string>()))
-                .Returns(async (IReadOnlyCollection<ResolvedCartLine> lines, Guid orderId, string reference) =>
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(async (
+                    IReadOnlyCollection<ResolvedCartLine> lines,
+                    Guid orderId,
+                    string reference,
+                    string _,
+                    CancellationToken _) =>
                 {
                     await using var providerContext = _database.CreateContext();
                     var persistedOrder = await providerContext.Orders.FindAsync(orderId);
@@ -350,7 +371,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     PaymentMethodId = PaymentMethodIds.CreditCard,
                     Carts = [new CartLineRequest(productId, null, 1)],
                 },
-                "customer-1");
+                "customer-1",
+                Guid.NewGuid());
 
             Assert.True(result.Success);
             Assert.Equal("https://checkout.stripe.test/session", result.Payload!.RedirectUrl);
@@ -742,7 +764,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             return await Task.WhenAll(firstTask, secondTask);
         }
 
-        private static CheckoutOrchestrator CreateCheckoutOrchestrator(
+        private CheckoutOrchestrator CreateCheckoutOrchestrator(
             BlazorShop.Infrastructure.Data.AppDbContext context,
             Guid paymentMethodId,
             IPaymentService? payment = null,
@@ -766,6 +788,10 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 payment ?? Mock.Of<IPaymentService>(),
                 users,
                 new InventoryReservationService(context),
+                new CheckoutIdempotencyStore(
+                    _database.CreateContextFactory(),
+                    Options.Create(new CheckoutIdempotencyOptions())),
+                new OrderRepository(context),
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings
                 {
