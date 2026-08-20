@@ -18,7 +18,7 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
         public decimal UnitPrice { get; set; }
 
-        public decimal LineTotal => UnitPrice * Quantity;
+        public decimal LineTotal { get; set; }
 
         public string? VariantLabel
         {

@@ -233,8 +233,13 @@
                     {
                         ProductId = line.ProductId,
                         ProductVariantId = line.VariantId,
+                        ProductNameSnapshot = line.ProductName,
+                        SkuSnapshot = line.Sku,
+                        SizeValueSnapshot = line.SizeValue,
+                        ColorSnapshot = line.Color,
                         Quantity = line.Quantity,
                         UnitPrice = line.UnitPrice,
+                        LineTotal = line.LineTotal,
                     })
                     .ToList(),
             };

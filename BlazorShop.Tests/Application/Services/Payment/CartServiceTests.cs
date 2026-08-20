@@ -248,6 +248,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 new Product
                 {
                     Id = productId,
+                    Name = "Base Product",
                     Price = 12.5m,
                     Quantity = 10,
                 }
@@ -273,9 +274,15 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal("Pending", createdOrder.Status);
             Assert.StartsWith("COD-", createdOrder.Reference, StringComparison.Ordinal);
             Assert.Equal(25m, createdOrder.TotalAmount);
-            Assert.Single(createdOrder.Lines);
-            Assert.Equal(2, createdOrder.Lines.First().Quantity);
-            Assert.Equal(12.5m, createdOrder.Lines.First().UnitPrice);
+            var orderLine = Assert.Single(createdOrder.Lines);
+            Assert.Null(orderLine.ProductVariantId);
+            Assert.Equal("Base Product", orderLine.ProductNameSnapshot);
+            Assert.Null(orderLine.SkuSnapshot);
+            Assert.Null(orderLine.SizeValueSnapshot);
+            Assert.Null(orderLine.ColorSnapshot);
+            Assert.Equal(2, orderLine.Quantity);
+            Assert.Equal(12.5m, orderLine.UnitPrice);
+            Assert.Equal(25m, orderLine.LineTotal);
             _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Once);
         }
 
@@ -299,6 +306,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 Stock = 4,
                 Sku = "RUN-42",
                 SizeValue = "42",
+                Color = "Black",
             };
             Order? createdOrder = null;
 
@@ -321,7 +329,12 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.NotNull(createdOrder);
             var orderLine = Assert.Single(createdOrder!.Lines);
             Assert.Equal(variantId, orderLine.ProductVariantId);
+            Assert.Equal("Runner", orderLine.ProductNameSnapshot);
+            Assert.Equal("RUN-42", orderLine.SkuSnapshot);
+            Assert.Equal("42", orderLine.SizeValueSnapshot);
+            Assert.Equal("Black", orderLine.ColorSnapshot);
             Assert.Equal(95m, orderLine.UnitPrice);
+            Assert.Equal(190m, orderLine.LineTotal);
             Assert.Equal(190m, createdOrder.TotalAmount);
         }
 
@@ -603,7 +616,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var orderLine = Assert.Single(createdOrder!.Lines);
             var paymentLine = Assert.Single(paymentLines!);
             Assert.Equal(variantId, orderLine.ProductVariantId);
+            Assert.Equal("Runner", orderLine.ProductNameSnapshot);
+            Assert.Equal("SERVER-SKU", orderLine.SkuSnapshot);
             Assert.Equal(95m, orderLine.UnitPrice);
+            Assert.Equal(190m, orderLine.LineTotal);
             Assert.Equal(95m, paymentLine.UnitPrice);
             Assert.Equal("SERVER-SKU", paymentLine.Sku);
             Assert.Equal(190m, createdOrder.TotalAmount);

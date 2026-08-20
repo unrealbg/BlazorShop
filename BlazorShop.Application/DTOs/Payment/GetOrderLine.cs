@@ -18,6 +18,6 @@ namespace BlazorShop.Application.DTOs.Payment
 
         public decimal UnitPrice { get; set; }
 
-        public decimal LineTotal => UnitPrice * Quantity;
+        public decimal LineTotal { get; set; }
     }
 }
