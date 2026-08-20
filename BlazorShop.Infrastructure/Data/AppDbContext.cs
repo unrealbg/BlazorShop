@@ -43,6 +43,8 @@
 
         public DbSet<InventoryReservation> InventoryReservations { get; set; }
 
+        public DbSet<CheckoutIdempotencyRecord> CheckoutIdempotencyRecords { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

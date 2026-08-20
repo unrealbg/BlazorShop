@@ -9,6 +9,12 @@ namespace BlazorShop.Domain.Contracts.Payment
             InventoryReservationStatus reservationStatus,
             CancellationToken cancellationToken = default);
 
+        Task<InventoryReservationResult> CreateOrderWithInventoryAsync(
+            Order order,
+            InventoryReservationStatus reservationStatus,
+            Guid checkoutIdempotencyRecordId,
+            CancellationToken cancellationToken = default);
+
         Task<InventoryTransitionResult> TransitionOrderAsync(
             Guid orderId,
             string orderStatus,

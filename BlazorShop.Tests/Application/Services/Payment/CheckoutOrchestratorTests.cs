@@ -1,6 +1,7 @@
 namespace BlazorShop.Tests.Application.Services.Payment
 {
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Application.Services.Payment;
     using BlazorShop.Domain.Contracts;
@@ -24,6 +25,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IPaymentService> _payment = new();
         private readonly Mock<IAppUserManager> _users = new();
         private readonly Mock<IInventoryReservationService> _inventory = new();
+        private readonly Mock<ICheckoutIdempotencyStore> _idempotency = new();
+        private readonly Mock<IOrderRepository> _orders = new();
         private readonly Mock<IEmailService> _email = new();
         private readonly CheckoutOrchestrator _orchestrator;
 
@@ -36,10 +39,56 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     It.IsAny<InventoryReservationStatus>(),
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new InventoryReservationResult(true));
             _users.Setup(manager => manager.GetUserByIdAsync(It.IsAny<string>()))
                 .ReturnsAsync(new AppUser { Id = "customer-1", Email = "customer@example.com" });
+            _idempotency.Setup(store => store.ClaimAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string userId, Guid key, string fingerprint, Guid paymentMethodId, CancellationToken _) =>
+                {
+                    var ownerId = Guid.NewGuid();
+                    return new CheckoutIdempotencyClaim(
+                        CheckoutIdempotencyClaimStatus.Acquired,
+                        new CheckoutIdempotencyRecord
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = userId,
+                            IdempotencyKey = key,
+                            RequestFingerprint = fingerprint,
+                            PaymentMethodId = paymentMethodId,
+                            OrderId = Guid.NewGuid(),
+                            OrderReference = $"{(paymentMethodId == PaymentMethodIds.CashOnDelivery ? "COD" : paymentMethodId == PaymentMethodIds.BankTransfer ? "BT" : "STRIPE")}-{Guid.NewGuid():N}",
+                            LeaseOwnerId = ownerId,
+                        },
+                        ownerId);
+                });
+            _idempotency.Setup(store => store.SetPendingOutcomeAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<PersistedCheckoutOutcome>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _idempotency.Setup(store => store.PrepareProviderInitializationAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, Guid _, StripeCheckoutInitialization initialization, CancellationToken _) =>
+                    new CheckoutProviderInitialization(DateTime.UtcNow, initialization));
+            _idempotency.Setup(store => store.CompleteAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<PersistedCheckoutOutcome>(),
+                    It.IsAny<CheckoutIdempotencyState>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _idempotency.Setup(store => store.ReleaseLeaseAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _orders.Setup(repository => repository.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync((Order?)null);
 
             _orchestrator = new CheckoutOrchestrator(
                 _products.Object,
@@ -47,6 +96,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _payment.Object,
                 _users.Object,
                 _inventory.Object,
+                _idempotency.Object,
+                _orders.Object,
                 _email.Object,
                 Options.Create(new BankTransferSettings
                 {
@@ -55,6 +106,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     BankName = "Test Bank",
                     AdditionalInfo = "Use the order reference.",
                 }),
+                Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
+                Options.Create(new CheckoutIdempotencyOptions()),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
         }
 
@@ -78,8 +131,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Consumed,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .Callback<Order, InventoryReservationStatus, Guid, CancellationToken>((order, _, _, _) => createdOrder = order)
                 .ReturnsAsync(new InventoryReservationResult(true));
 
             var result = await CheckoutAsync(
@@ -104,6 +158,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Verify(service => service.CreateOrderWithInventoryAsync(
                 createdOrder,
                 InventoryReservationStatus.Consumed,
+                It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()), Times.Once);
             VerifyStripeWasNotCalled();
         }
@@ -132,8 +187,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Consumed,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .Callback<Order, InventoryReservationStatus, Guid, CancellationToken>((order, _, _, _) => createdOrder = order)
                 .ReturnsAsync(new InventoryReservationResult(true));
 
             var result = await CheckoutAsync(
@@ -161,8 +217,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Reserved,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .Callback<Order, InventoryReservationStatus, Guid, CancellationToken>((order, _, _, _) => createdOrder = order)
                 .ReturnsAsync(new InventoryReservationResult(true));
 
             var result = await CheckoutAsync(
@@ -182,6 +239,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Verify(service => service.CreateOrderWithInventoryAsync(
                 createdOrder,
                 InventoryReservationStatus.Reserved,
+                It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()), Times.Once);
         }
 
@@ -212,24 +270,25 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var product = ConfigureProduct(price: 80m, quantity: 2, name: "Camera");
             ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
             Order? createdOrder = null;
-            IReadOnlyCollection<ResolvedCartLine>? providerLines = null;
+            StripeCheckoutInitialization? providerInitialization = null;
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Reserved,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .Callback<Order, InventoryReservationStatus, Guid, CancellationToken>((order, _, _, _) => createdOrder = order)
                 .ReturnsAsync(new InventoryReservationResult(true));
             _payment.Setup(service => service.Pay(
-                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
-                    It.IsAny<Guid>(),
-                    It.IsAny<string>()))
-                .Callback<IReadOnlyCollection<ResolvedCartLine>, Guid, string>((lines, orderId, reference) =>
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<StripeCheckoutInitialization, string, CancellationToken>((initialization, _, _) =>
                 {
                     Assert.NotNull(createdOrder);
-                    Assert.Equal(createdOrder!.Id, orderId);
-                    Assert.Equal(createdOrder.Reference, reference);
+                    Assert.Equal(createdOrder!.Id, initialization.OrderId);
+                    Assert.Equal(createdOrder.Reference, initialization.OrderReference);
                     Assert.Equal(PaymentOrderStatus.PendingPayment, createdOrder.Status);
-                    providerLines = lines;
+                    providerInitialization = initialization;
                 })
                 .ReturnsAsync(new PaymentInitializationResult(true, "https://checkout.stripe.test/session"));
 
@@ -243,9 +302,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(CheckoutPaymentKind.Stripe, result.Payload.PaymentKind);
             Assert.Equal(CheckoutStatus.PendingPayment, result.Payload.Status);
             Assert.Equal("https://checkout.stripe.test/session", result.Payload.RedirectUrl);
-            var providerLine = Assert.Single(providerLines!);
-            Assert.Equal(80m, providerLine.UnitPrice);
-            Assert.Equal(createdOrder.Lines.Single().UnitPrice, providerLine.UnitPrice);
+            var providerLine = Assert.Single(providerInitialization!.Lines);
+            Assert.Equal(8000, providerLine.UnitAmount);
+            Assert.Equal(
+                (long)(createdOrder.Lines.Single().UnitPrice * 100),
+                providerLine.UnitAmount);
         }
 
         [Fact]
@@ -257,14 +318,18 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Reserved,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .Callback<Order, InventoryReservationStatus, Guid, CancellationToken>((order, _, _, _) => createdOrder = order)
                 .ReturnsAsync(new InventoryReservationResult(true));
             _payment.Setup(service => service.Pay(
-                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
-                    It.IsAny<Guid>(),
-                    It.IsAny<string>()))
-                .ReturnsAsync(new PaymentInitializationResult(false, ErrorMessage: "Stripe unavailable"));
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Stripe unavailable",
+                    FailureKind: PaymentInitializationFailureKind.Definitive));
             _inventory.Setup(service => service.TransitionOrderAsync(
                     It.IsAny<Guid>(),
                     PaymentOrderStatus.PaymentFailed,
@@ -287,7 +352,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
         }
 
         [Fact]
-        public async Task StripeProviderException_ReleasesReservationAndReturnsFailure()
+        public async Task StripeAmbiguousFailure_KeepsReservationForSameKeyRecovery()
         {
             var product = ConfigureProduct(price: 15m, quantity: 1);
             ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
@@ -295,14 +360,18 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Reserved,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
-                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .Callback<Order, InventoryReservationStatus, Guid, CancellationToken>((order, _, _, _) => createdOrder = order)
                 .ReturnsAsync(new InventoryReservationResult(true));
             _payment.Setup(service => service.Pay(
-                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
-                    It.IsAny<Guid>(),
-                    It.IsAny<string>()))
-                .ThrowsAsync(new InvalidOperationException("Provider transport failure"));
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Provider response uncertain",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous));
             _inventory.Setup(service => service.TransitionOrderAsync(
                     It.IsAny<Guid>(),
                     PaymentOrderStatus.PaymentFailed,
@@ -315,12 +384,12 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 new CartLineRequest(product.Id, null, 1));
 
             Assert.False(result.Success);
-            Assert.Contains("Unable to initialize", result.Message, StringComparison.Ordinal);
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
             _inventory.Verify(service => service.TransitionOrderAsync(
-                createdOrder!.Id,
-                PaymentOrderStatus.PaymentFailed,
-                InventoryReservationStatus.Released,
-                It.IsAny<CancellationToken>()), Times.Once);
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<InventoryReservationStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]
@@ -330,7 +399,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             var result = await _orchestrator.CheckoutAsync(
                 new Checkout { PaymentMethodId = PaymentMethodIds.CreditCard, Carts = [] },
-                "customer-1");
+                "customer-1",
+                Guid.NewGuid());
 
             Assert.False(result.Success);
             VerifyInventoryWasNotCreated();
@@ -345,6 +415,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Setup(service => service.CreateOrderWithInventoryAsync(
                     It.IsAny<Order>(),
                     InventoryReservationStatus.Reserved,
+                    It.IsAny<Guid>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new InventoryReservationResult(false, "No stock"));
 
@@ -364,7 +435,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             var result = await _orchestrator.CheckoutAsync(
                 new Checkout { PaymentMethodId = PaymentMethodIds.CashOnDelivery, Carts = [] },
-                string.Empty);
+                string.Empty,
+                Guid.NewGuid());
 
             Assert.False(result.Success);
             VerifyInventoryWasNotCreated();
@@ -383,7 +455,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     PaymentMethodId = PaymentMethodIds.CashOnDelivery,
                     Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
                 },
-                "deleted-customer");
+                "deleted-customer",
+                Guid.NewGuid());
 
             Assert.False(result.Success);
             Assert.Contains("customer account", result.Message, StringComparison.OrdinalIgnoreCase);
@@ -467,13 +540,14 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 .ReturnsAsync([new GetPaymentMethod { Id = id, Name = name }]);
         }
 
-        private Task<BlazorShop.Application.DTOs.ServiceResponse<CheckoutResult>> CheckoutAsync(
+        private Task<CheckoutExecutionResult> CheckoutAsync(
             Guid paymentMethodId,
             params CartLineRequest[] lines)
         {
             return _orchestrator.CheckoutAsync(
                 new Checkout { PaymentMethodId = paymentMethodId, Carts = lines },
-                "customer-1");
+                "customer-1",
+                Guid.NewGuid());
         }
 
         private void VerifyInventoryWasNotCreated()
@@ -481,15 +555,16 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _inventory.Verify(service => service.CreateOrderWithInventoryAsync(
                 It.IsAny<Order>(),
                 It.IsAny<InventoryReservationStatus>(),
+                It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()), Times.Never);
         }
 
         private void VerifyStripeWasNotCalled()
         {
             _payment.Verify(service => service.Pay(
-                It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
-                It.IsAny<Guid>(),
-                It.IsAny<string>()), Times.Never);
+                It.IsAny<StripeCheckoutInitialization>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
     }
 }

@@ -30,9 +30,34 @@ namespace BlazorShop.Tests.Presentation.Payments
                 "BlazorShop.Presentation/BlazorShop.Web/Pages/Payments/Cart.razor.cs");
 
             Assert.Contains("result.Success && result.Payload is not null", cart);
-            Assert.Contains("await ClearCartAfterCheckoutAsync();", cart);
+            Assert.Contains("await ClearCartAfterCheckoutAsync(checkout);", cart);
             Assert.Contains("CookieStorageService.RemoveAsync(Constant.Cart.Name)", cart);
+            Assert.Contains("if (!cartCleanupSucceeded)", cart);
+            Assert.Contains("CheckoutAttemptStore.ClearForIntentAsync(checkout)", cart);
             Assert.Contains("Your cart was not cleared", cart);
+            var checkoutCleanup = cart.IndexOf(
+                "private async Task ClearCartAfterCheckoutAsync(Checkout checkout)",
+                StringComparison.Ordinal);
+            var cookieRemoval = cart.IndexOf(
+                "CookieStorageService.RemoveAsync(Constant.Cart.Name)",
+                checkoutCleanup,
+                StringComparison.Ordinal);
+            var attemptFinalization = cart.IndexOf(
+                "CheckoutAttemptStore.ClearForIntentAsync(checkout)",
+                checkoutCleanup,
+                StringComparison.Ordinal);
+            Assert.True(checkoutCleanup >= 0);
+            Assert.True(cookieRemoval > checkoutCleanup);
+            Assert.True(attemptFinalization > cookieRemoval);
+        }
+
+        [Fact]
+        public void Cart_GuardsQueuedPaymentClicksBeforeStartingAnotherCheckout()
+        {
+            var cart = ReadRepositoryFile(
+                "BlazorShop.Presentation/BlazorShop.Web/Pages/Payments/Cart.razor.cs");
+
+            Assert.Contains("paymentMethod is null || _processingMethodId.HasValue", cart);
         }
 
         [Fact]

@@ -81,6 +81,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await using var context = CreateContext();
             await context.Database.ExecuteSqlRawAsync("""
                 TRUNCATE TABLE
+                    "CheckoutIdempotencyRecords",
                     "InventoryReservations",
                     "OrderLines",
                     "Orders",

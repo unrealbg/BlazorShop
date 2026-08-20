@@ -9,6 +9,7 @@
     using BlazorShop.Web.Shared.Models.Notifications;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
+    using BlazorShop.Web.Shared.Services.Contracts;
     using Microsoft.AspNetCore.Components;
 
     public partial class Cart
@@ -29,6 +30,9 @@
         private bool _showBtDialog;
         private BankTransferInfo _btInfo = new();
         private CheckoutResult? _completedCheckout;
+
+        [Inject]
+        private ICheckoutAttemptStore CheckoutAttemptStore { get; set; } = default!;
 
         protected override async Task OnInitializedAsync()
         {
@@ -224,7 +228,7 @@
 
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
         {
-            if (paymentMethod is null)
+            if (paymentMethod is null || _processingMethodId.HasValue)
             {
                 return;
             }
@@ -255,7 +259,7 @@
 
                 if (result.Success && result.Payload is not null)
                 {
-                    await HandleSuccessfulCheckoutAsync(result.Payload);
+                    await HandleSuccessfulCheckoutAsync(result.Payload, checkout);
                 }
                 else
                 {
@@ -276,17 +280,17 @@
             }
         }
 
-        private async Task HandleSuccessfulCheckoutAsync(CheckoutResult result)
+        private async Task HandleSuccessfulCheckoutAsync(CheckoutResult result, Checkout checkout)
         {
             switch (result.PaymentKind)
             {
                 case CheckoutPaymentKind.CashOnDelivery when result.Status == CheckoutStatus.Confirmed:
-                    await ClearCartAfterCheckoutAsync();
+                    await ClearCartAfterCheckoutAsync(checkout);
                     this.NavigationManager.NavigateTo(BuildSuccessPath(result, "cod"), true);
                     return;
                 case CheckoutPaymentKind.BankTransfer
                     when result.Status == CheckoutStatus.PendingPayment && result.BankTransfer is not null:
-                    await ClearCartAfterCheckoutAsync();
+                    await ClearCartAfterCheckoutAsync(checkout);
                     _completedCheckout = result;
                     _btInfo = result.BankTransfer;
                     _showPaymentDialog = false;
@@ -296,7 +300,7 @@
                 case CheckoutPaymentKind.Stripe
                     when result.Status == CheckoutStatus.PendingPayment
                         && Uri.TryCreate(result.RedirectUrl, UriKind.Absolute, out var redirectUri):
-                    await ClearCartAfterCheckoutAsync();
+                    await ClearCartAfterCheckoutAsync(checkout);
                     this.NavigationManager.NavigateTo(redirectUri.ToString(), true);
                     return;
                 default:
@@ -308,11 +312,13 @@
             }
         }
 
-        private async Task ClearCartAfterCheckoutAsync()
+        private async Task ClearCartAfterCheckoutAsync(Checkout checkout)
         {
+            var cartCleanupSucceeded = false;
             try
             {
                 await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
+                cartCleanupSucceeded = true;
             }
             catch
             {
@@ -326,6 +332,24 @@
             _myCarts = [];
             this.BuildCartLines();
             _showPaymentDialog = false;
+
+            if (!cartCleanupSucceeded)
+            {
+                return;
+            }
+
+            try
+            {
+                await this.CheckoutAttemptStore.ClearForIntentAsync(checkout);
+            }
+            catch
+            {
+                this.NotificationService.NotifyWarning(
+                    "Your order was created and the cart was cleared, but this browser's checkout state could not be finalized.",
+                    "Checkout cleanup",
+                    NotificationKind.Order,
+                    addToInbox: false);
+            }
         }
 
         private static string BuildSuccessPath(CheckoutResult result, string paymentMethod)

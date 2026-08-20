@@ -2,6 +2,7 @@
 {
     using System.Security.Claims;
 
+    using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts.Payment;
@@ -37,7 +38,10 @@
         /// <returns>The products in the cart </returns>
         [HttpPost("checkout")]
         [Authorize(Roles = "User")]
-        public async Task<IActionResult> Checkout(Checkout checkout, CancellationToken cancellationToken)
+        public async Task<IActionResult> Checkout(
+            Checkout checkout,
+            [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+            CancellationToken cancellationToken)
         {
             var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -46,11 +50,36 @@
                 return this.Unauthorized("User ID is invalid or not found.");
             }
 
+            if (string.IsNullOrWhiteSpace(idempotencyKey)
+                || !Guid.TryParse(idempotencyKey, out var normalizedKey)
+                || normalizedKey == Guid.Empty)
+            {
+                return this.BadRequest(new ServiceResponse<CheckoutResult>(
+                    false,
+                    "A non-empty GUID Idempotency-Key header is required.")
+                {
+                    ResponseType = ServiceResponseType.ValidationError,
+                });
+            }
+
             var result = await _checkoutOrchestrator.CheckoutAsync(
                 checkout,
                 userId,
+                normalizedKey,
                 cancellationToken);
-            return result.Success ? this.Ok(result) : this.BadRequest(result);
+            if (result.IsReplay)
+            {
+                this.Response.Headers["Idempotency-Replayed"] = "true";
+            }
+
+            return result.Status switch
+            {
+                CheckoutExecutionStatus.Succeeded => this.Ok(result.Response),
+                CheckoutExecutionStatus.BadRequest => this.BadRequest(result.Response),
+                CheckoutExecutionStatus.Conflict or CheckoutExecutionStatus.InProgress =>
+                    this.Conflict(result.Response),
+                _ => this.StatusCode(StatusCodes.Status500InternalServerError),
+            };
         }
 
         /// <summary>

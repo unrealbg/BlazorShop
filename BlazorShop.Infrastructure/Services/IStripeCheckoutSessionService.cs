@@ -4,6 +4,9 @@ namespace BlazorShop.Infrastructure.Services
 
     public interface IStripeCheckoutSessionService
     {
-        Task<Session> CreateAsync(SessionCreateOptions options, CancellationToken cancellationToken = default);
+        Task<Session> CreateAsync(
+            SessionCreateOptions options,
+            string idempotencyKey,
+            CancellationToken cancellationToken = default);
     }
 }

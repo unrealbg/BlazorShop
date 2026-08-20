@@ -23,10 +23,24 @@ namespace BlazorShop.Infrastructure.Services
         {
         }
 
-        public async Task<InventoryReservationResult> CreateOrderWithInventoryAsync(
+        public Task<InventoryReservationResult> CreateOrderWithInventoryAsync(
             Order order,
             InventoryReservationStatus reservationStatus,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            CreateOrderWithInventoryAsync(order, reservationStatus, null, cancellationToken);
+
+        public Task<InventoryReservationResult> CreateOrderWithInventoryAsync(
+            Order order,
+            InventoryReservationStatus reservationStatus,
+            Guid checkoutIdempotencyRecordId,
+            CancellationToken cancellationToken = default) =>
+            CreateOrderWithInventoryAsync(order, reservationStatus, (Guid?)checkoutIdempotencyRecordId, cancellationToken);
+
+        private async Task<InventoryReservationResult> CreateOrderWithInventoryAsync(
+            Order order,
+            InventoryReservationStatus reservationStatus,
+            Guid? checkoutIdempotencyRecordId,
+            CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(order);
 
@@ -75,6 +89,51 @@ namespace BlazorShop.Infrastructure.Services
                 await using var transaction = await db.Database.BeginTransactionAsync(
                     IsolationLevel.ReadCommitted,
                     cancellationToken);
+
+                if (checkoutIdempotencyRecordId.HasValue)
+                {
+                    var idempotencyRecord = (await db.CheckoutIdempotencyRecords
+                        .FromSqlInterpolated(
+                            $"SELECT * FROM \"CheckoutIdempotencyRecords\" WHERE \"Id\" = {checkoutIdempotencyRecordId.Value} FOR UPDATE")
+                        .ToListAsync(cancellationToken))
+                        .SingleOrDefault();
+                    if (idempotencyRecord is null
+                        || idempotencyRecord.OrderId != order.Id
+                        || !string.Equals(idempotencyRecord.UserId, order.UserId, StringComparison.Ordinal)
+                        || !string.Equals(idempotencyRecord.OrderReference, order.Reference, StringComparison.Ordinal))
+                    {
+                        return await RollBackAsync(
+                            db,
+                            transaction,
+                            new InventoryReservationResult(
+                                false,
+                                "The checkout idempotency claim does not match the requested order."),
+                            cancellationToken);
+                    }
+                }
+
+                var existingOrder = (await db.Orders
+                    .FromSqlInterpolated($"SELECT * FROM \"Orders\" WHERE \"Id\" = {order.Id} FOR UPDATE")
+                    .ToListAsync(cancellationToken))
+                    .SingleOrDefault();
+                if (existingOrder is not null)
+                {
+                    var verification = await VerifyCreatedOrderAsync(
+                        db,
+                        order,
+                        targets,
+                        reservationStatus,
+                        cancellationToken);
+                    return await RollBackAsync(
+                        db,
+                        transaction,
+                        verification == CommitVerification.Succeeded
+                            ? new InventoryReservationResult(true)
+                            : new InventoryReservationResult(
+                                false,
+                                "The order exists, but its inventory reservation could not be verified."),
+                        cancellationToken);
+                }
 
                 var products = new Dictionary<Guid, Product>();
                 foreach (var productId in targets.Select(target => target.ProductId).Distinct().Order())
@@ -457,6 +516,8 @@ namespace BlazorShop.Infrastructure.Services
                 .Where(item => item.OrderId == requestedOrder.Id)
                 .ToListAsync(cancellationToken);
             if (!string.Equals(persistedOrder.Status, requestedOrder.Status, StringComparison.Ordinal)
+                || !string.Equals(persistedOrder.UserId, requestedOrder.UserId, StringComparison.Ordinal)
+                || !string.Equals(persistedOrder.Reference, requestedOrder.Reference, StringComparison.Ordinal)
                 || reservations.Count != targets.Count)
             {
                 return CommitVerification.Conflict;
