@@ -10,9 +10,17 @@ namespace BlazorShop.Infrastructure.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<Product> builder)
         {
+            builder.ToTable(table =>
+                table.HasCheckConstraint(
+                    "CK_Products_Quantity_NonNegative",
+                    "\"Quantity\" >= 0"));
+
             builder.HasIndex(product => new { product.CategoryId, product.CreatedOn });
             builder.HasIndex(product => product.Slug)
                 .IsUnique();
+
+            builder.Property(product => product.Quantity)
+                .IsConcurrencyToken();
 
             builder.Property(product => product.Slug)
                 .HasMaxLength(SeoConstraints.SlugMaxLength);

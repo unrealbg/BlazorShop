@@ -10,11 +10,16 @@ namespace BlazorShop.Application.Services
     public class ProductVariantService : IProductVariantService
     {
         private readonly IGenericRepository<ProductVariant> _variantRepository;
+        private readonly IProductInventoryTopologyRepository _inventoryTopologyRepository;
         private readonly IMapper _mapper;
 
-        public ProductVariantService(IGenericRepository<ProductVariant> variantRepository, IMapper mapper)
+        public ProductVariantService(
+            IGenericRepository<ProductVariant> variantRepository,
+            IProductInventoryTopologyRepository inventoryTopologyRepository,
+            IMapper mapper)
         {
             _variantRepository = variantRepository;
+            _inventoryTopologyRepository = inventoryTopologyRepository;
             _mapper = mapper;
         }
 
@@ -28,21 +33,36 @@ namespace BlazorShop.Application.Services
         public async Task<ServiceResponse> AddAsync(CreateProductVariant variant)
         {
             var mapped = _mapper.Map<ProductVariant>(variant);
-            var result = await _variantRepository.AddAsync(mapped);
-            return result > 0 ? new ServiceResponse(true, "Variant added successfully") : new ServiceResponse(false, "Variant not added");
+            mapped.Id = mapped.Id == Guid.Empty ? Guid.NewGuid() : mapped.Id;
+            mapped.Stock = 0;
+            var result = await _inventoryTopologyRepository.AddVariantAsync(mapped);
+            return new ServiceResponse(result.Success, result.Message);
         }
 
         public async Task<ServiceResponse> UpdateAsync(UpdateProductVariant variant)
         {
-            var mapped = _mapper.Map<ProductVariant>(variant);
-            var result = await _variantRepository.UpdateAsync(mapped);
+            var existingVariant = await _variantRepository.GetByIdAsync(variant.Id);
+            if (existingVariant is null)
+            {
+                return new ServiceResponse(false, "Variant not found");
+            }
+
+            if (variant.ProductId != existingVariant.ProductId)
+            {
+                return new ServiceResponse(false, "A product variant cannot be moved to another product");
+            }
+
+            var currentStock = existingVariant.Stock;
+            _mapper.Map(variant, existingVariant);
+            existingVariant.Stock = currentStock;
+            var result = await _variantRepository.UpdateAsync(existingVariant);
             return result > 0 ? new ServiceResponse(true, "Variant updated successfully") : new ServiceResponse(false, "Variant not found");
         }
 
         public async Task<ServiceResponse> DeleteAsync(Guid variantId)
         {
-            var result = await _variantRepository.DeleteAsync(variantId);
-            return result > 0 ? new ServiceResponse(true, "Variant deleted successfully") : new ServiceResponse(false, "Variant not found");
+            var result = await _inventoryTopologyRepository.DeleteVariantAsync(variantId);
+            return new ServiceResponse(result.Success, result.Message);
         }
     }
 }

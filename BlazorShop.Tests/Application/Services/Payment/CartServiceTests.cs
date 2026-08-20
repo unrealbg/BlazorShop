@@ -33,7 +33,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IPaymentService> _paymentServiceMock;
         private readonly Mock<IPayPalPaymentService> _paypalServiceMock;
         private readonly Mock<IAppUserManager> _userManagerMock;
-        private readonly Mock<IOrderRepository> _orderRepositoryMock;
+        private readonly Mock<IInventoryReservationService> _inventoryReservationServiceMock;
         private readonly Mock<IEmailService> _emailServiceMock;
         private readonly Mock<IOptions<BankTransferSettings>> _btOptionsMock;
         private readonly CartService _cartService;
@@ -47,7 +47,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _paymentServiceMock = new Mock<IPaymentService>();
             _paypalServiceMock = new Mock<IPayPalPaymentService>();
             _userManagerMock = new Mock<IAppUserManager>();
-            _orderRepositoryMock = new Mock<IOrderRepository>();
+            _inventoryReservationServiceMock = new Mock<IInventoryReservationService>();
             _emailServiceMock = new Mock<IEmailService>();
             _btOptionsMock = new Mock<IOptions<BankTransferSettings>>();
             _btOptionsMock.Setup(o => o.Value).Returns(new BankTransferSettings());
@@ -57,6 +57,12 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _productReadRepositoryMock
                 .Setup(repository => repository.GetProductIdsWithVariantsAsync(It.IsAny<IEnumerable<Guid>>()))
                 .ReturnsAsync(new HashSet<Guid>());
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    It.IsAny<InventoryReservationStatus>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryReservationResult(true));
 
             _cartService = new CartService(
                 _cartMock.Object,
@@ -66,7 +72,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _paymentServiceMock.Object,
                 _paypalServiceMock.Object,
                 _userManagerMock.Object,
-                _orderRepositoryMock.Object,
+                _inventoryReservationServiceMock.Object,
                 _emailServiceMock.Object,
                 _btOptionsMock.Object);
         }
@@ -184,14 +190,17 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 .Setup(s => s.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), orderId))
                 .Callback<IReadOnlyCollection<ResolvedCartLine>, Guid>((lines, _) => paymentLines = lines)
                 .ReturnsAsync(new ServiceResponse(true, "Payment successful"));
-            _orderRepositoryMock
-                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
-                .Callback<Order>(order =>
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Reserved,
+                    It.IsAny<CancellationToken>()))
+                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) =>
                 {
                     order.Id = orderId;
                     createdOrder = order;
                 })
-                .ReturnsAsync(orderId);
+                .ReturnsAsync(new InventoryReservationResult(true));
 
             // Act
             var result = await _cartService.CheckoutAsync(checkout);
@@ -259,10 +268,13 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
                 .ReturnsAsync(products.ToDictionary(product => product.Id));
 
-            _orderRepositoryMock
-                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
-                .Callback<Order>(order => createdOrder = order)
-                .ReturnsAsync(Guid.NewGuid());
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Consumed,
+                    It.IsAny<CancellationToken>()))
+                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .ReturnsAsync(new InventoryReservationResult(true));
 
             // Act
             var result = await _cartService.ConfirmOrderAsync(carts, "user-1");
@@ -284,7 +296,12 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(2, orderLine.Quantity);
             Assert.Equal(12.5m, orderLine.UnitPrice);
             Assert.Equal(25m, orderLine.LineTotal);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Once);
+            _inventoryReservationServiceMock.Verify(
+                service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Consumed,
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
         }
 
         [Fact]
@@ -318,10 +335,13 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _productReadRepositoryMock
                 .Setup(repository => repository.GetProductVariantsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
                 .ReturnsAsync(new Dictionary<Guid, ProductVariant> { [variantId] = variant });
-            _orderRepositoryMock
-                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
-                .Callback<Order>(order => createdOrder = order)
-                .ReturnsAsync(Guid.NewGuid());
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Consumed,
+                    It.IsAny<CancellationToken>()))
+                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => createdOrder = order)
+                .ReturnsAsync(new InventoryReservationResult(true));
 
             var result = await _cartService.ConfirmOrderAsync(
                 [new CartLineRequest(productId, variantId, 2)],
@@ -359,7 +379,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("variant no longer exists", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -375,7 +395,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("product in the cart no longer exists", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -403,7 +423,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("does not belong", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -430,7 +450,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("not currently purchasable", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -463,7 +483,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("variant is not currently purchasable", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -498,7 +518,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("variant must be selected", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
             _paymentServiceMock.Verify(
                 service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), It.IsAny<Guid>()),
                 Times.Never);
@@ -534,7 +554,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("exceeds the selected product variant", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -554,7 +574,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             Assert.False(result.Success);
             Assert.Contains("exceeds the product's current availability", result.Message, StringComparison.OrdinalIgnoreCase);
-            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+            VerifyInventoryWasNotReserved();
         }
 
         [Fact]
@@ -601,14 +621,17 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _paymentMethodServiceMock
                 .Setup(service => service.GetPaymentMethodsAsync())
                 .ReturnsAsync([new GetPaymentMethod { Id = paymentMethodId, Name = "Credit Card" }]);
-            _orderRepositoryMock
-                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
-                .Callback<Order>(order =>
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Reserved,
+                    It.IsAny<CancellationToken>()))
+                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) =>
                 {
                     order.Id = orderId;
                     createdOrder = order;
                 })
-                .ReturnsAsync(orderId);
+                .ReturnsAsync(new InventoryReservationResult(true));
             _paymentServiceMock
                 .Setup(service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), orderId))
                 .Callback<IReadOnlyCollection<ResolvedCartLine>, Guid>((lines, _) => paymentLines = lines)
@@ -773,6 +796,103 @@ namespace BlazorShop.Tests.Application.Services.Payment
 
             // Assert
             Assert.Empty(orderItems);
+        }
+
+        [Fact]
+        public async Task CheckoutAsync_DoesNotCallStripeWhenInventoryReservationFails()
+        {
+            var paymentMethodId = Guid.NewGuid();
+            var productId = Guid.NewGuid();
+            _paymentMethodServiceMock
+                .Setup(service => service.GetPaymentMethodsAsync())
+                .ReturnsAsync([new GetPaymentMethod { Id = paymentMethodId, Name = "Credit Card" }]);
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>
+                {
+                    [productId] = new Product { Id = productId, Name = "Camera", Price = 50m, Quantity = 1 },
+                });
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Reserved,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryReservationResult(false, "Inventory is no longer available."));
+
+            var result = await _cartService.CheckoutAsync(
+                new Checkout
+                {
+                    PaymentMethodId = paymentMethodId,
+                    Carts = [new CartLineRequest(productId, null, 1)],
+                },
+                "user-1");
+
+            Assert.False(result.Success);
+            Assert.Contains("no longer available", result.Message, StringComparison.OrdinalIgnoreCase);
+            _paymentServiceMock.Verify(
+                service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), It.IsAny<Guid>()),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task CheckoutAsync_ReleasesReservationWhenStripeInitializationFails()
+        {
+            var paymentMethodId = Guid.NewGuid();
+            var productId = Guid.NewGuid();
+            var orderId = Guid.NewGuid();
+            _paymentMethodServiceMock
+                .Setup(service => service.GetPaymentMethodsAsync())
+                .ReturnsAsync([new GetPaymentMethod { Id = paymentMethodId, Name = "Credit Card" }]);
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>
+                {
+                    [productId] = new Product { Id = productId, Name = "Camera", Price = 50m, Quantity = 1 },
+                });
+            _inventoryReservationServiceMock
+                .Setup(service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    InventoryReservationStatus.Reserved,
+                    It.IsAny<CancellationToken>()))
+                .Callback<Order, InventoryReservationStatus, CancellationToken>((order, _, _) => order.Id = orderId)
+                .ReturnsAsync(new InventoryReservationResult(true));
+            _paymentServiceMock
+                .Setup(service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), orderId))
+                .ReturnsAsync(new ServiceResponse(false, "Stripe unavailable"));
+            _inventoryReservationServiceMock
+                .Setup(service => service.TransitionOrderAsync(
+                    orderId,
+                    PaymentOrderStatus.PaymentFailed,
+                    InventoryReservationStatus.Released,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.Applied));
+
+            var result = await _cartService.CheckoutAsync(
+                new Checkout
+                {
+                    PaymentMethodId = paymentMethodId,
+                    Carts = [new CartLineRequest(productId, null, 1)],
+                },
+                "user-1");
+
+            Assert.False(result.Success);
+            _inventoryReservationServiceMock.Verify(
+                service => service.TransitionOrderAsync(
+                    orderId,
+                    PaymentOrderStatus.PaymentFailed,
+                    InventoryReservationStatus.Released,
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        private void VerifyInventoryWasNotReserved()
+        {
+            _inventoryReservationServiceMock.Verify(
+                service => service.CreateOrderWithInventoryAsync(
+                    It.IsAny<Order>(),
+                    It.IsAny<InventoryReservationStatus>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Never);
         }
     }
 }

@@ -32,8 +32,10 @@
                 .ForMember(dest => dest.RobotsIndex, opt => opt.MapFrom(src => src.IsPublished ? src.RobotsIndex : true))
                 .ForMember(dest => dest.RobotsFollow, opt => opt.MapFrom(src => src.IsPublished ? src.RobotsFollow : true));
 
-            this.CreateMap<CreateProduct, Product>();
-            this.CreateMap<UpdateProduct, Product>();
+            this.CreateMap<CreateProduct, Product>()
+                .ForMember(dest => dest.Quantity, opt => opt.Ignore());
+            this.CreateMap<UpdateProduct, Product>()
+                .ForMember(dest => dest.Quantity, opt => opt.Ignore());
             this.CreateMap<Product, GetProduct>()
                 .ForMember(dest => dest.Slug, opt => opt.MapFrom(src => src.IsPublished ? src.Slug : null))
                 .ForMember(dest => dest.MetaTitle, opt => opt.MapFrom(src => src.IsPublished ? src.MetaTitle : null))
@@ -68,8 +70,11 @@
             this.CreateMap<Product, GetProductRecommendation>()
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null));
 
-            this.CreateMap<CreateProductVariant, ProductVariant>();
-            this.CreateMap<UpdateProductVariant, ProductVariant>();
+            this.CreateMap<CreateProductVariant, ProductVariant>()
+                .ForMember(dest => dest.Stock, opt => opt.Ignore());
+            this.CreateMap<UpdateProductVariant, ProductVariant>()
+                .ForMember(dest => dest.Stock, opt => opt.Ignore())
+                .ForMember(dest => dest.ProductId, opt => opt.Ignore());
             this.CreateMap<ProductVariant, GetProductVariant>();
 
             this.CreateMap<CreateUser, AppUser>();

@@ -3,6 +3,8 @@ namespace BlazorShop.Tests.Infrastructure
     using BlazorShop.Infrastructure;
     using System.Reflection;
 
+    using BlazorShop.Domain.Contracts;
+    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.EntityFrameworkCore;
@@ -47,6 +49,18 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.False(
                 hasPendingModelChanges,
                 $"AddInfrastructure reported pending model changes. Operations: {string.Join(" | ", operationDetails)}");
+        }
+
+        [Fact]
+        public void AddInfrastructure_ResolvesInventoryServices()
+        {
+            using var provider = new ServiceCollection()
+                .AddInfrastructure(CreateConfiguration())
+                .BuildServiceProvider();
+            using var scope = provider.CreateScope();
+
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IInventoryReservationService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IProductInventoryTopologyRepository>());
         }
 
         [Fact]

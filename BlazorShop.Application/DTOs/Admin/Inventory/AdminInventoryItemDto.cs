@@ -10,6 +10,8 @@ namespace BlazorShop.Application.DTOs.Admin.Inventory
 
         public int Quantity { get; set; }
 
+        public bool ProductStockIsAuthoritative { get; set; }
+
         public int VariantStock { get; set; }
 
         public bool IsLowStock { get; set; }

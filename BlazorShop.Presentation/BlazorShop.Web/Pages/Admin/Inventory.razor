@@ -49,9 +49,9 @@
                         </div>
                         <div class="bs-action-row text-sm lg:justify-end">
                             @StockBadge(item.IsOutOfStock, item.IsLowStock)
-                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">Product: @item.Quantity</span>
+                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">@(item.ProductStockIsAuthoritative ? $"Product: {item.Quantity}" : "Product stock: ignored")</span>
                             <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-700">Variants: @item.VariantStock</span>
-                            <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="() => OpenProductStock(item)" disabled="@_isSaving">Edit product stock</button>
+                            <button class="bs-button bs-button-secondary disabled:opacity-60" @onclick="() => OpenProductStock(item)" disabled="@(_isSaving || !item.ProductStockIsAuthoritative)">Edit product stock</button>
                         </div>
                     </div>
 
@@ -139,10 +139,12 @@
     private Guid _editingProductId;
     private string _editingProductName = string.Empty;
     private int _productQuantity;
+    private int _expectedProductQuantity;
     private bool _showVariantStock;
     private Guid _editingVariantId;
     private string _editingVariantLabel = string.Empty;
     private int _variantStock;
+    private int _expectedVariantStock;
 
     protected override async Task OnInitializedAsync()
     {
@@ -202,6 +204,7 @@
         _editingProductId = item.ProductId;
         _editingProductName = item.ProductName;
         _productQuantity = item.Quantity;
+        _expectedProductQuantity = item.Quantity;
         _showProductStock = true;
     }
 
@@ -210,6 +213,7 @@
         _editingVariantId = variant.VariantId;
         _editingVariantLabel = string.IsNullOrWhiteSpace(variant.Sku) ? $"{variant.SizeScale} {variant.SizeValue}" : variant.Sku;
         _variantStock = variant.Stock;
+        _expectedVariantStock = variant.Stock;
         _showVariantStock = true;
     }
 
@@ -223,7 +227,11 @@
         _isSaving = true;
         try
         {
-            var result = await AdminInventoryService.UpdateProductStockAsync(_editingProductId, new UpdateProductStock { Quantity = _productQuantity });
+            var result = await AdminInventoryService.UpdateProductStockAsync(_editingProductId, new UpdateProductStock
+            {
+                Quantity = _productQuantity,
+                ExpectedQuantity = _expectedProductQuantity,
+            });
             ShowToast(result, "Product stock saved.");
             if (result.Success)
             {
@@ -247,7 +255,11 @@
         _isSaving = true;
         try
         {
-            var result = await AdminInventoryService.UpdateVariantStockAsync(_editingVariantId, new UpdateVariantStock { Stock = _variantStock });
+            var result = await AdminInventoryService.UpdateVariantStockAsync(_editingVariantId, new UpdateVariantStock
+            {
+                Stock = _variantStock,
+                ExpectedStock = _expectedVariantStock,
+            });
             ShowToast(result, "Variant stock saved.");
             if (result.Success)
             {

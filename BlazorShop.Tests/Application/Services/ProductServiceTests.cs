@@ -15,6 +15,7 @@
     {
         private readonly Mock<IProductReadRepository> _mockProductReadRepository;
         private readonly Mock<IGenericRepository<Product>> _mockProductRepository;
+        private readonly Mock<IProductInventoryTopologyRepository> _mockInventoryTopologyRepository;
         private readonly Mock<IMapper> _mockMapper;
         private readonly ProductService _productService;
 
@@ -23,12 +24,14 @@
             // Moq init
             this._mockProductReadRepository = new Mock<IProductReadRepository>();
             this._mockProductRepository = new Mock<IGenericRepository<Product>>();
+            this._mockInventoryTopologyRepository = new Mock<IProductInventoryTopologyRepository>();
             this._mockMapper = new Mock<IMapper>();
 
             // Create service
             this._productService = new ProductService(
                 this._mockProductReadRepository.Object,
                 this._mockProductRepository.Object,
+                this._mockInventoryTopologyRepository.Object,
                 this._mockMapper.Object);
         }
 
@@ -189,8 +192,8 @@
         public async Task AddAsync_WhenProductIsAdded_ShouldReturnSuccessResponse()
         {
             // Arrange
-            var product = new CreateProduct { Name = "Product1" };
-            var mappedProduct = new Product { Name = "Product1" };
+            var product = new CreateProduct { Name = "Product1", Quantity = 8 };
+            var mappedProduct = new Product { Name = "Product1", Quantity = 8 };
             this._mockMapper.Setup(mapper => mapper.Map<Product>(product))
                        .Returns(mappedProduct);
             this._mockProductRepository.Setup(repo => repo.AddAsync(mappedProduct))
@@ -203,6 +206,7 @@
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("Product added successfully", result.Message);
+            Assert.Equal(0, mappedProduct.Quantity);
             this._mockMapper.Verify(mapper => mapper.Map<Product>(product), Times.Once);
             this._mockProductRepository.Verify(repo => repo.AddAsync(mappedProduct), Times.Once);
         }
@@ -233,11 +237,12 @@
         public async Task UpdateAsync_WhenProductIsUpdated_ShouldReturnSuccessResponse()
         {
             // Arrange
-            var product = new UpdateProduct { Id = Guid.NewGuid(), Name = "Product1" };
+            var product = new UpdateProduct { Id = Guid.NewGuid(), Name = "Product1", Quantity = 99 };
             var existingProduct = new Product
             {
                 Id = product.Id,
                 Name = "Existing Product",
+                Quantity = 4,
                 Slug = "existing-product",
                 RobotsIndex = true,
                 RobotsFollow = true,
@@ -246,7 +251,11 @@
             this._mockProductRepository.Setup(repo => repo.GetByIdAsync(product.Id))
                 .ReturnsAsync(existingProduct);
             this._mockMapper.Setup(mapper => mapper.Map(product, existingProduct))
-                .Callback<UpdateProduct, Product>((source, destination) => destination.Name = source.Name)
+                .Callback<UpdateProduct, Product>((source, destination) =>
+                {
+                    destination.Name = source.Name;
+                    destination.Quantity = source.Quantity;
+                })
                 .Returns(existingProduct);
             this._mockProductRepository.Setup(repo => repo.UpdateAsync(existingProduct))
                                   .ReturnsAsync(1);
@@ -259,6 +268,7 @@
             Assert.True(result.Success);
             Assert.Equal("Product updated successfully", result.Message);
             Assert.Equal("Product1", existingProduct.Name);
+            Assert.Equal(4, existingProduct.Quantity);
             Assert.Equal("existing-product", existingProduct.Slug);
             Assert.True(existingProduct.RobotsIndex);
             Assert.True(existingProduct.RobotsFollow);
@@ -318,8 +328,8 @@
         {
             // Arrange
             var productId = Guid.NewGuid();
-            this._mockProductRepository.Setup(repo => repo.DeleteAsync(productId))
-                                  .ReturnsAsync(1);
+            this._mockInventoryTopologyRepository.Setup(repo => repo.DeleteProductAsync(productId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ProductInventoryTopologyResult(true, "Product deleted successfully", "Product"));
 
             // Act
             var result = await this._productService.DeleteAsync(productId);
@@ -328,7 +338,7 @@
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("Product deleted successfully", result.Message);
-            this._mockProductRepository.Verify(repo => repo.DeleteAsync(productId), Times.Once);
+            this._mockInventoryTopologyRepository.Verify(repo => repo.DeleteProductAsync(productId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -336,8 +346,8 @@
         {
             // Arrange
             var productId = Guid.NewGuid();
-            this._mockProductRepository.Setup(repo => repo.DeleteAsync(productId))
-                                  .ReturnsAsync(0);
+            this._mockInventoryTopologyRepository.Setup(repo => repo.DeleteProductAsync(productId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ProductInventoryTopologyResult(false, "Product not found"));
 
             // Act
             var result = await this._productService.DeleteAsync(productId);
@@ -346,7 +356,7 @@
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Product not found", result.Message);
-            this._mockProductRepository.Verify(repo => repo.DeleteAsync(productId), Times.Once);
+            this._mockInventoryTopologyRepository.Verify(repo => repo.DeleteProductAsync(productId, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -354,8 +364,8 @@
         {
             // Arrange
             var productId = Guid.NewGuid();
-            this._mockProductRepository.Setup(repo => repo.DeleteAsync(productId))
-                                  .ReturnsAsync(-1);
+            this._mockInventoryTopologyRepository.Setup(repo => repo.DeleteProductAsync(productId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ProductInventoryTopologyResult(false, "Product not found"));
 
             // Act
             var result = await this._productService.DeleteAsync(productId);
@@ -364,7 +374,7 @@
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Product not found", result.Message);
-            this._mockProductRepository.Verify(repo => repo.DeleteAsync(productId), Times.Once);
+            this._mockInventoryTopologyRepository.Verify(repo => repo.DeleteProductAsync(productId, It.IsAny<CancellationToken>()), Times.Once);
         }
     }
 }

@@ -83,8 +83,11 @@
                         });
                 });
 
+            services.AddScoped<IDbContextFactory<AppDbContext>, ScopedAppDbContextFactory>();
+
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             services.AddScoped<IProductReadRepository, ProductReadRepository>();
+            services.AddScoped<IProductInventoryTopologyRepository, ProductInventoryTopologyRepository>();
             services.AddScoped(typeof(IAppLogger<>), typeof(LoggerAdapter<>));
 
             services.AddDefaultIdentity<AppUser>(
@@ -137,6 +140,9 @@
             services.AddScoped<IStripeWebhookService, StripeWebhookService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IInventoryReservationService>(serviceProvider =>
+                new InventoryReservationService(
+                    serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>()));
             services.AddScoped<IOrderTrackingService, OrderTrackingService>();
             services.AddScoped<IOrderQueryService, OrderQueryService>();
             services.AddScoped<INewsletterSubscriberRepository, NewsletterSubscriberRepository>();
