@@ -95,6 +95,26 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
         }
 
         [Fact]
+        public async Task GetProductIdsWithVariantsAsync_ReturnsOnlyVariantBackedRequestedProducts()
+        {
+            await using var context = CreateContext();
+            await SeedProductsAsync(context, Guid.NewGuid(), Guid.NewGuid());
+            var variantBackedProductId = await context.ProductVariants
+                .Select(variant => variant.ProductId)
+                .SingleAsync();
+            var productWithoutVariantsId = await context.Products
+                .Where(product => product.Id != variantBackedProductId)
+                .Select(product => product.Id)
+                .FirstAsync();
+            var repository = new ProductReadRepository(context);
+
+            var result = await repository.GetProductIdsWithVariantsAsync(
+                [variantBackedProductId, productWithoutVariantsId, Guid.NewGuid()]);
+
+            Assert.Equal(variantBackedProductId, Assert.Single(result));
+        }
+
+        [Fact]
         public async Task GetPublishedProductDetailsByIdAsync_ReturnsNullForDraftProduct()
         {
             await using var context = CreateContext();

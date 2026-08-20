@@ -312,6 +312,8 @@
             var productLookup = await _productReadRepository.GetProductsByIdsAsync(cartList.Select(line => line.ProductId));
             var variantLookup = await _productReadRepository.GetProductVariantsByIdsAsync(
                 cartList.Where(line => line.VariantId.HasValue).Select(line => line.VariantId!.Value));
+            var productIdsWithVariants = await _productReadRepository.GetProductIdsWithVariantsAsync(
+                cartList.Select(line => line.ProductId));
             var resolvedLines = new List<ResolvedCartLine>(cartList.Count);
 
             foreach (var line in cartList)
@@ -343,10 +345,28 @@
                     {
                         return CartLineResolution.Failure("A selected product variant is not currently purchasable.");
                     }
+
+                    if (line.Quantity > variant.Stock)
+                    {
+                        return CartLineResolution.Failure("The requested quantity exceeds the selected product variant's current availability.");
+                    }
                 }
-                else if (product.Quantity <= 0)
+                else
                 {
-                    return CartLineResolution.Failure("A product in the cart is not currently purchasable.");
+                    if (productIdsWithVariants.Contains(line.ProductId))
+                    {
+                        return CartLineResolution.Failure("A product variant must be selected for this product.");
+                    }
+
+                    if (product.Quantity <= 0)
+                    {
+                        return CartLineResolution.Failure("A product in the cart is not currently purchasable.");
+                    }
+
+                    if (line.Quantity > product.Quantity)
+                    {
+                        return CartLineResolution.Failure("The requested quantity exceeds the product's current availability.");
+                    }
                 }
 
                 var unitPrice = variant?.Price ?? product.Price;
