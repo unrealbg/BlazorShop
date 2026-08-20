@@ -28,22 +28,33 @@ namespace BlazorShop.Web.Pages.Payments
                     item.ProductId,
                     item.VariantId,
                     "Unavailable item",
-                    item.SizeValue,
                     null,
-                    item.UnitPrice ?? 0m,
+                    null,
+                    null,
+                    null,
+                    0m,
                     item.Quantity,
                     IsUnavailable: true);
             }
+
+            var variant = item.VariantId.HasValue
+                ? product.Variants.FirstOrDefault(candidate => candidate.Id == item.VariantId.Value)
+                : null;
+            var isUnavailable = item.VariantId.HasValue
+                ? variant is null || variant.Stock <= 0
+                : product.Quantity <= 0;
 
             return new CheckoutCartLine(
                 item.ProductId,
                 item.VariantId,
                 string.IsNullOrWhiteSpace(product.Name) ? "Product" : product.Name,
-                item.SizeValue,
+                variant?.SizeValue,
+                variant?.Sku,
+                variant?.Color,
                 product.Image,
-                item.UnitPrice ?? product.Price,
+                variant?.Price ?? product.Price,
                 item.Quantity,
-                IsUnavailable: false);
+                IsUnavailable: isUnavailable);
         }
     }
 }

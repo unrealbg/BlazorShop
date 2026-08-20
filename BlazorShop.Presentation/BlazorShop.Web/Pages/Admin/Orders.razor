@@ -98,7 +98,13 @@
                           @foreach (var l in o.Lines)
                           {
                             <tr class="align-middle h-9">
-                              <td class="px-2 py-1"><Tooltip Text="@l.ProductName"><div class="truncate" title="@l.ProductName">@l.ProductName</div></Tooltip></td>
+                              <td class="px-2 py-1">
+                                <Tooltip Text="@l.ProductName"><div class="truncate" title="@l.ProductName">@l.ProductName</div></Tooltip>
+                                @if (!string.IsNullOrWhiteSpace(l.VariantLabel))
+                                {
+                                  <div class="truncate text-[11px] text-neutral-500" title="@l.VariantLabel">@l.VariantLabel</div>
+                                }
+                              </td>
                               <td class="px-2 py-1">@l.Quantity</td>
                               <td class="px-2 py-1">@l.UnitPrice.ToString("F2")</td>
                               <td class="px-2 py-1">@((l.UnitPrice * l.Quantity).ToString("F2"))</td>
@@ -208,7 +214,18 @@
           <tbody class="divide-y divide-slate-200">
             @foreach (var line in _detailsOrder.Lines)
             {
-              <tr><td class="px-3 py-2">@line.ProductName</td><td class="px-3 py-2">@line.Quantity</td><td class="px-3 py-2">@line.UnitPrice.ToString("F2")</td><td class="px-3 py-2">@((line.UnitPrice * line.Quantity).ToString("F2"))</td></tr>
+              <tr>
+                <td class="px-3 py-2">
+                  <div>@line.ProductName</div>
+                  @if (!string.IsNullOrWhiteSpace(line.VariantLabel))
+                  {
+                    <div class="mt-1 text-xs text-neutral-500">@line.VariantLabel</div>
+                  }
+                </td>
+                <td class="px-3 py-2">@line.Quantity</td>
+                <td class="px-3 py-2">@line.UnitPrice.ToString("F2")</td>
+                <td class="px-3 py-2">@((line.UnitPrice * line.Quantity).ToString("F2"))</td>
+              </tr>
             }
           </tbody>
         </table>

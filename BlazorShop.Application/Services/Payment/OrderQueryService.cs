@@ -24,26 +24,32 @@ namespace BlazorShop.Application.Services.Payment
         public async Task<IEnumerable<GetOrder>> GetOrdersForUserAsync(string userId)
         {
             var list = (await _orders.GetByUserIdAsync(userId)).ToList();
-            var map = await BuildProductNameMapAsync(list);
-            return await MapWithUsersAsync(list, map);
+            var catalog = await BuildCatalogMapsAsync(list);
+            return await MapWithUsersAsync(list, catalog);
         }
 
         public async Task<IEnumerable<GetOrder>> GetAllAsync()
         {
             var list = (await _orders.GetAllAsync()).ToList();
-            var map = await BuildProductNameMapAsync(list);
-            return await MapWithUsersAsync(list, map);
+            var catalog = await BuildCatalogMapsAsync(list);
+            return await MapWithUsersAsync(list, catalog);
         }
 
-        private async Task<Dictionary<Guid, string>> BuildProductNameMapAsync(IEnumerable<Order> orders)
+        private async Task<OrderCatalogMaps> BuildCatalogMapsAsync(IEnumerable<Order> orders)
         {
             var products = await _products.GetProductsByIdsAsync(
                 orders.SelectMany(order => order.Lines).Select(line => line.ProductId));
+            var variants = await _products.GetProductVariantsByIdsAsync(
+                orders.SelectMany(order => order.Lines)
+                    .Where(line => line.ProductVariantId.HasValue)
+                    .Select(line => line.ProductVariantId!.Value));
 
-            return products.ToDictionary(entry => entry.Key, entry => entry.Value.Name ?? string.Empty);
+            return new OrderCatalogMaps(
+                products.ToDictionary(entry => entry.Key, entry => entry.Value.Name ?? string.Empty),
+                variants);
         }
 
-        private async Task<IEnumerable<GetOrder>> MapWithUsersAsync(IEnumerable<Order> orders, IDictionary<Guid, string> nameMap)
+        private async Task<IEnumerable<GetOrder>> MapWithUsersAsync(IEnumerable<Order> orders, OrderCatalogMaps catalog)
         {
             var result = new List<GetOrder>();
             foreach (var o in orders)
@@ -78,16 +84,35 @@ namespace BlazorShop.Application.Services.Payment
                     CustomerName = userName,
                     CustomerEmail = email,
                     AdminNote = o.AdminNote,
-                    Lines = o.Lines.Select(l => new GetOrderLine
-                    {
-                        ProductId = l.ProductId,
-                        Quantity = l.Quantity,
-                        UnitPrice = l.UnitPrice,
-                        ProductName = nameMap.TryGetValue(l.ProductId, out var n) ? n : string.Empty
-                    })
+                    Lines = o.Lines.Select(line => MapLine(line, catalog)),
                 });
             }
             return result;
         }
+
+        private static GetOrderLine MapLine(OrderLine line, OrderCatalogMaps catalog)
+        {
+            ProductVariant? variant = null;
+            if (line.ProductVariantId.HasValue)
+            {
+                catalog.Variants.TryGetValue(line.ProductVariantId.Value, out variant);
+            }
+
+            return new GetOrderLine
+            {
+                ProductId = line.ProductId,
+                VariantId = line.ProductVariantId,
+                Quantity = line.Quantity,
+                UnitPrice = line.UnitPrice,
+                ProductName = catalog.ProductNames.TryGetValue(line.ProductId, out var name) ? name : string.Empty,
+                Sku = variant?.Sku,
+                SizeValue = variant?.SizeValue,
+                Color = variant?.Color,
+            };
+        }
+
+        private sealed record OrderCatalogMaps(
+            IReadOnlyDictionary<Guid, string> ProductNames,
+            IReadOnlyDictionary<Guid, ProductVariant> Variants);
     }
 }

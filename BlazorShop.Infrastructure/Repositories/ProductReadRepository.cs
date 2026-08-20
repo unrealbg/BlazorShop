@@ -200,6 +200,24 @@ namespace BlazorShop.Infrastructure.Repositories
                 .ToDictionaryAsync(product => product.Id);
         }
 
+        public async Task<IReadOnlyDictionary<Guid, ProductVariant>> GetProductVariantsByIdsAsync(IEnumerable<Guid> variantIds)
+        {
+            var ids = variantIds
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToArray();
+
+            if (ids.Length == 0)
+            {
+                return new Dictionary<Guid, ProductVariant>();
+            }
+
+            return await _context.ProductVariants
+                .AsNoTracking()
+                .Where(variant => ids.Contains(variant.Id))
+                .ToDictionaryAsync(variant => variant.Id);
+        }
+
         private static IQueryable<Product> BuildCatalogQuery(IQueryable<Product> products, ProductCatalogQuery query)
         {
             var searchTerm = query.GetNormalizedSearchTerm();

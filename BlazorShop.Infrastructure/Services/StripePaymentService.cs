@@ -4,8 +4,6 @@
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
-    using BlazorShop.Domain.Entities;
-
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
@@ -27,20 +25,14 @@
             _logger = logger;
         }
 
-        public async Task<ServiceResponse> Pay(
-            decimal totalAmount,
-            IEnumerable<Product> cartProducts,
-            IEnumerable<ProcessCart> carts,
-            Guid orderId)
+        public async Task<ServiceResponse> Pay(IReadOnlyCollection<ResolvedCartLine> lines, Guid orderId)
         {
             try
             {
                 var lineItems = new List<SessionLineItemOptions>();
 
-                foreach (var item in cartProducts)
+                foreach (var line in lines)
                 {
-                    var pQuantity = carts.FirstOrDefault(_ => _.ProductId == item.Id);
-
                     lineItems.Add(new SessionLineItemOptions
                     {
                         PriceData = new SessionLineItemPriceDataOptions
@@ -48,13 +40,13 @@
                             Currency = "eur",
                             ProductData = new SessionLineItemPriceDataProductDataOptions
                             {
-                                Name = item.Name,
-                                Description = item.Description
+                                Name = line.ProductName,
+                                Description = BuildDescription(line),
                             },
-                            UnitAmount = (long)(item.Price * 100),
+                            UnitAmount = (long)decimal.Round(line.UnitPrice * 100, 0, MidpointRounding.AwayFromZero),
                         },
 
-                        Quantity = pQuantity!.Quantity,
+                        Quantity = line.Quantity,
                     });
                 }
 
@@ -93,6 +85,22 @@
         private string BuildClientUrl(string path)
         {
             return $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
+        }
+
+        private static string? BuildDescription(ResolvedCartLine line)
+        {
+            var variantDetails = new[]
+                {
+                    string.IsNullOrWhiteSpace(line.Sku) ? null : $"SKU: {line.Sku}",
+                    string.IsNullOrWhiteSpace(line.SizeValue) ? null : $"Size: {line.SizeValue}",
+                    string.IsNullOrWhiteSpace(line.Color) ? null : $"Color: {line.Color}",
+                }
+                .Where(value => value is not null)
+                .ToArray();
+
+            return variantDetails.Length > 0
+                ? string.Join(", ", variantDetails)
+                : line.ProductDescription;
         }
     }
 }

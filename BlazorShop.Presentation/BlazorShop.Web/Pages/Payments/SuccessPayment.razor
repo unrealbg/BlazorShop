@@ -1,5 +1,6 @@
 ﻿@page "/payment-success"
 @page "/payment-success/{bt:int?}"
+@using BlazorShop.Domain.Contracts.Payment
 
 <section class="success-payment">
     <div class="card shadow-sm success-payment-card">
@@ -71,7 +72,9 @@
 
                             if (normalizedPaymentMethod == "cod")
                             {
-                                var confirmResult = await CartService.ConfirmOrder(list);
+                                var cartLines = list.Select(item =>
+                                    new CartLineRequest(item.ProductId, item.VariantId, item.Quantity));
+                                var confirmResult = await CartService.ConfirmOrder(cartLines);
 
                                 if (confirmResult.Success)
                                 {

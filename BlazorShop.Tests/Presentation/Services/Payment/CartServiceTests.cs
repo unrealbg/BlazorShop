@@ -9,6 +9,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Services;
+    using BlazorShop.Domain.Contracts.Payment;
 
     using Moq;
 
@@ -34,10 +35,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             var checkout = new Checkout
             {
                 PaymentMethodId = Guid.NewGuid(),
-                Carts = new List<ProcessCart>
-                {
-                    new ProcessCart { ProductId = Guid.NewGuid(), Quantity = 1 }
-                }
+                Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
             };
 
             var httpResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
@@ -89,17 +87,14 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
         public async Task ConfirmOrder_Returns_ServiceResponse()
         {
             // Arrange
-            var carts = new List<ProcessCart>
-            {
-                new ProcessCart { ProductId = Guid.NewGuid(), Quantity = 1 }
-            };
+            var carts = new[] { new CartLineRequest(Guid.NewGuid(), null, 1) };
 
             var httpResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
             this._httpClientHelperMock
                 .Setup(x => x.GetPrivateClientAsync())
                 .ReturnsAsync(new HttpClient());
             this._apiCallHelperMock
-                .Setup(x => x.ApiCallTypeCall<IEnumerable<ProcessCart>>(It.IsAny<ApiCall>()))
+                .Setup(x => x.ApiCallTypeCall<IEnumerable<CartLineRequest>>(It.IsAny<ApiCall>()))
                 .ReturnsAsync(httpResponse);
             this._apiCallHelperMock
                 .Setup(x => x.GetServiceResponse<ServiceResponse>(httpResponse))

@@ -66,7 +66,13 @@
                             @foreach (var line in SelectedOrder.Lines)
                             {
                                 <tr>
-                                    <td class="px-4 py-3">@line.ProductName</td>
+                                    <td class="px-4 py-3">
+                                        <div>@line.ProductName</div>
+                                        @if (!string.IsNullOrWhiteSpace(line.VariantLabel))
+                                        {
+                                            <div class="mt-1 text-xs text-slate-500">@line.VariantLabel</div>
+                                        }
+                                    </td>
                                     <td class="px-4 py-3">@line.Quantity</td>
                                     <td class="px-4 py-3">@line.UnitPrice.ToString("F2")</td>
                                     <td class="px-4 py-3">@line.LineTotal.ToString("F2")</td>
@@ -132,6 +138,10 @@
                         {
                             <div class="bs-panel-soft px-4 py-3 text-sm text-slate-700">
                                 <div class="font-semibold text-slate-950">@line.ProductName</div>
+                                @if (!string.IsNullOrWhiteSpace(line.VariantLabel))
+                                {
+                                    <div class="mt-1 text-xs text-slate-500">@line.VariantLabel</div>
+                                }
                                 <div class="mt-1">Qty: @line.Quantity</div>
                                 <div class="mt-1">Line total: € @line.LineTotal.ToString("F2")</div>
                             </div>

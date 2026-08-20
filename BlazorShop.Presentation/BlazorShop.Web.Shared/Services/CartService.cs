@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Web.Shared.Services
 {
+    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
@@ -35,7 +36,7 @@
                        : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
         }
 
-        public async Task<ServiceResponse> ConfirmOrder(IEnumerable<ProcessCart> carts)
+        public async Task<ServiceResponse> ConfirmOrder(IEnumerable<CartLineRequest> carts)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();
             var apiCallModel = new ApiCall
@@ -47,7 +48,7 @@
                 Model = carts,
             };
 
-            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<ProcessCart>>(apiCallModel);
+            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CartLineRequest>>(apiCallModel);
 
             return result is null || !result.IsSuccessStatusCode
                        ? _apiCallHelper.ConnectionError()

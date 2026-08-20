@@ -3,6 +3,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Text.Json;
     using System.Threading.Tasks;
 
     using AutoMapper;
@@ -50,6 +51,9 @@ namespace BlazorShop.Tests.Application.Services.Payment
             _emailServiceMock = new Mock<IEmailService>();
             _btOptionsMock = new Mock<IOptions<BankTransferSettings>>();
             _btOptionsMock.Setup(o => o.Value).Returns(new BankTransferSettings());
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductVariantsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, ProductVariant>());
 
             _cartService = new CartService(
                 _cartMock.Object,
@@ -145,26 +149,21 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var checkout = new Checkout
             {
                 PaymentMethodId = paymentMethodId,
-                Carts = new List<ProcessCart>
-                {
-                    new ProcessCart
-                    {
-                        ProductId = Guid.NewGuid(),
-                        Quantity = 1
-                    }
-                }
+                Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
             };
             var products = new List<Product>
             {
                 new Product
                 {
                     Id = checkout.Carts.First().ProductId,
-                    Price = 10m
+                    Price = 10m,
+                    Quantity = 10,
                 }
             };
             var totalAmount = 10m;
             var orderId = Guid.NewGuid();
             Order? createdOrder = null;
+            IReadOnlyCollection<ResolvedCartLine>? paymentLines = null;
             _productReadRepositoryMock
                 .Setup(r => r.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
                 .ReturnsAsync(products.ToDictionary(product => product.Id));
@@ -179,7 +178,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     }
                 });
             _paymentServiceMock
-                .Setup(s => s.Pay(totalAmount, products, checkout.Carts, orderId))
+                .Setup(s => s.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), orderId))
+                .Callback<IReadOnlyCollection<ResolvedCartLine>, Guid>((lines, _) => paymentLines = lines)
                 .ReturnsAsync(new ServiceResponse(true, "Payment successful"));
             _orderRepositoryMock
                 .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
@@ -198,8 +198,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal("Payment successful", result.Message);
             Assert.NotNull(createdOrder);
             Assert.Equal(PaymentOrderStatus.PendingPayment, createdOrder!.Status);
+            var resolvedLine = Assert.Single(paymentLines!);
+            Assert.Equal(totalAmount, resolvedLine.UnitPrice);
+            Assert.Equal(createdOrder.Lines.Single().UnitPrice, resolvedLine.UnitPrice);
             _paymentServiceMock.Verify(
-                service => service.Pay(totalAmount, products, checkout.Carts, createdOrder.Id),
+                service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), createdOrder.Id),
                 Times.Once);
         }
 
@@ -210,7 +213,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var checkout = new Checkout
             {
                 PaymentMethodId = Guid.NewGuid(),
-                Carts = new List<ProcessCart>()
+                Carts = [],
             };
             _paymentMethodServiceMock
                 .Setup(s => s.GetPaymentMethodsAsync())
@@ -236,20 +239,14 @@ namespace BlazorShop.Tests.Application.Services.Payment
         {
             // Arrange
             var productId = Guid.NewGuid();
-            var carts = new List<ProcessCart>
-            {
-                new ProcessCart
-                {
-                    ProductId = productId,
-                    Quantity = 2,
-                }
-            };
+            var carts = new[] { new CartLineRequest(productId, null, 2) };
             var products = new List<Product>
             {
                 new Product
                 {
                     Id = productId,
                     Price = 12.5m,
+                    Quantity = 10,
                 }
             };
             Order? createdOrder = null;
@@ -277,6 +274,245 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(2, createdOrder.Lines.First().Quantity);
             Assert.Equal(12.5m, createdOrder.Lines.First().UnitPrice);
             _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_PersistsSelectedVariantAndAuthoritativePrice()
+        {
+            var productId = Guid.NewGuid();
+            var variantId = Guid.NewGuid();
+            var product = new Product
+            {
+                Id = productId,
+                Name = "Runner",
+                Price = 80m,
+                Quantity = 0,
+            };
+            var variant = new ProductVariant
+            {
+                Id = variantId,
+                ProductId = productId,
+                Price = 95m,
+                Stock = 4,
+                Sku = "RUN-42",
+                SizeValue = "42",
+            };
+            Order? createdOrder = null;
+
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product> { [productId] = product });
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductVariantsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, ProductVariant> { [variantId] = variant });
+            _orderRepositoryMock
+                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
+                .Callback<Order>(order => createdOrder = order)
+                .ReturnsAsync(Guid.NewGuid());
+
+            var result = await _cartService.ConfirmOrderAsync(
+                [new CartLineRequest(productId, variantId, 2)],
+                "user-1");
+
+            Assert.True(result.Success);
+            Assert.NotNull(createdOrder);
+            var orderLine = Assert.Single(createdOrder!.Lines);
+            Assert.Equal(variantId, orderLine.ProductVariantId);
+            Assert.Equal(95m, orderLine.UnitPrice);
+            Assert.Equal(190m, createdOrder.TotalAmount);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_RejectsUnknownVariant()
+        {
+            var productId = Guid.NewGuid();
+            var variantId = Guid.NewGuid();
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>
+                {
+                    [productId] = new Product { Id = productId, Price = 50m, Quantity = 5 },
+                });
+
+            var result = await _cartService.ConfirmOrderAsync(
+                [new CartLineRequest(productId, variantId, 1)],
+                "user-1");
+
+            Assert.False(result.Success);
+            Assert.Contains("variant no longer exists", result.Message, StringComparison.OrdinalIgnoreCase);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_RejectsUnknownProduct()
+        {
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>());
+
+            var result = await _cartService.ConfirmOrderAsync(
+                [new CartLineRequest(Guid.NewGuid(), null, 1)],
+                "user-1");
+
+            Assert.False(result.Success);
+            Assert.Contains("product in the cart no longer exists", result.Message, StringComparison.OrdinalIgnoreCase);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_RejectsVariantFromAnotherProduct()
+        {
+            var productId = Guid.NewGuid();
+            var otherProductId = Guid.NewGuid();
+            var variantId = Guid.NewGuid();
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>
+                {
+                    [productId] = new Product { Id = productId, Price = 50m, Quantity = 5 },
+                });
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductVariantsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, ProductVariant>
+                {
+                    [variantId] = new ProductVariant { Id = variantId, ProductId = otherProductId, Price = 60m, Stock = 5 },
+                });
+
+            var result = await _cartService.ConfirmOrderAsync(
+                [new CartLineRequest(productId, variantId, 1)],
+                "user-1");
+
+            Assert.False(result.Success);
+            Assert.Contains("does not belong", result.Message, StringComparison.OrdinalIgnoreCase);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_RejectsUnpublishedProduct()
+        {
+            var productId = Guid.NewGuid();
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>
+                {
+                    [productId] = new Product
+                    {
+                        Id = productId,
+                        Price = 50m,
+                        Quantity = 5,
+                        IsPublished = false,
+                        PublishedOn = null,
+                    },
+                });
+
+            var result = await _cartService.ConfirmOrderAsync(
+                [new CartLineRequest(productId, null, 1)],
+                "user-1");
+
+            Assert.False(result.Success);
+            Assert.Contains("not currently purchasable", result.Message, StringComparison.OrdinalIgnoreCase);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ConfirmOrderAsync_RejectsOutOfStockVariant()
+        {
+            var productId = Guid.NewGuid();
+            var variantId = Guid.NewGuid();
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product>
+                {
+                    [productId] = new Product { Id = productId, Price = 50m, Quantity = 5 },
+                });
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductVariantsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, ProductVariant>
+                {
+                    [variantId] = new ProductVariant
+                    {
+                        Id = variantId,
+                        ProductId = productId,
+                        Price = 60m,
+                        Stock = 0,
+                    },
+                });
+
+            var result = await _cartService.ConfirmOrderAsync(
+                [new CartLineRequest(productId, variantId, 1)],
+                "user-1");
+
+            Assert.False(result.Success);
+            Assert.Contains("variant is not currently purchasable", result.Message, StringComparison.OrdinalIgnoreCase);
+            _orderRepositoryMock.Verify(repository => repository.CreateAsync(It.IsAny<Order>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CheckoutAsync_IgnoresClientPriceAndUsesSameVariantPriceForPaymentAndOrder()
+        {
+            var paymentMethodId = Guid.NewGuid();
+            var productId = Guid.NewGuid();
+            var variantId = Guid.NewGuid();
+            var orderId = Guid.NewGuid();
+            var checkout = JsonSerializer.Deserialize<Checkout>($$"""
+                {
+                  "paymentMethodId": "{{paymentMethodId}}",
+                  "carts": [
+                    {
+                      "productId": "{{productId}}",
+                      "variantId": "{{variantId}}",
+                      "quantity": 2,
+                      "unitPrice": 0.01,
+                      "sku": "CLIENT-SKU"
+                    }
+                  ]
+                }
+                """, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            var product = new Product { Id = productId, Name = "Runner", Price = 80m, Quantity = 0 };
+            var variant = new ProductVariant
+            {
+                Id = variantId,
+                ProductId = productId,
+                Price = 95m,
+                Stock = 4,
+                Sku = "SERVER-SKU",
+            };
+            Order? createdOrder = null;
+            IReadOnlyCollection<ResolvedCartLine>? paymentLines = null;
+
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, Product> { [productId] = product });
+            _productReadRepositoryMock
+                .Setup(repository => repository.GetProductVariantsByIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(new Dictionary<Guid, ProductVariant> { [variantId] = variant });
+            _paymentMethodServiceMock
+                .Setup(service => service.GetPaymentMethodsAsync())
+                .ReturnsAsync([new GetPaymentMethod { Id = paymentMethodId, Name = "Credit Card" }]);
+            _orderRepositoryMock
+                .Setup(repository => repository.CreateAsync(It.IsAny<Order>()))
+                .Callback<Order>(order =>
+                {
+                    order.Id = orderId;
+                    createdOrder = order;
+                })
+                .ReturnsAsync(orderId);
+            _paymentServiceMock
+                .Setup(service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), orderId))
+                .Callback<IReadOnlyCollection<ResolvedCartLine>, Guid>((lines, _) => paymentLines = lines)
+                .ReturnsAsync(new ServiceResponse(true, "https://payment.example/checkout"));
+
+            var result = await _cartService.CheckoutAsync(checkout, "user-1");
+
+            Assert.True(result.Success);
+            Assert.NotNull(createdOrder);
+            var orderLine = Assert.Single(createdOrder!.Lines);
+            var paymentLine = Assert.Single(paymentLines!);
+            Assert.Equal(variantId, orderLine.ProductVariantId);
+            Assert.Equal(95m, orderLine.UnitPrice);
+            Assert.Equal(95m, paymentLine.UnitPrice);
+            Assert.Equal("SERVER-SKU", paymentLine.Sku);
+            Assert.Equal(190m, createdOrder.TotalAmount);
         }
 
         [Fact]
