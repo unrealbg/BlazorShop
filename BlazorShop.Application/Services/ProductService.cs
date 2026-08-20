@@ -16,13 +16,20 @@
     {
         private readonly IProductReadRepository _productReadRepository;
         private readonly IGenericRepository<Product> _productRepository;
+        private readonly IProductInventoryTopologyRepository _inventoryTopologyRepository;
         private readonly IMapper _mapper;
         private readonly IAdminAuditService? _auditService;
 
-        public ProductService(IProductReadRepository productReadRepository, IGenericRepository<Product> productRepository, IMapper mapper, IAdminAuditService? auditService = null)
+        public ProductService(
+            IProductReadRepository productReadRepository,
+            IGenericRepository<Product> productRepository,
+            IProductInventoryTopologyRepository inventoryTopologyRepository,
+            IMapper mapper,
+            IAdminAuditService? auditService = null)
         {
             _productReadRepository = productReadRepository;
             _productRepository = productRepository;
+            _inventoryTopologyRepository = inventoryTopologyRepository;
             _mapper = mapper;
             _auditService = auditService;
         }
@@ -59,6 +66,7 @@
         public async Task<ServiceResponse> AddAsync(CreateProduct product)
         {
             var mappedData = _mapper.Map<Product>(product);
+            mappedData.Quantity = 0;
             int result = await _productRepository.AddAsync(mappedData);
 
             if (result <= 0)
@@ -79,7 +87,9 @@
                 return new ServiceResponse(false, "Product not found");
             }
 
+            var currentQuantity = existingProduct.Quantity;
             _mapper.Map(product, existingProduct);
+            existingProduct.Quantity = currentQuantity;
             int result = await _productRepository.UpdateAsync(existingProduct);
 
             if (result <= 0)
@@ -93,15 +103,14 @@
 
         public async Task<ServiceResponse> DeleteAsync(Guid id)
         {
-            var existingProduct = await _productRepository.GetByIdAsync(id);
-            var result = await _productRepository.DeleteAsync(id);
+            var result = await _inventoryTopologyRepository.DeleteProductAsync(id);
 
-            if (result <= 0)
+            if (!result.Success)
             {
-                return new ServiceResponse(false, "Product not found");
+                return new ServiceResponse(false, result.Message);
             }
 
-            await LogAsync("Product.Deleted", id, $"Product {existingProduct?.Name ?? id.ToString()} deleted.", new { existingProduct?.Name });
+            await LogAsync("Product.Deleted", id, $"Product {result.ProductName ?? id.ToString()} deleted.", new { Name = result.ProductName });
             return new ServiceResponse(true, "Product deleted successfully");
         }
 

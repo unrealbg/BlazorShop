@@ -46,6 +46,13 @@ namespace BlazorShop.Infrastructure.Migrations
                 UPDATE "ProductVariants"
                 SET "Stock" = 0
                 WHERE "Stock" < 0;
+
+                UPDATE "Products" AS product
+                SET "Quantity" = 0
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM "ProductVariants" AS variant
+                    WHERE variant."ProductId" = product."Id");
                 """);
 
             migrationBuilder.AddCheckConstraint(

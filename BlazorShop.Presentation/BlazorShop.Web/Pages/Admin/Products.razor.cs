@@ -21,7 +21,7 @@
         private Guid _newProductId;
         private List<GetProductVariant> _newVariants = new();
         private string? _newVariantsError;
-        private CreateOrUpdateProductVariant _newVariantForm = new() { SizeScale = 1, SizeValue = "XS", Stock = 0 };
+        private CreateOrUpdateProductVariant _newVariantForm = new() { SizeScale = 1, SizeValue = "XS" };
 
         private bool _showEditDialog = false;
         private bool _showConfirmDeleteDialog = false;
@@ -147,7 +147,7 @@
             _newProductId = Guid.Empty;
             _newVariants.Clear();
             _newVariantsError = null;
-            _newVariantForm = new CreateOrUpdateProductVariant { SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
+            _newVariantForm = new CreateOrUpdateProductVariant { SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS" };
             _showDialog = true;
         }
 
@@ -169,7 +169,6 @@
                 ProductId = productId,
                 SizeScale = _variantForm.SizeScale == 0 ? 1 : _variantForm.SizeScale,
                 SizeValue = GetSizeOptions(_variantForm.SizeScale == 0 ? 1 : _variantForm.SizeScale).FirstOrDefault() ?? string.Empty,
-                Stock = 0,
             };
             _editingVariantId = null;
         }
@@ -374,7 +373,7 @@
                         return;
                     }
 
-                    _newVariantForm = new CreateOrUpdateProductVariant { ProductId = _newProductId, SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS", Stock = 0 };
+                    _newVariantForm = new CreateOrUpdateProductVariant { ProductId = _newProductId, SizeScale = 1, SizeValue = GetSizeOptions(1).FirstOrDefault() ?? "XS" };
                 }
             });
         }
@@ -405,7 +404,6 @@
                 SizeScale = v.SizeScale,
                 SizeValue = v.SizeValue,
                 Price = v.Price,
-                Stock = v.Stock,
                 Color = v.Color,
                 IsDefault = v.IsDefault
             };

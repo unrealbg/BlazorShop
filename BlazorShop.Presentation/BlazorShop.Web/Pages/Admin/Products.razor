@@ -17,6 +17,10 @@
             </div>
         </div>
 
+        <div class="mt-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Product and variant stock is managed on the <a class="font-semibold underline" href="/admin/inventory">Inventory page</a> with conflict-safe updates.
+        </div>
+
         <div class="mt-4 space-y-4">
             @if (!string.IsNullOrWhiteSpace(_categoriesError))
             {
@@ -147,11 +151,6 @@
                     <ValidationMessage For="@(() => _product.Price)" />
                 </div>
                 <div class="form-group mb-3">
-                    <label class="block text-xs text-neutral-600 mb-1">Quantity</label>
-                    <InputNumber @bind-Value="_product.Quantity" class="w-full border rounded px-3 py-2" />
-                    <ValidationMessage For="@(() => _product.Quantity)" />
-                </div>
-                <div class="form-group mb-3">
                     <label class="block text-xs text-neutral-600 mb-1">Product Description</label>
                     <InputTextArea @bind-Value="_product.Description" class="w-full border rounded px-3 py-2" />
                     <ValidationMessage For="@(() => _product.Description)" />
@@ -219,10 +218,6 @@
                         <div>
                             <label class="block text-xs text-neutral-600 mb-1">Price (optional)</label>
                             <InputNumber @bind-Value="_newVariantForm.Price" class="w-full border rounded px-3 py-2" />
-                        </div>
-                        <div>
-                            <label class="block text-xs text-neutral-600 mb-1">Stock</label>
-                            <InputNumber @bind-Value="_newVariantForm.Stock" class="w-full border rounded px-3 py-2" />
                         </div>
                         <div>
                             <label class="block text-xs text-neutral-600 mb-1">Color (optional)</label>
@@ -312,11 +307,6 @@
                             <ValidationMessage For="@(() => _editProduct.Price)" />
                         </div>
                         <div class="form-group mb-3">
-                            <label class="block text-xs text-neutral-600 mb-1">Quantity</label>
-                            <InputNumber @bind-Value="_editProduct.Quantity" class="w-full border rounded px-3 py-2" />
-                            <ValidationMessage For="@(() => _editProduct.Quantity)" />
-                        </div>
-                        <div class="form-group mb-3">
                             <label class="block text-xs text-neutral-600 mb-1">Product Description</label>
                             <InputTextArea @bind-Value="_editProduct.Description" class="w-full border rounded px-3 py-2" />
                             <ValidationMessage For="@(() => _editProduct.Description)" />
@@ -385,10 +375,6 @@
                             <div>
                                 <label class="block text-xs text-neutral-600 mb-1">Price (optional)</label>
                                 <InputNumber @bind-Value="_variantForm.Price" class="w-full border rounded px-3 py-2" />
-                            </div>
-                            <div>
-                                <label class="block text-xs text-neutral-600 mb-1">Stock</label>
-                                <InputNumber @bind-Value="_variantForm.Stock" class="w-full border rounded px-3 py-2" />
                             </div>
                             <div>
                                 <label class="block text-xs text-neutral-600 mb-1">Color (optional)</label>

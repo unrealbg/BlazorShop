@@ -1,9 +1,13 @@
 namespace BlazorShop.Tests.Infrastructure.PostgreSql
 {
+    using System.Data.Common;
+
     using AutoMapper;
 
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
+    using BlazorShop.Application.DTOs.Product;
+    using BlazorShop.Application.DTOs.Product.ProductVariant;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Application.Services.Payment;
     using BlazorShop.Domain.Contracts;
@@ -13,8 +17,10 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using BlazorShop.Domain.Entities.Payment;
     using BlazorShop.Infrastructure.Repositories;
     using BlazorShop.Infrastructure.Services;
+    using BlazorShop.Tests.TestUtilities;
 
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.Extensions.Options;
 
     using Moq;
@@ -64,7 +70,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Single(results, result => !result.Success);
             await using var assertionContext = _database.CreateContext();
             Assert.Equal(0, (await assertionContext.ProductVariants.FindAsync(variantId))!.Stock);
-            Assert.Equal(99, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(0, (await assertionContext.Products.FindAsync(productId))!.Quantity);
             Assert.Equal(1, await assertionContext.InventoryReservations.CountAsync());
         }
 
@@ -260,6 +266,250 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         }
 
         [Fact]
+        public async Task StaleGenericProductUpdate_DoesNotResurrectReservedStock()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 5);
+            Product staleProduct;
+            await using (var staleContext = _database.CreateContext())
+            {
+                staleProduct = (await staleContext.Products.AsNoTracking().SingleAsync(item => item.Id == productId));
+            }
+
+            Assert.True((await ReserveAsync(CreateOrder(productId, null, 1))).Success);
+            await using var adminContext = _database.CreateContext();
+            var service = new BlazorShop.Application.Services.ProductService(
+                new ProductReadRepository(adminContext),
+                new GenericRepository<Product>(adminContext),
+                new ProductInventoryTopologyRepository(_database.CreateContextFactory()),
+                AutoMapperTestFactory.CreateMapper());
+
+            var result = await service.UpdateAsync(new UpdateProduct
+            {
+                Id = staleProduct.Id,
+                Name = staleProduct.Name,
+                Description = staleProduct.Description,
+                Price = staleProduct.Price,
+                Image = staleProduct.Image,
+                Quantity = staleProduct.Quantity,
+                CategoryId = staleProduct.CategoryId,
+            });
+
+            Assert.True(result.Success);
+            adminContext.ChangeTracker.Clear();
+            Assert.Equal(4, (await adminContext.Products.FindAsync(productId))!.Quantity);
+        }
+
+        [Fact]
+        public async Task StaleGenericVariantUpdate_DoesNotResurrectReservedStock()
+        {
+            await _database.ResetDatabaseAsync();
+            var (productId, variantId) = await SeedVariantProductAsync(stock: 5);
+            ProductVariant staleVariant;
+            await using (var staleContext = _database.CreateContext())
+            {
+                staleVariant = await staleContext.ProductVariants.AsNoTracking().SingleAsync(item => item.Id == variantId);
+            }
+
+            Assert.True((await ReserveAsync(CreateOrder(productId, variantId, 1))).Success);
+            await using var adminContext = _database.CreateContext();
+            var service = new BlazorShop.Application.Services.ProductVariantService(
+                new GenericRepository<ProductVariant>(adminContext),
+                new ProductInventoryTopologyRepository(_database.CreateContextFactory()),
+                AutoMapperTestFactory.CreateMapper());
+
+            var result = await service.UpdateAsync(new UpdateProductVariant
+            {
+                Id = staleVariant.Id,
+                ProductId = staleVariant.ProductId,
+                Sku = staleVariant.Sku,
+                SizeScale = (int)staleVariant.SizeScale,
+                SizeValue = staleVariant.SizeValue,
+                Price = staleVariant.Price,
+                Stock = staleVariant.Stock,
+                Color = staleVariant.Color,
+                IsDefault = staleVariant.IsDefault,
+            });
+
+            Assert.True(result.Success);
+            adminContext.ChangeTracker.Clear();
+            Assert.Equal(4, (await adminContext.ProductVariants.FindAsync(variantId))!.Stock);
+        }
+
+        [Fact]
+        public async Task DeleteLastVariant_LeavesProductQuantityNonSellable()
+        {
+            await _database.ResetDatabaseAsync();
+            var (productId, variantId) = await SeedVariantProductAsync(stock: 2);
+            await using (var legacyContext = _database.CreateContext())
+            {
+                await legacyContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE \"Products\" SET \"Quantity\" = {99} WHERE \"Id\" = {productId}");
+            }
+
+            var repository = new ProductInventoryTopologyRepository(_database.CreateContextFactory());
+            var result = await repository.DeleteVariantAsync(variantId);
+
+            Assert.True(result.Success);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Null(await assertionContext.ProductVariants.FindAsync(variantId));
+            Assert.Equal(0, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+        }
+
+        [Fact]
+        public async Task ReservedVariant_CannotBeDeleted()
+        {
+            await _database.ResetDatabaseAsync();
+            var (productId, variantId) = await SeedVariantProductAsync(stock: 2);
+            Assert.True((await ReserveAsync(CreateOrder(productId, variantId, 1))).Success);
+
+            var result = await new ProductInventoryTopologyRepository(_database.CreateContextFactory())
+                .DeleteVariantAsync(variantId);
+
+            Assert.False(result.Success);
+            await using var assertionContext = _database.CreateContext();
+            Assert.NotNull(await assertionContext.ProductVariants.FindAsync(variantId));
+            Assert.Equal(1, (await assertionContext.ProductVariants.FindAsync(variantId))!.Stock);
+        }
+
+        [Fact]
+        public async Task ReservedProduct_CannotBeDeleted()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            Assert.True((await ReserveAsync(CreateOrder(productId, null, 1))).Success);
+
+            var result = await new ProductInventoryTopologyRepository(_database.CreateContextFactory())
+                .DeleteProductAsync(productId);
+
+            Assert.False(result.Success);
+            await using var assertionContext = _database.CreateContext();
+            Assert.NotNull(await assertionContext.Products.FindAsync(productId));
+            Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+        }
+
+        [Fact]
+        public async Task AddFirstVariant_WithActiveProductReservation_IsRejected()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 3);
+            Assert.True((await ReserveAsync(CreateOrder(productId, null, 1))).Success);
+            var variant = new ProductVariant
+            {
+                Id = Guid.NewGuid(),
+                ProductId = productId,
+                SizeScale = SizeScale.ClothingAlpha,
+                SizeValue = "M",
+                Stock = 8,
+            };
+
+            var result = await new ProductInventoryTopologyRepository(_database.CreateContextFactory())
+                .AddVariantAsync(variant);
+
+            Assert.False(result.Success);
+            await using var assertionContext = _database.CreateContext();
+            Assert.False(await assertionContext.ProductVariants.AnyAsync(item => item.ProductId == productId));
+            Assert.Equal(2, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+        }
+
+        [Fact]
+        public async Task AddFirstVariant_NormalizesProductQuantityAndIgnoresRequestedStock()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 99);
+            var variant = new ProductVariant
+            {
+                Id = Guid.NewGuid(),
+                ProductId = productId,
+                SizeScale = SizeScale.ClothingAlpha,
+                SizeValue = "L",
+                Stock = 8,
+            };
+
+            var result = await new ProductInventoryTopologyRepository(_database.CreateContextFactory())
+                .AddVariantAsync(variant);
+
+            Assert.True(result.Success);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(0, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(0, (await assertionContext.ProductVariants.FindAsync(variant.Id))!.Stock);
+        }
+
+        [Fact]
+        public async Task MissingReservedTarget_StillReleasesReservationAndTerminalizesOrder()
+        {
+            await _database.ResetDatabaseAsync();
+            var (productId, variantId) = await SeedVariantProductAsync(stock: 2);
+            var order = CreateOrder(productId, variantId, 1);
+            Assert.True((await ReserveAsync(order)).Success);
+            await using (var corruptionContext = _database.CreateContext())
+            {
+                await corruptionContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM \"ProductVariants\" WHERE \"Id\" = {variantId}");
+            }
+
+            var result = await TransitionAsync(
+                order.Id,
+                PaymentOrderStatus.PaymentFailed,
+                InventoryReservationStatus.Released);
+
+            Assert.True(result.Success);
+            Assert.Equal(InventoryTransitionOutcome.Applied, result.Outcome);
+            Assert.NotNull(result.ErrorMessage);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await assertionContext.Orders.FindAsync(order.Id))!.Status);
+            Assert.Equal(
+                InventoryReservationStatus.Released,
+                (await assertionContext.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(0, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+        }
+
+        [Fact]
+        public async Task AmbiguousReleaseCommit_IsVerifiedWithoutDoubleRestoringStock()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 5);
+            var order = CreateOrder(productId, null, 2);
+            Assert.True((await ReserveAsync(order)).Success);
+            var interceptor = new ThrowOnceAfterCommitInterceptor();
+            var service = new InventoryReservationService(_database.CreateContextFactory(interceptor));
+
+            var result = await service.TransitionOrderAsync(
+                order.Id,
+                PaymentOrderStatus.Cancelled,
+                InventoryReservationStatus.Released);
+
+            Assert.Equal(InventoryTransitionOutcome.Applied, result.Outcome);
+            Assert.True(interceptor.FaultInjected);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(5, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(
+                InventoryReservationStatus.Released,
+                (await assertionContext.InventoryReservations.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task AmbiguousCreateCommit_IsVerifiedWithoutDoubleDeductingInventory()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 5);
+            var order = CreateOrder(productId, null, 2);
+            var interceptor = new ThrowOnceAfterCommitInterceptor();
+            var service = new InventoryReservationService(_database.CreateContextFactory(interceptor));
+
+            var result = await service.CreateOrderWithInventoryAsync(
+                order,
+                InventoryReservationStatus.Reserved);
+
+            Assert.True(result.Success);
+            Assert.True(interceptor.FaultInjected);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(3, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(1, await assertionContext.Orders.CountAsync(item => item.Id == order.Id));
+            Assert.Equal(1, await assertionContext.InventoryReservations.CountAsync(item => item.OrderId == order.Id));
+        }
+
+        [Fact]
         public async Task DatabaseConstraints_RejectNegativeProductAndVariantInventory()
         {
             await _database.ResetDatabaseAsync();
@@ -347,7 +597,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 Id = Guid.NewGuid(),
                 Name = $"{name}-{Guid.NewGuid():N}",
                 Price = 10m,
-                Quantity = 99,
+                Quantity = 0,
                 CategoryId = category.Id,
             };
             var variant = new ProductVariant
@@ -402,6 +652,26 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     LineTotal = line.Quantity * 10m,
                 }).ToList(),
             };
+        }
+
+        private sealed class ThrowOnceAfterCommitInterceptor : DbTransactionInterceptor
+        {
+            private int _faultsRemaining = 1;
+
+            public bool FaultInjected => Volatile.Read(ref _faultsRemaining) == 0;
+
+            public override Task TransactionCommittedAsync(
+                DbTransaction transaction,
+                TransactionEndEventData eventData,
+                CancellationToken cancellationToken = default)
+            {
+                if (Interlocked.Exchange(ref _faultsRemaining, 0) == 1)
+                {
+                    throw new TimeoutException("Injected ambiguous commit failure.");
+                }
+
+                return Task.CompletedTask;
+            }
         }
     }
 }
