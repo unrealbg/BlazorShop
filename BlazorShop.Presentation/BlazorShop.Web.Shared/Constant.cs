@@ -79,7 +79,6 @@
         public static class Cart
         {
             public const string Checkout = "cart/checkout";
-            public const string ConfirmOrder = "cart/confirm-order";
             public const string SaveCart = "cart/save-checkout";
             public const string Name = "my-cart";
             public const string GetOrderItems = "cart/order-items";

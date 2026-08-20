@@ -2,8 +2,6 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 {
     using System.Data.Common;
 
-    using AutoMapper;
-
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.DTOs.Product;
@@ -14,6 +12,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Domain.Entities;
+    using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Domain.Entities.Payment;
     using BlazorShop.Infrastructure.Repositories;
     using BlazorShop.Infrastructure.Services;
@@ -21,6 +20,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Diagnostics;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
     using Moq;
@@ -201,31 +201,34 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         {
             await _database.ResetDatabaseAsync();
             var productId = await SeedProductAsync(quantity: 2);
-            var creditCardId = Guid.NewGuid();
             await using var context = _database.CreateContext();
             var paymentMethods = new Mock<IPaymentMethodService>();
             paymentMethods.Setup(service => service.GetPaymentMethodsAsync())
-                .ReturnsAsync([new GetPaymentMethod { Id = creditCardId, Name = "Credit Card" }]);
+                .ReturnsAsync([new GetPaymentMethod { Id = PaymentMethodIds.CreditCard, Name = "Credit Card" }]);
             var payment = new Mock<IPaymentService>();
-            payment.Setup(service => service.Pay(It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(), It.IsAny<Guid>()))
-                .ReturnsAsync(new ServiceResponse(false, "Stripe unavailable"));
+            payment.Setup(service => service.Pay(
+                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>()))
+                .ReturnsAsync(new PaymentInitializationResult(false, ErrorMessage: "Stripe unavailable"));
+            var users = new Mock<IAppUserManager>();
+            users.Setup(manager => manager.GetUserByIdAsync("user-1"))
+                .ReturnsAsync(new AppUser { Id = "user-1", Email = "user@example.com" });
             var inventory = new InventoryReservationService(context);
-            var cart = new CartService(
-                Mock.Of<ICart>(),
-                Mock.Of<IMapper>(),
+            var orchestrator = new CheckoutOrchestrator(
                 new ProductReadRepository(context),
                 paymentMethods.Object,
                 payment.Object,
-                Mock.Of<IPayPalPaymentService>(),
-                Mock.Of<IAppUserManager>(),
+                users.Object,
                 inventory,
                 Mock.Of<IEmailService>(),
-                Options.Create(new BankTransferSettings()));
+                Options.Create(new BankTransferSettings()),
+                Mock.Of<ILogger<CheckoutOrchestrator>>());
 
-            var result = await cart.CheckoutAsync(
+            var result = await orchestrator.CheckoutAsync(
                 new Checkout
                 {
-                    PaymentMethodId = creditCardId,
+                    PaymentMethodId = PaymentMethodIds.CreditCard,
                     Carts = [new CartLineRequest(productId, null, 1)],
                 },
                 "user-1");
@@ -237,6 +240,121 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Equal(
                 InventoryReservationStatus.Released,
                 (await context.InventoryReservations.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task CashOnDeliveryCheckout_CommitsOrderAndConsumedReservationBeforeReturning()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            await using var context = _database.CreateContext();
+            var orchestrator = CreateCheckoutOrchestrator(
+                context,
+                PaymentMethodIds.CashOnDelivery);
+
+            var result = await orchestrator.CheckoutAsync(
+                new Checkout
+                {
+                    PaymentMethodId = PaymentMethodIds.CashOnDelivery,
+                    Carts = [new CartLineRequest(productId, null, 1)],
+                },
+                "customer-1");
+
+            Assert.True(result.Success);
+            Assert.NotNull(result.Payload);
+            context.ChangeTracker.Clear();
+            var order = await context.Orders
+                .Include(item => item.Lines)
+                .SingleAsync(item => item.Id == result.Payload!.OrderId);
+            Assert.Equal("customer-1", order.UserId);
+            Assert.Equal(result.Payload.OrderReference, order.Reference);
+            Assert.Single(order.Lines);
+            Assert.Equal(1, (await context.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(
+                InventoryReservationStatus.Consumed,
+                (await context.InventoryReservations.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task BankTransferCheckout_EmailFailureLeavesOrderAndReservationCommitted()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            await using var context = _database.CreateContext();
+            var email = new Mock<IEmailService>();
+            email.Setup(service => service.SendEmailAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>()))
+                .ThrowsAsync(new InvalidOperationException("SMTP unavailable"));
+            var users = new Mock<IAppUserManager>();
+            users.Setup(manager => manager.GetUserByIdAsync("customer-1"))
+                .ReturnsAsync(new AppUser { Id = "customer-1", Email = "customer@example.com" });
+            var orchestrator = CreateCheckoutOrchestrator(
+                context,
+                PaymentMethodIds.BankTransfer,
+                email: email.Object,
+                users: users.Object);
+
+            var result = await orchestrator.CheckoutAsync(
+                new Checkout
+                {
+                    PaymentMethodId = PaymentMethodIds.BankTransfer,
+                    Carts = [new CartLineRequest(productId, null, 1)],
+                },
+                "customer-1");
+
+            Assert.True(result.Success);
+            Assert.NotNull(result.Payload?.BankTransfer);
+            context.ChangeTracker.Clear();
+            Assert.NotNull(await context.Orders.FindAsync(result.Payload!.OrderId));
+            Assert.Equal(1, (await context.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(
+                InventoryReservationStatus.Reserved,
+                (await context.InventoryReservations.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task StripeCheckout_InitializesProviderAfterPendingOrderAndReservationCommit()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            await using var context = _database.CreateContext();
+            var payment = new Mock<IPaymentService>();
+            payment.Setup(service => service.Pay(
+                    It.IsAny<IReadOnlyCollection<ResolvedCartLine>>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>()))
+                .Returns(async (IReadOnlyCollection<ResolvedCartLine> lines, Guid orderId, string reference) =>
+                {
+                    await using var providerContext = _database.CreateContext();
+                    var persistedOrder = await providerContext.Orders.FindAsync(orderId);
+                    Assert.NotNull(persistedOrder);
+                    Assert.Equal(PaymentOrderStatus.PendingPayment, persistedOrder.Status);
+                    Assert.Equal(reference, persistedOrder.Reference);
+                    Assert.Equal(
+                        InventoryReservationStatus.Reserved,
+                        (await providerContext.InventoryReservations.SingleAsync(
+                            item => item.OrderId == orderId)).Status);
+                    Assert.Equal(10m, Assert.Single(lines).UnitPrice);
+                    return new PaymentInitializationResult(true, "https://checkout.stripe.test/session");
+                });
+            var orchestrator = CreateCheckoutOrchestrator(
+                context,
+                PaymentMethodIds.CreditCard,
+                payment.Object);
+
+            var result = await orchestrator.CheckoutAsync(
+                new Checkout
+                {
+                    PaymentMethodId = PaymentMethodIds.CreditCard,
+                    Carts = [new CartLineRequest(productId, null, 1)],
+                },
+                "customer-1");
+
+            Assert.True(result.Success);
+            Assert.Equal("https://checkout.stripe.test/session", result.Payload!.RedirectUrl);
+            Assert.Equal(1, (await context.Products.FindAsync(productId))!.Quantity);
         }
 
         [Fact]
@@ -622,6 +740,40 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             var secondTask = RunAsync(second);
             start.SetResult();
             return await Task.WhenAll(firstTask, secondTask);
+        }
+
+        private static CheckoutOrchestrator CreateCheckoutOrchestrator(
+            BlazorShop.Infrastructure.Data.AppDbContext context,
+            Guid paymentMethodId,
+            IPaymentService? payment = null,
+            IEmailService? email = null,
+            IAppUserManager? users = null)
+        {
+            var paymentMethods = new Mock<IPaymentMethodService>();
+            paymentMethods.Setup(service => service.GetPaymentMethodsAsync())
+                .ReturnsAsync([new GetPaymentMethod { Id = paymentMethodId, Name = "Available" }]);
+            if (users is null)
+            {
+                var userManager = new Mock<IAppUserManager>();
+                userManager.Setup(manager => manager.GetUserByIdAsync("customer-1"))
+                    .ReturnsAsync(new AppUser { Id = "customer-1", Email = "customer@example.com" });
+                users = userManager.Object;
+            }
+
+            return new CheckoutOrchestrator(
+                new ProductReadRepository(context),
+                paymentMethods.Object,
+                payment ?? Mock.Of<IPaymentService>(),
+                users,
+                new InventoryReservationService(context),
+                email ?? Mock.Of<IEmailService>(),
+                Options.Create(new BankTransferSettings
+                {
+                    Iban = "BG00TEST",
+                    Beneficiary = "Blazor Shop",
+                    BankName = "Test Bank",
+                }),
+                Mock.Of<ILogger<CheckoutOrchestrator>>());
         }
 
         private async Task<Guid> SeedProductAsync(int quantity, string name = "Product")

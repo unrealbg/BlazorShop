@@ -14,12 +14,18 @@
     public class CartController : ControllerBase
     {
         private readonly ICartService _cartService;
+        private readonly ICheckoutOrchestrator _checkoutOrchestrator;
         private readonly IOrderQueryService _orderQueryService;
         private readonly IOrderTrackingService _trackingService;
 
-        public CartController(ICartService cartService, IOrderQueryService orderQueryService, IOrderTrackingService trackingService)
+        public CartController(
+            ICartService cartService,
+            ICheckoutOrchestrator checkoutOrchestrator,
+            IOrderQueryService orderQueryService,
+            IOrderTrackingService trackingService)
         {
             _cartService = cartService;
+            _checkoutOrchestrator = checkoutOrchestrator;
             _orderQueryService = orderQueryService;
             _trackingService = trackingService;
         }
@@ -31,10 +37,19 @@
         /// <returns>The products in the cart </returns>
         [HttpPost("checkout")]
         [Authorize(Roles = "User")]
-        public async Task<IActionResult> Checkout(Checkout checkout)
+        public async Task<IActionResult> Checkout(Checkout checkout, CancellationToken cancellationToken)
         {
             var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var result = await _cartService.CheckoutAsync(checkout, userId);
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return this.Unauthorized("User ID is invalid or not found.");
+            }
+
+            var result = await _checkoutOrchestrator.CheckoutAsync(
+                checkout,
+                userId,
+                cancellationToken);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 
@@ -55,21 +70,6 @@
             }
 
             var result = await _cartService.SaveCheckoutHistoryAsync(userId, orderItems);
-            return result.Success ? this.Ok(result) : this.BadRequest(result);
-        }
-
-        [HttpPost("confirm-order")]
-        [Authorize(Roles = "User, Admin")]
-        public async Task<IActionResult> ConfirmOrder(IEnumerable<CartLineRequest> carts)
-        {
-            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                return this.Unauthorized("User ID is invalid or not found.");
-            }
-
-            var result = await _cartService.ConfirmOrderAsync(carts, userId);
             return result.Success ? this.Ok(result) : this.BadRequest(result);
         }
 

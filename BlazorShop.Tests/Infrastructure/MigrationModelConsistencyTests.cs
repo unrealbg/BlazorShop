@@ -1,5 +1,7 @@
 namespace BlazorShop.Tests.Infrastructure
 {
+    using BlazorShop.Application;
+    using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Infrastructure;
     using System.Reflection;
 
@@ -15,6 +17,9 @@ namespace BlazorShop.Tests.Infrastructure
     using Microsoft.EntityFrameworkCore.Migrations.Operations;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Hosting;
+
+    using Moq;
 
     using Xunit;
 
@@ -61,6 +66,24 @@ namespace BlazorShop.Tests.Infrastructure
 
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IInventoryReservationService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IProductInventoryTopologyRepository>());
+        }
+
+        [Fact]
+        public void AddApplicationAndInfrastructure_ResolveCheckoutOrchestrator()
+        {
+            var configuration = CreateConfiguration();
+            var hostEnvironment = new Mock<IHostEnvironment>();
+            hostEnvironment.SetupGet(environment => environment.EnvironmentName)
+                .Returns(Environments.Development);
+            using var provider = new ServiceCollection()
+                .AddLogging()
+                .AddSingleton(hostEnvironment.Object)
+                .AddInfrastructure(configuration)
+                .AddApplication(configuration)
+                .BuildServiceProvider();
+            using var scope = provider.CreateScope();
+
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<ICheckoutOrchestrator>());
         }
 
         [Fact]
@@ -111,7 +134,8 @@ namespace BlazorShop.Tests.Infrastructure
                     ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Port=5432;Database=blazorshop;Username=postgres;Password=postgres",
                     ["JWT:Audience"] = "test-audience",
                     ["JWT:Issuer"] = "test-issuer",
-                    ["JWT:Key"] = "abcdefghijklmnopqrstuvwxyz123456"
+                    ["JWT:Key"] = "abcdefghijklmnopqrstuvwxyz123456",
+                    ["ClientApp:BaseUrl"] = "https://shop.example.com",
                 })
                 .Build();
         }

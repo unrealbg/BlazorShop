@@ -7,6 +7,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts.Payment;
+    using BlazorShop.Domain.Entities.Payment;
 
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
@@ -18,13 +19,102 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
     public class CartControllerTests
     {
         [Fact]
+        public async Task Checkout_ReturnsTypedResultOwnedByAuthenticatedUser()
+        {
+            var checkout = new Checkout
+            {
+                PaymentMethodId = PaymentMethodIds.CashOnDelivery,
+                Carts = [new CartLineRequest(Guid.NewGuid(), null, 1)],
+            };
+            var typedResult = new CheckoutResult(
+                Guid.NewGuid(),
+                "COD-TEST",
+                CheckoutStatus.Confirmed,
+                CheckoutPaymentKind.CashOnDelivery);
+            var orchestrator = new Mock<ICheckoutOrchestrator>();
+            orchestrator.Setup(service => service.CheckoutAsync(
+                    checkout,
+                    "authenticated-user",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ServiceResponse<CheckoutResult>(true) { Payload = typedResult });
+            var controller = new CartController(
+                Mock.Of<ICartService>(),
+                orchestrator.Object,
+                Mock.Of<IOrderQueryService>(),
+                Mock.Of<IOrderTrackingService>())
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [
+                            new Claim(ClaimTypes.NameIdentifier, "authenticated-user"),
+                        ],
+                        authenticationType: "TestAuth")),
+                    },
+                },
+            };
+
+            var result = await controller.Checkout(checkout, CancellationToken.None);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var response = Assert.IsType<ServiceResponse<CheckoutResult>>(ok.Value);
+            Assert.Same(typedResult, response.Payload);
+            Assert.Equal(typedResult.OrderId, response.Payload!.OrderId);
+            Assert.Equal("COD-TEST", response.Payload.OrderReference);
+            Assert.Equal(CheckoutStatus.Confirmed, response.Payload.Status);
+            orchestrator.Verify(service => service.CheckoutAsync(
+                checkout,
+                "authenticated-user",
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Checkout_ReturnsUnauthorizedWithoutServerIdentity()
+        {
+            var orchestrator = new Mock<ICheckoutOrchestrator>();
+            var controller = new CartController(
+                Mock.Of<ICartService>(),
+                orchestrator.Object,
+                Mock.Of<IOrderQueryService>(),
+                Mock.Of<IOrderTrackingService>())
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = new ClaimsPrincipal(new ClaimsIdentity()),
+                    },
+                },
+            };
+            var checkout = new Checkout
+            {
+                PaymentMethodId = PaymentMethodIds.CashOnDelivery,
+                Carts = [],
+            };
+
+            var result = await controller.Checkout(checkout, CancellationToken.None);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
+            orchestrator.Verify(service => service.CheckoutAsync(
+                It.IsAny<Checkout>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
         public async Task SaveCheckout_ReturnsUnauthorized_WhenUserIdClaimIsMissing()
         {
             var cartService = new Mock<ICartService>();
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
 
-            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object)
+            var controller = new CartController(
+                cartService.Object,
+                Mock.Of<ICheckoutOrchestrator>(),
+                orderQueryService.Object,
+                trackingService.Object)
             {
                 ControllerContext = new ControllerContext
                 {
@@ -62,7 +152,11 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .Setup(service => service.SaveCheckoutHistoryAsync("user-1", orderItems))
                 .ReturnsAsync(new ServiceResponse(true, "Checkout history saved successfully"));
 
-            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object)
+            var controller = new CartController(
+                cartService.Object,
+                Mock.Of<ICheckoutOrchestrator>(),
+                orderQueryService.Object,
+                trackingService.Object)
             {
                 ControllerContext = new ControllerContext
                 {
@@ -94,7 +188,11 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .Setup(service => service.GetOrdersForUserAsync("user-1"))
                 .ReturnsAsync(Array.Empty<GetOrder>());
 
-            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object)
+            var controller = new CartController(
+                cartService.Object,
+                Mock.Of<ICheckoutOrchestrator>(),
+                orderQueryService.Object,
+                trackingService.Object)
             {
                 ControllerContext = new ControllerContext
                 {
@@ -127,7 +225,11 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .Setup(service => service.GetAllAsync())
                 .ReturnsAsync(Array.Empty<GetOrder>());
 
-            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object);
+            var controller = new CartController(
+                cartService.Object,
+                Mock.Of<ICheckoutOrchestrator>(),
+                orderQueryService.Object,
+                trackingService.Object);
 
             var result = await controller.GetAllOrders();
 
@@ -146,7 +248,11 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .Setup(service => service.UpdateTrackingAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync(false);
 
-            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object);
+            var controller = new CartController(
+                cartService.Object,
+                Mock.Of<ICheckoutOrchestrator>(),
+                orderQueryService.Object,
+                trackingService.Object);
 
             var result = await controller.UpdateTracking(Guid.NewGuid(), new UpdateTrackingRequest
             {
@@ -168,7 +274,11 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .Setup(service => service.UpdateShippingStatusAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
                 .ReturnsAsync(true);
 
-            var controller = new CartController(cartService.Object, orderQueryService.Object, trackingService.Object);
+            var controller = new CartController(
+                cartService.Object,
+                Mock.Of<ICheckoutOrchestrator>(),
+                orderQueryService.Object,
+                trackingService.Object);
 
             var result = await controller.UpdateShippingStatus(Guid.NewGuid(), new UpdateShippingStatusRequest
             {

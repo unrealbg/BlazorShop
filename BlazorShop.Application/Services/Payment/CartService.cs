@@ -1,4 +1,4 @@
-﻿namespace BlazorShop.Application.Services.Payment
+namespace BlazorShop.Application.Services.Payment
 {
     using AutoMapper;
 
@@ -8,47 +8,30 @@
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Contracts.Payment;
-    using BlazorShop.Domain.Entities;
     using BlazorShop.Domain.Entities.Payment;
-    using Microsoft.Extensions.Options;
 
     public class CartService : ICartService
     {
         private readonly ICart _cart;
         private readonly IMapper _mapper;
         private readonly IProductReadRepository _productReadRepository;
-        private readonly IPaymentMethodService _paymentMethodService;
-        private readonly IPaymentService _paymentService; // Stripe/Card
-        private readonly IPayPalPaymentService _payPalPaymentService; // PayPal
         private readonly IAppUserManager _userManager;
-        private readonly IInventoryReservationService _inventoryReservationService;
-        private readonly IEmailService _emailService;
-        private readonly BankTransferSettings _btSettings;
 
-        public CartService(ICart cart,
-                           IMapper mapper,
-                           IProductReadRepository productReadRepository,
-                           IPaymentMethodService paymentMethodService,
-                           IPaymentService paymentService,
-                           IPayPalPaymentService payPalPaymentService,
-                           IAppUserManager userManager,
-                           IInventoryReservationService inventoryReservationService,
-                           IEmailService emailService,
-                           IOptions<BankTransferSettings> bankTransferOptions)
+        public CartService(
+            ICart cart,
+            IMapper mapper,
+            IProductReadRepository productReadRepository,
+            IAppUserManager userManager)
         {
             _cart = cart;
             _mapper = mapper;
             _productReadRepository = productReadRepository;
-            _paymentMethodService = paymentMethodService;
-            _paymentService = paymentService;
-            _payPalPaymentService = payPalPaymentService;
             _userManager = userManager;
-            _inventoryReservationService = inventoryReservationService;
-            _emailService = emailService;
-            _btSettings = bankTransferOptions.Value;
         }
 
-        public async Task<ServiceResponse> SaveCheckoutHistoryAsync(string userId, IEnumerable<CreateOrderItem> orderItems)
+        public async Task<ServiceResponse> SaveCheckoutHistoryAsync(
+            string userId,
+            IEnumerable<CreateOrderItem> orderItems)
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
@@ -73,231 +56,23 @@
             var mappedData = _mapper.Map<IEnumerable<OrderItem>>(sanitizedOrderItems);
             var result = await _cart.SaveCheckoutHistory(mappedData);
 
-            return result > 0 ? new ServiceResponse(true, "Checkout history saved successfully") : new ServiceResponse(false, "Failed to save checkout history");
-        }
-
-        public async Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<CartLineRequest> carts, string userId)
-        {
-            if (string.IsNullOrWhiteSpace(userId))
-            {
-                return new ServiceResponse(false, "A signed-in user is required to confirm the order.");
-            }
-
-            var resolution = await ResolveCartLinesAsync(carts);
-            return resolution.Error ?? await CreateOrderAsync(
-                resolution.Lines,
-                userId,
-                "Pending",
-                "COD",
-                InventoryReservationStatus.Consumed);
-        }
-
-        public async Task<ServiceResponse> CheckoutAsync(Checkout checkout)
-        {
-            return await CheckoutAsync(checkout, null);
-        }
-
-        public async Task<ServiceResponse> CheckoutAsync(Checkout checkout, string? userId)
-        {
-            var methods = (await _paymentMethodService.GetPaymentMethodsAsync()).ToList();
-            if (!methods.Any()) return new ServiceResponse(false, "No payment methods available");
-
-            var creditCardId = methods.FirstOrDefault(m => m.Name == "Credit Card")?.Id;
-            var payPalId = methods.FirstOrDefault(m => m.Name == "PayPal")?.Id;
-            var codId = methods.FirstOrDefault(m => m.Name == "Cash on Delivery")?.Id;
-            var bankId = methods.FirstOrDefault(m => m.Name == "Bank Transfer")?.Id;
-
-            var isCreditCard = creditCardId.HasValue && checkout.PaymentMethodId == creditCardId.Value;
-            var isPayPal = payPalId.HasValue && checkout.PaymentMethodId == payPalId.Value;
-            var isCashOnDelivery = codId.HasValue && checkout.PaymentMethodId == codId.Value;
-            var isBankTransfer = bankId.HasValue && checkout.PaymentMethodId == bankId.Value;
-
-            if (!isCreditCard && !isPayPal && !isCashOnDelivery && !isBankTransfer)
-            {
-                return new ServiceResponse(false, "Invalid payment method");
-            }
-
-            var resolution = await ResolveCartLinesAsync(checkout.Carts);
-            if (resolution.Error is not null)
-            {
-                return resolution.Error;
-            }
-
-            var resolvedLines = resolution.Lines;
-            var totalAmount = resolvedLines.Sum(line => line.LineTotal);
-
-            if (isCreditCard)
-            {
-                var pendingOrder = await CreateOrderAsync(
-                    resolvedLines,
-                    userId,
-                    PaymentOrderStatus.PendingPayment,
-                    "STRIPE",
-                    InventoryReservationStatus.Reserved);
-
-                if (!pendingOrder.Success || !pendingOrder.Id.HasValue)
-                {
-                    return pendingOrder;
-                }
-
-                var paymentResult = await _paymentService.Pay(resolvedLines, pendingOrder.Id.Value);
-
-                if (!paymentResult.Success)
-                {
-                    var releaseResult = await _inventoryReservationService.TransitionOrderAsync(
-                        pendingOrder.Id.Value,
-                        PaymentOrderStatus.PaymentFailed,
-                        InventoryReservationStatus.Released);
-
-                    if (!releaseResult.Success)
-                    {
-                        return new ServiceResponse(
-                            false,
-                            releaseResult.ErrorMessage ?? "Unable to safely release inventory after payment initialization failed.");
-                    }
-                }
-
-                return paymentResult;
-            }
-            if (isPayPal)
-            {
-                return await _payPalPaymentService.Pay(resolvedLines);
-            }
-            if (isCashOnDelivery)
-            {
-                return new ServiceResponse(true, "Order placed with Cash on Delivery. You will pay upon delivery.");
-            }
-            if (isBankTransfer)
-            {
-                var reference = $"BT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}";
-                var orderResult = await CreateOrderAsync(
-                    resolvedLines,
-                    userId,
-                    "Pending",
-                    "BT",
-                    InventoryReservationStatus.Reserved,
-                    reference);
-
-                if (!orderResult.Success)
-                {
-                    return orderResult;
-                }
-
-                try
-                {
-                    if (!string.IsNullOrEmpty(userId))
-                    {
-                        var user = await _userManager.GetUserByIdAsync(userId);
-                        if (user != null && !string.IsNullOrEmpty(user.Email))
-                        {
-                            var iban = string.IsNullOrWhiteSpace(_btSettings.Iban) ? "BG00UNCR70001512345678" : _btSettings.Iban;
-                            var html = $@"<p>Thank you for your order.</p>
-<p>Please make a bank transfer to the following account:</p>
-<ul>
-<li>Bank: <b>{_btSettings.BankName}</b></li>
-<li>Beneficiary: <b>{_btSettings.Beneficiary}</b></li>
-<li>IBAN: <b>{iban}</b></li>
-<li>Amount: <b>{totalAmount:F2} EUR</b></li>
-<li>Reference: <b>{reference}</b></li>
-</ul>
-<p>{_btSettings.AdditionalInfo}</p>
-<p>Your order will be processed once we receive the payment.</p>";
-                            await _emailService.SendEmailAsync(user.Email, "Bank Transfer Instructions", html);
-                        }
-                    }
-                }
-                catch
-                {
-                    // ignored
-                }
-
-                var info = new BankTransferInfo
-                {
-                    Iban = _btSettings.Iban,
-                    Beneficiary = _btSettings.Beneficiary,
-                    BankName = _btSettings.BankName,
-                    Reference = reference,
-                    Amount = totalAmount,
-                    AdditionalInfo = _btSettings.AdditionalInfo
-                };
-
-                return new ServiceResponse(true, "Bank Transfer selected. Please check your email for payment instructions.")
-                {
-                    Payload = info
-                };
-            }
-
-            return new ServiceResponse(false, "Invalid payment method");
-        }
-
-        private async Task<ServiceResponse> CreateOrderAsync(
-            IReadOnlyCollection<ResolvedCartLine> lines,
-            string? userId,
-            string status,
-            string referencePrefix,
-            InventoryReservationStatus reservationStatus,
-            string? reference = null)
-        {
-            if (lines.Count == 0)
-            {
-                return new ServiceResponse(false, "Your cart is empty.");
-            }
-
-            var order = new Order
-            {
-                UserId = userId ?? string.Empty,
-                Status = status,
-                Reference = reference ?? $"{referencePrefix}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}",
-                TotalAmount = lines.Sum(line => line.LineTotal),
-                Lines = lines
-                    .Select(line => new OrderLine
-                    {
-                        ProductId = line.ProductId,
-                        ProductVariantId = line.VariantId,
-                        ProductNameSnapshot = line.ProductName,
-                        SkuSnapshot = line.Sku,
-                        SizeScaleSnapshot = line.SizeScale?.ToString(),
-                        SizeValueSnapshot = line.SizeValue,
-                        ColorSnapshot = line.Color,
-                        Quantity = line.Quantity,
-                        UnitPrice = line.UnitPrice,
-                        LineTotal = line.LineTotal,
-                    })
-                    .ToList(),
-            };
-
-            var reservationResult = await _inventoryReservationService.CreateOrderWithInventoryAsync(
-                order,
-                reservationStatus);
-
-            if (!reservationResult.Success)
-            {
-                return new ServiceResponse(
-                    false,
-                    reservationResult.ErrorMessage ?? "Unable to reserve the requested inventory.");
-            }
-
-            return new ServiceResponse(true, "Order saved successfully", order.Id)
-            {
-                Payload = new
-                {
-                    order.Id,
-                    order.Reference,
-                }
-            };
+            return result > 0
+                ? new ServiceResponse(true, "Checkout history saved successfully")
+                : new ServiceResponse(false, "Failed to save checkout history");
         }
 
         public async Task<IEnumerable<GetOrderItem>> GetOrderItemsAsync()
         {
             var history = (await _cart.GetAllCheckoutHistory())?.ToList();
 
-            if (history == null)
+            if (history is null)
             {
                 return [];
             }
 
-            var groupByCustomerId = history.GroupBy(x => x.UserId).ToList();
-            var products = await _productReadRepository.GetProductsByIdsAsync(history.Select(item => item.ProductId));
+            var groupByCustomerId = history.GroupBy(item => item.UserId).ToList();
+            var products = await _productReadRepository.GetProductsByIdsAsync(
+                history.Select(item => item.ProductId));
             var orderItems = new List<GetOrderItem>();
 
             foreach (var customerId in groupByCustomerId)
@@ -323,7 +98,7 @@
                         DatePurchased = item.CreatedOn,
                         TrackingNumber = null,
                         TrackingUrl = null,
-                        ShippingStatus = "PendingShipment"
+                        ShippingStatus = "PendingShipment",
                     });
                 }
             }
@@ -331,122 +106,18 @@
             return orderItems;
         }
 
-        private async Task<CartLineResolution> ResolveCartLinesAsync(IEnumerable<CartLineRequest> carts)
-        {
-            var cartList = carts?.ToList() ?? [];
-
-            if (cartList.Count == 0)
-            {
-                return CartLineResolution.Failure("Your cart is empty.");
-            }
-
-            if (cartList.Any(line => line.ProductId == Guid.Empty || line.Quantity <= 0))
-            {
-                return CartLineResolution.Failure("Every cart item must have a valid product and quantity.");
-            }
-
-            var productLookup = await _productReadRepository.GetProductsByIdsAsync(cartList.Select(line => line.ProductId));
-            var variantLookup = await _productReadRepository.GetProductVariantsByIdsAsync(
-                cartList.Where(line => line.VariantId.HasValue).Select(line => line.VariantId!.Value));
-            var productIdsWithVariants = await _productReadRepository.GetProductIdsWithVariantsAsync(
-                cartList.Select(line => line.ProductId));
-            var resolvedLines = new List<ResolvedCartLine>(cartList.Count);
-
-            foreach (var line in cartList)
-            {
-                if (!productLookup.TryGetValue(line.ProductId, out var product))
-                {
-                    return CartLineResolution.Failure("A product in the cart no longer exists.");
-                }
-
-                if (!product.IsPublished || product.PublishedOn is null)
-                {
-                    return CartLineResolution.Failure("A product in the cart is not currently purchasable.");
-                }
-
-                ProductVariant? variant = null;
-                if (line.VariantId.HasValue)
-                {
-                    if (!variantLookup.TryGetValue(line.VariantId.Value, out variant))
-                    {
-                        return CartLineResolution.Failure("A selected product variant no longer exists.");
-                    }
-
-                    if (variant.ProductId != line.ProductId)
-                    {
-                        return CartLineResolution.Failure("A selected product variant does not belong to the requested product.");
-                    }
-
-                    if (variant.Stock <= 0)
-                    {
-                        return CartLineResolution.Failure("A selected product variant is not currently purchasable.");
-                    }
-
-                    if (line.Quantity > variant.Stock)
-                    {
-                        return CartLineResolution.Failure("The requested quantity exceeds the selected product variant's current availability.");
-                    }
-                }
-                else
-                {
-                    if (productIdsWithVariants.Contains(line.ProductId))
-                    {
-                        return CartLineResolution.Failure("A product variant must be selected for this product.");
-                    }
-
-                    if (product.Quantity <= 0)
-                    {
-                        return CartLineResolution.Failure("A product in the cart is not currently purchasable.");
-                    }
-
-                    if (line.Quantity > product.Quantity)
-                    {
-                        return CartLineResolution.Failure("The requested quantity exceeds the product's current availability.");
-                    }
-                }
-
-                var unitPrice = variant?.Price ?? product.Price;
-                if (unitPrice <= 0)
-                {
-                    return CartLineResolution.Failure("A product in the cart does not have a valid current price.");
-                }
-
-                resolvedLines.Add(new ResolvedCartLine(
-                    product.Id,
-                    variant?.Id,
-                    line.Quantity,
-                    unitPrice,
-                    product.Name ?? "Product",
-                    product.Description,
-                    variant?.Sku,
-                    variant?.SizeScale,
-                    variant?.SizeValue,
-                    variant?.Color));
-            }
-
-            return CartLineResolution.Success(resolvedLines);
-        }
-
-        private sealed record CartLineResolution(IReadOnlyList<ResolvedCartLine> Lines, ServiceResponse? Error)
-        {
-            public static CartLineResolution Success(IReadOnlyList<ResolvedCartLine> lines) => new(lines, null);
-
-            public static CartLineResolution Failure(string message) => new([], new ServiceResponse(false, message));
-        }
-
         public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId(string userId)
         {
             var history = (await _cart.GetCheckoutHistoryByUserId(userId))?.ToList();
 
-            if (history == null || !history.Any())
+            if (history is null || history.Count == 0)
             {
-                return new List<GetOrderItem>();
+                return [];
             }
 
-            var products = await _productReadRepository.GetProductsByIdsAsync(history.Select(item => item.ProductId));
-
+            var products = await _productReadRepository.GetProductsByIdsAsync(
+                history.Select(item => item.ProductId));
             var orderItems = new List<GetOrderItem>();
-
             var customerDetails = await _userManager.GetUserByIdAsync(userId);
 
             foreach (var item in history)
@@ -454,17 +125,17 @@
                 products.TryGetValue(item.ProductId, out var product);
 
                 orderItems.Add(new GetOrderItem
-                                   {
-                                       CustomerName = customerDetails?.UserName,
-                                       CustomerEmail = customerDetails?.Email,
-                                       ProductName = product?.Name,
-                                       AmountPayed = item.Quantity * (product?.Price ?? 0),
-                                       QuantityOrdered = item.Quantity,
-                                       DatePurchased = item.CreatedOn,
-                                       TrackingNumber = null,
-                                       TrackingUrl = null,
-                                       ShippingStatus = "PendingShipment"
-                                   });
+                {
+                    CustomerName = customerDetails?.UserName,
+                    CustomerEmail = customerDetails?.Email,
+                    ProductName = product?.Name,
+                    AmountPayed = item.Quantity * (product?.Price ?? 0),
+                    QuantityOrdered = item.Quantity,
+                    DatePurchased = item.CreatedOn,
+                    TrackingNumber = null,
+                    TrackingUrl = null,
+                    ShippingStatus = "PendingShipment",
+                });
             }
 
             return orderItems;

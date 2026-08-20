@@ -1,6 +1,5 @@
 ﻿namespace BlazorShop.Infrastructure.Services
 {
-    using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
@@ -25,7 +24,10 @@
             _logger = logger;
         }
 
-        public async Task<ServiceResponse> Pay(IReadOnlyCollection<ResolvedCartLine> lines, Guid orderId)
+        public async Task<PaymentInitializationResult> Pay(
+            IReadOnlyCollection<ResolvedCartLine> lines,
+            Guid orderId,
+            string orderReference)
         {
             try
             {
@@ -67,18 +69,21 @@
                             ["order_id"] = orderId.ToString("D"),
                         },
                     },
-                    SuccessUrl = this.BuildClientUrl("payment-success?pm=card&session_id={CHECKOUT_SESSION_ID}"),
+                    SuccessUrl = this.BuildClientUrl(
+                        $"payment-success?pm=card&order_id={orderId:D}&reference={Uri.EscapeDataString(orderReference)}&session_id={{CHECKOUT_SESSION_ID}}"),
                     CancelUrl = this.BuildClientUrl($"payment-cancel?order_id={orderId:D}"),
                 };
 
                 var session = await _checkoutSessionService.CreateAsync(opt);
 
-                return new ServiceResponse(true, session.Url);
+                return new PaymentInitializationResult(true, session.Url);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to create Stripe checkout session.");
-                return new ServiceResponse(false, "Unable to initialize the card payment session. Please try again later.");
+                return new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Unable to initialize the card payment session. Please try again later.");
             }
         }
 

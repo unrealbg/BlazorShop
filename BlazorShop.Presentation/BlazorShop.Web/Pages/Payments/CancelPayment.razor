@@ -1,20 +1,24 @@
-﻿@page "/payment-cancel"
+@page "/payment-cancel"
 
 <div class="container m-5 p-5">
     <div class="row">
         <div class="col-lg-6 offset-3">
-            <div class="alert alert-danger text-center">Payment Canceled</div>
+            <div class="alert alert-warning text-center" role="status">
+                <h4>Payment not completed</h4>
+                <p>Visiting this page does not change your order or inventory.</p>
+                @if (OrderId.HasValue)
+                {
+                    <p>Order ID: @OrderId.Value</p>
+                }
+                <p>The server will use trusted payment events to determine the final order status.</p>
+                <a href="/account/orders">View orders</a>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
-    protected override void OnInitialized()
-    {
-        NotificationService.NotifyWarning(
-            "Payment was canceled. Your cart is still available if you want to try again.",
-            "Payment canceled",
-            NotificationKind.Payment,
-            link: "/account/checkout");
-    }
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "order_id")]
+    public Guid? OrderId { get; set; }
 }

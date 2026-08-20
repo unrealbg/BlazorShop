@@ -1,27 +1,52 @@
-﻿@page "/payment-success"
+@page "/payment-success"
 @page "/payment-success/{bt:int?}"
-@using BlazorShop.Domain.Contracts.Payment
 
 <section class="success-payment">
     <div class="card shadow-sm success-payment-card">
         <div class="card-header text-center">
-            <h4 class="mb-0">Payment Success</h4>
+            <h4 class="mb-0">Order received</h4>
         </div>
         <div class="card-body">
-            <div class="alert alert-success text-center" role="alert">
-                <h4 class="alert-heading">Thank you for your purchase!</h4>
-                <p>Your payment was successful. Your order will be delivered soon.</p>
+            <div class="alert alert-success text-center" role="status">
+                <h4 class="alert-heading">Thank you for your order!</h4>
+                @if (NormalizedPaymentMethod == "card")
+                {
+                    <p>Your order already exists. Its payment status will be updated from Stripe's trusted server notification.</p>
+                }
+                else if (NormalizedPaymentMethod == "bank" || Bt.GetValueOrDefault() == 1)
+                {
+                    <p>Your order is awaiting the bank transfer described in your checkout instructions.</p>
+                }
+                else
+                {
+                    <p>Your order was placed successfully and is awaiting fulfillment.</p>
+                }
+
+                @if (OrderId.HasValue || !string.IsNullOrWhiteSpace(OrderReference))
+                {
+                    <hr>
+                    <dl class="mb-0">
+                        @if (!string.IsNullOrWhiteSpace(OrderReference))
+                        {
+                            <dt>Order reference</dt>
+                            <dd>@OrderReference</dd>
+                        }
+                        @if (OrderId.HasValue)
+                        {
+                            <dt>Order ID</dt>
+                            <dd>@OrderId.Value</dd>
+                        }
+                    </dl>
+                }
+
                 <hr>
-                <p class="mb-0">You can track your order in the <a href="/account/orders">Orders</a> page.</p>
+                <p class="mb-0">View the current server-known status on the <a href="/account/orders">Orders</a> page.</p>
             </div>
         </div>
     </div>
 </section>
 
 @code {
-    [CascadingParameter]
-    public Task<AuthenticationState>? UserAuthState { get; set; }
-
     [Parameter]
     [SupplyParameterFromQuery(Name = "bt")]
     public int? Bt { get; set; }
@@ -31,99 +56,12 @@
     public string? PaymentMethod { get; set; }
 
     [Parameter]
-    [SupplyParameterFromQuery(Name = "session_id")]
-    public string? StripeSessionId { get; set; }
+    [SupplyParameterFromQuery(Name = "order_id")]
+    public Guid? OrderId { get; set; }
 
-    protected override async Task OnInitializedAsync()
-    {
-        var isBankTransfer = Bt.GetValueOrDefault() == 1;
-        var normalizedPaymentMethod = PaymentMethod?.Trim().ToLowerInvariant();
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "reference")]
+    public string? OrderReference { get; set; }
 
-        try
-        {
-            if (UserAuthState is null)
-            {
-                return;
-            }
-
-            var authState = await UserAuthState;
-            var user = authState?.User;
-            if (user?.Identity?.IsAuthenticated == true)
-            {
-                var cartString = await CookieStorageService.GetAsync(Constant.Cart.Name);
-                if (!string.IsNullOrEmpty(cartString))
-                {
-                    var list = JsonSerializer.Deserialize<IEnumerable<ProcessCart>>(cartString) ?? Enumerable.Empty<ProcessCart>();
-                    var userId = user.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-
-                    if (!string.IsNullOrEmpty(userId) && list.Any())
-                    {
-                        if (!isBankTransfer)
-                        {
-                            if (normalizedPaymentMethod is not ("card" or "cod"))
-                            {
-                                NotificationService.NotifyWarning(
-                                    "We couldn't confirm the payment result for this order yet.",
-                                    "Order update",
-                                    NotificationKind.Order,
-                                    link: "/account/checkout");
-                                return;
-                            }
-
-                            if (normalizedPaymentMethod == "cod")
-                            {
-                                var cartLines = list.Select(item =>
-                                    new CartLineRequest(item.ProductId, item.VariantId, item.Quantity));
-                                var confirmResult = await CartService.ConfirmOrder(cartLines);
-
-                                if (confirmResult.Success)
-                                {
-                                    NotificationService.NotifySuccess(
-                                        "Your order was placed successfully.",
-                                        "Order placed",
-                                        NotificationKind.Order,
-                                        link: "/account/orders");
-                                }
-                                else
-                                {
-                                    NotificationService.NotifyWarning(
-                                        "We could not finalize the order record right now.",
-                                        "Order update",
-                                        NotificationKind.Order,
-                                        link: "/account/orders");
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                NotificationService.NotifySuccess(
-                                    "Stripe accepted your payment. The signed webhook is finalizing your order status.",
-                                    "Payment received",
-                                    NotificationKind.Payment,
-                                    link: "/account/orders");
-                            }
-                        }
-                        else
-                        {
-                            NotificationService.NotifyInfo(
-                                "Your order has been placed. Complete the bank transfer using the checkout instructions.",
-                                "Payment pending",
-                                NotificationKind.Payment,
-                                link: "/account/orders");
-                        }
-
-                        await CookieStorageService.RemoveAsync(Constant.Cart.Name);
-                    }
-                }
-            }
-        }
-        catch
-        {
-            NotificationService.NotifyWarning(
-                "Your payment was processed, but we could not update the local order state completely.",
-                "Order update",
-                NotificationKind.Order,
-                link: "/account/orders");
-        }
-    }
+    private string? NormalizedPaymentMethod => PaymentMethod?.Trim().ToLowerInvariant();
 }
