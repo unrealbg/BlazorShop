@@ -1,7 +1,6 @@
 namespace BlazorShop.Tests.Infrastructure.Services
 {
     using BlazorShop.Application.DTOs.Payment;
-    using BlazorShop.Domain.Entities;
     using BlazorShop.Infrastructure.Services;
 
     using Xunit;
@@ -13,7 +12,8 @@ namespace BlazorShop.Tests.Infrastructure.Services
         [Fact]
         public async Task Pay_ReturnsFailureResponse()
         {
-            var result = await _service.Pay(10m, [], [new ProcessCart { ProductId = Guid.NewGuid(), Quantity = 1 }]);
+            var result = await _service.Pay(
+                [new ResolvedCartLine(Guid.NewGuid(), null, 1, 10m, "Product", null, null, null, null)]);
 
             Assert.False(result.Success);
             Assert.Equal("PayPal payments are not currently available.", result.Message);

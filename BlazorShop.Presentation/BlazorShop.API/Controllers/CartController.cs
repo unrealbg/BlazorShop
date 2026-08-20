@@ -60,7 +60,7 @@
 
         [HttpPost("confirm-order")]
         [Authorize(Roles = "User, Admin")]
-        public async Task<IActionResult> ConfirmOrder(IEnumerable<ProcessCart> carts)
+        public async Task<IActionResult> ConfirmOrder(IEnumerable<CartLineRequest> carts)
         {
             var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 

@@ -3,6 +3,7 @@
     using System.Net;
     using System.Text.Json;
 
+    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.Models.Notifications;
@@ -260,7 +261,13 @@
 
             try
             {
-                var checkout = new Checkout() { PaymentMethodId = paymentMethod.Id, Carts = _myCarts };
+                var checkout = new Checkout
+                {
+                    PaymentMethodId = paymentMethod.Id,
+                    Carts = _myCarts
+                        .Select(item => new CartLineRequest(item.ProductId, item.VariantId, item.Quantity))
+                        .ToArray(),
+                };
                 var result = await this.CartService.Checkout(checkout);
 
                 if (result.Success)

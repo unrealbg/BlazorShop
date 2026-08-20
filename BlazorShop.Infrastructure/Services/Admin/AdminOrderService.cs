@@ -205,6 +205,17 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 .Select(product => new { product.Id, product.Name })
                 .ToDictionaryAsync(product => product.Id, product => product.Name ?? string.Empty);
 
+            var variantIds = orders
+                .SelectMany(order => order.Lines)
+                .Where(line => line.ProductVariantId.HasValue)
+                .Select(line => line.ProductVariantId!.Value)
+                .Distinct()
+                .ToArray();
+            var variants = await _db.ProductVariants
+                .AsNoTracking()
+                .Where(variant => variantIds.Contains(variant.Id))
+                .ToDictionaryAsync(variant => variant.Id);
+
             var userIds = orders.Select(order => order.UserId).Where(userId => !string.IsNullOrWhiteSpace(userId)).Distinct().ToArray();
             var users = await _db.Users
                 .AsNoTracking()
@@ -232,12 +243,20 @@ namespace BlazorShop.Infrastructure.Services.Admin
                     CustomerName = string.IsNullOrWhiteSpace(user?.FullName) ? user?.UserName : user.FullName,
                     CustomerEmail = user?.Email,
                     AdminNote = order.AdminNote,
-                    Lines = order.Lines.Select(line => new GetOrderLine
+                    Lines = order.Lines.Select(line =>
                     {
-                        ProductId = line.ProductId,
-                        Quantity = line.Quantity,
-                        UnitPrice = line.UnitPrice,
-                        ProductName = productNames.TryGetValue(line.ProductId, out var productName) ? productName : string.Empty,
+                        variants.TryGetValue(line.ProductVariantId ?? Guid.Empty, out var variant);
+                        return new GetOrderLine
+                        {
+                            ProductId = line.ProductId,
+                            VariantId = line.ProductVariantId,
+                            Quantity = line.Quantity,
+                            UnitPrice = line.UnitPrice,
+                            ProductName = productNames.TryGetValue(line.ProductId, out var productName) ? productName : string.Empty,
+                            Sku = variant?.Sku,
+                            SizeValue = variant?.SizeValue,
+                            Color = variant?.Color,
+                        };
                     }),
                 };
             }).ToArray();

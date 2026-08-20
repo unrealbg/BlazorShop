@@ -73,9 +73,9 @@
                                         <h2 class="text-xl font-bold text-neutral-900">@line.DisplayName</h2>
                                     }
 
-                                    @if (!string.IsNullOrWhiteSpace(line.SizeValue))
+                                    @if (!string.IsNullOrWhiteSpace(line.VariantLabel))
                                     {
-                                        <p class="mt-1 text-sm font-medium uppercase tracking-[0.16em] text-neutral-500">Size @line.SizeValue</p>
+                                        <p class="mt-1 text-sm font-medium uppercase tracking-[0.16em] text-neutral-500">@line.VariantLabel</p>
                                     }
 
                                     @if (line.IsUnavailable)

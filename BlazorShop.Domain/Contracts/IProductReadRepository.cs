@@ -23,5 +23,9 @@ namespace BlazorShop.Domain.Contracts
         Task<bool> ProductSlugExistsAsync(string slug, Guid? excludedProductId = null);
 
         Task<IReadOnlyDictionary<Guid, Product>> GetProductsByIdsAsync(IEnumerable<Guid> productIds);
+
+        Task<IReadOnlyDictionary<Guid, ProductVariant>> GetProductVariantsByIdsAsync(IEnumerable<Guid> variantIds);
+
+        Task<IReadOnlySet<Guid>> GetProductIdsWithVariantsAsync(IEnumerable<Guid> productIds);
     }
 }

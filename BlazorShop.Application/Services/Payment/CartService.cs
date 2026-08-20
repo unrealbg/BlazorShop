@@ -76,14 +76,15 @@
             return result > 0 ? new ServiceResponse(true, "Checkout history saved successfully") : new ServiceResponse(false, "Failed to save checkout history");
         }
 
-        public async Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<ProcessCart> carts, string userId)
+        public async Task<ServiceResponse> ConfirmOrderAsync(IEnumerable<CartLineRequest> carts, string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))
             {
                 return new ServiceResponse(false, "A signed-in user is required to confirm the order.");
             }
 
-            return await CreateOrderAsync(carts, userId, "Pending", "COD");
+            var resolution = await ResolveCartLinesAsync(carts);
+            return resolution.Error ?? await CreateOrderAsync(resolution.Lines, userId, "Pending", "COD");
         }
 
         public async Task<ServiceResponse> CheckoutAsync(Checkout checkout)
@@ -93,7 +94,6 @@
 
         public async Task<ServiceResponse> CheckoutAsync(Checkout checkout, string? userId)
         {
-            var (products, totalAmount) = await this.GetCartTotalAmount(checkout.Carts);
             var methods = (await _paymentMethodService.GetPaymentMethodsAsync()).ToList();
             if (!methods.Any()) return new ServiceResponse(false, "No payment methods available");
 
@@ -102,10 +102,29 @@
             var codId = methods.FirstOrDefault(m => m.Name == "Cash on Delivery")?.Id;
             var bankId = methods.FirstOrDefault(m => m.Name == "Bank Transfer")?.Id;
 
-            if (creditCardId.HasValue && checkout.PaymentMethodId == creditCardId.Value)
+            var isCreditCard = creditCardId.HasValue && checkout.PaymentMethodId == creditCardId.Value;
+            var isPayPal = payPalId.HasValue && checkout.PaymentMethodId == payPalId.Value;
+            var isCashOnDelivery = codId.HasValue && checkout.PaymentMethodId == codId.Value;
+            var isBankTransfer = bankId.HasValue && checkout.PaymentMethodId == bankId.Value;
+
+            if (!isCreditCard && !isPayPal && !isCashOnDelivery && !isBankTransfer)
+            {
+                return new ServiceResponse(false, "Invalid payment method");
+            }
+
+            var resolution = await ResolveCartLinesAsync(checkout.Carts);
+            if (resolution.Error is not null)
+            {
+                return resolution.Error;
+            }
+
+            var resolvedLines = resolution.Lines;
+            var totalAmount = resolvedLines.Sum(line => line.LineTotal);
+
+            if (isCreditCard)
             {
                 var pendingOrder = await CreateOrderAsync(
-                    checkout.Carts,
+                    resolvedLines,
                     userId,
                     PaymentOrderStatus.PendingPayment,
                     "STRIPE");
@@ -115,11 +134,7 @@
                     return pendingOrder;
                 }
 
-                var paymentResult = await _paymentService.Pay(
-                    totalAmount,
-                    products,
-                    checkout.Carts,
-                    pendingOrder.Id.Value);
+                var paymentResult = await _paymentService.Pay(resolvedLines, pendingOrder.Id.Value);
 
                 if (!paymentResult.Success)
                 {
@@ -130,18 +145,18 @@
 
                 return paymentResult;
             }
-            if (payPalId.HasValue && checkout.PaymentMethodId == payPalId.Value)
+            if (isPayPal)
             {
-                return await _payPalPaymentService.Pay(totalAmount, products, checkout.Carts);
+                return await _payPalPaymentService.Pay(resolvedLines);
             }
-            if (codId.HasValue && checkout.PaymentMethodId == codId.Value)
+            if (isCashOnDelivery)
             {
                 return new ServiceResponse(true, "Order placed with Cash on Delivery. You will pay upon delivery.");
             }
-            if (bankId.HasValue && checkout.PaymentMethodId == bankId.Value)
+            if (isBankTransfer)
             {
                 var reference = $"BT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}";
-                var orderResult = await CreateOrderAsync(checkout.Carts, userId, "Pending", "BT", reference);
+                var orderResult = await CreateOrderAsync(resolvedLines, userId, "Pending", "BT", reference);
 
                 if (!orderResult.Success)
                 {
@@ -196,27 +211,15 @@
         }
 
         private async Task<ServiceResponse> CreateOrderAsync(
-            IEnumerable<ProcessCart> carts,
+            IReadOnlyCollection<ResolvedCartLine> lines,
             string? userId,
             string status,
             string referencePrefix,
             string? reference = null)
         {
-            var cartList = carts
-                .Where(item => item.ProductId != Guid.Empty && item.Quantity > 0)
-                .ToList();
-
-            if (cartList.Count == 0)
+            if (lines.Count == 0)
             {
                 return new ServiceResponse(false, "Your cart is empty.");
-            }
-
-            var (products, totalAmount) = await GetCartTotalAmount(cartList);
-            var productMap = products.ToDictionary(product => product.Id);
-
-            if (productMap.Count == 0 || totalAmount <= 0)
-            {
-                return new ServiceResponse(false, "We couldn't resolve the cart items for this order.");
             }
 
             var order = new Order
@@ -224,22 +227,17 @@
                 UserId = userId ?? string.Empty,
                 Status = status,
                 Reference = reference ?? $"{referencePrefix}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}",
-                TotalAmount = totalAmount,
-                Lines = cartList
-                    .Where(item => productMap.ContainsKey(item.ProductId))
-                    .Select(item => new OrderLine
+                TotalAmount = lines.Sum(line => line.LineTotal),
+                Lines = lines
+                    .Select(line => new OrderLine
                     {
-                        ProductId = item.ProductId,
-                        Quantity = item.Quantity,
-                        UnitPrice = productMap[item.ProductId].Price,
+                        ProductId = line.ProductId,
+                        ProductVariantId = line.VariantId,
+                        Quantity = line.Quantity,
+                        UnitPrice = line.UnitPrice,
                     })
                     .ToList(),
             };
-
-            if (order.Lines.Count == 0)
-            {
-                return new ServiceResponse(false, "We couldn't resolve the cart items for this order.");
-            }
 
             await _orderRepository.CreateAsync(order);
 
@@ -297,30 +295,106 @@
             return orderItems;
         }
 
-        private async Task<(IEnumerable<Product>, decimal)> GetCartTotalAmount(IEnumerable<ProcessCart> carts)
+        private async Task<CartLineResolution> ResolveCartLinesAsync(IEnumerable<CartLineRequest> carts)
         {
-            var cartList = carts.ToList();
+            var cartList = carts?.ToList() ?? [];
 
             if (cartList.Count == 0)
             {
-                return ([], 0);
+                return CartLineResolution.Failure("Your cart is empty.");
             }
 
-            var productLookup = await _productReadRepository.GetProductsByIdsAsync(cartList.Select(item => item.ProductId));
-
-            if (productLookup.Count == 0)
+            if (cartList.Any(line => line.ProductId == Guid.Empty || line.Quantity <= 0))
             {
-                return ([], 0);
+                return CartLineResolution.Failure("Every cart item must have a valid product and quantity.");
             }
 
-            var cartProducts = productLookup.Values.ToList();
+            var productLookup = await _productReadRepository.GetProductsByIdsAsync(cartList.Select(line => line.ProductId));
+            var variantLookup = await _productReadRepository.GetProductVariantsByIdsAsync(
+                cartList.Where(line => line.VariantId.HasValue).Select(line => line.VariantId!.Value));
+            var productIdsWithVariants = await _productReadRepository.GetProductIdsWithVariantsAsync(
+                cartList.Select(line => line.ProductId));
+            var resolvedLines = new List<ResolvedCartLine>(cartList.Count);
 
-            var totalAmount = cartList.Sum(item =>
-                productLookup.TryGetValue(item.ProductId, out var product)
-                    ? item.Quantity * product.Price
-                    : 0);
+            foreach (var line in cartList)
+            {
+                if (!productLookup.TryGetValue(line.ProductId, out var product))
+                {
+                    return CartLineResolution.Failure("A product in the cart no longer exists.");
+                }
 
-            return (cartProducts, totalAmount);
+                if (!product.IsPublished || product.PublishedOn is null)
+                {
+                    return CartLineResolution.Failure("A product in the cart is not currently purchasable.");
+                }
+
+                ProductVariant? variant = null;
+                if (line.VariantId.HasValue)
+                {
+                    if (!variantLookup.TryGetValue(line.VariantId.Value, out variant))
+                    {
+                        return CartLineResolution.Failure("A selected product variant no longer exists.");
+                    }
+
+                    if (variant.ProductId != line.ProductId)
+                    {
+                        return CartLineResolution.Failure("A selected product variant does not belong to the requested product.");
+                    }
+
+                    if (variant.Stock <= 0)
+                    {
+                        return CartLineResolution.Failure("A selected product variant is not currently purchasable.");
+                    }
+
+                    if (line.Quantity > variant.Stock)
+                    {
+                        return CartLineResolution.Failure("The requested quantity exceeds the selected product variant's current availability.");
+                    }
+                }
+                else
+                {
+                    if (productIdsWithVariants.Contains(line.ProductId))
+                    {
+                        return CartLineResolution.Failure("A product variant must be selected for this product.");
+                    }
+
+                    if (product.Quantity <= 0)
+                    {
+                        return CartLineResolution.Failure("A product in the cart is not currently purchasable.");
+                    }
+
+                    if (line.Quantity > product.Quantity)
+                    {
+                        return CartLineResolution.Failure("The requested quantity exceeds the product's current availability.");
+                    }
+                }
+
+                var unitPrice = variant?.Price ?? product.Price;
+                if (unitPrice <= 0)
+                {
+                    return CartLineResolution.Failure("A product in the cart does not have a valid current price.");
+                }
+
+                resolvedLines.Add(new ResolvedCartLine(
+                    product.Id,
+                    variant?.Id,
+                    line.Quantity,
+                    unitPrice,
+                    product.Name ?? "Product",
+                    product.Description,
+                    variant?.Sku,
+                    variant?.SizeValue,
+                    variant?.Color));
+            }
+
+            return CartLineResolution.Success(resolvedLines);
+        }
+
+        private sealed record CartLineResolution(IReadOnlyList<ResolvedCartLine> Lines, ServiceResponse? Error)
+        {
+            public static CartLineResolution Success(IReadOnlyList<ResolvedCartLine> lines) => new(lines, null);
+
+            public static CartLineResolution Failure(string message) => new([], new ServiceResponse(false, message));
         }
 
         public async Task<IEnumerable<GetOrderItem>> GetCheckoutHistoryByUserId(string userId)

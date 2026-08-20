@@ -6,6 +6,7 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Domain.Contracts.Payment;
+    using BlazorShop.Domain.Entities;
     using BlazorShop.Domain.Entities.Payment;
     using BlazorShop.Infrastructure.Data;
     using BlazorShop.Infrastructure.Services.Admin;
@@ -43,6 +44,56 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
 
             Assert.True(result.Success);
             Assert.Equal("Call before shipping", (await context.Orders.FindAsync(order.Id))!.AdminNote);
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_ReturnsSelectedVariantDetails()
+        {
+            await using var context = CreateContext();
+            var category = new Category { Id = Guid.NewGuid(), Name = "Shoes" };
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Runner",
+                CategoryId = category.Id,
+            };
+            var variant = new ProductVariant
+            {
+                Id = Guid.NewGuid(),
+                ProductId = product.Id,
+                Sku = "RUN-42-BLK",
+                SizeValue = "42",
+                Color = "Black",
+                Stock = 3,
+            };
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                Reference = "BS-2",
+                UserId = string.Empty,
+                Lines =
+                [
+                    new OrderLine
+                    {
+                        ProductId = product.Id,
+                        ProductVariantId = variant.Id,
+                        Quantity = 1,
+                        UnitPrice = 95m,
+                    },
+                ],
+            };
+            context.AddRange(category, product, variant, order);
+            await context.SaveChangesAsync();
+            var service = CreateService(context);
+
+            var result = await service.GetByIdAsync(order.Id);
+
+            Assert.True(result.Success);
+            var line = Assert.Single(result.Payload!.Lines);
+            Assert.Equal(variant.Id, line.VariantId);
+            Assert.Equal("RUN-42-BLK", line.Sku);
+            Assert.Equal("42", line.SizeValue);
+            Assert.Equal("Black", line.Color);
         }
 
         private static AdminOrderService CreateService(AppDbContext context)

@@ -2,7 +2,6 @@ namespace BlazorShop.Tests.Infrastructure
 {
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
-    using BlazorShop.Domain.Entities;
     using BlazorShop.Infrastructure.Services;
 
     using Microsoft.Extensions.Logging;
@@ -31,9 +30,7 @@ namespace BlazorShop.Tests.Infrastructure
             var orderId = Guid.NewGuid();
 
             var result = await paymentService.Pay(
-                25m,
-                [new Product { Id = productId, Name = "Camera", Description = "Mirrorless", Price = 25m }],
-                [new ProcessCart { ProductId = productId, Quantity = 1 }],
+                [new ResolvedCartLine(productId, null, 1, 25m, "Camera", "Mirrorless", null, null, null)],
                 orderId);
 
             Assert.False(result.Success);
@@ -47,6 +44,7 @@ namespace BlazorShop.Tests.Infrastructure
             var sessionService = new Mock<IStripeCheckoutSessionService>();
             var logger = new Mock<ILogger<StripePaymentService>>();
             var productId = Guid.NewGuid();
+            var variantId = Guid.NewGuid();
             SessionCreateOptions? capturedOptions = null;
 
             sessionService
@@ -58,9 +56,7 @@ namespace BlazorShop.Tests.Infrastructure
             var orderId = Guid.NewGuid();
 
             var result = await paymentService.Pay(
-                25m,
-                [new Product { Id = productId, Name = "Camera", Description = "Mirrorless", Price = 25m }],
-                [new ProcessCart { ProductId = productId, Quantity = 1 }],
+                [new ResolvedCartLine(productId, variantId, 2, 39.95m, "Camera", "Mirrorless", "CAM-BLK", "One Size", "Black")],
                 orderId);
 
             Assert.True(result.Success);
@@ -73,6 +69,11 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.Equal(orderId.ToString("D"), capturedOptions.ClientReferenceId);
             Assert.Equal(orderId.ToString("D"), capturedOptions.Metadata["order_id"]);
             Assert.Equal(orderId.ToString("D"), capturedOptions.PaymentIntentData.Metadata["order_id"]);
+            var lineItem = Assert.Single(capturedOptions.LineItems);
+            Assert.Equal(3995, lineItem.PriceData.UnitAmount);
+            Assert.Equal(2, lineItem.Quantity);
+            Assert.Equal("Camera", lineItem.PriceData.ProductData.Name);
+            Assert.Contains("CAM-BLK", lineItem.PriceData.ProductData.Description);
         }
 
         private static StripePaymentService CreatePaymentService(

@@ -97,11 +97,20 @@ namespace BlazorShop.Storefront.Pages
             foreach (var cartItem in cartItems)
             {
                 var quantity = Math.Max(1, cartItem.Quantity);
-                var sizeValue = string.IsNullOrWhiteSpace(cartItem.SizeValue) ? null : cartItem.SizeValue.Trim();
-
                 if (productsById.TryGetValue(cartItem.ProductId, out var product))
                 {
-                    var unitPrice = cartItem.UnitPrice ?? product.Price;
+                    var variant = cartItem.VariantId.HasValue
+                        ? product.Variants.FirstOrDefault(candidate => candidate.Id == cartItem.VariantId.Value)
+                        : null;
+                    var isUnavailable = cartItem.VariantId.HasValue
+                        ? variant is null || variant.Stock <= 0
+                        : product.Quantity <= 0;
+
+                    if (isUnavailable)
+                    {
+                        unavailableItems++;
+                    }
+
                     lines.Add(new CartLine(
                         ProductId: cartItem.ProductId,
                         VariantId: cartItem.VariantId,
@@ -109,9 +118,11 @@ namespace BlazorShop.Storefront.Pages
                         ProductUrl: string.IsNullOrWhiteSpace(product.Slug) ? null : StorefrontRoutes.Product(product.Slug),
                         ImageUrl: product.Image,
                         Quantity: quantity,
-                        UnitPrice: unitPrice,
-                        SizeValue: sizeValue,
-                        IsUnavailable: false));
+                        UnitPrice: variant?.Price ?? product.Price,
+                        SizeValue: variant?.SizeValue,
+                        Sku: variant?.Sku,
+                        Color: variant?.Color,
+                        IsUnavailable: isUnavailable));
                     continue;
                 }
 
@@ -123,8 +134,10 @@ namespace BlazorShop.Storefront.Pages
                     ProductUrl: null,
                     ImageUrl: null,
                     Quantity: quantity,
-                    UnitPrice: cartItem.UnitPrice ?? 0m,
-                    SizeValue: sizeValue,
+                    UnitPrice: 0m,
+                    SizeValue: null,
+                    Sku: null,
+                    Color: null,
                     IsUnavailable: true));
             }
 
@@ -151,6 +164,8 @@ namespace BlazorShop.Storefront.Pages
             int Quantity,
             decimal UnitPrice,
             string? SizeValue,
+            string? Sku,
+            string? Color,
             bool IsUnavailable)
         {
             public decimal LineTotal => UnitPrice * Quantity;
@@ -158,6 +173,23 @@ namespace BlazorShop.Storefront.Pages
             public string UnitPriceDisplay => UnitPrice.ToString("0.00", CultureInfo.InvariantCulture);
 
             public string LineTotalDisplay => LineTotal.ToString("0.00", CultureInfo.InvariantCulture);
+
+            public string? VariantLabel
+            {
+                get
+                {
+                    var details = new[]
+                        {
+                            string.IsNullOrWhiteSpace(Sku) ? null : $"SKU {Sku}",
+                            string.IsNullOrWhiteSpace(SizeValue) ? null : $"Size {SizeValue}",
+                            string.IsNullOrWhiteSpace(Color) ? null : Color,
+                        }
+                        .Where(value => value is not null)
+                        .ToArray();
+
+                    return details.Length == 0 ? null : string.Join(" · ", details);
+                }
+            }
         }
     }
 }

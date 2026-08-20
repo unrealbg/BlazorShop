@@ -1,5 +1,6 @@
 ﻿namespace BlazorShop.Web.Shared.Services.Contracts
 {
+    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
 
@@ -7,7 +8,7 @@
     {
         Task<ServiceResponse> Checkout(Checkout checkout);
 
-        Task<ServiceResponse> ConfirmOrder(IEnumerable<ProcessCart> carts);
+        Task<ServiceResponse> ConfirmOrder(IEnumerable<CartLineRequest> carts);
 
         Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems);
 
