@@ -10,6 +10,7 @@ RUN apt-get update \
 
 COPY BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj BlazorShop.Presentation/BlazorShop.Web/
 COPY BlazorShop.Presentation/BlazorShop.Web.Shared/BlazorShop.Web.Shared.csproj BlazorShop.Presentation/BlazorShop.Web.Shared/
+COPY BlazorShop.Domain/BlazorShop.Domain.csproj BlazorShop.Domain/
 
 RUN dotnet restore BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj
 
@@ -20,6 +21,7 @@ RUN npm ci --prefix BlazorShop.Presentation/BlazorShop.Web
 
 COPY BlazorShop.Presentation/BlazorShop.Web.Shared/ BlazorShop.Presentation/BlazorShop.Web.Shared/
 COPY BlazorShop.Presentation/BlazorShop.Web/ BlazorShop.Presentation/BlazorShop.Web/
+COPY BlazorShop.Domain/ BlazorShop.Domain/
 
 RUN dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj \
     --configuration Release \
