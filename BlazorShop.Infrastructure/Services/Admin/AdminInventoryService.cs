@@ -87,6 +87,11 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure<AdminInventoryItemDto>("Product quantity cannot be negative.", ServiceResponseType.ValidationError);
             }
 
+            if (!request.ExpectedQuantity.HasValue || request.ExpectedQuantity.Value < 0)
+            {
+                return Failure<AdminInventoryItemDto>("The current product quantity is required.", ServiceResponseType.ValidationError);
+            }
+
             var product = await _db.Products
                 .Include(item => item.Category)
                 .Include(item => item.Variants)
@@ -97,9 +102,33 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure<AdminInventoryItemDto>("Product not found.", ServiceResponseType.NotFound);
             }
 
+            if (product.Variants.Count > 0)
+            {
+                return Failure<AdminInventoryItemDto>(
+                    "Product quantity is not authoritative when variants exist. Update variant stock instead.",
+                    ServiceResponseType.ValidationError);
+            }
+
+            if (product.Quantity != request.ExpectedQuantity.Value)
+            {
+                return Failure<AdminInventoryItemDto>(
+                    "Product stock changed after it was loaded. Refresh inventory and try again.",
+                    ServiceResponseType.Conflict);
+            }
+
             var previousQuantity = product.Quantity;
             product.Quantity = request.Quantity;
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+                return Failure<AdminInventoryItemDto>(
+                    "Product stock changed while it was being updated. Refresh inventory and try again.",
+                    ServiceResponseType.Conflict);
+            }
 
             await LogAsync("Inventory.ProductStockUpdated", "Product", product.Id.ToString(), $"Product stock updated for {product.Name}.", new { previousQuantity, product.Quantity });
 
@@ -120,6 +149,11 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure<AdminInventoryVariantDto>("Variant stock cannot be negative.", ServiceResponseType.ValidationError);
             }
 
+            if (!request.ExpectedStock.HasValue || request.ExpectedStock.Value < 0)
+            {
+                return Failure<AdminInventoryVariantDto>("The current variant stock is required.", ServiceResponseType.ValidationError);
+            }
+
             var variant = await _db.ProductVariants
                 .Include(item => item.Product)
                 .FirstOrDefaultAsync(item => item.Id == variantId);
@@ -129,9 +163,26 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure<AdminInventoryVariantDto>("Product variant not found.", ServiceResponseType.NotFound);
             }
 
+            if (variant.Stock != request.ExpectedStock.Value)
+            {
+                return Failure<AdminInventoryVariantDto>(
+                    "Variant stock changed after it was loaded. Refresh inventory and try again.",
+                    ServiceResponseType.Conflict);
+            }
+
             var previousStock = variant.Stock;
             variant.Stock = request.Stock;
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _db.ChangeTracker.Clear();
+                return Failure<AdminInventoryVariantDto>(
+                    "Variant stock changed while it was being updated. Refresh inventory and try again.",
+                    ServiceResponseType.Conflict);
+            }
 
             await LogAsync("Inventory.VariantStockUpdated", "ProductVariant", variant.Id.ToString(), $"Variant stock updated for {variant.Product?.Name ?? variant.Sku ?? variant.Id.ToString()}.", new { previousStock, variant.Stock, variant.Sku });
 
@@ -145,6 +196,13 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 .ThenBy(variant => variant.SizeValue)
                 .Select(variant => MapVariant(variant, threshold))
                 .ToArray();
+            var productStockIsAuthoritative = variants.Length == 0;
+            var isOutOfStock = productStockIsAuthoritative
+                ? product.Quantity <= 0
+                : variants.All(variant => variant.IsOutOfStock);
+            var isLowStock = productStockIsAuthoritative
+                ? product.Quantity > 0 && product.Quantity <= threshold
+                : !isOutOfStock && variants.Any(variant => variant.IsLowStock);
 
             return new AdminInventoryItemDto
             {
@@ -152,9 +210,10 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 ProductName = product.Name ?? string.Empty,
                 CategoryName = product.Category?.Name,
                 Quantity = product.Quantity,
+                ProductStockIsAuthoritative = productStockIsAuthoritative,
                 VariantStock = variants.Sum(variant => variant.Stock),
-                IsLowStock = (product.Quantity > 0 && product.Quantity <= threshold) || variants.Any(variant => variant.IsLowStock),
-                IsOutOfStock = product.Quantity <= 0 || variants.Any(variant => variant.IsOutOfStock),
+                IsLowStock = isLowStock,
+                IsOutOfStock = isOutOfStock,
                 Variants = variants,
             };
         }

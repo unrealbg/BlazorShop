@@ -46,10 +46,83 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
             await context.SaveChangesAsync();
             var service = CreateService(context);
 
-            var result = await service.UpdateVariantStockAsync(variant.Id, new UpdateVariantStockDto { Stock = 8 });
+            var result = await service.UpdateVariantStockAsync(variant.Id, new UpdateVariantStockDto
+            {
+                Stock = 8,
+                ExpectedStock = 1,
+            });
 
             Assert.True(result.Success);
             Assert.Equal(8, (await context.ProductVariants.FindAsync(variant.Id))!.Stock);
+        }
+
+        [Fact]
+        public async Task GetAsync_UsesVariantAvailabilityAndIgnoresProductQuantity()
+        {
+            await using var context = CreateContext();
+            var category = new Category { Id = Guid.NewGuid(), Name = "Shoes" };
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Variant shoe",
+                Quantity = 0,
+                CategoryId = category.Id,
+                Category = category,
+            };
+            product.Variants.Add(new ProductVariant
+            {
+                Id = Guid.NewGuid(),
+                ProductId = product.Id,
+                Product = product,
+                SizeValue = "42",
+                Stock = 3,
+            });
+            context.AddRange(category, product);
+            await context.SaveChangesAsync();
+            var service = CreateService(context);
+
+            var result = await service.GetAsync(new AdminInventoryQueryDto());
+
+            var item = Assert.Single(result.Items);
+            Assert.False(item.ProductStockIsAuthoritative);
+            Assert.False(item.IsOutOfStock);
+            Assert.Equal(3, item.VariantStock);
+        }
+
+        [Fact]
+        public async Task UpdateProductStockAsync_RejectsVariantBackedProduct()
+        {
+            await using var context = CreateContext();
+            var category = new Category { Id = Guid.NewGuid(), Name = "Shoes" };
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Variant shoe",
+                Quantity = 10,
+                CategoryId = category.Id,
+                Category = category,
+            };
+            product.Variants.Add(new ProductVariant
+            {
+                Id = Guid.NewGuid(),
+                ProductId = product.Id,
+                Product = product,
+                SizeValue = "42",
+                Stock = 1,
+            });
+            context.AddRange(category, product);
+            await context.SaveChangesAsync();
+            var service = CreateService(context);
+
+            var result = await service.UpdateProductStockAsync(product.Id, new UpdateProductStockDto
+            {
+                Quantity = 20,
+                ExpectedQuantity = 10,
+            });
+
+            Assert.False(result.Success);
+            Assert.Equal(ServiceResponseType.ValidationError, result.ResponseType);
+            Assert.Equal(10, (await context.Products.FindAsync(product.Id))!.Quantity);
         }
 
         private static AdminInventoryService CreateService(AppDbContext context)

@@ -21,7 +21,7 @@
         private readonly IPaymentService _paymentService; // Stripe/Card
         private readonly IPayPalPaymentService _payPalPaymentService; // PayPal
         private readonly IAppUserManager _userManager;
-        private readonly IOrderRepository _orderRepository;
+        private readonly IInventoryReservationService _inventoryReservationService;
         private readonly IEmailService _emailService;
         private readonly BankTransferSettings _btSettings;
 
@@ -32,7 +32,7 @@
                            IPaymentService paymentService,
                            IPayPalPaymentService payPalPaymentService,
                            IAppUserManager userManager,
-                           IOrderRepository orderRepository,
+                           IInventoryReservationService inventoryReservationService,
                            IEmailService emailService,
                            IOptions<BankTransferSettings> bankTransferOptions)
         {
@@ -43,7 +43,7 @@
             _paymentService = paymentService;
             _payPalPaymentService = payPalPaymentService;
             _userManager = userManager;
-            _orderRepository = orderRepository;
+            _inventoryReservationService = inventoryReservationService;
             _emailService = emailService;
             _btSettings = bankTransferOptions.Value;
         }
@@ -84,7 +84,12 @@
             }
 
             var resolution = await ResolveCartLinesAsync(carts);
-            return resolution.Error ?? await CreateOrderAsync(resolution.Lines, userId, "Pending", "COD");
+            return resolution.Error ?? await CreateOrderAsync(
+                resolution.Lines,
+                userId,
+                "Pending",
+                "COD",
+                InventoryReservationStatus.Consumed);
         }
 
         public async Task<ServiceResponse> CheckoutAsync(Checkout checkout)
@@ -127,7 +132,8 @@
                     resolvedLines,
                     userId,
                     PaymentOrderStatus.PendingPayment,
-                    "STRIPE");
+                    "STRIPE",
+                    InventoryReservationStatus.Reserved);
 
                 if (!pendingOrder.Success || !pendingOrder.Id.HasValue)
                 {
@@ -138,9 +144,17 @@
 
                 if (!paymentResult.Success)
                 {
-                    await _orderRepository.UpdatePaymentStatusAsync(
+                    var releaseResult = await _inventoryReservationService.TransitionOrderAsync(
                         pendingOrder.Id.Value,
-                        PaymentOrderStatus.PaymentFailed);
+                        PaymentOrderStatus.PaymentFailed,
+                        InventoryReservationStatus.Released);
+
+                    if (!releaseResult.Success)
+                    {
+                        return new ServiceResponse(
+                            false,
+                            releaseResult.ErrorMessage ?? "Unable to safely release inventory after payment initialization failed.");
+                    }
                 }
 
                 return paymentResult;
@@ -156,7 +170,13 @@
             if (isBankTransfer)
             {
                 var reference = $"BT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpper()}";
-                var orderResult = await CreateOrderAsync(resolvedLines, userId, "Pending", "BT", reference);
+                var orderResult = await CreateOrderAsync(
+                    resolvedLines,
+                    userId,
+                    "Pending",
+                    "BT",
+                    InventoryReservationStatus.Reserved,
+                    reference);
 
                 if (!orderResult.Success)
                 {
@@ -215,6 +235,7 @@
             string? userId,
             string status,
             string referencePrefix,
+            InventoryReservationStatus reservationStatus,
             string? reference = null)
         {
             if (lines.Count == 0)
@@ -245,7 +266,16 @@
                     .ToList(),
             };
 
-            await _orderRepository.CreateAsync(order);
+            var reservationResult = await _inventoryReservationService.CreateOrderWithInventoryAsync(
+                order,
+                reservationStatus);
+
+            if (!reservationResult.Success)
+            {
+                return new ServiceResponse(
+                    false,
+                    reservationResult.ErrorMessage ?? "Unable to reserve the requested inventory.");
+            }
 
             return new ServiceResponse(true, "Order saved successfully", order.Id)
             {

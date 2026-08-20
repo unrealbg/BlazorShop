@@ -15,14 +15,14 @@ namespace BlazorShop.Tests.Infrastructure
     public sealed class StripeWebhookServiceTests
     {
         private readonly Mock<IStripeWebhookEventParser> _parser = new();
-        private readonly Mock<IOrderRepository> _orders = new();
+        private readonly Mock<IInventoryReservationService> _inventory = new();
         private readonly StripeWebhookService _service;
 
         public StripeWebhookServiceTests()
         {
             _service = new StripeWebhookService(
                 _parser.Object,
-                _orders.Object,
+                _inventory.Object,
                 Options.Create(new StripeOptions { WebhookSecret = "whsec_test" }),
                 Mock.Of<ILogger<StripeWebhookService>>());
         }
@@ -32,32 +32,43 @@ namespace BlazorShop.Tests.Infrastructure
         {
             var order = new Order { Id = Guid.NewGuid(), Status = PaymentOrderStatus.PendingPayment };
             SetupEvent("checkout.session.completed", order.Id, "paid");
-            _orders.Setup(repository => repository.GetByIdAsync(order.Id)).ReturnsAsync(order);
-            _orders
-                .Setup(repository => repository.UpdatePaymentStatusAsync(order.Id, PaymentOrderStatus.Paid))
-                .ReturnsAsync(1);
+            _inventory
+                .Setup(service => service.TransitionOrderAsync(
+                    order.Id,
+                    PaymentOrderStatus.Paid,
+                    InventoryReservationStatus.Consumed,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.Applied));
 
             var result = await _service.HandleAsync("{}", "valid-signature");
 
             Assert.Equal(StripeWebhookHandlingResult.Processed, result);
-            _orders.Verify(
-                repository => repository.UpdatePaymentStatusAsync(order.Id, PaymentOrderStatus.Paid),
+            _inventory.Verify(
+                service => service.TransitionOrderAsync(
+                    order.Id,
+                    PaymentOrderStatus.Paid,
+                    InventoryReservationStatus.Consumed,
+                    It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
         [Fact]
-        public async Task HandleAsync_DuplicatePaidEvent_DoesNotWriteAgain()
+        public async Task HandleAsync_DuplicatePaidEvent_IsTreatedAsProcessed()
         {
             var order = new Order { Id = Guid.NewGuid(), Status = PaymentOrderStatus.Paid };
             SetupEvent("checkout.session.completed", order.Id, "paid");
-            _orders.Setup(repository => repository.GetByIdAsync(order.Id)).ReturnsAsync(order);
+            _inventory
+                .Setup(service => service.TransitionOrderAsync(
+                    order.Id,
+                    PaymentOrderStatus.Paid,
+                    InventoryReservationStatus.Consumed,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.AlreadyApplied));
 
             var result = await _service.HandleAsync("{}", "valid-signature");
 
             Assert.Equal(StripeWebhookHandlingResult.Processed, result);
-            _orders.Verify(
-                repository => repository.UpdatePaymentStatusAsync(It.IsAny<Guid>(), It.IsAny<string>()),
-                Times.Never);
+            _inventory.VerifyAll();
         }
 
         [Theory]
@@ -67,13 +78,24 @@ namespace BlazorShop.Tests.Infrastructure
         {
             var order = new Order { Id = Guid.NewGuid(), Status = PaymentOrderStatus.PendingPayment };
             SetupEvent(eventType, order.Id, null);
-            _orders.Setup(repository => repository.GetByIdAsync(order.Id)).ReturnsAsync(order);
-            _orders.Setup(repository => repository.UpdatePaymentStatusAsync(order.Id, expectedStatus)).ReturnsAsync(1);
+            _inventory
+                .Setup(service => service.TransitionOrderAsync(
+                    order.Id,
+                    expectedStatus,
+                    InventoryReservationStatus.Released,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.Applied));
 
             var result = await _service.HandleAsync("{}", "valid-signature");
 
             Assert.Equal(StripeWebhookHandlingResult.Processed, result);
-            _orders.Verify(repository => repository.UpdatePaymentStatusAsync(order.Id, expectedStatus), Times.Once);
+            _inventory.Verify(
+                service => service.TransitionOrderAsync(
+                    order.Id,
+                    expectedStatus,
+                    InventoryReservationStatus.Released,
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
         }
 
         [Fact]
@@ -81,14 +103,18 @@ namespace BlazorShop.Tests.Infrastructure
         {
             var order = new Order { Id = Guid.NewGuid(), Status = PaymentOrderStatus.Paid };
             SetupEvent("checkout.session.async_payment_failed", order.Id, null);
-            _orders.Setup(repository => repository.GetByIdAsync(order.Id)).ReturnsAsync(order);
+            _inventory
+                .Setup(service => service.TransitionOrderAsync(
+                    order.Id,
+                    PaymentOrderStatus.PaymentFailed,
+                    InventoryReservationStatus.Released,
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.AlreadyApplied));
 
             var result = await _service.HandleAsync("{}", "valid-signature");
 
             Assert.Equal(StripeWebhookHandlingResult.Processed, result);
-            _orders.Verify(
-                repository => repository.UpdatePaymentStatusAsync(It.IsAny<Guid>(), It.IsAny<string>()),
-                Times.Never);
+            _inventory.VerifyAll();
         }
 
         [Fact]
@@ -101,7 +127,13 @@ namespace BlazorShop.Tests.Infrastructure
             var result = await _service.HandleAsync("{}", "invalid-signature");
 
             Assert.Equal(StripeWebhookHandlingResult.InvalidSignature, result);
-            _orders.Verify(repository => repository.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+            _inventory.Verify(
+                service => service.TransitionOrderAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<InventoryReservationStatus>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Never);
         }
 
         private void SetupEvent(string eventType, Guid orderId, string? paymentStatus)

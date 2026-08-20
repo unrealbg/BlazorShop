@@ -137,6 +137,7 @@
             services.AddScoped<IStripeWebhookService, StripeWebhookService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IInventoryReservationService, InventoryReservationService>();
             services.AddScoped<IOrderTrackingService, OrderTrackingService>();
             services.AddScoped<IOrderQueryService, OrderQueryService>();
             services.AddScoped<INewsletterSubscriberRepository, NewsletterSubscriberRepository>();

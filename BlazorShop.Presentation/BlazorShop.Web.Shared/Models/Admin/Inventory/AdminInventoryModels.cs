@@ -25,6 +25,8 @@ namespace BlazorShop.Web.Shared.Models.Admin.Inventory
 
         public int Quantity { get; set; }
 
+        public bool ProductStockIsAuthoritative { get; set; }
+
         public int VariantStock { get; set; }
 
         public bool IsLowStock { get; set; }
@@ -60,10 +62,14 @@ namespace BlazorShop.Web.Shared.Models.Admin.Inventory
     public class UpdateProductStock
     {
         public int Quantity { get; set; }
+
+        public int? ExpectedQuantity { get; set; }
     }
 
     public class UpdateVariantStock
     {
         public int Stock { get; set; }
+
+        public int? ExpectedStock { get; set; }
     }
 }

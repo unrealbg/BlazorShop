@@ -41,6 +41,8 @@
 
         public DbSet<OrderLine> OrderLines { get; set; }
 
+        public DbSet<InventoryReservation> InventoryReservations { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

@@ -34,8 +34,14 @@ namespace BlazorShop.Application.Services
 
         public async Task<ServiceResponse> UpdateAsync(UpdateProductVariant variant)
         {
-            var mapped = _mapper.Map<ProductVariant>(variant);
-            var result = await _variantRepository.UpdateAsync(mapped);
+            var existingVariant = await _variantRepository.GetByIdAsync(variant.Id);
+            if (existingVariant is null)
+            {
+                return new ServiceResponse(false, "Variant not found");
+            }
+
+            _mapper.Map(variant, existingVariant);
+            var result = await _variantRepository.UpdateAsync(existingVariant);
             return result > 0 ? new ServiceResponse(true, "Variant updated successfully") : new ServiceResponse(false, "Variant not found");
         }
 

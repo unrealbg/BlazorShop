@@ -15,18 +15,18 @@ namespace BlazorShop.Infrastructure.Services
         private const string CheckoutExpired = "checkout.session.expired";
 
         private readonly IStripeWebhookEventParser _eventParser;
-        private readonly IOrderRepository _orderRepository;
+        private readonly IInventoryReservationService _inventoryReservationService;
         private readonly StripeOptions _options;
         private readonly ILogger<StripeWebhookService> _logger;
 
         public StripeWebhookService(
             IStripeWebhookEventParser eventParser,
-            IOrderRepository orderRepository,
+            IInventoryReservationService inventoryReservationService,
             IOptions<StripeOptions> options,
             ILogger<StripeWebhookService> logger)
         {
             _eventParser = eventParser;
-            _orderRepository = orderRepository;
+            _inventoryReservationService = inventoryReservationService;
             _options = options.Value;
             _logger = logger;
         }
@@ -73,8 +73,16 @@ namespace BlazorShop.Infrastructure.Services
                 return StripeWebhookHandlingResult.InvalidPayload;
             }
 
-            var order = await _orderRepository.GetByIdAsync(stripeEvent.OrderId.Value);
-            if (order is null)
+            var reservationStatus = string.Equals(targetStatus, PaymentOrderStatus.Paid, StringComparison.Ordinal)
+                ? InventoryReservationStatus.Consumed
+                : InventoryReservationStatus.Released;
+            var transition = await _inventoryReservationService.TransitionOrderAsync(
+                stripeEvent.OrderId.Value,
+                targetStatus,
+                reservationStatus,
+                cancellationToken);
+
+            if (transition.Outcome == InventoryTransitionOutcome.OrderNotFound)
             {
                 _logger.LogWarning(
                     "Stripe event {StripeEventId} references missing order {OrderId}.",
@@ -83,19 +91,21 @@ namespace BlazorShop.Infrastructure.Services
                 return StripeWebhookHandlingResult.OrderNotFound;
             }
 
-            if (string.Equals(order.Status, targetStatus, StringComparison.Ordinal)
-                || (string.Equals(order.Status, PaymentOrderStatus.Paid, StringComparison.Ordinal)
-                    && !string.Equals(targetStatus, PaymentOrderStatus.Paid, StringComparison.Ordinal)))
+            if (transition.Outcome == InventoryTransitionOutcome.InvalidTransition)
             {
+                _logger.LogWarning(
+                    "Stripe event {StripeEventId} could not apply status {OrderStatus} to order {OrderId}: {Reason}",
+                    stripeEvent.EventId,
+                    targetStatus,
+                    stripeEvent.OrderId.Value,
+                    transition.ErrorMessage);
                 return StripeWebhookHandlingResult.Processed;
             }
-
-            await _orderRepository.UpdatePaymentStatusAsync(order.Id, targetStatus);
 
             _logger.LogInformation(
                 "Applied Stripe event {StripeEventId} to order {OrderId}; status is now {OrderStatus}.",
                 stripeEvent.EventId,
-                order.Id,
+                stripeEvent.OrderId.Value,
                 targetStatus);
 
             return StripeWebhookHandlingResult.Processed;
