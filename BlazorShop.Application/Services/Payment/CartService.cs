@@ -235,6 +235,7 @@
                         ProductVariantId = line.VariantId,
                         ProductNameSnapshot = line.ProductName,
                         SkuSnapshot = line.Sku,
+                        SizeScaleSnapshot = line.SizeScale?.ToString(),
                         SizeValueSnapshot = line.SizeValue,
                         ColorSnapshot = line.Color,
                         Quantity = line.Quantity,
@@ -388,6 +389,7 @@
                     product.Name ?? "Product",
                     product.Description,
                     variant?.Sku,
+                    variant?.SizeScale,
                     variant?.SizeValue,
                     variant?.Color));
             }

@@ -32,6 +32,13 @@ namespace BlazorShop.Infrastructure.Migrations
                 defaultValue: "");
 
             migrationBuilder.AddColumn<string>(
+                name: "SizeScaleSnapshot",
+                table: "OrderLines",
+                type: "character varying(32)",
+                maxLength: 32,
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
                 name: "SizeValueSnapshot",
                 table: "OrderLines",
                 type: "character varying(16)",
@@ -55,6 +62,17 @@ namespace BlazorShop.Infrastructure.Migrations
                         '[Unavailable product]'),
                     "SkuSnapshot" = (
                         SELECT variant."Sku"
+                        FROM "ProductVariants" AS variant
+                        WHERE variant."Id" = order_line."ProductVariantId"),
+                    "SizeScaleSnapshot" = (
+                        SELECT CASE variant."SizeScale"
+                            WHEN 1 THEN 'ClothingAlpha'
+                            WHEN 2 THEN 'ClothingNumericEU'
+                            WHEN 10 THEN 'ShoesEU'
+                            WHEN 11 THEN 'ShoesUS'
+                            WHEN 12 THEN 'ShoesUK'
+                            ELSE 'Unknown'
+                        END
                         FROM "ProductVariants" AS variant
                         WHERE variant."Id" = order_line."ProductVariantId"),
                     "SizeValueSnapshot" = (
@@ -86,6 +104,10 @@ namespace BlazorShop.Infrastructure.Migrations
 
             migrationBuilder.DropColumn(
                 name: "ProductNameSnapshot",
+                table: "OrderLines");
+
+            migrationBuilder.DropColumn(
+                name: "SizeScaleSnapshot",
                 table: "OrderLines");
 
             migrationBuilder.DropColumn(

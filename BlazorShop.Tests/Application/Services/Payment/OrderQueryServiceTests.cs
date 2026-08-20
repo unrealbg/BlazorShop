@@ -36,7 +36,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                                 ProductVariantId = variantId,
                                 ProductNameSnapshot = "Original Runner",
                                 SkuSnapshot = "RUN-42-BLK",
-                                SizeValueSnapshot = "42",
+                                SizeScaleSnapshot = "ShoesUS",
+                                SizeValueSnapshot = "10",
                                 ColorSnapshot = "Black",
                                 Quantity = 2,
                                 UnitPrice = 95m,
@@ -64,7 +65,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var variantLine = Assert.Single(result.Lines, line => line.VariantId == variantId);
             Assert.Equal("Original Runner", variantLine.ProductName);
             Assert.Equal("RUN-42-BLK", variantLine.Sku);
-            Assert.Equal("42", variantLine.SizeValue);
+            Assert.Equal("ShoesUS", variantLine.SizeScale);
+            Assert.Equal("10", variantLine.SizeValue);
             Assert.Equal("Black", variantLine.Color);
             Assert.Equal(95m, variantLine.UnitPrice);
             Assert.Equal(190m, variantLine.LineTotal);

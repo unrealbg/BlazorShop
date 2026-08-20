@@ -13,7 +13,7 @@ namespace BlazorShop.Tests.Infrastructure.Services
         public async Task Pay_ReturnsFailureResponse()
         {
             var result = await _service.Pay(
-                [new ResolvedCartLine(Guid.NewGuid(), null, 1, 10m, "Product", null, null, null, null)]);
+                [new ResolvedCartLine(Guid.NewGuid(), null, 1, 10m, "Product", null, null, null, null, null)]);
 
             Assert.False(result.Success);
             Assert.Equal("PayPal payments are not currently available.", result.Message);

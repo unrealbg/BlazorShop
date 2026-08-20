@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorShop.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260820143408_AddOrderLinePurchaseSnapshots")]
+    [Migration("20260820145506_AddOrderLinePurchaseSnapshots")]
     partial class AddOrderLinePurchaseSnapshots
     {
         /// <inheritdoc />
@@ -492,6 +492,10 @@ namespace BlazorShop.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<string>("SizeScaleSnapshot")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("SizeValueSnapshot")
                         .HasMaxLength(16)

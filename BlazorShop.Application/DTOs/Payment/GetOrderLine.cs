@@ -10,6 +10,8 @@ namespace BlazorShop.Application.DTOs.Payment
 
         public string? Sku { get; set; }
 
+        public string? SizeScale { get; set; }
+
         public string? SizeValue { get; set; }
 
         public string? Color { get; set; }

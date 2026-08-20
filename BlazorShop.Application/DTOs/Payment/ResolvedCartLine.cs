@@ -1,5 +1,7 @@
 namespace BlazorShop.Application.DTOs.Payment
 {
+    using BlazorShop.Domain.Entities;
+
     public sealed record ResolvedCartLine(
         Guid ProductId,
         Guid? VariantId,
@@ -8,6 +10,7 @@ namespace BlazorShop.Application.DTOs.Payment
         string ProductName,
         string? ProductDescription,
         string? Sku,
+        SizeScale? SizeScale,
         string? SizeValue,
         string? Color)
     {

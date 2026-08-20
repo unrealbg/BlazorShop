@@ -63,7 +63,8 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
                 Id = Guid.NewGuid(),
                 ProductId = product.Id,
                 Sku = "ORIGINAL-SKU",
-                SizeValue = "42",
+                SizeScale = SizeScale.ShoesUS,
+                SizeValue = "10",
                 Color = "Black",
                 Price = 95m,
                 Stock = 3,
@@ -81,7 +82,8 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
                         ProductVariantId = variant.Id,
                         ProductNameSnapshot = "Original Runner",
                         SkuSnapshot = "ORIGINAL-SKU",
-                        SizeValueSnapshot = "42",
+                        SizeScaleSnapshot = "ShoesUS",
+                        SizeValueSnapshot = "10",
                         ColorSnapshot = "Black",
                         Quantity = 1,
                         UnitPrice = 95m,
@@ -96,7 +98,8 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
             product.Name = "Renamed Runner";
             product.Price = 1m;
             variant.Sku = "CHANGED-SKU";
-            variant.SizeValue = "44";
+            variant.SizeScale = SizeScale.ShoesUK;
+            variant.SizeValue = "10";
             variant.Color = "White";
             variant.Price = 1m;
             await context.SaveChangesAsync();
@@ -121,7 +124,8 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
             Assert.Equal(variantId, line.VariantId);
             Assert.Equal("Original Runner", line.ProductName);
             Assert.Equal("ORIGINAL-SKU", line.Sku);
-            Assert.Equal("42", line.SizeValue);
+            Assert.Equal("ShoesUS", line.SizeScale);
+            Assert.Equal("10", line.SizeValue);
             Assert.Equal("Black", line.Color);
             Assert.Equal(95m, line.UnitPrice);
             Assert.Equal(95m, line.LineTotal);

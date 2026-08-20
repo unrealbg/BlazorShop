@@ -490,6 +490,10 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SizeScaleSnapshot")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("SizeValueSnapshot")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");

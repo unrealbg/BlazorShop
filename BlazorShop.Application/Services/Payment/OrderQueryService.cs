@@ -81,6 +81,7 @@ namespace BlazorShop.Application.Services.Payment
                 LineTotal = line.LineTotal,
                 ProductName = line.ProductNameSnapshot,
                 Sku = line.SkuSnapshot,
+                SizeScale = line.SizeScaleSnapshot,
                 SizeValue = line.SizeValueSnapshot,
                 Color = line.ColorSnapshot,
             };

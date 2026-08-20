@@ -17,6 +17,9 @@ namespace BlazorShop.Domain.Entities.Payment
         [MaxLength(64)]
         public string? SkuSnapshot { get; set; }
 
+        [MaxLength(32)]
+        public string? SizeScaleSnapshot { get; set; }
+
         [MaxLength(16)]
         public string? SizeValueSnapshot { get; set; }
 

@@ -278,6 +278,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Null(orderLine.ProductVariantId);
             Assert.Equal("Base Product", orderLine.ProductNameSnapshot);
             Assert.Null(orderLine.SkuSnapshot);
+            Assert.Null(orderLine.SizeScaleSnapshot);
             Assert.Null(orderLine.SizeValueSnapshot);
             Assert.Null(orderLine.ColorSnapshot);
             Assert.Equal(2, orderLine.Quantity);
@@ -305,6 +306,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 Price = 95m,
                 Stock = 4,
                 Sku = "RUN-42",
+                SizeScale = SizeScale.ShoesEU,
                 SizeValue = "42",
                 Color = "Black",
             };
@@ -331,6 +333,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(variantId, orderLine.ProductVariantId);
             Assert.Equal("Runner", orderLine.ProductNameSnapshot);
             Assert.Equal("RUN-42", orderLine.SkuSnapshot);
+            Assert.Equal("ShoesEU", orderLine.SizeScaleSnapshot);
             Assert.Equal("42", orderLine.SizeValueSnapshot);
             Assert.Equal("Black", orderLine.ColorSnapshot);
             Assert.Equal(95m, orderLine.UnitPrice);
@@ -570,7 +573,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                       "variantId": "{{variantId}}",
                       "quantity": 2,
                       "unitPrice": 0.01,
-                      "sku": "CLIENT-SKU"
+                      "sku": "CLIENT-SKU",
+                      "sizeScale": "ShoesUK"
                     }
                   ]
                 }
@@ -583,6 +587,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 Price = 95m,
                 Stock = 4,
                 Sku = "SERVER-SKU",
+                SizeScale = SizeScale.ShoesUS,
             };
             Order? createdOrder = null;
             IReadOnlyCollection<ResolvedCartLine>? paymentLines = null;
@@ -618,6 +623,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(variantId, orderLine.ProductVariantId);
             Assert.Equal("Runner", orderLine.ProductNameSnapshot);
             Assert.Equal("SERVER-SKU", orderLine.SkuSnapshot);
+            Assert.Equal("ShoesUS", orderLine.SizeScaleSnapshot);
             Assert.Equal(95m, orderLine.UnitPrice);
             Assert.Equal(190m, orderLine.LineTotal);
             Assert.Equal(95m, paymentLine.UnitPrice);
