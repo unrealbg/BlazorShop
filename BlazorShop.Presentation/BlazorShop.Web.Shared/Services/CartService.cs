@@ -1,6 +1,5 @@
 ﻿namespace BlazorShop.Web.Shared.Services
 {
-    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Web.Shared.Helper.Contracts;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
@@ -17,7 +16,7 @@
             _apiCallHelper = apiCallHelper;
         }
 
-        public async Task<ServiceResponse> Checkout(Checkout checkout)
+        public async Task<ServiceResponse<CheckoutResult>> Checkout(Checkout checkout)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();
             var apiCallModel = new ApiCall
@@ -30,41 +29,22 @@
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Checkout>(apiCallModel);
-            
-            return result is null || !result.IsSuccessStatusCode
-                       ? _apiCallHelper.ConnectionError()
-                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
-        }
 
-        public async Task<ServiceResponse> ConfirmOrder(IEnumerable<CartLineRequest> carts)
-        {
-            var privateClient = await _httpClientHelper.GetPrivateClientAsync();
-            var apiCallModel = new ApiCall
-            {
-                Route = Constant.Cart.ConfirmOrder,
-                Type = Constant.ApiCallType.Post,
-                Client = privateClient,
-                Id = null!,
-                Model = carts,
-            };
-
-            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CartLineRequest>>(apiCallModel);
-
-            return result is null || !result.IsSuccessStatusCode
-                       ? _apiCallHelper.ConnectionError()
-                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
+            return await _apiCallHelper.GetMutationResponse<CheckoutResult>(
+                result,
+                "Checkout could not be completed. Please try again.");
         }
 
         public async Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems)
         {
             var privateClient = await _httpClientHelper.GetPrivateClientAsync();
             var apiCallModel = new ApiCall
-                                   {
-                                       Route = Constant.Cart.SaveCart,
-                                       Type = Constant.ApiCallType.Post,
-                                       Client = privateClient,
-                                       Id = null!,
-                                       Model = orderItems
+            {
+                Route = Constant.Cart.SaveCart,
+                Type = Constant.ApiCallType.Post,
+                Client = privateClient,
+                Id = null!,
+                Model = orderItems
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CreateOrderItem>>(apiCallModel);
@@ -78,13 +58,13 @@
         {
             var client = await _httpClientHelper.GetPrivateClientAsync();
             var currentApiCall = new ApiCall
-                                     {
-                                         Route = Constant.Cart.GetOrderItems,
-                                         Type = Constant.ApiCallType.Get,
-                                         Client = client,
-                                         Model = null!,
-                                         Id = null!
-                                     };
+            {
+                Route = Constant.Cart.GetOrderItems,
+                Type = Constant.ApiCallType.Get,
+                Client = client,
+                Model = null!,
+                Id = null!
+            };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
             return await _apiCallHelper.GetQueryResult<IEnumerable<GetOrderItem>>(

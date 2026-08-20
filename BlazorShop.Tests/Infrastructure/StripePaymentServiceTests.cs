@@ -31,11 +31,13 @@ namespace BlazorShop.Tests.Infrastructure
 
             var result = await paymentService.Pay(
                 [new ResolvedCartLine(productId, null, 1, 25m, "Camera", "Mirrorless", null, null, null, null)],
-                orderId);
+                orderId,
+                "STRIPE-FAIL");
 
             Assert.False(result.Success);
-            Assert.Equal("Unable to initialize the card payment session. Please try again later.", result.Message);
-            Assert.DoesNotContain("Sensitive Stripe error details", result.Message, StringComparison.Ordinal);
+            Assert.Equal("Unable to initialize the card payment session. Please try again later.", result.ErrorMessage);
+            Assert.DoesNotContain("Sensitive Stripe error details", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.Null(result.RedirectUrl);
         }
 
         [Fact]
@@ -57,13 +59,14 @@ namespace BlazorShop.Tests.Infrastructure
 
             var result = await paymentService.Pay(
                 [new ResolvedCartLine(productId, variantId, 2, 39.95m, "Camera", "Mirrorless", "CAM-BLK", null, "One Size", "Black")],
-                orderId);
+                orderId,
+                "STRIPE-TEST-1");
 
             Assert.True(result.Success);
-            Assert.Equal("https://checkout.stripe.com/session/test", result.Message);
+            Assert.Equal("https://checkout.stripe.com/session/test", result.RedirectUrl);
             Assert.NotNull(capturedOptions);
             Assert.Equal(
-                "https://shop.example.com/payment-success?pm=card&session_id={CHECKOUT_SESSION_ID}",
+                $"https://shop.example.com/payment-success?pm=card&order_id={orderId:D}&reference=STRIPE-TEST-1&session_id={{CHECKOUT_SESSION_ID}}",
                 capturedOptions!.SuccessUrl);
             Assert.Equal($"https://shop.example.com/payment-cancel?order_id={orderId:D}", capturedOptions.CancelUrl);
             Assert.Equal(orderId.ToString("D"), capturedOptions.ClientReferenceId);

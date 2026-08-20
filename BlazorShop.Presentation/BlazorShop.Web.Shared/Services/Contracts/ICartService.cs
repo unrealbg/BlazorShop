@@ -1,14 +1,11 @@
 ﻿namespace BlazorShop.Web.Shared.Services.Contracts
 {
-    using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Web.Shared.Models;
     using BlazorShop.Web.Shared.Models.Payment;
 
     public interface ICartService
     {
-        Task<ServiceResponse> Checkout(Checkout checkout);
-
-        Task<ServiceResponse> ConfirmOrder(IEnumerable<CartLineRequest> carts);
+        Task<ServiceResponse<CheckoutResult>> Checkout(Checkout checkout);
 
         Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems);
 

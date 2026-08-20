@@ -27,17 +27,8 @@
         private bool _showPaymentDialog;
 
         private bool _showBtDialog;
-        private BtInfo _btInfo = new();
-
-        private sealed class BtInfo
-        {
-            public string Iban { get; set; } = string.Empty;
-            public string Beneficiary { get; set; } = string.Empty;
-            public string BankName { get; set; } = string.Empty;
-            public string Reference { get; set; } = string.Empty;
-            public decimal Amount { get; set; }
-            public string? AdditionalInfo { get; set; }
-        }
+        private BankTransferInfo _btInfo = new();
+        private CheckoutResult? _completedCheckout;
 
         protected override async Task OnInitializedAsync()
         {
@@ -231,14 +222,6 @@
             }
         }
 
-        private static bool TryGetProp(JsonElement obj, string name, out JsonElement value)
-        {
-            if (obj.TryGetProperty(name, out value)) return true;
-            // Fallback to PascalCase if API happens to send it
-            var pascal = char.ToUpperInvariant(name[0]) + name.Substring(1);
-            return obj.TryGetProperty(pascal, out value);
-        }
-
         private async Task SelectPaymentMethod(GetPaymentMethod paymentMethod)
         {
             if (paymentMethod is null)
@@ -270,54 +253,16 @@
                 };
                 var result = await this.CartService.Checkout(checkout);
 
-                if (result.Success)
+                if (result.Success && result.Payload is not null)
                 {
-                    var paymentLink = result.Message;
-                    if (!string.IsNullOrWhiteSpace(paymentLink) && (paymentLink.StartsWith("http://") || paymentLink.StartsWith("https://")))
-                    {
-                        this.NavigationManager.NavigateTo(paymentLink, true);
-                    }
-                    else
-                    {
-                        var isBankTransfer = string.Equals(paymentMethod.Name, "Bank Transfer", StringComparison.OrdinalIgnoreCase);
-                        if (isBankTransfer && result.Payload.HasValue)
-                        {
-                            try
-                            {
-                                var payload = result.Payload.Value;
-                                if (payload.ValueKind == JsonValueKind.Object)
-                                {
-                                    _btInfo = new BtInfo
-                                    {
-                                        Iban = TryGetProp(payload, "iban", out var iban) ? (iban.GetString() ?? string.Empty) : string.Empty,
-                                        Beneficiary = TryGetProp(payload, "beneficiary", out var ben) ? (ben.GetString() ?? string.Empty) : string.Empty,
-                                        BankName = TryGetProp(payload, "bankName", out var bank) ? (bank.GetString() ?? string.Empty) : string.Empty,
-                                        Reference = TryGetProp(payload, "reference", out var @ref) ? (@ref.GetString() ?? string.Empty) : string.Empty,
-                                        Amount = TryGetProp(payload, "amount", out var amt) ? (amt.TryGetDecimal(out var d) ? d : 0m) : 0m,
-                                        AdditionalInfo = TryGetProp(payload, "additionalInfo", out var ai) ? ai.GetString() : null
-                                    };
-                                }
-                            }
-                            catch { }
-
-                            _showPaymentDialog = false;
-                            _showBtDialog = true;
-                            StateHasChanged();
-                        }
-                        else
-                        {
-                            _showPaymentDialog = false;
-                            this.StateHasChanged();
-                            var successPath = string.Equals(paymentMethod.Name, "Cash on Delivery", StringComparison.OrdinalIgnoreCase)
-                                ? "/payment-success?pm=cod"
-                                : "/payment-success?pm=card";
-                            this.NavigationManager.NavigateTo(successPath, true);
-                        }
-                    }
+                    await HandleSuccessfulCheckoutAsync(result.Payload);
                 }
                 else
                 {
-                    this.NotificationService.NotifyError(result.Message ?? "Payment processing failed.", "Checkout", NotificationKind.Payment);
+                    this.NotificationService.NotifyError(
+                        result.Message ?? "Payment processing failed.",
+                        "Checkout",
+                        NotificationKind.Payment);
                 }
             }
             catch
@@ -331,10 +276,72 @@
             }
         }
 
+        private async Task HandleSuccessfulCheckoutAsync(CheckoutResult result)
+        {
+            switch (result.PaymentKind)
+            {
+                case CheckoutPaymentKind.CashOnDelivery when result.Status == CheckoutStatus.Confirmed:
+                    await ClearCartAfterCheckoutAsync();
+                    this.NavigationManager.NavigateTo(BuildSuccessPath(result, "cod"), true);
+                    return;
+                case CheckoutPaymentKind.BankTransfer
+                    when result.Status == CheckoutStatus.PendingPayment && result.BankTransfer is not null:
+                    await ClearCartAfterCheckoutAsync();
+                    _completedCheckout = result;
+                    _btInfo = result.BankTransfer;
+                    _showPaymentDialog = false;
+                    _showBtDialog = true;
+                    StateHasChanged();
+                    return;
+                case CheckoutPaymentKind.Stripe
+                    when result.Status == CheckoutStatus.PendingPayment
+                        && Uri.TryCreate(result.RedirectUrl, UriKind.Absolute, out var redirectUri):
+                    await ClearCartAfterCheckoutAsync();
+                    this.NavigationManager.NavigateTo(redirectUri.ToString(), true);
+                    return;
+                default:
+                    this.NotificationService.NotifyError(
+                        "The server returned an incomplete checkout result. Your cart was not cleared.",
+                        "Checkout",
+                        NotificationKind.Payment);
+                    return;
+            }
+        }
+
+        private async Task ClearCartAfterCheckoutAsync()
+        {
+            try
+            {
+                await this.CookieStorageService.RemoveAsync(Constant.Cart.Name);
+            }
+            catch
+            {
+                this.NotificationService.NotifyWarning(
+                    "Your order was created, but this browser's cart could not be cleared automatically.",
+                    "Cart cleanup",
+                    NotificationKind.Order,
+                    addToInbox: false);
+            }
+
+            _myCarts = [];
+            this.BuildCartLines();
+            _showPaymentDialog = false;
+        }
+
+        private static string BuildSuccessPath(CheckoutResult result, string paymentMethod)
+        {
+            return $"/payment-success?pm={paymentMethod}&order_id={result.OrderId:D}&reference={Uri.EscapeDataString(result.OrderReference)}";
+        }
+
         private void ConfirmBankTransfer()
         {
             _showBtDialog = false;
-            this.NavigationManager.NavigateTo("/payment-success?bt=1", true);
+            if (_completedCheckout is not null)
+            {
+                this.NavigationManager.NavigateTo(
+                    BuildSuccessPath(_completedCheckout, "bank"),
+                    true);
+            }
         }
 
         private void Checkout()

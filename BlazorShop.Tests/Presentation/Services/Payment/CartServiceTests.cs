@@ -29,7 +29,7 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
         }
 
         [Fact]
-        public async Task Checkout_Returns_ServiceResponse()
+        public async Task Checkout_Returns_TypedCheckoutResponse()
         {
             // Arrange
             var checkout = new Checkout
@@ -45,15 +45,21 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             this._apiCallHelperMock
                 .Setup(x => x.ApiCallTypeCall<Checkout>(It.IsAny<ApiCall>()))
                 .ReturnsAsync(httpResponse);
+            var checkoutResult = new CheckoutResult(
+                Guid.NewGuid(),
+                "COD-TEST",
+                CheckoutStatus.Confirmed,
+                CheckoutPaymentKind.CashOnDelivery);
             this._apiCallHelperMock
-                .Setup(x => x.GetServiceResponse<ServiceResponse>(httpResponse))
-                .ReturnsAsync(new ServiceResponse());
+                .Setup(x => x.GetMutationResponse<CheckoutResult>(httpResponse, It.IsAny<string>()))
+                .ReturnsAsync(new ServiceResponse<CheckoutResult>(true) { Payload = checkoutResult });
 
             // Act
             var result = await this._cartService.Checkout(checkout);
 
             // Assert
             Assert.NotNull(result);
+            Assert.Same(checkoutResult, result.Payload);
         }
 
         [Fact]
@@ -78,30 +84,6 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
 
             // Act
             var result = await this._cartService.SaveCheckoutHistory(orderItems);
-
-            // Assert
-            Assert.NotNull(result);
-        }
-
-        [Fact]
-        public async Task ConfirmOrder_Returns_ServiceResponse()
-        {
-            // Arrange
-            var carts = new[] { new CartLineRequest(Guid.NewGuid(), null, 1) };
-
-            var httpResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
-            this._httpClientHelperMock
-                .Setup(x => x.GetPrivateClientAsync())
-                .ReturnsAsync(new HttpClient());
-            this._apiCallHelperMock
-                .Setup(x => x.ApiCallTypeCall<IEnumerable<CartLineRequest>>(It.IsAny<ApiCall>()))
-                .ReturnsAsync(httpResponse);
-            this._apiCallHelperMock
-                .Setup(x => x.GetServiceResponse<ServiceResponse>(httpResponse))
-                .ReturnsAsync(new ServiceResponse());
-
-            // Act
-            var result = await this._cartService.ConfirmOrder(carts);
 
             // Assert
             Assert.NotNull(result);
