@@ -91,9 +91,7 @@
                 return new ServiceResponse { Message = "Unable to load the newly created user." };
             }
 
-            var users = await _userManager.GetAllUsersAsync();
-
-            bool assignedResult = await _roleManager.AddUserToRoleAsync(currentUser, users.Count() > 1 ? "User" : "Admin");
+            bool assignedResult = await _roleManager.AddUserToRoleAsync(currentUser, "User");
 
             if (!assignedResult)
             {

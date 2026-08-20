@@ -35,12 +35,15 @@ namespace BlazorShop.API
         private const string PublicApiRateLimitPolicyName = "PublicApi";
         private const string AuthApiRateLimitPolicyName = "AuthApi";
         private const string SeedSampleCatalogCommand = "--seed-sample-catalog";
+        private const string BootstrapAdminCommand = "--bootstrap-admin";
 
         public static void Main(string[] args)
         {
             var seedSampleCatalogOnly = args.Contains(SeedSampleCatalogCommand, StringComparer.OrdinalIgnoreCase);
+            var bootstrapAdminOnly = args.Contains(BootstrapAdminCommand, StringComparer.OrdinalIgnoreCase);
             var hostArgs = args
-                .Where(arg => !string.Equals(arg, SeedSampleCatalogCommand, StringComparison.OrdinalIgnoreCase))
+                .Where(arg => !string.Equals(arg, SeedSampleCatalogCommand, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(arg, BootstrapAdminCommand, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             var builder = WebApplication.CreateBuilder(hostArgs);
             var runtimeSection = builder.Configuration.GetSection(ApiRuntimeOptions.SectionName);
@@ -139,6 +142,12 @@ namespace BlazorShop.API
 
             try
             {
+                if (seedSampleCatalogOnly && bootstrapAdminOnly)
+                {
+                    throw new InvalidOperationException(
+                        $"{SeedSampleCatalogCommand} and {BootstrapAdminCommand} must be run as separate deployment actions.");
+                }
+
                 var app = builder.Build();
 
                 if (!app.Environment.IsDevelopment() && runtimeOptions.ForwardedHeaders.Enabled)
@@ -166,6 +175,13 @@ namespace BlazorShop.API
                 }
 
                 DatabaseMigrationBootstrapper.MigrateAsync(app.Services).GetAwaiter().GetResult();
+
+                if (bootstrapAdminOnly)
+                {
+                    AdminBootstrapper.BootstrapAsync(app.Services, app.Configuration).GetAwaiter().GetResult();
+                    Log.Logger.Information("Initial administrator created successfully.");
+                    return;
+                }
 
                 if (app.Environment.IsDevelopment() || seedSampleCatalogOnly)
                 {

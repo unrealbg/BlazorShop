@@ -92,6 +92,9 @@ EmailSettings__Port=587
 EmailSettings__UseSsl=true
 EmailSettings__Username=<secret>
 EmailSettings__Password=<secret>
+AdminBootstrap__Email=admin@example.com
+AdminBootstrap__Password=<one-time-secret>
+AdminBootstrap__FullName=Initial Administrator
 Runtime__Cors__AllowedOrigins__0=https://account.shop.example.com
 Runtime__ForwardedHeaders__Enabled=true
 Runtime__ForwardedHeaders__KnownProxies__0=10.0.0.10
@@ -202,7 +205,35 @@ Optional compose overrides:
 - `BLAZORSHOP_REQUIRE_CONFIRMED_ACCOUNT`
 - `BLAZORSHOP_REQUIRE_CONFIRMED_EMAIL`
 
-Start the stack with:
+## Initial Administrator Bootstrap
+
+Public registration always assigns the `User` role. Create the first administrator as an explicit deployment action before opening a fresh deployment to public traffic. Supply these values from the deployment secret store only for the bootstrap process:
+
+- `AdminBootstrap__Email`
+- `AdminBootstrap__Password`
+- `AdminBootstrap__FullName`
+
+Run the API with `--bootstrap-admin`. The command applies pending migrations, creates an email-confirmed administrator, and exits before the HTTP server starts. It fails closed if an administrator already exists or if the configured email belongs to any existing account; there is no override/reset mode.
+
+For a direct deployment:
+
+```powershell
+dotnet BlazorShop.API.dll --bootstrap-admin
+```
+
+For Docker Compose, set the three `AdminBootstrap__*` variables in the current shell from your secret store and forward only their names to the one-off container:
+
+```powershell
+docker compose -f compose.production.yml run --rm --build `
+  -e AdminBootstrap__Email `
+  -e AdminBootstrap__Password `
+  -e AdminBootstrap__FullName `
+  api --bootstrap-admin
+```
+
+Remove the bootstrap variables or secret references after success. Do not place bootstrap credentials in source-controlled appsettings files, Compose files, container images, or command arguments.
+
+Start the full stack after bootstrap completes:
 
 ```powershell
 docker compose -f compose.production.yml up -d --build
