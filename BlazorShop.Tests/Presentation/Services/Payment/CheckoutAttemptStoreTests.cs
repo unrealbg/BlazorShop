@@ -157,10 +157,13 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
         }
 
         [Fact]
-        public async Task SuccessfulCheckoutThenMaterialIntentChange_GeneratesNewKeyNaturally()
+        public async Task SuccessfulCheckoutThenCartCleanupCompletes_IdenticalLaterPurchaseGeneratesNewKey()
         {
             string? sessionValue = null;
             var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            storage.Setup(service => service.RemoveAsync(It.IsAny<string>()))
+                .Callback<string>(_ => sessionValue = null)
+                .Returns(Task.CompletedTask);
             var productId = Guid.NewGuid();
             var checkout = CreateCheckout(Guid.NewGuid(), productId, 1);
             var observed = new ConcurrentQueue<string>();
@@ -171,11 +174,49 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             var service = new CartService(clients.Object, new ApiCallHelper(), store);
 
             Assert.True((await service.Checkout(checkout)).Success);
-            var changed = await store.GetOrCreateAsync(
-                CreateCheckout(checkout.PaymentMethodId, productId, 2));
+            await store.ClearForIntentAsync(checkout);
+            var identicalLaterPurchase = await store.GetOrCreateAsync(checkout);
 
-            Assert.NotEqual(Assert.Single(observed), changed.IdempotencyKey.ToString("D"));
+            Assert.NotEqual(Assert.Single(observed), identicalLaterPurchase.IdempotencyKey.ToString("D"));
+            storage.Verify(service => service.RemoveAsync(It.IsAny<string>()), Times.Once);
             storage.Verify(service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Exactly(2));
+        }
+
+        [Fact]
+        public async Task ClearForIntent_DoesNotRemoveNewerDifferentIntent()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var store = new CheckoutAttemptStore(storage.Object);
+            var productId = Guid.NewGuid();
+            var completedCheckout = CreateCheckout(Guid.NewGuid(), productId, 1);
+            var newerCheckout = CreateCheckout(Guid.NewGuid(), productId, 1);
+
+            await store.GetOrCreateAsync(completedCheckout);
+            var newerAttempt = await store.GetOrCreateAsync(newerCheckout);
+            await store.ClearForIntentAsync(completedCheckout);
+            var retained = await store.GetOrCreateAsync(newerCheckout);
+
+            Assert.Equal(newerAttempt.IdempotencyKey, retained.IdempotencyKey);
+            storage.Verify(service => service.RemoveAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ClearForIntent_WhenSessionStorageRemovalFails_RetainsAttempt()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            storage.Setup(service => service.RemoveAsync(It.IsAny<string>()))
+                .ThrowsAsync(new InvalidOperationException("Session storage unavailable"));
+            var store = new CheckoutAttemptStore(storage.Object);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var first = await store.GetOrCreateAsync(checkout);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => store.ClearForIntentAsync(checkout));
+            var retained = await store.GetOrCreateAsync(checkout);
+
+            Assert.Equal(first.IdempotencyKey, retained.IdempotencyKey);
+            storage.Verify(service => service.SetAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
@@ -262,6 +303,34 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
 
             Assert.Equal(2, observed.Count);
             Assert.Single(observed.Distinct());
+        }
+
+        [Fact]
+        public async Task AmbiguousServerFailure_KeepsSamePendingAttempt()
+        {
+            string? sessionValue = null;
+            var storage = CreateStorage(value => sessionValue = value, () => sessionValue);
+            var store = new CheckoutAttemptStore(storage.Object);
+            var checkout = CreateCheckout(Guid.NewGuid(), Guid.NewGuid(), 1);
+            var observed = new ConcurrentQueue<string>();
+            var client = new HttpClient(new AsyncStubHandler((request, _) =>
+            {
+                observed.Enqueue(Assert.Single(request.Headers.GetValues("Idempotency-Key")));
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+            }))
+            {
+                BaseAddress = new Uri("https://shop.test/api/"),
+            };
+            var clients = new Mock<IHttpClientHelper>();
+            clients.Setup(helper => helper.GetPrivateClientAsync()).ReturnsAsync(client);
+            var service = new CartService(clients.Object, new ApiCallHelper(), store);
+
+            await service.Checkout(checkout);
+            await service.Checkout(checkout);
+
+            Assert.Equal(2, observed.Count);
+            Assert.Single(observed.Distinct());
+            storage.Verify(service => service.RemoveAsync(It.IsAny<string>()), Times.Never);
         }
 
         [Fact]

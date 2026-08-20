@@ -7,5 +7,7 @@ namespace BlazorShop.Web.Shared.Services.Contracts
         Task<CheckoutAttempt> GetOrCreateAsync(Checkout checkout);
 
         Task ClearAsync(Guid completedKey);
+
+        Task ClearForIntentAsync(Checkout checkout);
     }
 }

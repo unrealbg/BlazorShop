@@ -62,6 +62,25 @@ namespace BlazorShop.Web.Shared.Services
             }
         }
 
+        public async Task ClearForIntentAsync(Checkout checkout)
+        {
+            var signature = CreateIntentSignature(checkout);
+            await _gate.WaitAsync();
+            try
+            {
+                var stored = await ReadAsync();
+                if (stored is not null
+                    && string.Equals(stored.IntentSignature, signature, StringComparison.Ordinal))
+                {
+                    await _sessionStorage.RemoveAsync(StorageKey);
+                }
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
         public static string CreateIntentSignature(Checkout checkout)
         {
             ArgumentNullException.ThrowIfNull(checkout);

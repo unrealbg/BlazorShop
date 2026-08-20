@@ -74,6 +74,9 @@ namespace BlazorShop.Tests.Presentation.Services.Payment
             Assert.Same(checkoutResult, result.Payload);
             Assert.Equal(idempotencyKey.ToString("D"), sentKey);
             this._checkoutAttemptStoreMock.Verify(store => store.ClearAsync(idempotencyKey), Times.Never);
+            this._checkoutAttemptStoreMock.Verify(
+                store => store.ClearForIntentAsync(It.IsAny<Checkout>()),
+                Times.Never);
         }
 
         [Fact]
