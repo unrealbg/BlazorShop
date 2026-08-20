@@ -70,7 +70,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task CreateUser_ShouldReturnSuccess_WhenUserIsCreated()
+        public async Task CreateUser_AssignsUserRole_WhenDatabaseWasEmpty()
         {
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
@@ -82,9 +82,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email))
                 .ReturnsAsync(mappedUser);
-            _userManagerMock.Setup(u => u.GetAllUsersAsync())
-                .ReturnsAsync(new List<AppUser> { mappedUser });
-            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin"))
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "User"))
                 .ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser))
                 .ReturnsAsync("confirmation-token");
@@ -95,6 +93,9 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             // Assert
             Assert.True(result.Success);
             Assert.Equal("User created successfully.", result.Message);
+            _roleManagerMock.Verify(r => r.AddUserToRoleAsync(mappedUser, "User"), Times.Once);
+            _roleManagerMock.Verify(r => r.AddUserToRoleAsync(mappedUser, "Admin"), Times.Never);
+            _userManagerMock.Verify(u => u.GetAllUsersAsync(), Times.Never);
             _emailServiceMock.Verify(e => e.SendEmailAsync(createUser.Email, "Confirm your email", It.IsAny<string>()), Times.Once);
             _userManagerMock.Verify(u => u.ConfirmEmailAsync(It.IsAny<AppUser>(), It.IsAny<string>()), Times.Never);
         }
@@ -151,8 +152,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
-            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
-            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(true);
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "User")).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
             _emailServiceMock.Setup(e => e.SendEmailAsync(createUser.Email, It.IsAny<string>(), It.IsAny<string>()))
                 .ThrowsAsync(new Exception("Email service error"));
@@ -181,8 +181,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
-            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
-            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(false);
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "User")).ReturnsAsync(false);
             _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(0);
 
             // Act
@@ -232,8 +231,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
-            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
-            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(true);
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "User")).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
             _userManagerMock.Setup(u => u.ConfirmEmailAsync(mappedUser, "confirmation-token")).ReturnsAsync(true);
 
@@ -267,8 +265,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
-            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
-            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(true);
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "User")).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GenerateEmailConfirmationTokenAsync(mappedUser)).ReturnsAsync("confirmation-token");
             _userManagerMock.Setup(u => u.ConfirmEmailAsync(mappedUser, "confirmation-token")).ReturnsAsync(true);
             _emailServiceMock
@@ -299,8 +296,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserByEmailAsync(createUser.Email)).ReturnsAsync(mappedUser);
-            _userManagerMock.Setup(u => u.GetAllUsersAsync()).ReturnsAsync(new List<AppUser> { mappedUser });
-            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "Admin")).ReturnsAsync(false);
+            _roleManagerMock.Setup(r => r.AddUserToRoleAsync(mappedUser, "User")).ReturnsAsync(false);
             _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(1);
 
             // Act

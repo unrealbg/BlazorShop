@@ -85,12 +85,12 @@ Additional production/UX work remains tracked in GitHub Issues. The issue tracke
   - Automated unit/service/infrastructure tests and GitHub Actions CI
   - Modern UI with Tailwind-style classes, toast notifications, and Chart.js
   - Production Docker Compose deployment with separate Storefront, Web, API, and PostgreSQL services
+  - Explicit deployment-only initial administrator bootstrap command
   - Configurable CORS, rate limiting, forwarded headers, HSTS/HTTPS behavior, and refresh-token cookie policy
 
 ## Current Limitations
 These are known areas being actively hardened; see the linked issues for the source-of-truth acceptance criteria.
 
-- **Administrator bootstrap (#87):** on the current `master`, the first registered user on a clean database becomes Admin. This is a known security limitation and is being replaced with an explicit deployment/bootstrap mechanism. Do not expose a fresh production deployment to public registration before creating/securing the intended administrator.
 - **Variant/order integrity (#88, #89):** the commerce contracts and historical order snapshots are being strengthened so the exact purchased variant/SKU is authoritative throughout checkout and order history.
 - **Inventory concurrency (#90):** atomic reservation/decrement behavior is still being implemented to prevent overselling under concurrent checkout.
 - **Checkout lifecycle (#91, #92):** checkout is being moved to a fully authoritative server-side, order-first and idempotent flow.
@@ -160,7 +160,17 @@ You can also apply migrations manually from the solution root:
    dotnet ef database update --project BlazorShop.Infrastructure --startup-project BlazorShop.Presentation/BlazorShop.API
    ```
 
-4) Run the app
+4) Bootstrap the initial administrator
+
+Public registration always creates a normal `User` account. On a fresh deployment, supply `AdminBootstrap:Email`, `AdminBootstrap:Password`, and `AdminBootstrap:FullName` through environment variables, deployment secrets, or local user-secrets, then run the deployment-only command:
+
+   ```bash
+   dotnet run --project BlazorShop.Presentation/BlazorShop.API -- --bootstrap-admin
+   ```
+
+The command applies pending migrations, creates an email-confirmed `Admin`, and exits without starting the HTTP server. It refuses to run when an administrator or an account with the configured email already exists. Remove the bootstrap credentials from the active deployment configuration after the command succeeds. See `docs/production-runbook.md` for environment-variable and Docker Compose examples.
+
+5) Run the app
 
 Using the AppHost is the recommended local orchestration path:
 
