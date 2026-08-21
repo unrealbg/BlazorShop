@@ -140,6 +140,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Equal(1, await assertionContext.Orders.CountAsync());
             Assert.Equal(1, await assertionContext.InventoryReservations.CountAsync());
             Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            var paymentTransaction = await assertionContext.PaymentTransactions.SingleAsync();
+            var identityReplay = await new PaymentTransactionStore(_database.CreateContextFactory())
+                .PersistProviderIdentityAsync(
+                    paymentTransaction.Id,
+                    paymentTransaction.ProviderSessionId!,
+                    providerPaymentIntentId: null);
+            Assert.Equal(PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted, identityReplay);
         }
 
         [Fact]
@@ -224,6 +231,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 Status = "Pending",
                 Reference = claim.Record.OrderReference,
                 TotalAmount = 10m,
+                Currency = "EUR",
                 Lines =
                 [
                     new OrderLine
@@ -313,6 +321,72 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             var record = await assertionContext.CheckoutIdempotencyRecords.SingleAsync();
             Assert.NotNull(record.ProviderInitializationStartedOn);
             Assert.NotNull(record.ProviderInitializationJson);
+            Assert.Single(await assertionContext.PaymentTransactions.ToListAsync());
+        }
+
+        [Fact]
+        public async Task ProviderIdentityPersistenceFailure_RetryUsesSameProviderRequestAndOneTransaction()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(true, "https://checkout.stripe.test/recovered")));
+            var transactionStore = new FailFirstIdentityPersistenceStore(
+                new PaymentTransactionStore(_database.CreateContextFactory()));
+            var key = Guid.NewGuid();
+
+            var ambiguous = await ExecuteAsync(
+                checkout,
+                "customer-1",
+                key,
+                provider,
+                paymentTransactionStore: transactionStore);
+            var recovered = await ExecuteAsync(
+                checkout,
+                "customer-1",
+                key,
+                provider,
+                paymentTransactionStore: transactionStore);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, ambiguous.Status);
+            Assert.True(recovered.Success);
+            var calls = provider.Calls.ToArray();
+            Assert.Equal(2, calls.Length);
+            Assert.Single(calls.Select(call => call.ProviderIdempotencyKey).Distinct());
+            Assert.Single(calls.Select(call => JsonSerializer.Serialize(call.Initialization)).Distinct());
+            await using var assertionContext = _database.CreateContext();
+            var paymentTransaction = await assertionContext.PaymentTransactions.SingleAsync();
+            Assert.Equal($"cs_{calls[0].ProviderIdempotencyKey}", paymentTransaction.ProviderSessionId);
+            Assert.Equal($"pi_{calls[0].ProviderIdempotencyKey}", paymentTransaction.ProviderPaymentIntentId);
+            Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(InventoryReservationStatus.Reserved,
+                (await assertionContext.InventoryReservations.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task StripeCheckout_NormalizesRoundingOnceAcrossOrderTransactionAndProvider()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2, price: 1.005m);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(true, "https://checkout.stripe.test/rounded")));
+
+            var result = await ExecuteAsync(checkout, "customer-1", Guid.NewGuid(), provider);
+
+            Assert.True(result.Success);
+            var providerLine = Assert.Single(Assert.Single(provider.Calls).Initialization.Lines);
+            Assert.Equal(101, providerLine.UnitAmount);
+            await using var assertionContext = _database.CreateContext();
+            var order = await assertionContext.Orders.Include(item => item.Lines).SingleAsync();
+            Assert.Equal(1.01m, order.TotalAmount);
+            Assert.Equal("EUR", order.Currency);
+            Assert.Equal(1.01m, Assert.Single(order.Lines).UnitPrice);
+            Assert.Equal(1.01m, Assert.Single(order.Lines).LineTotal);
+            var paymentTransaction = await assertionContext.PaymentTransactions.SingleAsync();
+            Assert.Equal(101, paymentTransaction.ExpectedAmountMinor);
+            Assert.Equal("EUR", paymentTransaction.Currency);
         }
 
         [Fact]
@@ -561,7 +635,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             string userId,
             Guid key,
             IPaymentService? payment = null,
-            IEmailService? email = null)
+            IEmailService? email = null,
+            IPaymentTransactionStore? paymentTransactionStore = null)
         {
             await using var context = _database.CreateContext();
             var paymentMethods = new Mock<IPaymentMethodService>();
@@ -577,6 +652,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 users.Object,
                 new InventoryReservationService(_database.CreateContextFactory()),
                 CreateStore(),
+                paymentTransactionStore ?? new PaymentTransactionStore(_database.CreateContextFactory()),
                 new OrderRepository(context),
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings
@@ -590,6 +666,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 {
                     ProviderRecoveryWindowHours = 23,
                 }),
+                Options.Create(new CommerceOptions { Currency = "EUR" }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
             return await orchestrator.CheckoutAsync(checkout, userId, key);
         }
@@ -605,7 +682,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 ProviderRecoveryWindowHours = 23,
             }));
 
-        private async Task<Guid> SeedProductAsync(int quantity)
+        private async Task<Guid> SeedProductAsync(int quantity, decimal price = 10m)
         {
             await using var context = _database.CreateContext();
             var category = await context.Categories.FirstOrDefaultAsync();
@@ -619,7 +696,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             {
                 Id = Guid.NewGuid(),
                 Name = $"Product-{Guid.NewGuid():N}",
-                Price = 10m,
+                Price = price,
                 Quantity = quantity,
                 CategoryId = category.Id,
             };
@@ -703,12 +780,55 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             {
                 var call = new ProviderCall(initialization, providerIdempotencyKey);
                 Calls.Enqueue(call);
-                return await _handler(call);
+                var result = await _handler(call);
+                return result.Success && string.IsNullOrWhiteSpace(result.ProviderSessionId)
+                    ? result with
+                    {
+                        ProviderSessionId = $"cs_{providerIdempotencyKey}",
+                        ProviderPaymentIntentId = $"pi_{providerIdempotencyKey}",
+                    }
+                    : result;
             }
         }
 
         private sealed record ProviderCall(
             StripeCheckoutInitialization Initialization,
             string ProviderIdempotencyKey);
+
+        private sealed class FailFirstIdentityPersistenceStore : IPaymentTransactionStore
+        {
+            private readonly IPaymentTransactionStore _inner;
+            private int _attempts;
+
+            public FailFirstIdentityPersistenceStore(IPaymentTransactionStore inner)
+            {
+                _inner = inner;
+            }
+
+            public Task<PaymentTransaction> GetOrCreateStripeAsync(
+                Guid orderId,
+                long expectedAmountMinor,
+                string currency,
+                CancellationToken cancellationToken = default) =>
+                _inner.GetOrCreateStripeAsync(orderId, expectedAmountMinor, currency, cancellationToken);
+
+            public Task<PaymentProviderIdentityPersistenceOutcome> PersistProviderIdentityAsync(
+                Guid paymentTransactionId,
+                string providerSessionId,
+                string? providerPaymentIntentId,
+                CancellationToken cancellationToken = default)
+            {
+                if (Interlocked.Increment(ref _attempts) == 1)
+                {
+                    throw new TimeoutException("Simulated lost database response.");
+                }
+
+                return _inner.PersistProviderIdentityAsync(
+                    paymentTransactionId,
+                    providerSessionId,
+                    providerPaymentIntentId,
+                    cancellationToken);
+            }
+        }
     }
 }

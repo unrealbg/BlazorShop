@@ -137,10 +137,12 @@
             services.AddScoped<IStripeCheckoutSessionService, StripeCheckoutSessionService>();
             services.AddScoped<IPaymentService, StripePaymentService>();
             services.AddSingleton<IStripeWebhookEventParser, StripeWebhookEventParser>();
+            services.AddScoped<IStripePaymentReconciliationService, StripePaymentReconciliationService>();
             services.AddScoped<IStripeWebhookService, StripeWebhookService>();
             services.AddScoped<IPayPalPaymentService, PayPalPaymentService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<ICheckoutIdempotencyStore, CheckoutIdempotencyStore>();
+            services.AddScoped<IPaymentTransactionStore, PaymentTransactionStore>();
             services.AddScoped<IInventoryReservationService>(serviceProvider =>
                 new InventoryReservationService(
                     serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>()));

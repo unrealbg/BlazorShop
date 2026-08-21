@@ -31,6 +31,7 @@ services:
       Stripe__Enabled: ${BLAZORSHOP_STRIPE_ENABLED:-false}
       Stripe__SecretKey: "${BLAZORSHOP_STRIPE_SECRET_KEY:-}"
       Stripe__WebhookSecret: "${BLAZORSHOP_STRIPE_WEBHOOK_SECRET:-}"
+      Commerce__Currency: ${BLAZORSHOP_COMMERCE_CURRENCY:-EUR}
       Demo__Enabled: ${BLAZORSHOP_DEMO_ENABLED:-true}
       Demo__LifetimeMinutes: ${BLAZORSHOP_DEMO_LIFETIME_MINUTES:-30}
       Demo__MaxConcurrentSessions: ${BLAZORSHOP_DEMO_MAX_CONCURRENT_SESSIONS:-20}

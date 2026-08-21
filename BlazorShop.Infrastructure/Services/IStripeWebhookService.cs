@@ -11,9 +11,10 @@ namespace BlazorShop.Infrastructure.Services
     public enum StripeWebhookHandlingResult
     {
         Processed,
+        Duplicate,
+        Rejected,
         Ignored,
         InvalidSignature,
-        InvalidPayload,
-        OrderNotFound,
+        TransientFailure,
     }
 }

@@ -12,9 +12,13 @@ namespace BlazorShop.Domain.Entities.Payment
 
         public decimal TotalAmount { get; set; }
 
+        public string Currency { get; set; } = string.Empty;
+
         public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
         public ICollection<OrderLine> Lines { get; set; } = new List<OrderLine>();
+
+        public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
 
         public string? ShippingCarrier { get; set; }
 

@@ -136,6 +136,7 @@ namespace BlazorShop.Tests.Infrastructure
                     ["JWT:Issuer"] = "test-issuer",
                     ["JWT:Key"] = "abcdefghijklmnopqrstuvwxyz123456",
                     ["ClientApp:BaseUrl"] = "https://shop.example.com",
+                    ["Commerce:Currency"] = "EUR",
                 })
                 .Build();
         }

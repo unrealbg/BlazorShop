@@ -58,17 +58,25 @@ namespace BlazorShop.Tests.Infrastructure
                     It.IsAny<string>(),
                     It.IsAny<CancellationToken>()))
                 .Callback<SessionCreateOptions, string, CancellationToken>((options, _, _) => capturedOptions = options)
-                .ReturnsAsync(new Session { Url = "https://checkout.stripe.com/session/test" });
+                .ReturnsAsync(new Session
+                {
+                    Id = "cs_test",
+                    PaymentIntentId = "pi_test",
+                    Url = "https://checkout.stripe.com/session/test",
+                });
 
             var paymentService = CreatePaymentService(sessionService.Object, logger.Object);
             var orderId = Guid.NewGuid();
 
+            var initialization = CreateInitialization(orderId, productId, variantId);
             var result = await paymentService.Pay(
-                CreateInitialization(orderId, productId, variantId),
+                initialization,
                 "provider-key");
 
             Assert.True(result.Success);
             Assert.Equal("https://checkout.stripe.com/session/test", result.RedirectUrl);
+            Assert.Equal("cs_test", result.ProviderSessionId);
+            Assert.Equal("pi_test", result.ProviderPaymentIntentId);
             Assert.NotNull(capturedOptions);
             Assert.Equal(
                 $"https://shop.example.com/payment-success?pm=card&order_id={orderId:D}&reference=STRIPE-TEST-1&session_id={{CHECKOUT_SESSION_ID}}",
@@ -76,7 +84,13 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.Equal($"https://shop.example.com/payment-cancel?order_id={orderId:D}", capturedOptions.CancelUrl);
             Assert.Equal(orderId.ToString("D"), capturedOptions.ClientReferenceId);
             Assert.Equal(orderId.ToString("D"), capturedOptions.Metadata["order_id"]);
+            Assert.Equal(
+                initialization.PaymentTransactionId.ToString("D"),
+                capturedOptions.Metadata["payment_transaction_id"]);
             Assert.Equal(orderId.ToString("D"), capturedOptions.PaymentIntentData.Metadata["order_id"]);
+            Assert.Equal(
+                initialization.PaymentTransactionId.ToString("D"),
+                capturedOptions.PaymentIntentData.Metadata["payment_transaction_id"]);
             Assert.Equal(["card"], capturedOptions.PaymentMethodTypes);
             Assert.Equal("payment", capturedOptions.Mode);
             var lineItem = Assert.Single(capturedOptions.LineItems);
@@ -88,6 +102,28 @@ namespace BlazorShop.Tests.Infrastructure
                 It.IsAny<SessionCreateOptions>(),
                 "provider-key",
                 It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Pay_WhenLineTotalDoesNotMatchExpectedAmount_RejectsBeforeStripeCall()
+        {
+            var sessionService = new Mock<IStripeCheckoutSessionService>();
+            var initialization = CreateInitialization(Guid.NewGuid(), Guid.NewGuid()) with
+            {
+                ExpectedAmountMinor = 2499,
+            };
+            var paymentService = CreatePaymentService(
+                sessionService.Object,
+                Mock.Of<ILogger<StripePaymentService>>());
+
+            var result = await paymentService.Pay(initialization, "provider-key");
+
+            Assert.False(result.Success);
+            Assert.Equal(PaymentInitializationFailureKind.Definitive, result.FailureKind);
+            sessionService.Verify(service => service.CreateAsync(
+                It.IsAny<SessionCreateOptions>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Theory]
@@ -148,9 +184,12 @@ namespace BlazorShop.Tests.Infrastructure
             Guid orderId,
             Guid productId,
             Guid? variantId = null) => new(
-                1,
+                2,
                 orderId,
                 "STRIPE-TEST-1",
+                Guid.NewGuid(),
+                variantId.HasValue ? 7990 : 2500,
+                "EUR",
                 ["card"],
                 "payment",
                 [

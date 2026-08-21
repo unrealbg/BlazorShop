@@ -22,6 +22,8 @@ namespace BlazorShop.Web.Shared.Models.Payment
 
         public decimal Amount { get; init; }
 
+        public string Currency { get; init; } = string.Empty;
+
         public string? AdditionalInfo { get; init; }
     }
 

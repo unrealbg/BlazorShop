@@ -4,7 +4,9 @@ namespace BlazorShop.Application.DTOs.Payment
         bool Success,
         string? RedirectUrl = null,
         string? ErrorMessage = null,
-        PaymentInitializationFailureKind FailureKind = PaymentInitializationFailureKind.None);
+        PaymentInitializationFailureKind FailureKind = PaymentInitializationFailureKind.None,
+        string? ProviderSessionId = null,
+        string? ProviderPaymentIntentId = null);
 
     public enum PaymentInitializationFailureKind
     {

@@ -229,11 +229,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 new CheckoutIdempotencyStore(
                     _database.CreateContextFactory(),
                     Options.Create(new CheckoutIdempotencyOptions())),
+                new PaymentTransactionStore(_database.CreateContextFactory()),
                 new OrderRepository(context),
                 Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings()),
                 Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
                 Options.Create(new CheckoutIdempotencyOptions()),
+                Options.Create(new CommerceOptions { Currency = "EUR" }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
 
             var result = await orchestrator.CheckoutAsync(
@@ -354,7 +356,11 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                         (await providerContext.InventoryReservations.SingleAsync(
                             item => item.OrderId == initialization.OrderId)).Status);
                     Assert.Equal(1000, Assert.Single(initialization.Lines).UnitAmount);
-                    return new PaymentInitializationResult(true, "https://checkout.stripe.test/session");
+                    return new PaymentInitializationResult(
+                        true,
+                        "https://checkout.stripe.test/session",
+                        ProviderSessionId: "cs_test",
+                        ProviderPaymentIntentId: "pi_test");
                 });
             var orchestrator = CreateCheckoutOrchestrator(
                 context,
@@ -787,6 +793,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 new CheckoutIdempotencyStore(
                     _database.CreateContextFactory(),
                     Options.Create(new CheckoutIdempotencyOptions())),
+                new PaymentTransactionStore(_database.CreateContextFactory()),
                 new OrderRepository(context),
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings
@@ -797,6 +804,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 }),
                 Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
                 Options.Create(new CheckoutIdempotencyOptions()),
+                Options.Create(new CommerceOptions { Currency = "EUR" }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
         }
 
@@ -873,6 +881,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 Status = PaymentOrderStatus.PendingPayment,
                 Reference = $"INV-{Guid.NewGuid():N}",
                 TotalAmount = lines.Sum(line => line.Quantity * 10m),
+                Currency = "EUR",
                 Lines = lines.Select(line => new OrderLine
                 {
                     ProductId = line.ProductId,

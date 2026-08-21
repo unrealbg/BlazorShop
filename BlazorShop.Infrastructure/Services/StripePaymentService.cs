@@ -24,6 +24,14 @@
             string providerIdempotencyKey,
             CancellationToken cancellationToken = default)
         {
+            if (!HasValidAuthoritativeTotal(initialization))
+            {
+                return new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "The card payment amount does not match the immutable order total.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive);
+            }
+
             try
             {
                 var lineItems = new List<SessionLineItemOptions>();
@@ -56,12 +64,14 @@
                     Metadata = new Dictionary<string, string>
                     {
                         ["order_id"] = initialization.OrderId.ToString("D"),
+                        ["payment_transaction_id"] = initialization.PaymentTransactionId.ToString("D"),
                     },
                     PaymentIntentData = new SessionPaymentIntentDataOptions
                     {
                         Metadata = new Dictionary<string, string>
                         {
                             ["order_id"] = initialization.OrderId.ToString("D"),
+                            ["payment_transaction_id"] = initialization.PaymentTransactionId.ToString("D"),
                         },
                     },
                     SuccessUrl = initialization.SuccessUrl,
@@ -73,7 +83,11 @@
                     providerIdempotencyKey,
                     cancellationToken);
 
-                return new PaymentInitializationResult(true, session.Url);
+                return new PaymentInitializationResult(
+                    true,
+                    session.Url,
+                    ProviderSessionId: session.Id,
+                    ProviderPaymentIntentId: session.PaymentIntentId);
             }
             catch (Stripe.StripeException ex)
             {
@@ -149,6 +163,34 @@
                     || string.Equals(errorType, "authentication_error", StringComparison.Ordinal)
                     || string.Equals(errorType, "permission_error", StringComparison.Ordinal)
                     || string.Equals(errorType, "card_error", StringComparison.Ordinal));
+        }
+
+        private static bool HasValidAuthoritativeTotal(StripeCheckoutInitialization initialization)
+        {
+            if (initialization.PaymentTransactionId == Guid.Empty
+                || initialization.OrderId == Guid.Empty
+                || initialization.ExpectedAmountMinor < 0
+                || string.IsNullOrWhiteSpace(initialization.Currency)
+                || initialization.Lines.Count == 0
+                || initialization.Lines.Any(line =>
+                    line.Quantity <= 0
+                    || line.UnitAmount < 0
+                    || !string.Equals(line.Currency, initialization.Currency, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            try
+            {
+                var lineTotal = initialization.Lines.Aggregate(
+                    0L,
+                    (total, line) => checked(total + checked(line.UnitAmount * line.Quantity)));
+                return lineTotal == initialization.ExpectedAmountMinor;
+            }
+            catch (OverflowException)
+            {
+                return false;
+            }
         }
     }
 }

@@ -26,6 +26,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IAppUserManager> _users = new();
         private readonly Mock<IInventoryReservationService> _inventory = new();
         private readonly Mock<ICheckoutIdempotencyStore> _idempotency = new();
+        private readonly Mock<IPaymentTransactionStore> _paymentTransactions = new();
         private readonly Mock<IOrderRepository> _orders = new();
         private readonly Mock<IEmailService> _email = new();
         private readonly CheckoutOrchestrator _orchestrator;
@@ -89,6 +90,20 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
             _orders.Setup(repository => repository.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync((Order?)null);
+            _paymentTransactions.Setup(store => store.GetOrCreateStripeAsync(
+                    It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid orderId, long amount, string currency, CancellationToken _) =>
+                    new PaymentTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        Provider = PaymentProviderNames.Stripe,
+                        ExpectedAmountMinor = amount,
+                        Currency = currency,
+                    });
+            _paymentTransactions.Setup(store => store.PersistProviderIdentityAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(PaymentProviderIdentityPersistenceOutcome.Persisted);
 
             _orchestrator = new CheckoutOrchestrator(
                 _products.Object,
@@ -97,6 +112,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _users.Object,
                 _inventory.Object,
                 _idempotency.Object,
+                _paymentTransactions.Object,
                 _orders.Object,
                 _email.Object,
                 Options.Create(new BankTransferSettings
@@ -108,6 +124,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 }),
                 Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
                 Options.Create(new CheckoutIdempotencyOptions()),
+                Options.Create(new CommerceOptions { Currency = "EUR" }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
         }
 
@@ -290,7 +307,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     Assert.Equal(PaymentOrderStatus.PendingPayment, createdOrder.Status);
                     providerInitialization = initialization;
                 })
-                .ReturnsAsync(new PaymentInitializationResult(true, "https://checkout.stripe.test/session"));
+                .ReturnsAsync(new PaymentInitializationResult(
+                    true,
+                    "https://checkout.stripe.test/session",
+                    ProviderSessionId: "cs_test",
+                    ProviderPaymentIntentId: "pi_test"));
 
             var result = await CheckoutAsync(
                 PaymentMethodIds.CreditCard,

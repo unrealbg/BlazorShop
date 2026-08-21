@@ -1,9 +1,6 @@
 namespace BlazorShop.Infrastructure.Services
 {
     using BlazorShop.Application.Options;
-    using BlazorShop.Domain.Contracts.Payment;
-    using BlazorShop.Domain.Entities.Payment;
-
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
@@ -15,18 +12,18 @@ namespace BlazorShop.Infrastructure.Services
         private const string CheckoutExpired = "checkout.session.expired";
 
         private readonly IStripeWebhookEventParser _eventParser;
-        private readonly IInventoryReservationService _inventoryReservationService;
+        private readonly IStripePaymentReconciliationService _reconciliationService;
         private readonly StripeOptions _options;
         private readonly ILogger<StripeWebhookService> _logger;
 
         public StripeWebhookService(
             IStripeWebhookEventParser eventParser,
-            IInventoryReservationService inventoryReservationService,
+            IStripePaymentReconciliationService reconciliationService,
             IOptions<StripeOptions> options,
             ILogger<StripeWebhookService> logger)
         {
             _eventParser = eventParser;
-            _inventoryReservationService = inventoryReservationService;
+            _reconciliationService = reconciliationService;
             _options = options.Value;
             _logger = logger;
         }
@@ -55,8 +52,7 @@ namespace BlazorShop.Infrastructure.Services
                 return StripeWebhookHandlingResult.InvalidSignature;
             }
 
-            var targetStatus = ResolveTargetStatus(stripeEvent);
-            if (targetStatus is null)
+            if (!IsHandledEventType(stripeEvent.EventType))
             {
                 _logger.LogDebug(
                     "Ignoring Stripe event {StripeEventId} of type {StripeEventType}.",
@@ -65,68 +61,35 @@ namespace BlazorShop.Infrastructure.Services
                 return StripeWebhookHandlingResult.Ignored;
             }
 
-            if (!stripeEvent.OrderId.HasValue)
+            try
             {
-                _logger.LogWarning(
-                    "Stripe event {StripeEventId} does not contain a valid order_id metadata value.",
+                return await _reconciliationService.ReconcileAsync(stripeEvent, cancellationToken) switch
+                {
+                    StripePaymentReconciliationOutcome.Processed => StripeWebhookHandlingResult.Processed,
+                    StripePaymentReconciliationOutcome.Duplicate => StripeWebhookHandlingResult.Duplicate,
+                    StripePaymentReconciliationOutcome.Rejected => StripeWebhookHandlingResult.Rejected,
+                    StripePaymentReconciliationOutcome.Ignored => StripeWebhookHandlingResult.Ignored,
+                    _ => throw new InvalidOperationException("Unknown Stripe reconciliation outcome."),
+                };
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Stripe event {StripeEventId} failed transiently and remains eligible for provider retry.",
                     stripeEvent.EventId);
-                return StripeWebhookHandlingResult.InvalidPayload;
+                return StripeWebhookHandlingResult.TransientFailure;
             }
-
-            var reservationStatus = string.Equals(targetStatus, PaymentOrderStatus.Paid, StringComparison.Ordinal)
-                ? InventoryReservationStatus.Consumed
-                : InventoryReservationStatus.Released;
-            var transition = await _inventoryReservationService.TransitionOrderAsync(
-                stripeEvent.OrderId.Value,
-                targetStatus,
-                reservationStatus,
-                cancellationToken);
-
-            if (transition.Outcome == InventoryTransitionOutcome.OrderNotFound)
-            {
-                _logger.LogWarning(
-                    "Stripe event {StripeEventId} references missing order {OrderId}.",
-                    stripeEvent.EventId,
-                    stripeEvent.OrderId.Value);
-                return StripeWebhookHandlingResult.OrderNotFound;
-            }
-
-            if (transition.Outcome == InventoryTransitionOutcome.InvalidTransition)
-            {
-                _logger.LogWarning(
-                    "Stripe event {StripeEventId} could not apply status {OrderStatus} to order {OrderId}: {Reason}",
-                    stripeEvent.EventId,
-                    targetStatus,
-                    stripeEvent.OrderId.Value,
-                    transition.ErrorMessage);
-                return StripeWebhookHandlingResult.Processed;
-            }
-
-            _logger.LogInformation(
-                "Applied Stripe event {StripeEventId} to order {OrderId}; status is now {OrderStatus}.",
-                stripeEvent.EventId,
-                stripeEvent.OrderId.Value,
-                targetStatus);
-
-            return StripeWebhookHandlingResult.Processed;
         }
 
-        private static string? ResolveTargetStatus(StripeWebhookEventData stripeEvent)
-        {
-            return stripeEvent.EventType switch
-            {
-                CheckoutCompleted when IsPaid(stripeEvent.PaymentStatus) => PaymentOrderStatus.Paid,
-                CheckoutAsyncPaymentSucceeded => PaymentOrderStatus.Paid,
-                CheckoutAsyncPaymentFailed => PaymentOrderStatus.PaymentFailed,
-                CheckoutExpired => PaymentOrderStatus.Cancelled,
-                _ => null,
-            };
-        }
-
-        private static bool IsPaid(string? paymentStatus)
-        {
-            return string.Equals(paymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(paymentStatus, "no_payment_required", StringComparison.OrdinalIgnoreCase);
-        }
+        private static bool IsHandledEventType(string eventType) =>
+            eventType is CheckoutCompleted
+                or CheckoutAsyncPaymentSucceeded
+                or CheckoutAsyncPaymentFailed
+                or CheckoutExpired;
     }
 }

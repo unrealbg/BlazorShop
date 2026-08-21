@@ -94,7 +94,7 @@ These are known areas being actively hardened; see the linked issues for the sou
 - **Variant/order integrity (#88, #89):** the commerce contracts and historical order snapshots are being strengthened so the exact purchased variant/SKU is authoritative throughout checkout and order history.
 - **Inventory concurrency (#90):** atomic reservation/decrement behavior is still being implemented to prevent overselling under concurrent checkout.
 - **Checkout lifecycle (#91, #92):** checkout is being moved to a fully authoritative server-side, order-first and idempotent flow.
-- **Stripe reconciliation (#93):** webhook signatures are validated, while persistent provider-event idempotency plus amount/currency reconciliation are still being hardened.
+- **Stripe reconciliation (#93):** signed Checkout Session events are durably deduplicated and reconciled against immutable local order, payment, provider-identity, amount, and currency state.
 - **Legacy checkout history (#95):** `Orders`/`OrderLines` are the direction of travel, but the older `CheckoutOrderItems` persistence path still exists and is scheduled for removal.
 
 ## Technologies Used
@@ -143,6 +143,7 @@ Core values commonly required:
 - `ConnectionStrings:DefaultConnection`
 - `Jwt:Key`, `Jwt:Issuer`, `Jwt:Audience`
 - `Stripe:Enabled`, `Stripe:SecretKey`, `Stripe:WebhookSecret`
+- `Commerce:Currency` (required store currency; currently supports `EUR`, `GBP`, and `USD`)
 - `BankTransfer:Iban`, `BankTransfer:Beneficiary`, `BankTransfer:BankName`, `BankTransfer:AdditionalInfo`
 - `EmailSettings:From`, `DisplayName`, `SmtpServer`, `Port`, `UseSsl`, `Username`, `Password`
 

@@ -17,18 +17,20 @@ namespace BlazorShop.Application.Services.Payment
     public sealed class CheckoutOrchestrator : ICheckoutOrchestrator
     {
         private const int OutcomeVersion = 1;
-        private const int StripeInitializationVersion = 1;
+        private const int StripeInitializationVersion = 2;
         private readonly IProductReadRepository _productReadRepository;
         private readonly IPaymentMethodService _paymentMethodService;
         private readonly IPaymentService _paymentService;
         private readonly IAppUserManager _userManager;
         private readonly IInventoryReservationService _inventoryReservationService;
         private readonly ICheckoutIdempotencyStore _idempotencyStore;
+        private readonly IPaymentTransactionStore _paymentTransactionStore;
         private readonly IOrderRepository _orderRepository;
         private readonly IEmailService _emailService;
         private readonly BankTransferSettings _bankTransferSettings;
         private readonly ClientAppOptions _clientAppOptions;
         private readonly CheckoutIdempotencyOptions _idempotencyOptions;
+        private readonly CommerceOptions _commerceOptions;
         private readonly ILogger<CheckoutOrchestrator> _logger;
 
         public CheckoutOrchestrator(
@@ -38,11 +40,13 @@ namespace BlazorShop.Application.Services.Payment
             IAppUserManager userManager,
             IInventoryReservationService inventoryReservationService,
             ICheckoutIdempotencyStore idempotencyStore,
+            IPaymentTransactionStore paymentTransactionStore,
             IOrderRepository orderRepository,
             IEmailService emailService,
             IOptions<BankTransferSettings> bankTransferOptions,
             IOptions<ClientAppOptions> clientAppOptions,
             IOptions<CheckoutIdempotencyOptions> idempotencyOptions,
+            IOptions<CommerceOptions> commerceOptions,
             ILogger<CheckoutOrchestrator> logger)
         {
             _productReadRepository = productReadRepository;
@@ -51,11 +55,13 @@ namespace BlazorShop.Application.Services.Payment
             _userManager = userManager;
             _inventoryReservationService = inventoryReservationService;
             _idempotencyStore = idempotencyStore;
+            _paymentTransactionStore = paymentTransactionStore;
             _orderRepository = orderRepository;
             _emailService = emailService;
             _bankTransferSettings = bankTransferOptions.Value;
             _clientAppOptions = clientAppOptions.Value;
             _idempotencyOptions = idempotencyOptions.Value;
+            _commerceOptions = commerceOptions.Value;
             _logger = logger;
         }
 
@@ -162,12 +168,24 @@ namespace BlazorShop.Application.Services.Payment
                 return await FinishFailureAsync(claim, resolution.ErrorMessage, cancellationToken);
             }
 
-            var order = CreateOrder(
-                resolution.Lines,
-                userId,
-                claim.Record.OrderId,
-                claim.Record.OrderReference,
-                paymentKind.Value);
+            Order order;
+            try
+            {
+                order = CreateOrder(
+                    resolution.Lines,
+                    userId,
+                    claim.Record.OrderId,
+                    claim.Record.OrderReference,
+                    paymentKind.Value,
+                    _commerceOptions.Currency);
+            }
+            catch (Exception exception) when (exception is OverflowException or ArgumentOutOfRangeException)
+            {
+                return await FinishFailureAsync(
+                    claim,
+                    "The order amount cannot be represented safely in the configured currency.",
+                    cancellationToken);
+            }
             var successOutcome = paymentKind.Value switch
             {
                 CheckoutPaymentKind.CashOnDelivery => CreateSuccessOutcome(
@@ -300,10 +318,34 @@ namespace BlazorShop.Application.Services.Payment
             CheckoutIdempotencyClaim claim,
             CancellationToken cancellationToken)
         {
+            PaymentTransaction paymentTransaction;
+            try
+            {
+                paymentTransaction = await _paymentTransactionStore.GetOrCreateStripeAsync(
+                    order.Id,
+                    CurrencyMoney.ToMinorUnits(order.TotalAmount, order.Currency),
+                    order.Currency,
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                or ArgumentOutOfRangeException
+                or OverflowException)
+            {
+                _logger.LogError(
+                    exception,
+                    "Could not create or recover the Stripe payment transaction for order {OrderId}.",
+                    order.Id);
+                await _idempotencyStore.ReleaseLeaseAsync(
+                    claim.Record.Id,
+                    claim.LeaseOwnerId,
+                    cancellationToken);
+                return CheckoutExecutionResult.InProgress();
+            }
+
             var providerInitialization = await _idempotencyStore.PrepareProviderInitializationAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,
-                CreateStripeInitialization(order),
+                CreateStripeInitialization(order, paymentTransaction),
                 cancellationToken);
             if (providerInitialization is null)
             {
@@ -312,6 +354,9 @@ namespace BlazorShop.Application.Services.Payment
 
             var initialization = providerInitialization.Initialization;
             if (initialization.OrderId != order.Id
+                || initialization.PaymentTransactionId != paymentTransaction.Id
+                || initialization.ExpectedAmountMinor != paymentTransaction.ExpectedAmountMinor
+                || !string.Equals(initialization.Currency, paymentTransaction.Currency, StringComparison.Ordinal)
                 || !string.Equals(initialization.OrderReference, order.Reference, StringComparison.Ordinal))
             {
                 var invalidSnapshot = CreateFailureOutcome(
@@ -354,8 +399,47 @@ namespace BlazorShop.Application.Services.Payment
                 $"blazorshop-checkout-{claim.Record.Id:N}",
                 cancellationToken);
 
-            if (paymentResult.Success && !string.IsNullOrWhiteSpace(paymentResult.RedirectUrl))
+            if (paymentResult.Success
+                && !string.IsNullOrWhiteSpace(paymentResult.RedirectUrl)
+                && !string.IsNullOrWhiteSpace(paymentResult.ProviderSessionId))
             {
+                PaymentProviderIdentityPersistenceOutcome identityOutcome;
+                try
+                {
+                    identityOutcome = await _paymentTransactionStore.PersistProviderIdentityAsync(
+                        paymentTransaction.Id,
+                        paymentResult.ProviderSessionId,
+                        paymentResult.ProviderPaymentIntentId,
+                        cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Stripe returned session {ProviderSessionId} for transaction {PaymentTransactionId}, but provider identity persistence was ambiguous.",
+                        paymentResult.ProviderSessionId,
+                        paymentTransaction.Id);
+                    await _idempotencyStore.ReleaseLeaseAsync(
+                        claim.Record.Id,
+                        claim.LeaseOwnerId,
+                        cancellationToken);
+                    return CheckoutExecutionResult.InProgress();
+                }
+
+                if (identityOutcome is not (PaymentProviderIdentityPersistenceOutcome.Persisted
+                    or PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted))
+                {
+                    _logger.LogWarning(
+                        "Stripe provider identity for transaction {PaymentTransactionId} could not be persisted safely: {Outcome}.",
+                        paymentTransaction.Id,
+                        identityOutcome);
+                    await _idempotencyStore.ReleaseLeaseAsync(
+                        claim.Record.Id,
+                        claim.LeaseOwnerId,
+                        cancellationToken);
+                    return CheckoutExecutionResult.InProgress();
+                }
+
                 var outcome = CreateSuccessOutcome(
                     order,
                     CheckoutStatus.PendingPayment,
@@ -547,16 +631,15 @@ namespace BlazorShop.Application.Services.Payment
             string userId,
             Guid orderId,
             string orderReference,
-            CheckoutPaymentKind paymentKind) => new()
+            CheckoutPaymentKind paymentKind,
+            string currency)
+        {
+            var normalizedCurrency = CurrencyMoney.NormalizeCurrency(currency);
+            var orderLines = lines.Select(line =>
             {
-                Id = orderId,
-                UserId = userId,
-                Status = paymentKind == CheckoutPaymentKind.Stripe
-                    ? PaymentOrderStatus.PendingPayment
-                    : "Pending",
-                Reference = orderReference,
-                TotalAmount = lines.Sum(line => line.LineTotal),
-                Lines = lines.Select(line => new OrderLine
+                var unitPrice = CurrencyMoney.NormalizeAmount(line.UnitPrice, normalizedCurrency);
+                var lineTotal = checked(unitPrice * line.Quantity);
+                return new OrderLine
                 {
                     ProductId = line.ProductId,
                     ProductVariantId = line.VariantId,
@@ -566,12 +649,29 @@ namespace BlazorShop.Application.Services.Payment
                     SizeValueSnapshot = line.SizeValue,
                     ColorSnapshot = line.Color,
                     Quantity = line.Quantity,
-                    UnitPrice = line.UnitPrice,
-                    LineTotal = line.LineTotal,
-                }).ToList(),
+                    UnitPrice = unitPrice,
+                    LineTotal = lineTotal,
+                };
+            }).ToList();
+            var totalAmount = orderLines.Aggregate(0m, (total, line) => checked(total + line.LineTotal));
+            _ = CurrencyMoney.ToMinorUnits(totalAmount, normalizedCurrency);
+            return new Order
+            {
+                Id = orderId,
+                UserId = userId,
+                Status = paymentKind == CheckoutPaymentKind.Stripe
+                    ? PaymentOrderStatus.PendingPayment
+                    : "Pending",
+                Reference = orderReference,
+                TotalAmount = totalAmount,
+                Currency = normalizedCurrency,
+                Lines = orderLines,
             };
+        }
 
-        private StripeCheckoutInitialization CreateStripeInitialization(Order order)
+        private StripeCheckoutInitialization CreateStripeInitialization(
+            Order order,
+            PaymentTransaction paymentTransaction)
         {
             var lines = order.Lines
                 .OrderBy(line => line.ProductId)
@@ -582,16 +682,25 @@ namespace BlazorShop.Application.Services.Payment
                     line.ProductNameSnapshot,
                     BuildStripeDescription(line),
                     line.Quantity,
-                    (long)decimal.Round(
-                        line.UnitPrice * 100,
-                        0,
-                        MidpointRounding.AwayFromZero),
-                    "eur"))
+                    CurrencyMoney.ToMinorUnits(line.UnitPrice, order.Currency),
+                    order.Currency.ToLowerInvariant()))
                 .ToArray();
+            var stripeTotal = lines.Aggregate(
+                0L,
+                (total, line) => checked(total + checked(line.UnitAmount * line.Quantity)));
+            if (stripeTotal != paymentTransaction.ExpectedAmountMinor)
+            {
+                throw new InvalidOperationException(
+                    "The Stripe line total does not match the immutable payment transaction amount.");
+            }
+
             return new StripeCheckoutInitialization(
                 StripeInitializationVersion,
                 order.Id,
                 order.Reference,
+                paymentTransaction.Id,
+                paymentTransaction.ExpectedAmountMinor,
+                paymentTransaction.Currency,
                 ["card"],
                 "payment",
                 lines,
@@ -629,6 +738,7 @@ namespace BlazorShop.Application.Services.Payment
             BankName = _bankTransferSettings.BankName,
             Reference = order.Reference,
             Amount = order.TotalAmount,
+            Currency = order.Currency,
             AdditionalInfo = _bankTransferSettings.AdditionalInfo,
         };
 
@@ -647,7 +757,7 @@ namespace BlazorShop.Application.Services.Payment
 <li>Bank: <b>{info.BankName}</b></li>
 <li>Beneficiary: <b>{info.Beneficiary}</b></li>
 <li>IBAN: <b>{info.Iban}</b></li>
-<li>Amount: <b>{info.Amount:F2} EUR</b></li>
+<li>Amount: <b>{info.Amount:F2} {info.Currency}</b></li>
 <li>Reference: <b>{info.Reference}</b></li>
 </ul>
 <p>{info.AdditionalInfo}</p>
