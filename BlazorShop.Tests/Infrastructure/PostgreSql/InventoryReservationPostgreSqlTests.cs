@@ -230,6 +230,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     _database.CreateContextFactory(),
                     Options.Create(new CheckoutIdempotencyOptions())),
                 new PaymentTransactionStore(_database.CreateContextFactory()),
+                new StripePaymentStateTransitionService(
+                    _database.CreateContextFactory(),
+                    Mock.Of<ILogger<StripePaymentStateTransitionService>>()),
                 new OrderRepository(context),
                 Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings()),
@@ -251,6 +254,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             context.ChangeTracker.Clear();
             Assert.Equal(2, (await context.Products.FindAsync(productId))!.Quantity);
             Assert.Equal(PaymentOrderStatus.PaymentFailed, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(
+                PaymentTransactionStatus.Failed,
+                (await context.PaymentTransactions.SingleAsync()).Status);
             Assert.Equal(
                 InventoryReservationStatus.Released,
                 (await context.InventoryReservations.SingleAsync()).Status);
@@ -794,6 +800,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     _database.CreateContextFactory(),
                     Options.Create(new CheckoutIdempotencyOptions())),
                 new PaymentTransactionStore(_database.CreateContextFactory()),
+                new StripePaymentStateTransitionService(
+                    _database.CreateContextFactory(),
+                    Mock.Of<ILogger<StripePaymentStateTransitionService>>()),
                 new OrderRepository(context),
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings

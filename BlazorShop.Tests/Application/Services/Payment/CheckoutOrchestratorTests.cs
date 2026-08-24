@@ -27,6 +27,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IInventoryReservationService> _inventory = new();
         private readonly Mock<ICheckoutIdempotencyStore> _idempotency = new();
         private readonly Mock<IPaymentTransactionStore> _paymentTransactions = new();
+        private readonly Mock<IStripePaymentStateTransitionService> _stripeTransitions = new();
         private readonly Mock<IOrderRepository> _orders = new();
         private readonly Mock<IEmailService> _email = new();
         private readonly CheckoutOrchestrator _orchestrator;
@@ -103,7 +104,15 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     });
             _paymentTransactions.Setup(store => store.PersistProviderIdentityAsync(
                     It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(PaymentProviderIdentityPersistenceOutcome.Persisted);
+                .ReturnsAsync(new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.Persisted,
+                    PaymentTransactionStatus.Pending));
+            _stripeTransitions.Setup(service => service.TransitionAsync(
+                    It.IsAny<Guid>(), It.IsAny<PaymentTransactionStatus>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, PaymentTransactionStatus target, CancellationToken _) =>
+                    new StripePaymentStateTransitionResult(
+                        StripePaymentStateTransitionOutcome.Applied,
+                        target));
 
             _orchestrator = new CheckoutOrchestrator(
                 _products.Object,
@@ -113,6 +122,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _inventory.Object,
                 _idempotency.Object,
                 _paymentTransactions.Object,
+                _stripeTransitions.Object,
                 _orders.Object,
                 _email.Object,
                 Options.Create(new BankTransferSettings
@@ -351,13 +361,6 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     false,
                     ErrorMessage: "Stripe unavailable",
                     FailureKind: PaymentInitializationFailureKind.Definitive));
-            _inventory.Setup(service => service.TransitionOrderAsync(
-                    It.IsAny<Guid>(),
-                    PaymentOrderStatus.PaymentFailed,
-                    InventoryReservationStatus.Released,
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.Applied));
-
             var result = await CheckoutAsync(
                 PaymentMethodIds.CreditCard,
                 new CartLineRequest(product.Id, null, 1));
@@ -365,11 +368,15 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.False(result.Success);
             Assert.Equal("Stripe unavailable", result.Message);
             Assert.NotNull(createdOrder);
-            _inventory.Verify(service => service.TransitionOrderAsync(
-                createdOrder!.Id,
-                PaymentOrderStatus.PaymentFailed,
-                InventoryReservationStatus.Released,
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                PaymentTransactionStatus.Failed,
                 It.IsAny<CancellationToken>()), Times.Once);
+            _inventory.Verify(service => service.TransitionOrderAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<InventoryReservationStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]

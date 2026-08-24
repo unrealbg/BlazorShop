@@ -69,7 +69,19 @@ namespace BlazorShop.Infrastructure.Services
             return transaction;
         }
 
-        public async Task<PaymentProviderIdentityPersistenceOutcome> PersistProviderIdentityAsync(
+        public async Task<PaymentTransaction?> GetStripeByOrderIdAsync(
+            Guid orderId,
+            CancellationToken cancellationToken = default)
+        {
+            await using var db = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await db.PaymentTransactions
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    item => item.OrderId == orderId && item.Provider == PaymentProviderNames.Stripe,
+                    cancellationToken);
+        }
+
+        public async Task<PaymentProviderIdentityPersistenceResult> PersistProviderIdentityAsync(
             Guid paymentTransactionId,
             string providerSessionId,
             string? providerPaymentIntentId,
@@ -90,7 +102,7 @@ namespace BlazorShop.Infrastructure.Services
                     cancellationToken));
         }
 
-        private async Task<PaymentProviderIdentityPersistenceOutcome> PersistProviderIdentityWithinTransactionAsync(
+        private async Task<PaymentProviderIdentityPersistenceResult> PersistProviderIdentityWithinTransactionAsync(
             Guid paymentTransactionId,
             string providerSessionId,
             string? providerPaymentIntentId,
@@ -107,7 +119,9 @@ namespace BlazorShop.Infrastructure.Services
             if (paymentTransaction is null)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return PaymentProviderIdentityPersistenceOutcome.NotFound;
+                return new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.NotFound,
+                    null);
             }
 
             if (!string.Equals(paymentTransaction.Provider, PaymentProviderNames.Stripe, StringComparison.Ordinal)
@@ -121,7 +135,9 @@ namespace BlazorShop.Infrastructure.Services
                         StringComparison.Ordinal)))
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return PaymentProviderIdentityPersistenceOutcome.Conflict;
+                return new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.Conflict,
+                    paymentTransaction.Status);
             }
 
             var changed = paymentTransaction.ProviderSessionId is null
@@ -136,7 +152,9 @@ namespace BlazorShop.Infrastructure.Services
             if (!changed)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted;
+                return new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted,
+                    paymentTransaction.Status);
             }
 
             paymentTransaction.UpdatedOn = DateTime.UtcNow;
@@ -144,7 +162,9 @@ namespace BlazorShop.Infrastructure.Services
             {
                 await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return PaymentProviderIdentityPersistenceOutcome.Persisted;
+                return new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.Persisted,
+                    paymentTransaction.Status);
             }
             catch (DbUpdateException exception) when (exception.InnerException is PostgresException
             {
@@ -152,7 +172,9 @@ namespace BlazorShop.Infrastructure.Services
             })
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return PaymentProviderIdentityPersistenceOutcome.Conflict;
+                return new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.Conflict,
+                    paymentTransaction.Status);
             }
         }
     }

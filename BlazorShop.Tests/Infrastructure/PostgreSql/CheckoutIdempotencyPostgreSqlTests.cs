@@ -1,6 +1,7 @@
 namespace BlazorShop.Tests.Infrastructure.PostgreSql
 {
     using System.Collections.Concurrent;
+    using System.Data.Common;
     using System.Text.Json;
 
     using BlazorShop.Application.DTOs.Payment;
@@ -19,6 +20,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using BlazorShop.Tests.TestUtilities;
 
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Diagnostics;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
 
@@ -146,7 +148,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     paymentTransaction.Id,
                     paymentTransaction.ProviderSessionId!,
                     providerPaymentIntentId: null);
-            Assert.Equal(PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted, identityReplay);
+            Assert.Equal(PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted, identityReplay.Outcome);
+            Assert.Equal(PaymentTransactionStatus.Pending, identityReplay.PaymentStatus);
         }
 
         [Fact]
@@ -500,7 +503,10 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Single(provider.Calls);
             await using var assertionContext = _database.CreateContext();
             Assert.Equal(2, (await assertionContext.Products.FindAsync(productId))!.Quantity);
-            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await assertionContext.Orders.SingleAsync()).Status);
+            Assert.Equal(PaymentOrderStatus.Cancelled, (await assertionContext.Orders.SingleAsync()).Status);
+            Assert.Equal(
+                PaymentTransactionStatus.Cancelled,
+                (await assertionContext.PaymentTransactions.SingleAsync()).Status);
             Assert.Equal(
                 InventoryReservationStatus.Released,
                 (await assertionContext.InventoryReservations.SingleAsync()).Status);
@@ -534,11 +540,284 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Equal(1, await assertionContext.Orders.CountAsync());
             Assert.Equal(2, (await assertionContext.Products.FindAsync(productId))!.Quantity);
             Assert.Equal(
+                PaymentTransactionStatus.Failed,
+                (await assertionContext.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(
+                PaymentOrderStatus.PaymentFailed,
+                (await assertionContext.Orders.SingleAsync()).Status);
+            Assert.Equal(
                 InventoryReservationStatus.Released,
                 (await assertionContext.InventoryReservations.SingleAsync()).Status);
             Assert.Equal(
                 CheckoutIdempotencyState.Failed,
                 (await assertionContext.CheckoutIdempotencyRecords.SingleAsync()).State);
+        }
+
+        [Theory]
+        [InlineData(PaymentTransactionStatus.Failed, PaymentOrderStatus.PaymentFailed)]
+        [InlineData(PaymentTransactionStatus.Cancelled, PaymentOrderStatus.Cancelled)]
+        public async Task RetryAfterTerminalPaymentTransaction_DoesNotCallProviderOrMutateInventory(
+            PaymentTransactionStatus paymentStatus,
+            string orderStatus)
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var transition = await CreateStripeTransitionService().TransitionAsync(
+                seed.PaymentTransactionId,
+                paymentStatus);
+            Assert.Equal(StripePaymentStateTransitionOutcome.Applied, transition.Outcome);
+            await ExpireCheckoutLeaseAsync();
+
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
+
+            Assert.False(retry.Success);
+            Assert.Single(seed.Provider.Calls);
+            await using var context = _database.CreateContext();
+            Assert.Single(await context.PaymentTransactions.ToListAsync());
+            Assert.Equal(paymentStatus, (await context.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(orderStatus, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(InventoryReservationStatus.Released,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(2, (await context.Products.FindAsync(seed.ProductId))!.Quantity);
+            Assert.Equal(CheckoutIdempotencyState.Failed,
+                (await context.CheckoutIdempotencyRecords.SingleAsync()).State);
+        }
+
+        [Fact]
+        public async Task RecoveryAfterPaidPaymentTransaction_CompletesLocallyWithoutCallingProviderAgain()
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var reconciliation = await CreateStripeReconciliationService().ReconcileAsync(
+                CreateStripeEvent(seed, "evt_paid_before_checkout_recovery"));
+            Assert.Equal(StripePaymentReconciliationOutcome.Processed, reconciliation);
+            await ExpireCheckoutLeaseAsync();
+
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
+
+            Assert.True(retry.Success);
+            Assert.Equal(CheckoutStatus.Confirmed, retry.Payload!.Status);
+            Assert.Null(retry.Payload.RedirectUrl);
+            Assert.Single(seed.Provider.Calls);
+            await using var context = _database.CreateContext();
+            Assert.Single(await context.PaymentTransactions.ToListAsync());
+            Assert.Equal(PaymentTransactionStatus.Paid,
+                (await context.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(PaymentOrderStatus.Paid, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(InventoryReservationStatus.Consumed,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(1, (await context.Products.FindAsync(seed.ProductId))!.Quantity);
+            Assert.Equal(CheckoutIdempotencyState.Completed,
+                (await context.CheckoutIdempotencyRecords.SingleAsync()).State);
+        }
+
+        [Fact]
+        public async Task CompletedRedirectReplayAfterPaidWebhook_ReturnsLocalPaidSuccess()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(true, "https://checkout.stripe.test/completed")));
+            var key = Guid.NewGuid();
+            var initial = await ExecuteAsync(checkout, "customer-1", key, provider);
+            Assert.True(initial.Success);
+            Assert.Equal(CheckoutStatus.PendingPayment, initial.Payload!.Status);
+            AmbiguousStripeCheckoutSeed seed;
+            await using (var context = _database.CreateContext())
+            {
+                var order = await context.Orders.SingleAsync();
+                var transaction = await context.PaymentTransactions.SingleAsync();
+                seed = new AmbiguousStripeCheckoutSeed(
+                    checkout,
+                    key,
+                    provider,
+                    productId,
+                    order.Id,
+                    transaction.Id,
+                    transaction.ExpectedAmountMinor,
+                    transaction.Currency);
+                Assert.Equal(
+                    StripePaymentReconciliationOutcome.Processed,
+                    await CreateStripeReconciliationService().ReconcileAsync(
+                        CreateStripeEvent(seed, "evt_paid_after_redirect") with
+                        {
+                            SessionId = transaction.ProviderSessionId,
+                            PaymentIntentId = transaction.ProviderPaymentIntentId,
+                        }));
+            }
+
+            var replay = await ExecuteAsync(checkout, "customer-1", key, provider);
+
+            Assert.True(replay.Success);
+            Assert.True(replay.IsReplay);
+            Assert.Equal(CheckoutStatus.Confirmed, replay.Payload!.Status);
+            Assert.Null(replay.Payload.RedirectUrl);
+            Assert.Single(provider.Calls);
+        }
+
+        [Theory]
+        [InlineData("checkout.session.completed", "paid", PaymentTransactionStatus.Paid, true)]
+        [InlineData("checkout.session.async_payment_failed", null, PaymentTransactionStatus.Failed, false)]
+        [InlineData("checkout.session.expired", "unpaid", PaymentTransactionStatus.Cancelled, false)]
+        public async Task WebhookTerminalizingBeforeProviderIdentityPersistence_DecidesCheckoutOutcome(
+            string eventType,
+            string? paymentStatus,
+            PaymentTransactionStatus expectedPaymentStatus,
+            bool expectedSuccess)
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(true, "https://checkout.stripe.test/race")));
+            var eventId = $"evt_identity_{expectedPaymentStatus}";
+            var store = new ReconcileBeforeIdentityPersistenceStore(
+                new PaymentTransactionStore(_database.CreateContextFactory()),
+                async (paymentTransactionId, sessionId, paymentIntentId) =>
+                {
+                    await using var context = _database.CreateContext();
+                    var transaction = await context.PaymentTransactions
+                        .AsNoTracking()
+                        .SingleAsync(item => item.Id == paymentTransactionId);
+                    var seed = new AmbiguousStripeCheckoutSeed(
+                        checkout,
+                        Guid.Empty,
+                        provider,
+                        productId,
+                        transaction.OrderId,
+                        transaction.Id,
+                        transaction.ExpectedAmountMinor,
+                        transaction.Currency);
+                    var outcome = await CreateStripeReconciliationService().ReconcileAsync(
+                        CreateStripeEvent(seed, eventId, eventType, paymentStatus) with
+                        {
+                            SessionId = sessionId,
+                            PaymentIntentId = paymentIntentId,
+                        });
+                    Assert.Equal(StripePaymentReconciliationOutcome.Processed, outcome);
+                });
+
+            var result = await ExecuteAsync(
+                checkout,
+                "customer-1",
+                Guid.NewGuid(),
+                provider,
+                paymentTransactionStore: store);
+
+            Assert.Equal(expectedSuccess, result.Success);
+            Assert.Single(provider.Calls);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(expectedPaymentStatus,
+                (await assertionContext.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(
+                expectedSuccess ? CheckoutIdempotencyState.Completed : CheckoutIdempotencyState.Failed,
+                (await assertionContext.CheckoutIdempotencyRecords.SingleAsync()).State);
+            if (expectedSuccess)
+            {
+                Assert.Equal(CheckoutStatus.Confirmed, result.Payload!.Status);
+                Assert.Null(result.Payload.RedirectUrl);
+                Assert.Equal(InventoryReservationStatus.Consumed,
+                    (await assertionContext.InventoryReservations.SingleAsync()).Status);
+                Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            }
+            else
+            {
+                Assert.Equal(InventoryReservationStatus.Released,
+                    (await assertionContext.InventoryReservations.SingleAsync()).Status);
+                Assert.Equal(2, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            }
+        }
+
+        [Fact]
+        public async Task PaidWebhookWinningAgainstLocalCompensation_CannotPersistCheckoutFailure()
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var webhookLock = new PaymentTransactionLockInterceptor();
+            var reconciliationTask = CreateStripeReconciliationService(webhookLock).ReconcileAsync(
+                CreateStripeEvent(seed, "evt_paid_wins"));
+            await webhookLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var compensationTask = CreateStripeTransitionService().TransitionAsync(
+                seed.PaymentTransactionId,
+                PaymentTransactionStatus.Failed);
+            webhookLock.Release.SetResult();
+
+            Assert.Equal(StripePaymentReconciliationOutcome.Processed, await reconciliationTask);
+            var compensation = await compensationTask;
+            Assert.Equal(StripePaymentStateTransitionOutcome.AlreadyTerminal, compensation.Outcome);
+            Assert.Equal(PaymentTransactionStatus.Paid, compensation.PaymentStatus);
+            await ExpireCheckoutLeaseAsync();
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
+
+            Assert.True(retry.Success);
+            Assert.Equal(CheckoutStatus.Confirmed, retry.Payload!.Status);
+            await AssertAmbiguousSeedStateAsync(
+                seed,
+                PaymentTransactionStatus.Paid,
+                PaymentOrderStatus.Paid,
+                InventoryReservationStatus.Consumed,
+                expectedStock: 1,
+                CheckoutIdempotencyState.Completed);
+        }
+
+        [Fact]
+        public async Task LocalFailureWinningAgainstPaidWebhook_LeavesConsistentFailureAndRejectsEvent()
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var localLock = new PaymentTransactionLockInterceptor();
+            var compensationTask = CreateStripeTransitionService(localLock).TransitionAsync(
+                seed.PaymentTransactionId,
+                PaymentTransactionStatus.Failed);
+            await localLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var reconciliationTask = CreateStripeReconciliationService().ReconcileAsync(
+                CreateStripeEvent(seed, "evt_local_failure_wins"));
+            localLock.Release.SetResult();
+
+            Assert.Equal(StripePaymentStateTransitionOutcome.Applied, (await compensationTask).Outcome);
+            Assert.Equal(StripePaymentReconciliationOutcome.Rejected, await reconciliationTask);
+            await ExpireCheckoutLeaseAsync();
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
+
+            Assert.False(retry.Success);
+            await AssertAmbiguousSeedStateAsync(
+                seed,
+                PaymentTransactionStatus.Failed,
+                PaymentOrderStatus.PaymentFailed,
+                InventoryReservationStatus.Released,
+                expectedStock: 2,
+                CheckoutIdempotencyState.Failed);
+            await using var context = _database.CreateContext();
+            Assert.Equal(
+                PaymentProviderEventOutcome.Rejected,
+                (await context.PaymentProviderEvents.SingleAsync()).ProcessingOutcome);
+        }
+
+        [Fact]
+        public async Task WebhookFailureRacingLocalFailure_RestoresStockExactlyOnce()
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var webhookLock = new PaymentTransactionLockInterceptor();
+            var reconciliationTask = CreateStripeReconciliationService(webhookLock).ReconcileAsync(
+                CreateStripeEvent(
+                    seed,
+                    "evt_webhook_failure_wins",
+                    "checkout.session.async_payment_failed",
+                    paymentStatus: null));
+            await webhookLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var compensationTask = CreateStripeTransitionService().TransitionAsync(
+                seed.PaymentTransactionId,
+                PaymentTransactionStatus.Failed);
+            webhookLock.Release.SetResult();
+
+            Assert.Equal(StripePaymentReconciliationOutcome.Processed, await reconciliationTask);
+            var compensation = await compensationTask;
+            Assert.Equal(StripePaymentStateTransitionOutcome.AlreadyTerminal, compensation.Outcome);
+            Assert.Equal(PaymentTransactionStatus.Failed, compensation.PaymentStatus);
+            await using var context = _database.CreateContext();
+            Assert.Equal(PaymentTransactionStatus.Failed,
+                (await context.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(InventoryReservationStatus.Released,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(2, (await context.Products.FindAsync(seed.ProductId))!.Quantity);
         }
 
         [Fact]
@@ -630,6 +909,90 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.NotNull(await assertionContext.CheckoutIdempotencyRecords.FindAsync(activeId));
         }
 
+        private async Task<AmbiguousStripeCheckoutSeed> SeedAmbiguousStripeCheckoutAsync()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var key = Guid.NewGuid();
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Response lost",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)));
+
+            var ambiguous = await ExecuteAsync(checkout, "customer-1", key, provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, ambiguous.Status);
+            await using var context = _database.CreateContext();
+            var order = await context.Orders.SingleAsync();
+            var paymentTransaction = await context.PaymentTransactions.SingleAsync();
+            return new AmbiguousStripeCheckoutSeed(
+                checkout,
+                key,
+                provider,
+                productId,
+                order.Id,
+                paymentTransaction.Id,
+                paymentTransaction.ExpectedAmountMinor,
+                paymentTransaction.Currency);
+        }
+
+        private async Task ExpireCheckoutLeaseAsync()
+        {
+            await using var context = _database.CreateContext();
+            await context.CheckoutIdempotencyRecords.ExecuteUpdateAsync(setters => setters
+                .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
+        }
+
+        private StripePaymentStateTransitionService CreateStripeTransitionService(
+            params IInterceptor[] interceptors) => new(
+                _database.CreateContextFactory(interceptors),
+                Mock.Of<ILogger<StripePaymentStateTransitionService>>());
+
+        private StripePaymentReconciliationService CreateStripeReconciliationService(
+            params IInterceptor[] interceptors) => new(
+                _database.CreateContextFactory(interceptors),
+                Mock.Of<ILogger<StripePaymentReconciliationService>>());
+
+        private static StripeWebhookEventData CreateStripeEvent(
+            AmbiguousStripeCheckoutSeed seed,
+            string eventId,
+            string eventType = "checkout.session.completed",
+            string? paymentStatus = "paid") => new(
+                eventId,
+                eventType,
+                DateTime.UtcNow,
+                "cs_race_test",
+                "pi_race_test",
+                seed.OrderId,
+                seed.OrderId.ToString("D"),
+                seed.PaymentTransactionId,
+                paymentStatus,
+                seed.ExpectedAmountMinor,
+                seed.Currency.ToLowerInvariant(),
+                "complete");
+
+        private async Task AssertAmbiguousSeedStateAsync(
+            AmbiguousStripeCheckoutSeed seed,
+            PaymentTransactionStatus paymentStatus,
+            string orderStatus,
+            InventoryReservationStatus reservationStatus,
+            int expectedStock,
+            CheckoutIdempotencyState idempotencyState)
+        {
+            await using var context = _database.CreateContext();
+            Assert.Equal(paymentStatus,
+                (await context.PaymentTransactions.FindAsync(seed.PaymentTransactionId))!.Status);
+            Assert.Equal(orderStatus, (await context.Orders.FindAsync(seed.OrderId))!.Status);
+            Assert.Equal(reservationStatus,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(expectedStock, (await context.Products.FindAsync(seed.ProductId))!.Quantity);
+            Assert.Equal(idempotencyState,
+                (await context.CheckoutIdempotencyRecords.SingleAsync()).State);
+            Assert.Single(await context.PaymentTransactions.ToListAsync());
+        }
+
         private async Task<CheckoutExecutionResult> ExecuteAsync(
             Checkout checkout,
             string userId,
@@ -653,6 +1016,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 new InventoryReservationService(_database.CreateContextFactory()),
                 CreateStore(),
                 paymentTransactionStore ?? new PaymentTransactionStore(_database.CreateContextFactory()),
+                new StripePaymentStateTransitionService(
+                    _database.CreateContextFactory(),
+                    Mock.Of<ILogger<StripePaymentStateTransitionService>>()),
                 new OrderRepository(context),
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings
@@ -795,6 +1161,87 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             StripeCheckoutInitialization Initialization,
             string ProviderIdempotencyKey);
 
+        private sealed record AmbiguousStripeCheckoutSeed(
+            Checkout Checkout,
+            Guid Key,
+            RecordingPaymentService Provider,
+            Guid ProductId,
+            Guid OrderId,
+            Guid PaymentTransactionId,
+            long ExpectedAmountMinor,
+            string Currency);
+
+        private sealed class PaymentTransactionLockInterceptor : DbCommandInterceptor
+        {
+            private int _remainingBlocks = 1;
+
+            public TaskCompletionSource LockAcquired { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource Release { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+                DbCommand command,
+                CommandExecutedEventData eventData,
+                DbDataReader result,
+                CancellationToken cancellationToken = default)
+            {
+                if (command.CommandText.Contains("PaymentTransactions", StringComparison.Ordinal)
+                    && command.CommandText.Contains("FOR UPDATE", StringComparison.Ordinal)
+                    && Interlocked.Exchange(ref _remainingBlocks, 0) == 1)
+                {
+                    LockAcquired.TrySetResult();
+                    await Release.Task.WaitAsync(cancellationToken);
+                }
+
+                return result;
+            }
+        }
+
+        private sealed class ReconcileBeforeIdentityPersistenceStore : IPaymentTransactionStore
+        {
+            private readonly IPaymentTransactionStore _inner;
+            private readonly Func<Guid, string, string?, Task> _beforePersistence;
+
+            public ReconcileBeforeIdentityPersistenceStore(
+                IPaymentTransactionStore inner,
+                Func<Guid, string, string?, Task> beforePersistence)
+            {
+                _inner = inner;
+                _beforePersistence = beforePersistence;
+            }
+
+            public Task<PaymentTransaction> GetOrCreateStripeAsync(
+                Guid orderId,
+                long expectedAmountMinor,
+                string currency,
+                CancellationToken cancellationToken = default) =>
+                _inner.GetOrCreateStripeAsync(orderId, expectedAmountMinor, currency, cancellationToken);
+
+            public Task<PaymentTransaction?> GetStripeByOrderIdAsync(
+                Guid orderId,
+                CancellationToken cancellationToken = default) =>
+                _inner.GetStripeByOrderIdAsync(orderId, cancellationToken);
+
+            public async Task<PaymentProviderIdentityPersistenceResult> PersistProviderIdentityAsync(
+                Guid paymentTransactionId,
+                string providerSessionId,
+                string? providerPaymentIntentId,
+                CancellationToken cancellationToken = default)
+            {
+                await _beforePersistence(
+                    paymentTransactionId,
+                    providerSessionId,
+                    providerPaymentIntentId);
+                return await _inner.PersistProviderIdentityAsync(
+                    paymentTransactionId,
+                    providerSessionId,
+                    providerPaymentIntentId,
+                    cancellationToken);
+            }
+        }
+
         private sealed class FailFirstIdentityPersistenceStore : IPaymentTransactionStore
         {
             private readonly IPaymentTransactionStore _inner;
@@ -812,7 +1259,12 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 CancellationToken cancellationToken = default) =>
                 _inner.GetOrCreateStripeAsync(orderId, expectedAmountMinor, currency, cancellationToken);
 
-            public Task<PaymentProviderIdentityPersistenceOutcome> PersistProviderIdentityAsync(
+            public Task<PaymentTransaction?> GetStripeByOrderIdAsync(
+                Guid orderId,
+                CancellationToken cancellationToken = default) =>
+                _inner.GetStripeByOrderIdAsync(orderId, cancellationToken);
+
+            public Task<PaymentProviderIdentityPersistenceResult> PersistProviderIdentityAsync(
                 Guid paymentTransactionId,
                 string providerSessionId,
                 string? providerPaymentIntentId,

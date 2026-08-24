@@ -25,6 +25,7 @@ namespace BlazorShop.Application.Services.Payment
         private readonly IInventoryReservationService _inventoryReservationService;
         private readonly ICheckoutIdempotencyStore _idempotencyStore;
         private readonly IPaymentTransactionStore _paymentTransactionStore;
+        private readonly IStripePaymentStateTransitionService _stripePaymentStateTransitionService;
         private readonly IOrderRepository _orderRepository;
         private readonly IEmailService _emailService;
         private readonly BankTransferSettings _bankTransferSettings;
@@ -41,6 +42,7 @@ namespace BlazorShop.Application.Services.Payment
             IInventoryReservationService inventoryReservationService,
             ICheckoutIdempotencyStore idempotencyStore,
             IPaymentTransactionStore paymentTransactionStore,
+            IStripePaymentStateTransitionService stripePaymentStateTransitionService,
             IOrderRepository orderRepository,
             IEmailService emailService,
             IOptions<BankTransferSettings> bankTransferOptions,
@@ -56,6 +58,7 @@ namespace BlazorShop.Application.Services.Payment
             _inventoryReservationService = inventoryReservationService;
             _idempotencyStore = idempotencyStore;
             _paymentTransactionStore = paymentTransactionStore;
+            _stripePaymentStateTransitionService = stripePaymentStateTransitionService;
             _orderRepository = orderRepository;
             _emailService = emailService;
             _bankTransferSettings = bankTransferOptions.Value;
@@ -113,7 +116,7 @@ namespace BlazorShop.Application.Services.Payment
 
             if (claim.Status == CheckoutIdempotencyClaimStatus.Replayed)
             {
-                return FromPersistedOutcome(claim.Outcome!, isReplay: true);
+                return await ReplayPersistedOutcomeAsync(claim.Outcome!, cancellationToken);
             }
 
             var normalizedCheckout = new Checkout
@@ -250,18 +253,6 @@ namespace BlazorShop.Application.Services.Payment
         {
             if (paymentKind == CheckoutPaymentKind.Stripe)
             {
-                var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
-                if (pendingFailure?.Status == CheckoutExecutionStatus.BadRequest
-                    || string.Equals(order.Status, PaymentOrderStatus.PaymentFailed, StringComparison.Ordinal))
-                {
-                    return await CompensateStripeFailureAsync(
-                        order,
-                        claim,
-                        pendingFailure ?? CreateFailureOutcome(
-                            "Unable to initialize the card payment session. Please start a new checkout attempt."),
-                        cancellationToken);
-                }
-
                 return await InitializeStripeAsync(order, claim, cancellationToken);
             }
 
@@ -342,6 +333,16 @@ namespace BlazorShop.Application.Services.Payment
                 return CheckoutExecutionResult.InProgress();
             }
 
+            var terminalResult = await FinalizeExistingStripeStateAsync(
+                order,
+                paymentTransaction,
+                claim,
+                cancellationToken);
+            if (terminalResult is not null)
+            {
+                return terminalResult;
+            }
+
             var providerInitialization = await _idempotencyStore.PrepareProviderInitializationAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,
@@ -370,10 +371,12 @@ namespace BlazorShop.Application.Services.Payment
                     return CheckoutExecutionResult.InProgress();
                 }
 
-                return await CompensateStripeFailureAsync(
+                return await TerminalizeStripeAsync(
                     order,
+                    paymentTransaction,
                     claim,
                     invalidSnapshot,
+                    PaymentTransactionStatus.Failed,
                     cancellationToken);
             }
 
@@ -391,7 +394,25 @@ namespace BlazorShop.Application.Services.Payment
                     return CheckoutExecutionResult.InProgress();
                 }
 
-                return await CompensateStripeFailureAsync(order, claim, expired, cancellationToken);
+                return await TerminalizeStripeAsync(
+                    order,
+                    paymentTransaction,
+                    claim,
+                    expired,
+                    PaymentTransactionStatus.Cancelled,
+                    cancellationToken);
+            }
+
+            var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
+            if (pendingFailure?.Status == CheckoutExecutionStatus.BadRequest)
+            {
+                return await TerminalizeStripeAsync(
+                    order,
+                    paymentTransaction,
+                    claim,
+                    pendingFailure,
+                    PaymentTransactionStatus.Failed,
+                    cancellationToken);
             }
 
             var paymentResult = await _paymentService.Pay(
@@ -403,10 +424,10 @@ namespace BlazorShop.Application.Services.Payment
                 && !string.IsNullOrWhiteSpace(paymentResult.RedirectUrl)
                 && !string.IsNullOrWhiteSpace(paymentResult.ProviderSessionId))
             {
-                PaymentProviderIdentityPersistenceOutcome identityOutcome;
+                PaymentProviderIdentityPersistenceResult identityResult;
                 try
                 {
-                    identityOutcome = await _paymentTransactionStore.PersistProviderIdentityAsync(
+                    identityResult = await _paymentTransactionStore.PersistProviderIdentityAsync(
                         paymentTransaction.Id,
                         paymentResult.ProviderSessionId,
                         paymentResult.ProviderPaymentIntentId,
@@ -426,13 +447,36 @@ namespace BlazorShop.Application.Services.Payment
                     return CheckoutExecutionResult.InProgress();
                 }
 
-                if (identityOutcome is not (PaymentProviderIdentityPersistenceOutcome.Persisted
+                if (identityResult.Outcome is not (PaymentProviderIdentityPersistenceOutcome.Persisted
                     or PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted))
                 {
                     _logger.LogWarning(
                         "Stripe provider identity for transaction {PaymentTransactionId} could not be persisted safely: {Outcome}.",
                         paymentTransaction.Id,
-                        identityOutcome);
+                        identityResult.Outcome);
+                    await _idempotencyStore.ReleaseLeaseAsync(
+                        claim.Record.Id,
+                        claim.LeaseOwnerId,
+                        cancellationToken);
+                    return CheckoutExecutionResult.InProgress();
+                }
+
+                if (identityResult.PaymentStatus == PaymentTransactionStatus.Paid)
+                {
+                    return await FinalizePaidStripeCheckoutAsync(order, claim, cancellationToken);
+                }
+
+                if (identityResult.PaymentStatus is PaymentTransactionStatus.Failed
+                    or PaymentTransactionStatus.Cancelled)
+                {
+                    return await FinalizeTerminalStripeFailureAsync(
+                        identityResult.PaymentStatus.Value,
+                        claim,
+                        cancellationToken);
+                }
+
+                if (identityResult.PaymentStatus != PaymentTransactionStatus.Pending)
+                {
                     await _idempotencyStore.ReleaseLeaseAsync(
                         claim.Record.Id,
                         claim.LeaseOwnerId,
@@ -478,29 +522,111 @@ namespace BlazorShop.Application.Services.Payment
                 return CheckoutExecutionResult.InProgress();
             }
 
-            return await CompensateStripeFailureAsync(order, claim, failure, cancellationToken);
+            return await TerminalizeStripeAsync(
+                order,
+                paymentTransaction,
+                claim,
+                failure,
+                PaymentTransactionStatus.Failed,
+                cancellationToken);
         }
 
-        private async Task<CheckoutExecutionResult> CompensateStripeFailureAsync(
+        private async Task<CheckoutExecutionResult> TerminalizeStripeAsync(
             Order order,
+            PaymentTransaction paymentTransaction,
             CheckoutIdempotencyClaim claim,
             PersistedCheckoutOutcome failure,
+            PaymentTransactionStatus targetStatus,
             CancellationToken cancellationToken)
         {
-            var releaseResult = await _inventoryReservationService.TransitionOrderAsync(
-                order.Id,
-                PaymentOrderStatus.PaymentFailed,
-                InventoryReservationStatus.Released,
+            var transition = await _stripePaymentStateTransitionService.TransitionAsync(
+                paymentTransaction.Id,
+                targetStatus,
                 cancellationToken);
-            if (!releaseResult.Success)
+
+            if (transition.PaymentStatus == PaymentTransactionStatus.Paid)
             {
-                await _idempotencyStore.ReleaseLeaseAsync(
-                    claim.Record.Id,
-                    claim.LeaseOwnerId,
-                    cancellationToken);
-                return CheckoutExecutionResult.InProgress();
+                return await FinalizePaidStripeCheckoutAsync(order, claim, cancellationToken);
             }
 
+            if (transition.PaymentStatus is PaymentTransactionStatus.Failed
+                or PaymentTransactionStatus.Cancelled)
+            {
+                return await FinalizeTerminalStripeFailureAsync(
+                    transition.PaymentStatus.Value,
+                    claim,
+                    cancellationToken,
+                    failure);
+            }
+
+            _logger.LogWarning(
+                "Could not terminalize Stripe transaction {PaymentTransactionId} as {TargetStatus}: {Outcome}, current state {PaymentStatus}, reason {Reason}",
+                paymentTransaction.Id,
+                targetStatus,
+                transition.Outcome,
+                transition.PaymentStatus,
+                transition.ErrorMessage);
+            await _idempotencyStore.ReleaseLeaseAsync(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                cancellationToken);
+            return CheckoutExecutionResult.InProgress();
+        }
+
+        private async Task<CheckoutExecutionResult?> FinalizeExistingStripeStateAsync(
+            Order order,
+            PaymentTransaction paymentTransaction,
+            CheckoutIdempotencyClaim claim,
+            CancellationToken cancellationToken)
+        {
+            if (paymentTransaction.Status == PaymentTransactionStatus.Pending)
+            {
+                return null;
+            }
+
+            if (paymentTransaction.Status == PaymentTransactionStatus.Paid)
+            {
+                return await FinalizePaidStripeCheckoutAsync(order, claim, cancellationToken);
+            }
+
+            return await FinalizeTerminalStripeFailureAsync(
+                paymentTransaction.Status,
+                claim,
+                cancellationToken);
+        }
+
+        private async Task<CheckoutExecutionResult> FinalizePaidStripeCheckoutAsync(
+            Order order,
+            CheckoutIdempotencyClaim claim,
+            CancellationToken cancellationToken)
+        {
+            var paidOutcome = CreateSuccessOutcome(
+                order,
+                CheckoutStatus.Confirmed,
+                CheckoutPaymentKind.Stripe,
+                "Card payment was already confirmed for this order.");
+            var completed = await _idempotencyStore.CompleteAsync(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                paidOutcome,
+                CheckoutIdempotencyState.Completed,
+                cancellationToken);
+            return completed
+                ? FromPersistedOutcome(paidOutcome)
+                : CheckoutExecutionResult.InProgress();
+        }
+
+        private async Task<CheckoutExecutionResult> FinalizeTerminalStripeFailureAsync(
+            PaymentTransactionStatus paymentStatus,
+            CheckoutIdempotencyClaim claim,
+            CancellationToken cancellationToken,
+            PersistedCheckoutOutcome? existingFailure = null)
+        {
+            var failure = existingFailure
+                ?? _idempotencyStore.ReadOutcome(claim.Record)
+                ?? CreateFailureOutcome(paymentStatus == PaymentTransactionStatus.Cancelled
+                    ? "The card-payment attempt expired or was cancelled. Start a new checkout attempt."
+                    : "Unable to initialize the card payment session. Please start a new checkout attempt.");
             var completed = await _idempotencyStore.CompleteAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,
@@ -810,6 +936,52 @@ namespace BlazorShop.Application.Services.Payment
                 CheckoutExecutionStatus.BadRequest => CheckoutExecutionResult.Invalid(outcome.Response, isReplay),
                 _ => throw new InvalidOperationException("Only terminal checkout outcomes may be persisted."),
             };
+
+        private async Task<CheckoutExecutionResult> ReplayPersistedOutcomeAsync(
+            PersistedCheckoutOutcome outcome,
+            CancellationToken cancellationToken)
+        {
+            var checkout = outcome.Response.Payload;
+            if (checkout?.PaymentKind != CheckoutPaymentKind.Stripe)
+            {
+                return FromPersistedOutcome(outcome, isReplay: true);
+            }
+
+            var paymentTransaction = await _paymentTransactionStore.GetStripeByOrderIdAsync(
+                checkout.OrderId,
+                cancellationToken);
+            if (paymentTransaction?.Status == PaymentTransactionStatus.Paid)
+            {
+                var paidOutcome = new PersistedCheckoutOutcome(
+                    OutcomeVersion,
+                    CheckoutExecutionStatus.Succeeded,
+                    new ServiceResponse<CheckoutResult>(
+                        true,
+                        "Card payment was already confirmed for this order.",
+                        checkout.OrderId)
+                    {
+                        Payload = checkout with
+                        {
+                            Status = CheckoutStatus.Confirmed,
+                            RedirectUrl = null,
+                        },
+                        ResponseType = ServiceResponseType.Success,
+                    });
+                return FromPersistedOutcome(paidOutcome, isReplay: true);
+            }
+
+            if (paymentTransaction?.Status is PaymentTransactionStatus.Failed
+                or PaymentTransactionStatus.Cancelled)
+            {
+                var failure = CreateFailureOutcome(
+                    paymentTransaction.Status == PaymentTransactionStatus.Cancelled
+                        ? "The card-payment attempt expired or was cancelled. Start a new checkout attempt."
+                        : "The card-payment attempt failed. Start a new checkout attempt.");
+                return FromPersistedOutcome(failure, isReplay: true);
+            }
+
+            return FromPersistedOutcome(outcome, isReplay: true);
+        }
 
         private static CheckoutExecutionResult BadRequest(string message) =>
             CheckoutExecutionResult.Invalid(CreateFailureOutcome(message).Response);

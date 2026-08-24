@@ -143,6 +143,7 @@
             services.AddScoped<IOrderRepository, OrderRepository>();
             services.AddScoped<ICheckoutIdempotencyStore, CheckoutIdempotencyStore>();
             services.AddScoped<IPaymentTransactionStore, PaymentTransactionStore>();
+            services.AddScoped<IStripePaymentStateTransitionService, StripePaymentStateTransitionService>();
             services.AddScoped<IInventoryReservationService>(serviceProvider =>
                 new InventoryReservationService(
                     serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>()));

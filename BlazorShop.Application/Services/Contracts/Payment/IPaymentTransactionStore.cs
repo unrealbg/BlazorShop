@@ -10,7 +10,11 @@ namespace BlazorShop.Application.Services.Contracts.Payment
             string currency,
             CancellationToken cancellationToken = default);
 
-        Task<PaymentProviderIdentityPersistenceOutcome> PersistProviderIdentityAsync(
+        Task<PaymentTransaction?> GetStripeByOrderIdAsync(
+            Guid orderId,
+            CancellationToken cancellationToken = default);
+
+        Task<PaymentProviderIdentityPersistenceResult> PersistProviderIdentityAsync(
             Guid paymentTransactionId,
             string providerSessionId,
             string? providerPaymentIntentId,
@@ -24,4 +28,8 @@ namespace BlazorShop.Application.Services.Contracts.Payment
         NotFound,
         Conflict,
     }
+
+    public sealed record PaymentProviderIdentityPersistenceResult(
+        PaymentProviderIdentityPersistenceOutcome Outcome,
+        PaymentTransactionStatus? PaymentStatus);
 }
