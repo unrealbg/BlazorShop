@@ -674,7 +674,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await using (var context = _database.CreateContext())
             {
                 await context.CheckoutIdempotencyRecords.ExecuteUpdateAsync(setters => setters
-                    .SetProperty(record => record.ProviderInitializationJson, "{invalid-json")
+                    .SetProperty(record => record.ProviderInitializationJson, "{}")
                     .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
             }
 
