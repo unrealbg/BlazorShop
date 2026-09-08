@@ -12,6 +12,8 @@ namespace BlazorShop.Application.Options
 
         public int PollMilliseconds { get; set; } = 50;
 
+        // Bounds safe retries of the original provider Session.Create request. Reaching this
+        // deadline does not prove that the payment failed or authorize inventory release.
         public int ProviderRecoveryWindowHours { get; set; } = 23;
     }
 }

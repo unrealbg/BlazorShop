@@ -471,7 +471,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         }
 
         [Fact]
-        public async Task StripeRecoveryAfterProviderWindow_StopsProviderAndReleasesInventoryOnce()
+        public async Task StripeRecoveryAfterProviderDeadline_WithUnknownProviderStateKeepsReservationAndKey()
         {
             await _database.ResetDatabaseAsync();
             var productId = await SeedProductAsync(quantity: 2);
@@ -493,27 +493,196 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
             }
 
-            var expired = await ExecuteAsync(checkout, "customer-1", key, provider);
-            var replay = await ExecuteAsync(checkout, "customer-1", key, provider);
+            var unresolved = await ExecuteAsync(checkout, "customer-1", key, provider);
+            var retry = await ExecuteAsync(checkout, "customer-1", key, provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, unresolved.Status);
+            Assert.Contains("requires reconciliation", unresolved.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(CheckoutExecutionStatus.InProgress, retry.Status);
+            Assert.Single(provider.Calls);
+            Assert.Empty(provider.RecoveryCalls);
+            await using var assertionContext = _database.CreateContext();
+            Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(PaymentOrderStatus.PendingPayment, (await assertionContext.Orders.SingleAsync()).Status);
+            Assert.Equal(
+                PaymentTransactionStatus.Pending,
+                (await assertionContext.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(
+                InventoryReservationStatus.Reserved,
+                (await assertionContext.InventoryReservations.SingleAsync()).Status);
+            var record = await assertionContext.CheckoutIdempotencyRecords.SingleAsync();
+            Assert.Equal(CheckoutIdempotencyState.LocalCommitted, record.State);
+            Assert.NotNull(record.OutcomeJson);
+            Assert.Contains("requires reconciliation", record.OutcomeJson, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(key, record.IdempotencyKey);
+            Assert.NotNull(record.ProviderInitializationStartedOn);
+            Assert.NotNull(record.ProviderInitializationJson);
+        }
+
+        [Fact]
+        public async Task ProviderLookupAfterDeadline_WhenPaid_CompletesOrderWithoutReleasingInventory()
+        {
+            var provider = new RecordingPaymentService(
+                _ => Task.FromResult(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Response lost",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)),
+                _ => Task.FromResult(new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Paid,
+                    "pi_recovery")));
+            var seed = await SeedAmbiguousStripeCheckoutAsync(provider);
+            await ExpireProviderRecoveryDeadlineAsync(seed);
+
+            var recovered = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
+
+            Assert.True(recovered.Success);
+            Assert.Equal(CheckoutStatus.Confirmed, recovered.Payload!.Status);
+            Assert.Single(provider.Calls);
+            Assert.Single(provider.RecoveryCalls);
+            await AssertAmbiguousSeedStateAsync(
+                seed,
+                PaymentTransactionStatus.Paid,
+                PaymentOrderStatus.Paid,
+                InventoryReservationStatus.Consumed,
+                expectedStock: 1,
+                CheckoutIdempotencyState.Completed);
+        }
+
+        [Fact]
+        public async Task ProviderLookupAfterDeadline_WhenSessionRemainsOpen_KeepsInventoryReserved()
+        {
+            var provider = new RecordingPaymentService(
+                _ => Task.FromResult(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Response lost",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)),
+                _ => Task.FromResult(new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Open,
+                    "pi_recovery",
+                    "The provider session remains open.")));
+            var seed = await SeedAmbiguousStripeCheckoutAsync(provider);
+            await ExpireProviderRecoveryDeadlineAsync(seed);
+
+            var unresolved = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, unresolved.Status);
+            Assert.Single(provider.Calls);
+            Assert.Single(provider.RecoveryCalls);
+            await AssertUnresolvedSeedStateAsync(seed);
+        }
+
+        [Fact]
+        public async Task ProviderLookupAfterDeadline_WhenLookupTimesOut_KeepsInventoryReserved()
+        {
+            var provider = new RecordingPaymentService(
+                _ => Task.FromResult(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Response lost",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)),
+                _ => throw new TimeoutException("Provider lookup timed out."));
+            var seed = await SeedAmbiguousStripeCheckoutAsync(provider);
+            await ExpireProviderRecoveryDeadlineAsync(seed);
+
+            var unresolved = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, unresolved.Status);
+            Assert.Single(provider.Calls);
+            Assert.Single(provider.RecoveryCalls);
+            await AssertUnresolvedSeedStateAsync(seed);
+        }
+
+        [Fact]
+        public async Task ProviderLookupAfterDeadline_WhenExpirationConfirmed_ReleasesExactlyOnce()
+        {
+            var provider = new RecordingPaymentService(
+                _ => Task.FromResult(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Response lost",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)),
+                _ => Task.FromResult(new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Expired,
+                    "pi_recovery")));
+            var seed = await SeedAmbiguousStripeCheckoutAsync(provider);
+            await ExpireProviderRecoveryDeadlineAsync(seed);
+
+            var expired = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
+            var replay = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
 
             Assert.False(expired.Success);
-            Assert.Contains("recovery window expired", expired.Message, StringComparison.OrdinalIgnoreCase);
             Assert.False(replay.Success);
             Assert.True(replay.IsReplay);
             Assert.Single(provider.Calls);
-            await using var assertionContext = _database.CreateContext();
-            Assert.Equal(2, (await assertionContext.Products.FindAsync(productId))!.Quantity);
-            Assert.Equal(PaymentOrderStatus.Cancelled, (await assertionContext.Orders.SingleAsync()).Status);
-            Assert.Equal(
+            Assert.Single(provider.RecoveryCalls);
+            await AssertAmbiguousSeedStateAsync(
+                seed,
                 PaymentTransactionStatus.Cancelled,
-                (await assertionContext.PaymentTransactions.SingleAsync()).Status);
-            Assert.Equal(
+                PaymentOrderStatus.Cancelled,
                 InventoryReservationStatus.Released,
-                (await assertionContext.InventoryReservations.SingleAsync()).Status);
-            var record = await assertionContext.CheckoutIdempotencyRecords.SingleAsync();
-            Assert.Equal(CheckoutIdempotencyState.Failed, record.State);
-            Assert.NotNull(record.ProviderInitializationStartedOn);
-            Assert.NotNull(record.ProviderInitializationJson);
+                expectedStock: 2,
+                CheckoutIdempotencyState.Failed);
+        }
+
+        [Fact]
+        public async Task PaymentCompletionDuringProviderExpiration_WinsOverStaleExpiredResult()
+        {
+            AmbiguousStripeCheckoutSeed? seededCheckout = null;
+            var provider = new RecordingPaymentService(
+                _ => Task.FromResult(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Response lost",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)),
+                async _ =>
+                {
+                    var seed = Assert.IsType<AmbiguousStripeCheckoutSeed>(seededCheckout);
+                    var reconciliation = await CreateStripeReconciliationService().ReconcileAsync(
+                        CreateStripeEvent(seed, "evt_paid_during_expiration") with
+                        {
+                            SessionId = "cs_recovery",
+                            PaymentIntentId = "pi_recovery",
+                        });
+                    Assert.Equal(StripePaymentReconciliationOutcome.Processed, reconciliation);
+                    return new StripePaymentRecoveryResult(
+                        StripePaymentRecoveryOutcome.Expired,
+                        "pi_recovery");
+                });
+            seededCheckout = await SeedAmbiguousStripeCheckoutAsync(provider);
+            await ExpireProviderRecoveryDeadlineAsync(seededCheckout);
+
+            var recovered = await ExecuteAsync(
+                seededCheckout.Checkout,
+                "customer-1",
+                seededCheckout.Key,
+                provider);
+
+            Assert.True(recovered.Success);
+            Assert.Equal(CheckoutStatus.Confirmed, recovered.Payload!.Status);
+            Assert.Single(provider.Calls);
+            Assert.Single(provider.RecoveryCalls);
+            await AssertAmbiguousSeedStateAsync(
+                seededCheckout,
+                PaymentTransactionStatus.Paid,
+                PaymentOrderStatus.Paid,
+                InventoryReservationStatus.Consumed,
+                expectedStock: 1,
+                CheckoutIdempotencyState.Completed);
+        }
+
+        [Fact]
+        public async Task InvalidPersistedProviderSnapshot_DoesNotTerminalizeUnknownPayment()
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            await using (var context = _database.CreateContext())
+            {
+                await context.CheckoutIdempotencyRecords.ExecuteUpdateAsync(setters => setters
+                    .SetProperty(record => record.ProviderInitializationJson, "{invalid-json")
+                    .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
+            }
+
+            var unresolved = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, unresolved.Status);
+            Assert.Single(seed.Provider.Calls);
+            await AssertUnresolvedSeedStateAsync(seed);
         }
 
         [Fact]
@@ -727,17 +896,20 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             }
         }
 
-        [Fact]
-        public async Task PaidWebhookWinningAgainstLocalCompensation_CannotPersistCheckoutFailure()
+        [Theory]
+        [InlineData(PaymentTransactionStatus.Failed)]
+        [InlineData(PaymentTransactionStatus.Cancelled)]
+        public async Task PaidWebhookWinningAgainstLocalTerminalization_CannotPersistCheckoutFailure(
+            PaymentTransactionStatus localTarget)
         {
             var seed = await SeedAmbiguousStripeCheckoutAsync();
             var webhookLock = new PaymentTransactionLockInterceptor();
             var reconciliationTask = CreateStripeReconciliationService(webhookLock).ReconcileAsync(
-                CreateStripeEvent(seed, "evt_paid_wins"));
+                CreateStripeEvent(seed, $"evt_paid_wins_{localTarget}"));
             await webhookLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var compensationTask = CreateStripeTransitionService().TransitionAsync(
                 seed.PaymentTransactionId,
-                PaymentTransactionStatus.Failed);
+                localTarget);
             webhookLock.Release.SetResult();
 
             Assert.Equal(StripePaymentReconciliationOutcome.Processed, await reconciliationTask);
@@ -909,13 +1081,14 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.NotNull(await assertionContext.CheckoutIdempotencyRecords.FindAsync(activeId));
         }
 
-        private async Task<AmbiguousStripeCheckoutSeed> SeedAmbiguousStripeCheckoutAsync()
+        private async Task<AmbiguousStripeCheckoutSeed> SeedAmbiguousStripeCheckoutAsync(
+            RecordingPaymentService? paymentProvider = null)
         {
             await _database.ResetDatabaseAsync();
             var productId = await SeedProductAsync(quantity: 2);
             var key = Guid.NewGuid();
             var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
-            var provider = new RecordingPaymentService(_ => Task.FromResult(
+            var provider = paymentProvider ?? new RecordingPaymentService(_ => Task.FromResult(
                 new PaymentInitializationResult(
                     false,
                     ErrorMessage: "Response lost",
@@ -942,6 +1115,24 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         {
             await using var context = _database.CreateContext();
             await context.CheckoutIdempotencyRecords.ExecuteUpdateAsync(setters => setters
+                .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
+        }
+
+        private async Task ExpireProviderRecoveryDeadlineAsync(
+            AmbiguousStripeCheckoutSeed seed,
+            string providerSessionId = "cs_recovery",
+            string? providerPaymentIntentId = "pi_recovery")
+        {
+            await using var context = _database.CreateContext();
+            await context.PaymentTransactions
+                .Where(transaction => transaction.Id == seed.PaymentTransactionId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(transaction => transaction.ProviderSessionId, providerSessionId)
+                    .SetProperty(transaction => transaction.ProviderPaymentIntentId, providerPaymentIntentId));
+            await context.CheckoutIdempotencyRecords.ExecuteUpdateAsync(setters => setters
+                .SetProperty(
+                    record => record.ProviderInitializationStartedOn,
+                    DateTime.UtcNow.AddHours(-24))
                 .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
         }
 
@@ -991,6 +1182,24 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Equal(idempotencyState,
                 (await context.CheckoutIdempotencyRecords.SingleAsync()).State);
             Assert.Single(await context.PaymentTransactions.ToListAsync());
+        }
+
+        private async Task AssertUnresolvedSeedStateAsync(AmbiguousStripeCheckoutSeed seed)
+        {
+            await using var context = _database.CreateContext();
+            Assert.Equal(
+                PaymentTransactionStatus.Pending,
+                (await context.PaymentTransactions.FindAsync(seed.PaymentTransactionId))!.Status);
+            Assert.Equal(PaymentOrderStatus.PendingPayment, (await context.Orders.FindAsync(seed.OrderId))!.Status);
+            Assert.Equal(
+                InventoryReservationStatus.Reserved,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(1, (await context.Products.FindAsync(seed.ProductId))!.Quantity);
+            var record = await context.CheckoutIdempotencyRecords.SingleAsync();
+            Assert.Equal(CheckoutIdempotencyState.LocalCommitted, record.State);
+            Assert.NotNull(record.OutcomeJson);
+            Assert.Contains("requires reconciliation", record.OutcomeJson, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(seed.Key, record.IdempotencyKey);
         }
 
         private async Task<CheckoutExecutionResult> ExecuteAsync(
@@ -1131,13 +1340,22 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         private sealed class RecordingPaymentService : IPaymentService
         {
             private readonly Func<ProviderCall, Task<PaymentInitializationResult>> _handler;
+            private readonly Func<StripePaymentRecoveryRequest, Task<StripePaymentRecoveryResult>> _recoveryHandler;
 
-            public RecordingPaymentService(Func<ProviderCall, Task<PaymentInitializationResult>> handler)
+            public RecordingPaymentService(
+                Func<ProviderCall, Task<PaymentInitializationResult>> handler,
+                Func<StripePaymentRecoveryRequest, Task<StripePaymentRecoveryResult>>? recoveryHandler = null)
             {
                 _handler = handler;
+                _recoveryHandler = recoveryHandler
+                    ?? (_ => Task.FromResult(new StripePaymentRecoveryResult(
+                        StripePaymentRecoveryOutcome.Unresolved,
+                        Reason: "No provider state was configured.")));
             }
 
             public ConcurrentQueue<ProviderCall> Calls { get; } = new();
+
+            public ConcurrentQueue<StripePaymentRecoveryRequest> RecoveryCalls { get; } = new();
 
             public async Task<PaymentInitializationResult> Pay(
                 StripeCheckoutInitialization initialization,
@@ -1154,6 +1372,14 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                         ProviderPaymentIntentId = $"pi_{providerIdempotencyKey}",
                     }
                     : result;
+            }
+
+            public Task<StripePaymentRecoveryResult> RecoverAsync(
+                StripePaymentRecoveryRequest request,
+                CancellationToken cancellationToken = default)
+            {
+                RecoveryCalls.Enqueue(request);
+                return _recoveryHandler(request);
             }
         }
 

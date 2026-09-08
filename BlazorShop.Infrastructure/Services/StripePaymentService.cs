@@ -142,6 +142,148 @@
             }
         }
 
+        public async Task<StripePaymentRecoveryResult> RecoverAsync(
+            StripePaymentRecoveryRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            if (!HasValidAuthoritativeTotal(request.Initialization)
+                || string.IsNullOrWhiteSpace(request.ProviderSessionId))
+            {
+                return Unresolved("The stored Stripe recovery identity is incomplete or invalid.");
+            }
+
+            var session = await TryGetSessionAsync(request.ProviderSessionId, cancellationToken);
+            if (session is null)
+            {
+                return Unresolved("Stripe session state could not be confirmed.");
+            }
+
+            var inspected = InspectRecoverySession(request, session);
+            if (inspected.Outcome != StripePaymentRecoveryOutcome.Open)
+            {
+                return inspected;
+            }
+
+            try
+            {
+                await _checkoutSessionService.ExpireAsync(request.ProviderSessionId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Stripe session {ProviderSessionId} could not be expired conclusively; re-reading provider state.",
+                    request.ProviderSessionId);
+            }
+
+            // Expiration can race payment completion, and a successful API response is not the
+            // authoritative final observation. Always re-read before returning a terminal outcome.
+            session = await TryGetSessionAsync(request.ProviderSessionId, cancellationToken);
+            return session is null
+                ? Unresolved("Stripe session state remained unavailable after the expiration attempt.")
+                : InspectRecoverySession(request, session);
+        }
+
+        private async Task<Session?> TryGetSessionAsync(
+            string providerSessionId,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await _checkoutSessionService.GetAsync(providerSessionId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Stripe session {ProviderSessionId} could not be read for checkout recovery.",
+                    providerSessionId);
+                return null;
+            }
+        }
+
+        private static StripePaymentRecoveryResult InspectRecoverySession(
+            StripePaymentRecoveryRequest request,
+            Session session)
+        {
+            var initialization = request.Initialization;
+            if (!string.Equals(session.Id, request.ProviderSessionId, StringComparison.Ordinal)
+                || !string.Equals(
+                    session.ClientReferenceId,
+                    initialization.OrderId.ToString("D"),
+                    StringComparison.OrdinalIgnoreCase)
+                || !HasMetadataIdentity(session.Metadata, "order_id", initialization.OrderId)
+                || !HasMetadataIdentity(
+                    session.Metadata,
+                    "payment_transaction_id",
+                    initialization.PaymentTransactionId)
+                || session.AmountTotal != initialization.ExpectedAmountMinor
+                || !string.Equals(session.Currency, initialization.Currency, StringComparison.OrdinalIgnoreCase)
+                || (request.ProviderPaymentIntentId is not null
+                    && !string.Equals(
+                        session.PaymentIntentId,
+                        request.ProviderPaymentIntentId,
+                        StringComparison.Ordinal)))
+            {
+                return Unresolved("Stripe session identity, amount, or currency contradicted the local checkout snapshot.");
+            }
+
+            if (string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
+                || (string.Equals(
+                        session.PaymentStatus,
+                        "no_payment_required",
+                        StringComparison.OrdinalIgnoreCase)
+                    && initialization.ExpectedAmountMinor == 0))
+            {
+                return new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Paid,
+                    session.PaymentIntentId);
+            }
+
+            if (string.Equals(session.Status, "expired", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(session.PaymentStatus, "unpaid", StringComparison.OrdinalIgnoreCase))
+            {
+                return new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Expired,
+                    session.PaymentIntentId);
+            }
+
+            if (string.Equals(session.Status, "open", StringComparison.OrdinalIgnoreCase))
+            {
+                return new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Open,
+                    session.PaymentIntentId,
+                    "The Stripe session remains open and payable.");
+            }
+
+            return Unresolved(
+                "Stripe did not report a safely terminal paid or expired/unpaid session state.",
+                session.PaymentIntentId);
+        }
+
+        private static bool HasMetadataIdentity(
+            IReadOnlyDictionary<string, string>? metadata,
+            string key,
+            Guid expected) =>
+            metadata is not null
+            && metadata.TryGetValue(key, out var value)
+            && Guid.TryParse(value, out var parsed)
+            && parsed == expected;
+
+        private static StripePaymentRecoveryResult Unresolved(
+            string reason,
+            string? providerPaymentIntentId = null) =>
+            new(StripePaymentRecoveryOutcome.Unresolved, providerPaymentIntentId, reason);
+
         private static bool IsDefinitiveStripeFailure(Stripe.StripeException exception)
         {
             var statusCode = (int)exception.HttpStatusCode;

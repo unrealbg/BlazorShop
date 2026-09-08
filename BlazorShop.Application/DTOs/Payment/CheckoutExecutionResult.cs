@@ -36,11 +36,11 @@ namespace BlazorShop.Application.DTOs.Payment
                 ResponseType = ServiceResponseType.Conflict,
             });
 
-        public static CheckoutExecutionResult InProgress() => new(
+        public static CheckoutExecutionResult InProgress(string? message = null) => new(
             CheckoutExecutionStatus.InProgress,
             new ServiceResponse<CheckoutResult>(
                 false,
-                "Checkout is still processing. Retry with the same Idempotency-Key.")
+                message ?? "Checkout is still processing. Retry with the same Idempotency-Key.")
             {
                 ResponseType = ServiceResponseType.Conflict,
             });

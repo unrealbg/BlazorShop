@@ -421,6 +421,85 @@ namespace BlazorShop.Tests.Application.Services.Payment
         }
 
         [Fact]
+        public async Task StripeRetryDeadlineWithoutProviderIdentity_RemainsNonTerminal()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _idempotency.Setup(store => store.PrepareProviderInitializationAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, Guid _, StripeCheckoutInitialization initialization, CancellationToken _) =>
+                    new CheckoutProviderInitialization(DateTime.UtcNow.AddHours(-24), initialization));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
+            Assert.Contains("requires reconciliation", result.Message, StringComparison.OrdinalIgnoreCase);
+            VerifyStripeWasNotCalled();
+            _payment.Verify(service => service.RecoverAsync(
+                It.IsAny<StripePaymentRecoveryRequest>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<PaymentTransactionStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _idempotency.Verify(store => store.SetPendingOutcomeAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.Is<PersistedCheckoutOutcome>(outcome => outcome.Status == CheckoutExecutionStatus.InProgress),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task StripeRetryDeadlineWithConfirmedPaidProviderState_UsesAtomicPaidTransition()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _paymentTransactions.Setup(store => store.GetOrCreateStripeAsync(
+                    It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid orderId, long amount, string currency, CancellationToken _) =>
+                    new PaymentTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        Provider = PaymentProviderNames.Stripe,
+                        ProviderSessionId = "cs_recovery",
+                        ProviderPaymentIntentId = "pi_recovery",
+                        ExpectedAmountMinor = amount,
+                        Currency = currency,
+                    });
+            _idempotency.Setup(store => store.PrepareProviderInitializationAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, Guid _, StripeCheckoutInitialization initialization, CancellationToken _) =>
+                    new CheckoutProviderInitialization(DateTime.UtcNow.AddHours(-24), initialization));
+            _payment.Setup(service => service.RecoverAsync(
+                    It.IsAny<StripePaymentRecoveryRequest>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Paid,
+                    "pi_recovery"));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.True(result.Success);
+            Assert.Equal(CheckoutStatus.Confirmed, result.Payload!.Status);
+            VerifyStripeWasNotCalled();
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                PaymentTransactionStatus.Paid,
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
         public async Task ValidationFailure_CreatesNoOrderAndDoesNotCallStripe()
         {
             ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");

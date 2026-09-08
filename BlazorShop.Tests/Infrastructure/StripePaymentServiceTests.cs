@@ -180,6 +180,120 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.Equal(PaymentInitializationFailureKind.Definitive, result.FailureKind);
         }
 
+        [Fact]
+        public async Task RecoverAsync_WhenProviderConfirmsPaid_ReturnsPaidWithoutExpiration()
+        {
+            var sessionService = new Mock<IStripeCheckoutSessionService>();
+            var initialization = CreateInitialization(Guid.NewGuid(), Guid.NewGuid());
+            sessionService.Setup(service => service.GetAsync("cs_recovery", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(CreateRecoverySession(initialization, "paid", "complete"));
+            var paymentService = CreatePaymentService(
+                sessionService.Object,
+                Mock.Of<ILogger<StripePaymentService>>());
+
+            var result = await paymentService.RecoverAsync(
+                new StripePaymentRecoveryRequest(initialization, "cs_recovery", "pi_recovery"));
+
+            Assert.Equal(StripePaymentRecoveryOutcome.Paid, result.Outcome);
+            sessionService.Verify(service => service.ExpireAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task RecoverAsync_WhenOpenSessionExpires_ReReadsAndReturnsConfirmedExpiration()
+        {
+            var sessionService = new Mock<IStripeCheckoutSessionService>();
+            var initialization = CreateInitialization(Guid.NewGuid(), Guid.NewGuid());
+            sessionService.SetupSequence(service => service.GetAsync(
+                    "cs_recovery",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(CreateRecoverySession(initialization, "unpaid", "open"))
+                .ReturnsAsync(CreateRecoverySession(initialization, "unpaid", "expired"));
+            sessionService.Setup(service => service.ExpireAsync(
+                    "cs_recovery",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(CreateRecoverySession(initialization, "unpaid", "expired"));
+            var paymentService = CreatePaymentService(
+                sessionService.Object,
+                Mock.Of<ILogger<StripePaymentService>>());
+
+            var result = await paymentService.RecoverAsync(
+                new StripePaymentRecoveryRequest(initialization, "cs_recovery", "pi_recovery"));
+
+            Assert.Equal(StripePaymentRecoveryOutcome.Expired, result.Outcome);
+            sessionService.Verify(service => service.GetAsync(
+                "cs_recovery",
+                It.IsAny<CancellationToken>()), Times.Exactly(2));
+        }
+
+        [Fact]
+        public async Task RecoverAsync_WhenExpirationTimesOutAndPaymentCompletes_ReReadReturnsPaid()
+        {
+            var sessionService = new Mock<IStripeCheckoutSessionService>();
+            var initialization = CreateInitialization(Guid.NewGuid(), Guid.NewGuid());
+            sessionService.SetupSequence(service => service.GetAsync(
+                    "cs_recovery",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(CreateRecoverySession(initialization, "unpaid", "open"))
+                .ReturnsAsync(CreateRecoverySession(initialization, "paid", "complete"));
+            sessionService.Setup(service => service.ExpireAsync(
+                    "cs_recovery",
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TimeoutException("Expiration response was lost."));
+            var paymentService = CreatePaymentService(
+                sessionService.Object,
+                Mock.Of<ILogger<StripePaymentService>>());
+
+            var result = await paymentService.RecoverAsync(
+                new StripePaymentRecoveryRequest(initialization, "cs_recovery", "pi_recovery"));
+
+            Assert.Equal(StripePaymentRecoveryOutcome.Paid, result.Outcome);
+        }
+
+        [Fact]
+        public async Task RecoverAsync_WhenExpirationAndFinalLookupTimeOut_RemainsUnresolved()
+        {
+            var sessionService = new Mock<IStripeCheckoutSessionService>();
+            var initialization = CreateInitialization(Guid.NewGuid(), Guid.NewGuid());
+            sessionService.SetupSequence(service => service.GetAsync(
+                    "cs_recovery",
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(CreateRecoverySession(initialization, "unpaid", "open"))
+                .ThrowsAsync(new TimeoutException("Final provider lookup timed out."));
+            sessionService.Setup(service => service.ExpireAsync(
+                    "cs_recovery",
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TimeoutException("Expiration response was lost."));
+            var paymentService = CreatePaymentService(
+                sessionService.Object,
+                Mock.Of<ILogger<StripePaymentService>>());
+
+            var result = await paymentService.RecoverAsync(
+                new StripePaymentRecoveryRequest(initialization, "cs_recovery", "pi_recovery"));
+
+            Assert.Equal(StripePaymentRecoveryOutcome.Unresolved, result.Outcome);
+        }
+
+        [Fact]
+        public async Task RecoverAsync_WhenProviderIdentityContradictsSnapshot_RemainsUnresolved()
+        {
+            var sessionService = new Mock<IStripeCheckoutSessionService>();
+            var initialization = CreateInitialization(Guid.NewGuid(), Guid.NewGuid());
+            var contradictory = CreateRecoverySession(initialization, "unpaid", "expired");
+            contradictory.AmountTotal = initialization.ExpectedAmountMinor + 1;
+            sessionService.Setup(service => service.GetAsync("cs_recovery", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(contradictory);
+            var paymentService = CreatePaymentService(
+                sessionService.Object,
+                Mock.Of<ILogger<StripePaymentService>>());
+
+            var result = await paymentService.RecoverAsync(
+                new StripePaymentRecoveryRequest(initialization, "cs_recovery", "pi_recovery"));
+
+            Assert.Equal(StripePaymentRecoveryOutcome.Unresolved, result.Outcome);
+        }
+
         private static StripeCheckoutInitialization CreateInitialization(
             Guid orderId,
             Guid productId,
@@ -204,6 +318,25 @@ namespace BlazorShop.Tests.Infrastructure
                 ],
                 $"https://shop.example.com/payment-success?pm=card&order_id={orderId:D}&reference=STRIPE-TEST-1&session_id={{CHECKOUT_SESSION_ID}}",
                 $"https://shop.example.com/payment-cancel?order_id={orderId:D}");
+
+        private static Session CreateRecoverySession(
+            StripeCheckoutInitialization initialization,
+            string paymentStatus,
+            string status) => new()
+            {
+                Id = "cs_recovery",
+                PaymentIntentId = "pi_recovery",
+                ClientReferenceId = initialization.OrderId.ToString("D"),
+                AmountTotal = initialization.ExpectedAmountMinor,
+                Currency = initialization.Currency.ToLowerInvariant(),
+                PaymentStatus = paymentStatus,
+                Status = status,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["order_id"] = initialization.OrderId.ToString("D"),
+                    ["payment_transaction_id"] = initialization.PaymentTransactionId.ToString("D"),
+                },
+            };
 
         private static StripePaymentService CreatePaymentService(
             IStripeCheckoutSessionService sessionService,

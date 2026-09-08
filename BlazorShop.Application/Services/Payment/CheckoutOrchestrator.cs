@@ -18,6 +18,7 @@ namespace BlazorShop.Application.Services.Payment
     {
         private const int OutcomeVersion = 1;
         private const int StripeInitializationVersion = 2;
+        private static readonly TimeSpan StripeRecoveryTimeout = TimeSpan.FromSeconds(15);
         private readonly IProductReadRepository _productReadRepository;
         private readonly IPaymentMethodService _paymentMethodService;
         private readonly IPaymentService _paymentService;
@@ -343,66 +344,34 @@ namespace BlazorShop.Application.Services.Payment
                 return terminalResult;
             }
 
-            var providerInitialization = await _idempotencyStore.PrepareProviderInitializationAsync(
-                claim.Record.Id,
-                claim.LeaseOwnerId,
-                CreateStripeInitialization(order, paymentTransaction),
-                cancellationToken);
+            CheckoutProviderInitialization? providerInitialization;
+            try
+            {
+                providerInitialization = await _idempotencyStore.PrepareProviderInitializationAsync(
+                    claim.Record.Id,
+                    claim.LeaseOwnerId,
+                    CreateStripeInitialization(order, paymentTransaction),
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                or System.Text.Json.JsonException)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Stripe initialization snapshot for transaction {PaymentTransactionId} cannot be reconstructed; provider state requires reconciliation.",
+                    paymentTransaction.Id);
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "The persisted Stripe initialization snapshot could not be reconstructed.",
+                    cancellationToken);
+            }
+
             if (providerInitialization is null)
             {
                 return CheckoutExecutionResult.InProgress();
             }
 
             var initialization = providerInitialization.Initialization;
-            if (initialization.OrderId != order.Id
-                || initialization.PaymentTransactionId != paymentTransaction.Id
-                || initialization.ExpectedAmountMinor != paymentTransaction.ExpectedAmountMinor
-                || !string.Equals(initialization.Currency, paymentTransaction.Currency, StringComparison.Ordinal)
-                || !string.Equals(initialization.OrderReference, order.Reference, StringComparison.Ordinal))
-            {
-                var invalidSnapshot = CreateFailureOutcome(
-                    "Card payment initialization could not be recovered safely. Start a new checkout attempt.");
-                if (!await _idempotencyStore.SetPendingOutcomeAsync(
-                    claim.Record.Id,
-                    claim.LeaseOwnerId,
-                    invalidSnapshot,
-                    cancellationToken))
-                {
-                    return CheckoutExecutionResult.InProgress();
-                }
-
-                return await TerminalizeStripeAsync(
-                    order,
-                    paymentTransaction,
-                    claim,
-                    invalidSnapshot,
-                    PaymentTransactionStatus.Failed,
-                    cancellationToken);
-            }
-
-            if (DateTime.UtcNow >= providerInitialization.StartedOn
-                .AddHours(_idempotencyOptions.ProviderRecoveryWindowHours))
-            {
-                var expired = CreateFailureOutcome(
-                    "The safe card-payment recovery window expired. Start a new checkout with a new Idempotency-Key.");
-                if (!await _idempotencyStore.SetPendingOutcomeAsync(
-                    claim.Record.Id,
-                    claim.LeaseOwnerId,
-                    expired,
-                    cancellationToken))
-                {
-                    return CheckoutExecutionResult.InProgress();
-                }
-
-                return await TerminalizeStripeAsync(
-                    order,
-                    paymentTransaction,
-                    claim,
-                    expired,
-                    PaymentTransactionStatus.Cancelled,
-                    cancellationToken);
-            }
-
             var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
             if (pendingFailure?.Status == CheckoutExecutionStatus.BadRequest)
             {
@@ -412,6 +381,29 @@ namespace BlazorShop.Application.Services.Payment
                     claim,
                     pendingFailure,
                     PaymentTransactionStatus.Failed,
+                    cancellationToken);
+            }
+
+            if (initialization.OrderId != order.Id
+                || initialization.PaymentTransactionId != paymentTransaction.Id
+                || initialization.ExpectedAmountMinor != paymentTransaction.ExpectedAmountMinor
+                || !string.Equals(initialization.Currency, paymentTransaction.Currency, StringComparison.Ordinal)
+                || !string.Equals(initialization.OrderReference, order.Reference, StringComparison.Ordinal))
+            {
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "The persisted Stripe initialization snapshot does not match the immutable order or payment transaction.",
+                    cancellationToken);
+            }
+
+            if (DateTime.UtcNow >= providerInitialization.StartedOn
+                .AddHours(_idempotencyOptions.ProviderRecoveryWindowHours))
+            {
+                return await RecoverStripeAfterProviderDeadlineAsync(
+                    order,
+                    paymentTransaction,
+                    claim,
+                    initialization,
                     cancellationToken);
             }
 
@@ -531,11 +523,164 @@ namespace BlazorShop.Application.Services.Payment
                 cancellationToken);
         }
 
+        private async Task<CheckoutExecutionResult> RecoverStripeAfterProviderDeadlineAsync(
+            Order order,
+            PaymentTransaction paymentTransaction,
+            CheckoutIdempotencyClaim claim,
+            StripeCheckoutInitialization initialization,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(paymentTransaction.ProviderSessionId))
+            {
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "The provider retry deadline elapsed without a durable Stripe Session identifier.",
+                    cancellationToken);
+            }
+
+            StripePaymentRecoveryResult recovery;
+            using var recoveryTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            recoveryTimeout.CancelAfter(StripeRecoveryTimeout);
+            try
+            {
+                recovery = await _paymentService.RecoverAsync(
+                    new StripePaymentRecoveryRequest(
+                        initialization,
+                        paymentTransaction.ProviderSessionId,
+                        paymentTransaction.ProviderPaymentIntentId),
+                    recoveryTimeout.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "Stripe provider lookup or expiration timed out.",
+                    cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Stripe recovery lookup for transaction {PaymentTransactionId} was inconclusive.",
+                    paymentTransaction.Id);
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "Stripe provider lookup was unavailable or timed out.",
+                    cancellationToken);
+            }
+
+            if (recovery.Outcome is StripePaymentRecoveryOutcome.Open
+                or StripePaymentRecoveryOutcome.Unresolved)
+            {
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    recovery.Reason ?? "Stripe has not confirmed a safe terminal payment outcome.",
+                    cancellationToken);
+            }
+
+            PaymentProviderIdentityPersistenceResult identityResult;
+            try
+            {
+                identityResult = await _paymentTransactionStore.PersistProviderIdentityAsync(
+                    paymentTransaction.Id,
+                    paymentTransaction.ProviderSessionId,
+                    recovery.ProviderPaymentIntentId,
+                    cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Stripe recovery identity persistence for transaction {PaymentTransactionId} was inconclusive.",
+                    paymentTransaction.Id);
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "The confirmed Stripe state could not be bound durably to the local transaction.",
+                    cancellationToken);
+            }
+
+            if (identityResult.Outcome is not (PaymentProviderIdentityPersistenceOutcome.Persisted
+                or PaymentProviderIdentityPersistenceOutcome.AlreadyPersisted))
+            {
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    "Stripe provider identity contradicted the local payment transaction.",
+                    cancellationToken);
+            }
+
+            if (identityResult.PaymentStatus == PaymentTransactionStatus.Paid)
+            {
+                return await FinalizePaidStripeCheckoutAsync(order, claim, cancellationToken);
+            }
+
+            if (identityResult.PaymentStatus is PaymentTransactionStatus.Failed
+                or PaymentTransactionStatus.Cancelled)
+            {
+                return await FinalizeTerminalStripeFailureAsync(
+                    identityResult.PaymentStatus.Value,
+                    claim,
+                    cancellationToken);
+            }
+
+            var targetStatus = recovery.Outcome == StripePaymentRecoveryOutcome.Paid
+                ? PaymentTransactionStatus.Paid
+                : PaymentTransactionStatus.Cancelled;
+            var terminalFailure = recovery.Outcome == StripePaymentRecoveryOutcome.Expired
+                ? CreateFailureOutcome(
+                    "Stripe confirmed that the payment session expired without payment. Start a new checkout attempt.")
+                : null;
+            return await TerminalizeStripeAsync(
+                order,
+                paymentTransaction,
+                claim,
+                terminalFailure,
+                targetStatus,
+                cancellationToken);
+        }
+
+        private async Task<CheckoutExecutionResult> MarkStripeReconciliationRequiredAsync(
+            CheckoutIdempotencyClaim claim,
+            string reason,
+            CancellationToken cancellationToken)
+        {
+            const string browserMessage =
+                "Card payment status requires reconciliation. Inventory remains reserved; retry with the same Idempotency-Key.";
+            var marker = new PersistedCheckoutOutcome(
+                OutcomeVersion,
+                CheckoutExecutionStatus.InProgress,
+                new ServiceResponse<CheckoutResult>(false, $"{browserMessage} Reason: {reason}")
+                {
+                    ResponseType = ServiceResponseType.Conflict,
+                });
+            if (!await _idempotencyStore.SetPendingOutcomeAsync(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                marker,
+                cancellationToken))
+            {
+                return CheckoutExecutionResult.InProgress();
+            }
+
+            await _idempotencyStore.ReleaseLeaseAsync(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                cancellationToken);
+            _logger.LogWarning(
+                "Stripe checkout {CheckoutIdempotencyRecordId} requires reconciliation: {Reason}",
+                claim.Record.Id,
+                reason);
+            return CheckoutExecutionResult.InProgress(marker.Response.Message);
+        }
+
         private async Task<CheckoutExecutionResult> TerminalizeStripeAsync(
             Order order,
             PaymentTransaction paymentTransaction,
             CheckoutIdempotencyClaim claim,
-            PersistedCheckoutOutcome failure,
+            PersistedCheckoutOutcome? failure,
             PaymentTransactionStatus targetStatus,
             CancellationToken cancellationToken)
         {
@@ -622,11 +767,15 @@ namespace BlazorShop.Application.Services.Payment
             CancellationToken cancellationToken,
             PersistedCheckoutOutcome? existingFailure = null)
         {
-            var failure = existingFailure
-                ?? _idempotencyStore.ReadOutcome(claim.Record)
-                ?? CreateFailureOutcome(paymentStatus == PaymentTransactionStatus.Cancelled
-                    ? "The card-payment attempt expired or was cancelled. Start a new checkout attempt."
-                    : "Unable to initialize the card payment session. Please start a new checkout attempt.");
+            var storedOutcome = _idempotencyStore.ReadOutcome(claim.Record);
+            var defaultFailure = CreateFailureOutcome(paymentStatus == PaymentTransactionStatus.Cancelled
+                ? "The card-payment attempt expired or was cancelled. Start a new checkout attempt."
+                : "Unable to initialize the card payment session. Please start a new checkout attempt.");
+            var failure = existingFailure?.Status == CheckoutExecutionStatus.BadRequest
+                ? existingFailure
+                : storedOutcome?.Status == CheckoutExecutionStatus.BadRequest
+                    ? storedOutcome
+                    : defaultFailure;
             var completed = await _idempotencyStore.CompleteAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,

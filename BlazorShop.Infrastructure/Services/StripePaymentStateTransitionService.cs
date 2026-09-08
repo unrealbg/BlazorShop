@@ -36,12 +36,14 @@ namespace BlazorShop.Infrastructure.Services
                     "A valid Stripe payment transaction is required.");
             }
 
-            if (targetStatus is not (PaymentTransactionStatus.Failed or PaymentTransactionStatus.Cancelled))
+            if (targetStatus is not (PaymentTransactionStatus.Paid
+                or PaymentTransactionStatus.Failed
+                or PaymentTransactionStatus.Cancelled))
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(targetStatus),
                     targetStatus,
-                    "Local Stripe terminalization supports only Failed or Cancelled.");
+                    "Stripe terminalization supports only Paid, Failed, or Cancelled.");
             }
 
             await using var strategyContext = await _contextFactory.CreateDbContextAsync(cancellationToken);
@@ -101,6 +103,8 @@ namespace BlazorShop.Infrastructure.Services
 
             var (orderStatus, reservationStatus) = targetStatus switch
             {
+                PaymentTransactionStatus.Paid =>
+                    (PaymentOrderStatus.Paid, InventoryReservationStatus.Consumed),
                 PaymentTransactionStatus.Failed =>
                     (PaymentOrderStatus.PaymentFailed, InventoryReservationStatus.Released),
                 PaymentTransactionStatus.Cancelled =>
@@ -117,7 +121,7 @@ namespace BlazorShop.Infrastructure.Services
             {
                 await transaction.RollbackAsync(cancellationToken);
                 _logger.LogWarning(
-                    "Refused local Stripe transition {PaymentTransactionId} from Pending to {TargetStatus} because coordinated order/inventory state returned {InventoryOutcome}: {Reason}",
+                    "Refused coordinated Stripe transition {PaymentTransactionId} from Pending to {TargetStatus} because order/inventory state returned {InventoryOutcome}: {Reason}",
                     paymentTransaction.Id,
                     targetStatus,
                     inventoryResult.Outcome,
@@ -133,7 +137,7 @@ namespace BlazorShop.Infrastructure.Services
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             _logger.LogInformation(
-                "Applied local Stripe transition {PaymentTransactionId} for order {OrderId}: payment {PaymentStatus}, order {OrderStatus}, inventory {InventoryStatus}.",
+                "Applied coordinated Stripe transition {PaymentTransactionId} for order {OrderId}: payment {PaymentStatus}, order {OrderStatus}, inventory {InventoryStatus}.",
                 paymentTransaction.Id,
                 order.Id,
                 paymentTransaction.Status,
@@ -151,6 +155,7 @@ namespace BlazorShop.Infrastructure.Services
             var now = DateTime.UtcNow;
             paymentTransaction.Status = targetStatus;
             paymentTransaction.UpdatedOn = now;
+            paymentTransaction.PaidOn = targetStatus == PaymentTransactionStatus.Paid ? now : null;
             paymentTransaction.FailedOn = targetStatus == PaymentTransactionStatus.Failed ? now : null;
             paymentTransaction.CancelledOn = targetStatus == PaymentTransactionStatus.Cancelled ? now : null;
         }
