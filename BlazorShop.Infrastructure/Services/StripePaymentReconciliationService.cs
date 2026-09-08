@@ -95,7 +95,7 @@ namespace BlazorShop.Infrastructure.Services
             ledger.PaymentTransactionId = paymentTransaction.Id;
             ledger.OrderId = paymentTransaction.OrderId;
             var order = (await db.Orders
-                .FromSqlInterpolated($"SELECT * FROM \"Orders\" WHERE \"Id\" = {paymentTransaction.OrderId} FOR UPDATE")
+                .FromSqlInterpolated($"SELECT *, xmin FROM \"Orders\" WHERE \"Id\" = {paymentTransaction.OrderId} FOR UPDATE")
                 .ToListAsync(cancellationToken))
                 .SingleOrDefault();
             if (order is null)

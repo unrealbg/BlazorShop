@@ -148,7 +148,7 @@ namespace BlazorShop.Infrastructure.Services
             }
 
             var order = (await db.Orders
-                .FromSqlInterpolated($"SELECT * FROM \"Orders\" WHERE \"Id\" = {paymentTransaction.OrderId} FOR UPDATE")
+                .FromSqlInterpolated($"SELECT *, xmin FROM \"Orders\" WHERE \"Id\" = {paymentTransaction.OrderId} FOR UPDATE")
                 .ToListAsync(cancellationToken))
                 .SingleOrDefault();
             if (order is null)
