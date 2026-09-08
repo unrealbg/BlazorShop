@@ -2,6 +2,7 @@
 {
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Payment;
+    using BlazorShop.Application.Services.Payment;
     using Microsoft.Extensions.Logging;
 
     using Stripe.Checkout;
@@ -24,11 +25,13 @@
             string providerIdempotencyKey,
             CancellationToken cancellationToken = default)
         {
-            if (!HasValidAuthoritativeTotal(initialization))
+            if (!StripeCheckoutInitializationValidator.TryValidateAuthoritativeTotal(
+                initialization,
+                out var validationError))
             {
                 return new PaymentInitializationResult(
                     false,
-                    ErrorMessage: "The card payment amount does not match the immutable order total.",
+                    ErrorMessage: validationError,
                     FailureKind: PaymentInitializationFailureKind.Definitive);
             }
 
@@ -91,7 +94,7 @@
             }
             catch (Stripe.StripeException ex)
             {
-                var failureKind = IsDefinitiveStripeFailure(ex)
+                var failureKind = IsDefinitiveCurrentRequestFailure(ex)
                     ? PaymentInitializationFailureKind.Definitive
                     : PaymentInitializationFailureKind.Ambiguous;
                 if (failureKind == PaymentInitializationFailureKind.Definitive)
@@ -147,7 +150,9 @@
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
-            if (!HasValidAuthoritativeTotal(request.Initialization)
+            if (!StripeCheckoutInitializationValidator.TryValidateAuthoritativeTotal(
+                    request.Initialization,
+                    out _)
                 || string.IsNullOrWhiteSpace(request.ProviderSessionId))
             {
                 return Unresolved("The stored Stripe recovery identity is incomplete or invalid.");
@@ -284,7 +289,7 @@
             string? providerPaymentIntentId = null) =>
             new(StripePaymentRecoveryOutcome.Unresolved, providerPaymentIntentId, reason);
 
-        private static bool IsDefinitiveStripeFailure(Stripe.StripeException exception)
+        private static bool IsDefinitiveCurrentRequestFailure(Stripe.StripeException exception)
         {
             var statusCode = (int)exception.HttpStatusCode;
             if (statusCode is 408 or 409 or 425 or 429 || statusCode >= 500)
@@ -307,32 +312,5 @@
                     || string.Equals(errorType, "card_error", StringComparison.Ordinal));
         }
 
-        private static bool HasValidAuthoritativeTotal(StripeCheckoutInitialization initialization)
-        {
-            if (initialization.PaymentTransactionId == Guid.Empty
-                || initialization.OrderId == Guid.Empty
-                || initialization.ExpectedAmountMinor < 0
-                || string.IsNullOrWhiteSpace(initialization.Currency)
-                || initialization.Lines.Count == 0
-                || initialization.Lines.Any(line =>
-                    line.Quantity <= 0
-                    || line.UnitAmount < 0
-                    || !string.Equals(line.Currency, initialization.Currency, StringComparison.OrdinalIgnoreCase)))
-            {
-                return false;
-            }
-
-            try
-            {
-                var lineTotal = initialization.Lines.Aggregate(
-                    0L,
-                    (total, line) => checked(total + checked(line.UnitAmount * line.Quantity)));
-                return lineTotal == initialization.ExpectedAmountMinor;
-            }
-            catch (OverflowException)
-            {
-                return false;
-            }
-        }
     }
 }

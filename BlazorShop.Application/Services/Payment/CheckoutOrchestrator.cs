@@ -344,6 +344,10 @@ namespace BlazorShop.Application.Services.Payment
                 return terminalResult;
             }
 
+            // This timestamp is persisted before the provider call. If it was already present
+            // when this lease was claimed, an earlier process may have dispatched to Stripe
+            // even when it crashed before recording the provider response.
+            var mayHaveEarlierProviderSideEffects = claim.Record.ProviderInitializationStartedOn.HasValue;
             CheckoutProviderInitialization? providerInitialization;
             try
             {
@@ -372,18 +376,6 @@ namespace BlazorShop.Application.Services.Payment
             }
 
             var initialization = providerInitialization.Initialization;
-            var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
-            if (pendingFailure?.Status == CheckoutExecutionStatus.BadRequest)
-            {
-                return await TerminalizeStripeAsync(
-                    order,
-                    paymentTransaction,
-                    claim,
-                    pendingFailure,
-                    PaymentTransactionStatus.Failed,
-                    cancellationToken);
-            }
-
             if (initialization.OrderId != order.Id
                 || initialization.PaymentTransactionId != paymentTransaction.Id
                 || initialization.ExpectedAmountMinor != paymentTransaction.ExpectedAmountMinor
@@ -396,14 +388,60 @@ namespace BlazorShop.Application.Services.Payment
                     cancellationToken);
             }
 
+            if (!StripeCheckoutInitializationValidator.TryValidateAuthoritativeTotal(
+                initialization,
+                out var snapshotValidationError))
+            {
+                if (!mayHaveEarlierProviderSideEffects)
+                {
+                    return await FailDefinitiveInitialStripeAttemptAsync(
+                        order,
+                        paymentTransaction,
+                        claim,
+                        snapshotValidationError
+                        ?? "The persisted Stripe line snapshot could not be validated.",
+                        cancellationToken);
+                }
+
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    snapshotValidationError
+                    ?? "The persisted Stripe line snapshot could not be validated.",
+                    cancellationToken);
+            }
+
+            var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
+            if (pendingFailure?.Status == CheckoutExecutionStatus.BadRequest)
+            {
+                if (mayHaveEarlierProviderSideEffects)
+                {
+                    return await RecoverStripeProviderStateAsync(
+                        order,
+                        paymentTransaction,
+                        claim,
+                        initialization,
+                        "A prior Stripe request may have executed before its failure outcome was persisted.",
+                        cancellationToken);
+                }
+
+                return await TerminalizeStripeAsync(
+                    order,
+                    paymentTransaction,
+                    claim,
+                    pendingFailure,
+                    PaymentTransactionStatus.Failed,
+                    cancellationToken);
+            }
+
             if (DateTime.UtcNow >= providerInitialization.StartedOn
                 .AddHours(_idempotencyOptions.ProviderRecoveryWindowHours))
             {
-                return await RecoverStripeAfterProviderDeadlineAsync(
+                return await RecoverStripeProviderStateAsync(
                     order,
                     paymentTransaction,
                     claim,
                     initialization,
+                    "The provider retry deadline elapsed without a durable Stripe Session identifier.",
                     cancellationToken);
             }
 
@@ -432,11 +470,10 @@ namespace BlazorShop.Application.Services.Payment
                         "Stripe returned session {ProviderSessionId} for transaction {PaymentTransactionId}, but provider identity persistence was ambiguous.",
                         paymentResult.ProviderSessionId,
                         paymentTransaction.Id);
-                    await _idempotencyStore.ReleaseLeaseAsync(
-                        claim.Record.Id,
-                        claim.LeaseOwnerId,
+                    return await MarkStripeReconciliationRequiredAsync(
+                        claim,
+                        "Stripe returned a Session, but its identity could not be persisted conclusively.",
                         cancellationToken);
-                    return CheckoutExecutionResult.InProgress();
                 }
 
                 if (identityResult.Outcome is not (PaymentProviderIdentityPersistenceOutcome.Persisted
@@ -446,11 +483,10 @@ namespace BlazorShop.Application.Services.Payment
                         "Stripe provider identity for transaction {PaymentTransactionId} could not be persisted safely: {Outcome}.",
                         paymentTransaction.Id,
                         identityResult.Outcome);
-                    await _idempotencyStore.ReleaseLeaseAsync(
-                        claim.Record.Id,
-                        claim.LeaseOwnerId,
+                    return await MarkStripeReconciliationRequiredAsync(
+                        claim,
+                        "Stripe returned a Session whose identity could not be bound safely to the local transaction.",
                         cancellationToken);
-                    return CheckoutExecutionResult.InProgress();
                 }
 
                 if (identityResult.PaymentStatus == PaymentTransactionStatus.Paid)
@@ -469,11 +505,10 @@ namespace BlazorShop.Application.Services.Payment
 
                 if (identityResult.PaymentStatus != PaymentTransactionStatus.Pending)
                 {
-                    await _idempotencyStore.ReleaseLeaseAsync(
-                        claim.Record.Id,
-                        claim.LeaseOwnerId,
+                    return await MarkStripeReconciliationRequiredAsync(
+                        claim,
+                        "The local payment state could not be classified after Stripe Session creation.",
                         cancellationToken);
-                    return CheckoutExecutionResult.InProgress();
                 }
 
                 var outcome = CreateSuccessOutcome(
@@ -495,16 +530,41 @@ namespace BlazorShop.Application.Services.Payment
 
             if (paymentResult.FailureKind == PaymentInitializationFailureKind.Ambiguous)
             {
-                await _idempotencyStore.ReleaseLeaseAsync(
-                    claim.Record.Id,
-                    claim.LeaseOwnerId,
+                return await MarkStripeReconciliationRequiredAsync(
+                    claim,
+                    paymentResult.ErrorMessage
+                    ?? "Stripe checkout-session creation returned an ambiguous result.",
                     cancellationToken);
-                return CheckoutExecutionResult.InProgress();
             }
 
-            var failure = CreateFailureOutcome(
+            if (mayHaveEarlierProviderSideEffects)
+            {
+                return await RecoverStripeProviderStateAsync(
+                    order,
+                    paymentTransaction,
+                    claim,
+                    initialization,
+                    "The current Stripe retry was rejected, but an earlier request may have executed.",
+                    cancellationToken);
+            }
+
+            return await FailDefinitiveInitialStripeAttemptAsync(
+                order,
+                paymentTransaction,
+                claim,
                 paymentResult.ErrorMessage
-                ?? "Unable to initialize the card payment session. Please start a new checkout attempt.");
+                ?? "Unable to initialize the card payment session. Please start a new checkout attempt.",
+                cancellationToken);
+        }
+
+        private async Task<CheckoutExecutionResult> FailDefinitiveInitialStripeAttemptAsync(
+            Order order,
+            PaymentTransaction paymentTransaction,
+            CheckoutIdempotencyClaim claim,
+            string errorMessage,
+            CancellationToken cancellationToken)
+        {
+            var failure = CreateFailureOutcome(errorMessage);
             if (!await _idempotencyStore.SetPendingOutcomeAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,
@@ -523,18 +583,19 @@ namespace BlazorShop.Application.Services.Payment
                 cancellationToken);
         }
 
-        private async Task<CheckoutExecutionResult> RecoverStripeAfterProviderDeadlineAsync(
+        private async Task<CheckoutExecutionResult> RecoverStripeProviderStateAsync(
             Order order,
             PaymentTransaction paymentTransaction,
             CheckoutIdempotencyClaim claim,
             StripeCheckoutInitialization initialization,
+            string missingProviderIdentityReason,
             CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(paymentTransaction.ProviderSessionId))
             {
                 return await MarkStripeReconciliationRequiredAsync(
                     claim,
-                    "The provider retry deadline elapsed without a durable Stripe Session identifier.",
+                    missingProviderIdentityReason,
                     cancellationToken);
             }
 

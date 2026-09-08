@@ -421,6 +421,62 @@ namespace BlazorShop.Tests.Application.Services.Payment
         }
 
         [Fact]
+        public async Task StripeDefinitiveRetryFailureAfterDurableDispatchMarker_RemainsNonTerminal()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _idempotency.Setup(store => store.ClaimAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string userId, Guid key, string fingerprint, Guid paymentMethodId, CancellationToken _) =>
+                {
+                    var ownerId = Guid.NewGuid();
+                    return new CheckoutIdempotencyClaim(
+                        CheckoutIdempotencyClaimStatus.Acquired,
+                        new CheckoutIdempotencyRecord
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = userId,
+                            IdempotencyKey = key,
+                            RequestFingerprint = fingerprint,
+                            PaymentMethodId = paymentMethodId,
+                            OrderId = Guid.NewGuid(),
+                            OrderReference = $"STRIPE-{Guid.NewGuid():N}",
+                            LeaseOwnerId = ownerId,
+                            ProviderInitializationStartedOn = DateTime.UtcNow.AddMinutes(-1),
+                        },
+                        ownerId);
+                });
+            _payment.Setup(service => service.Pay(
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Stripe authentication failed.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
+            Assert.Contains("requires reconciliation", result.Message, StringComparison.OrdinalIgnoreCase);
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<PaymentTransactionStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _idempotency.Verify(store => store.SetPendingOutcomeAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.Is<PersistedCheckoutOutcome>(outcome => outcome.Status == CheckoutExecutionStatus.InProgress),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
         public async Task StripeRetryDeadlineWithoutProviderIdentity_RemainsNonTerminal()
         {
             var product = ConfigureProduct(price: 15m, quantity: 1);

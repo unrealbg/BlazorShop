@@ -470,6 +470,118 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.Equal(1, (await assertionContext.ProductVariants.FindAsync(variantId))!.Stock);
         }
 
+        [Theory]
+        [InlineData("Stripe authentication failed (401).")]
+        [InlineData("Stripe permission denied (403).")]
+        public async Task DefinitiveRetryFailureAfterAmbiguousDispatch_RemainsNonTerminal(
+            string retryFailure)
+        {
+            var attempt = 0;
+            var provider = new RecordingPaymentService(_ => Task.FromResult(
+                Interlocked.Increment(ref attempt) == 1
+                    ? new PaymentInitializationResult(
+                        false,
+                        ErrorMessage: "The initial provider response was lost.",
+                        FailureKind: PaymentInitializationFailureKind.Ambiguous)
+                    : new PaymentInitializationResult(
+                        false,
+                        ErrorMessage: retryFailure,
+                        FailureKind: PaymentInitializationFailureKind.Definitive)));
+            var seed = await SeedAmbiguousStripeCheckoutAsync(provider);
+
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, retry.Status);
+            Assert.Contains("requires reconciliation", retry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(2, provider.Calls.Count);
+            Assert.Empty(provider.RecoveryCalls);
+            await AssertUnresolvedSeedStateAsync(seed);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task InvalidPersistedProviderLineSnapshotAfterPossibleDispatch_RemainsNonTerminal(
+            bool useMismatchedLineCurrency)
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+            await using (var context = _database.CreateContext())
+            {
+                var record = await context.CheckoutIdempotencyRecords.SingleAsync();
+                var serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+                var initialization = JsonSerializer.Deserialize<StripeCheckoutInitialization>(
+                    record.ProviderInitializationJson!,
+                    serializerOptions);
+                Assert.NotNull(initialization);
+                var line = Assert.Single(initialization.Lines);
+                var invalidLine = useMismatchedLineCurrency
+                    ? line with { Currency = "USD" }
+                    : line with { UnitAmount = line.UnitAmount + 1 };
+                record.ProviderInitializationJson = JsonSerializer.Serialize(
+                    initialization with { Lines = [invalidLine] },
+                    serializerOptions);
+                record.LeaseExpiresOn = DateTime.UtcNow.AddSeconds(-1);
+                await context.SaveChangesAsync();
+            }
+
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, retry.Status);
+            Assert.Single(seed.Provider.Calls);
+            Assert.Empty(seed.Provider.RecoveryCalls);
+            await AssertUnresolvedSeedStateAsync(seed);
+        }
+
+        [Fact]
+        public async Task PaidProviderAttemptWithAuthenticationFailureDuringRecovery_CanStillBePaidByWebhook()
+        {
+            var attempt = 0;
+            var provider = new RecordingPaymentService(
+                _ => Task.FromResult(
+                    Interlocked.Increment(ref attempt) == 1
+                        ? new PaymentInitializationResult(
+                            false,
+                            ErrorMessage: "The successful provider response was lost.",
+                            FailureKind: PaymentInitializationFailureKind.Ambiguous)
+                        : new PaymentInitializationResult(
+                            false,
+                            ErrorMessage: "Stripe authentication failed (401).",
+                            FailureKind: PaymentInitializationFailureKind.Definitive)),
+                _ => throw new UnauthorizedAccessException("Provider recovery authentication failed."));
+            var seed = await SeedAmbiguousStripeCheckoutAsync(provider);
+            await using (var context = _database.CreateContext())
+            {
+                await context.PaymentTransactions
+                    .Where(transaction => transaction.Id == seed.PaymentTransactionId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(transaction => transaction.ProviderSessionId, "cs_delayed_paid")
+                        .SetProperty(transaction => transaction.ProviderPaymentIntentId, "pi_delayed_paid"));
+            }
+
+            var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, provider);
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, retry.Status);
+            Assert.Equal(2, provider.Calls.Count);
+            Assert.Single(provider.RecoveryCalls);
+            await AssertUnresolvedSeedStateAsync(seed);
+
+            var reconciliation = await CreateStripeReconciliationService().ReconcileAsync(
+                CreateStripeEvent(seed, "evt_delayed_paid_after_recovery_auth") with
+                {
+                    SessionId = "cs_delayed_paid",
+                    PaymentIntentId = "pi_delayed_paid",
+                });
+
+            Assert.Equal(StripePaymentReconciliationOutcome.Processed, reconciliation);
+            await AssertAmbiguousSeedStateAsync(
+                seed,
+                PaymentTransactionStatus.Paid,
+                PaymentOrderStatus.Paid,
+                InventoryReservationStatus.Consumed,
+                expectedStock: 1,
+                CheckoutIdempotencyState.LocalCommitted);
+        }
+
         [Fact]
         public async Task StripeRecoveryAfterProviderDeadline_WithUnknownProviderStateKeepsReservationAndKey()
         {

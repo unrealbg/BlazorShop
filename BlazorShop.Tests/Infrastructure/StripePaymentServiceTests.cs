@@ -156,8 +156,13 @@ namespace BlazorShop.Tests.Infrastructure
             Assert.Equal(PaymentInitializationFailureKind.Ambiguous, result.FailureKind);
         }
 
-        [Fact]
-        public async Task Pay_WhenStripeDeterministicallyRejectsRequest_ReturnsDefinitive()
+        [Theory]
+        [InlineData(HttpStatusCode.BadRequest, "invalid_request_error")]
+        [InlineData(HttpStatusCode.Unauthorized, "authentication_error")]
+        [InlineData(HttpStatusCode.Forbidden, "permission_error")]
+        public async Task Pay_WhenCurrentStripeRequestIsDeterministicallyRejected_ReturnsDefinitive(
+            HttpStatusCode statusCode,
+            string errorType)
         {
             var sessionService = new Mock<IStripeCheckoutSessionService>();
             sessionService.Setup(service => service.CreateAsync(
@@ -165,8 +170,8 @@ namespace BlazorShop.Tests.Infrastructure
                     It.IsAny<string>(),
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Stripe.StripeException(
-                    HttpStatusCode.BadRequest,
-                    new Stripe.StripeError { Type = "invalid_request_error" },
+                    statusCode,
+                    new Stripe.StripeError { Type = errorType },
                     "invalid request"));
             var paymentService = CreatePaymentService(
                 sessionService.Object,
