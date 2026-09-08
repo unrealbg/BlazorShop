@@ -177,8 +177,12 @@
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateTracking(Guid orderId, UpdateTrackingRequest dto)
         {
-            var updated = await _trackingService.UpdateTrackingAsync(orderId, dto.Carrier, dto.TrackingNumber, dto.TrackingUrl);
-            return updated ? this.NoContent() : this.NotFound();
+            var result = await _trackingService.UpdateTrackingDetailsAsync(
+                orderId,
+                dto.Carrier,
+                dto.TrackingNumber,
+                dto.TrackingUrl);
+            return ToTrackingResult(result);
         }
 
         /// <summary>
@@ -191,8 +195,23 @@
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateShippingStatus(Guid orderId, UpdateShippingStatusRequest dto)
         {
-            var updated = await _trackingService.UpdateShippingStatusAsync(orderId, dto.ShippingStatus, dto.ShippedOn, dto.DeliveredOn);
-            return updated ? this.NoContent() : this.NotFound();
+            var result = await _trackingService.TransitionFulfillmentAsync(
+                orderId,
+                dto.FulfillmentStatus,
+                dto.ShippedOn,
+                dto.DeliveredOn);
+            return ToTrackingResult(result);
+        }
+
+        private IActionResult ToTrackingResult(OrderTrackingTransitionResult result)
+        {
+            return result.Outcome switch
+            {
+                OrderTrackingTransitionOutcome.Applied or OrderTrackingTransitionOutcome.AlreadyApplied => this.NoContent(),
+                OrderTrackingTransitionOutcome.NotFound => this.NotFound(result.ErrorMessage),
+                OrderTrackingTransitionOutcome.ValidationError => this.BadRequest(result.ErrorMessage),
+                _ => this.Conflict(result.ErrorMessage),
+            };
         }
     }
 }

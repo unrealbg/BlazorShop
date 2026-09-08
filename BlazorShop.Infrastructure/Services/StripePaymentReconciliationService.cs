@@ -196,21 +196,13 @@ namespace BlazorShop.Infrastructure.Services
                     cancellationToken);
             }
 
-            var (orderStatus, reservationStatus) = target.Status.Value switch
-            {
-                PaymentTransactionStatus.Paid =>
-                    (PaymentOrderStatus.Paid, InventoryReservationStatus.Consumed),
-                PaymentTransactionStatus.Failed =>
-                    (PaymentOrderStatus.PaymentFailed, InventoryReservationStatus.Released),
-                PaymentTransactionStatus.Cancelled =>
-                    (PaymentOrderStatus.Cancelled, InventoryReservationStatus.Released),
-                _ => throw new InvalidOperationException("Pending is not a terminal provider transition."),
-            };
+            var paymentTransition = OrderLifecyclePolicy.GetStripeTerminalTransition(order, target.Status.Value);
             var inventoryResult = await InventoryReservationTransitionOperation.ApplyAsync(
                 db,
                 order,
-                orderStatus,
-                reservationStatus,
+                paymentTransition.OrderStatus,
+                paymentTransition.PaymentStatus,
+                paymentTransition.ReservationStatus,
                 cancellationToken);
             if (inventoryResult.Outcome != InventoryTransitionOutcome.Applied)
             {

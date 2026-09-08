@@ -195,10 +195,10 @@
 
     <div class="bs-panel-soft mt-6 grid grid-cols-1 items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
       <div>
-        <label class="block text-xs text-neutral-600">Status</label>
+        <label class="block text-xs text-neutral-600">Fulfillment</label>
         <select value="@_statusFilter" @onchange="e => { _statusFilter = e.Value?.ToString() ?? string.Empty; ApplyFilters(); }">
           <option value="">All</option>
-          <option value="PendingShipment">PendingShipment</option>
+          <option value="NotStarted">NotStarted</option>
           <option value="Shipped">Shipped</option>
           <option value="InTransit">InTransit</option>
           <option value="OutForDelivery">OutForDelivery</option>
@@ -226,7 +226,7 @@
           <button class="ml-2 underline" @onclick='@(() => SortBy("Reference"))'>Reference</button>
           <button class="ml-2 underline" @onclick='@(() => SortBy("CreatedOn"))'>Date</button>
           <button class="ml-2 underline" @onclick='@(() => SortBy("TotalAmount"))'>Total</button>
-          <button class="ml-2 underline" @onclick='@(() => SortBy("ShippingStatus"))'>Status</button>
+          <button class="ml-2 underline" @onclick='@(() => SortBy("FulfillmentStatus"))'>Fulfillment</button>
         </div>
       </div>
       <div class="p-4 overflow-x-auto">
@@ -235,8 +235,10 @@
             <tr class="bg-neutral-50 text-left">
               <th class="px-3 py-2">Created</th>
               <th class="px-3 py-2">Reference</th>
-              <th class="px-3 py-2">Status</th>
-              <th class="px-3 py-2">Total (€)</th>
+              <th class="px-3 py-2">Order</th>
+              <th class="px-3 py-2">Payment</th>
+              <th class="px-3 py-2">Fulfillment</th>
+              <th class="px-3 py-2">Total</th>
               <th class="px-3 py-2">Tracking</th>
               <th class="px-3 py-2">Actions</th>
             </tr>
@@ -249,8 +251,10 @@
                 <tr>
                   <td class="px-3 py-2">@o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                   <td class="px-3 py-2">@o.Reference</td>
-                  <td class="px-3 py-2">@o.ShippingStatus</td>
-                  <td class="px-3 py-2">@o.TotalAmount.ToString("F2")</td>
+                  <td class="px-3 py-2">@o.OrderStatus</td>
+                  <td class="px-3 py-2">@o.PaymentStatus</td>
+                  <td class="px-3 py-2">@o.FulfillmentStatus</td>
+                  <td class="px-3 py-2">@o.Currency @o.TotalAmount.ToString("F2")</td>
                   <td class="px-3 py-2">
                     @if (!string.IsNullOrWhiteSpace(o.TrackingUrl))
                     {
@@ -349,11 +353,10 @@
       <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
       <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
       <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
-        <option>PendingShipment</option>
-        <option>Shipped</option>
-        <option>InTransit</option>
-        <option>OutForDelivery</option>
-        <option>Delivered</option>
+        @foreach (var status in GetAllowedFulfillmentStatuses(_editOrder))
+        {
+          <option value="@status">@status</option>
+        }
       </select>
     </div>
   </Body>

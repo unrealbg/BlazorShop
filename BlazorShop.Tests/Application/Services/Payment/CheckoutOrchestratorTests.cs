@@ -46,7 +46,12 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new InventoryReservationResult(true));
             _users.Setup(manager => manager.GetUserByIdAsync(It.IsAny<string>()))
-                .ReturnsAsync(new AppUser { Id = "customer-1", Email = "customer@example.com" });
+                .ReturnsAsync(new AppUser
+                {
+                    Id = "customer-1",
+                    FullName = "Original Customer",
+                    Email = "customer@example.com",
+                });
             _idempotency.Setup(store => store.ClaimAsync(
                     It.IsAny<string>(),
                     It.IsAny<Guid>(),
@@ -182,6 +187,16 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal("customer-1", createdOrder!.UserId);
             Assert.StartsWith("COD-", createdOrder.Reference, StringComparison.Ordinal);
             Assert.Equal(50m, createdOrder.TotalAmount);
+            Assert.Equal(OrderStatus.Confirmed, createdOrder.OrderStatus);
+            Assert.Equal(OrderPaymentStatus.Pending, createdOrder.PaymentStatus);
+            Assert.Equal(OrderPaymentMethod.CashOnDelivery, createdOrder.PaymentMethod);
+            Assert.Equal(FulfillmentStatus.NotStarted, createdOrder.FulfillmentStatus);
+            Assert.Equal("Original Customer", createdOrder.CustomerNameSnapshot);
+            Assert.Equal("customer@example.com", createdOrder.CustomerEmailSnapshot);
+            Assert.Equal(50m, createdOrder.SubtotalAmount);
+            Assert.Equal(0m, createdOrder.DiscountAmount);
+            Assert.Equal(0m, createdOrder.ShippingAmount);
+            Assert.Equal(0m, createdOrder.TaxAmount);
             Assert.NotNull(result.Payload);
             Assert.Equal(createdOrder.Id, result.Payload!.OrderId);
             Assert.Equal(createdOrder.Reference, result.Payload.OrderReference);
@@ -269,6 +284,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(createdOrder!.Id, result.Payload!.OrderId);
             Assert.Equal(CheckoutStatus.PendingPayment, result.Payload.Status);
             Assert.Equal(CheckoutPaymentKind.BankTransfer, result.Payload.PaymentKind);
+            Assert.Equal(OrderStatus.Confirmed, createdOrder.OrderStatus);
+            Assert.Equal(OrderPaymentStatus.Pending, createdOrder.PaymentStatus);
+            Assert.Equal(OrderPaymentMethod.BankTransfer, createdOrder.PaymentMethod);
+            Assert.Equal(FulfillmentStatus.NotStarted, createdOrder.FulfillmentStatus);
             Assert.NotNull(result.Payload.BankTransfer);
             Assert.Equal(createdOrder.Reference, result.Payload.BankTransfer!.Reference);
             Assert.Equal(39m, result.Payload.BankTransfer.Amount);
@@ -296,7 +315,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.NotNull(result.Payload?.BankTransfer);
             _inventory.Verify(service => service.TransitionOrderAsync(
                 It.IsAny<Guid>(),
-                It.IsAny<string>(),
+                It.IsAny<OrderPaymentStatus>(),
                 It.IsAny<InventoryReservationStatus>(),
                 It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -324,7 +343,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     Assert.NotNull(createdOrder);
                     Assert.Equal(createdOrder!.Id, initialization.OrderId);
                     Assert.Equal(createdOrder.Reference, initialization.OrderReference);
-                    Assert.Equal(PaymentOrderStatus.PendingPayment, createdOrder.Status);
+                    Assert.Equal(OrderStatus.Pending, createdOrder.OrderStatus);
+                    Assert.Equal(OrderPaymentStatus.Pending, createdOrder.PaymentStatus);
+                    Assert.Equal(OrderPaymentMethod.Stripe, createdOrder.PaymentMethod);
+                    Assert.Equal(FulfillmentStatus.NotStarted, createdOrder.FulfillmentStatus);
                     providerInitialization = initialization;
                 })
                 .ReturnsAsync(new PaymentInitializationResult(
@@ -386,7 +408,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 It.IsAny<CancellationToken>()), Times.Once);
             _inventory.Verify(service => service.TransitionOrderAsync(
                 It.IsAny<Guid>(),
-                It.IsAny<string>(),
+                It.IsAny<OrderPaymentStatus>(),
                 It.IsAny<InventoryReservationStatus>(),
                 It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -414,7 +436,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     FailureKind: PaymentInitializationFailureKind.Ambiguous));
             _inventory.Setup(service => service.TransitionOrderAsync(
                     It.IsAny<Guid>(),
-                    PaymentOrderStatus.PaymentFailed,
+                    OrderPaymentStatus.Failed,
                     InventoryReservationStatus.Released,
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.Applied));
@@ -427,7 +449,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
             _inventory.Verify(service => service.TransitionOrderAsync(
                 It.IsAny<Guid>(),
-                It.IsAny<string>(),
+                It.IsAny<OrderPaymentStatus>(),
                 It.IsAny<InventoryReservationStatus>(),
                 It.IsAny<CancellationToken>()), Times.Never);
         }

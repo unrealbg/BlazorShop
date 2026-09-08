@@ -70,8 +70,9 @@ namespace BlazorShop.Web.Shared.Services
             };
 
             Add(parameters, "searchTerm", query.SearchTerm);
-            Add(parameters, "status", query.Status);
-            Add(parameters, "shippingStatus", query.ShippingStatus);
+            Add(parameters, "orderStatus", query.OrderStatus);
+            Add(parameters, "paymentStatus", query.PaymentStatus);
+            Add(parameters, "fulfillmentStatus", query.FulfillmentStatus);
 
             if (query.FromUtc.HasValue)
             {

@@ -181,7 +181,8 @@ namespace BlazorShop.Application.Services.Payment
                     claim.Record.OrderId,
                     claim.Record.OrderReference,
                     paymentKind.Value,
-                    _commerceOptions.Currency);
+                    _commerceOptions.Currency,
+                    customer);
             }
             catch (Exception exception) when (exception is OverflowException or ArgumentOutOfRangeException)
             {
@@ -1021,7 +1022,8 @@ namespace BlazorShop.Application.Services.Payment
             Guid orderId,
             string orderReference,
             CheckoutPaymentKind paymentKind,
-            string currency)
+            string currency,
+            AppUser customer)
         {
             var normalizedCurrency = CurrencyMoney.NormalizeCurrency(currency);
             var orderLines = lines.Select(line =>
@@ -1048,12 +1050,29 @@ namespace BlazorShop.Application.Services.Payment
             {
                 Id = orderId,
                 UserId = userId,
-                Status = paymentKind == CheckoutPaymentKind.Stripe
-                    ? PaymentOrderStatus.PendingPayment
-                    : "Pending",
+                OrderStatus = paymentKind == CheckoutPaymentKind.Stripe
+                    ? OrderStatus.Pending
+                    : OrderStatus.Confirmed,
+                PaymentStatus = OrderPaymentStatus.Pending,
+                PaymentMethod = paymentKind switch
+                {
+                    CheckoutPaymentKind.CashOnDelivery => OrderPaymentMethod.CashOnDelivery,
+                    CheckoutPaymentKind.BankTransfer => OrderPaymentMethod.BankTransfer,
+                    CheckoutPaymentKind.Stripe => OrderPaymentMethod.Stripe,
+                    _ => throw new ArgumentOutOfRangeException(nameof(paymentKind), paymentKind, null),
+                },
+                FulfillmentStatus = FulfillmentStatus.NotStarted,
                 Reference = orderReference,
                 TotalAmount = totalAmount,
+                SubtotalAmount = totalAmount,
+                DiscountAmount = 0m,
+                ShippingAmount = 0m,
+                TaxAmount = 0m,
                 Currency = normalizedCurrency,
+                CustomerNameSnapshot = string.IsNullOrWhiteSpace(customer.FullName)
+                    ? customer.UserName
+                    : customer.FullName,
+                CustomerEmailSnapshot = customer.Email,
                 Lines = orderLines,
             };
         }

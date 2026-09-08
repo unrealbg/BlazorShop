@@ -16,15 +16,6 @@ namespace BlazorShop.Infrastructure.Services.Admin
 
     public class AdminOrderService : IAdminOrderService
     {
-        private static readonly HashSet<string> ShippingStatuses = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "PendingShipment",
-            "Shipped",
-            "InTransit",
-            "OutForDelivery",
-            "Delivered",
-        };
-
         private readonly AppDbContext _db;
         private readonly IOrderTrackingService _trackingService;
         private readonly IAdminAuditService _auditService;
@@ -61,16 +52,19 @@ namespace BlazorShop.Infrastructure.Services.Admin
                     matchingUserIds.Contains(order.UserId));
             }
 
-            if (!string.IsNullOrWhiteSpace(query.Status))
+            if (query.OrderStatus.HasValue)
             {
-                var status = query.Status.Trim();
-                orders = orders.Where(order => order.Status == status);
+                orders = orders.Where(order => order.OrderStatus == query.OrderStatus.Value);
             }
 
-            if (!string.IsNullOrWhiteSpace(query.ShippingStatus))
+            if (query.PaymentStatus.HasValue)
             {
-                var shippingStatus = query.ShippingStatus.Trim();
-                orders = orders.Where(order => order.ShippingStatus == shippingStatus);
+                orders = orders.Where(order => order.PaymentStatus == query.PaymentStatus.Value);
+            }
+
+            if (query.FulfillmentStatus.HasValue)
+            {
+                orders = orders.Where(order => order.FulfillmentStatus == query.FulfillmentStatus.Value);
             }
 
             if (query.FromUtc.HasValue)
@@ -116,19 +110,22 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure("Order id is required.", ServiceResponseType.ValidationError);
             }
 
-            var updated = await _trackingService.UpdateTrackingAsync(
+            var updated = await _trackingService.UpdateTrackingDetailsAsync(
                 id,
                 request.Carrier?.Trim() ?? string.Empty,
                 request.TrackingNumber?.Trim() ?? string.Empty,
                 request.TrackingUrl?.Trim() ?? string.Empty);
 
-            if (!updated)
+            if (!updated.Success)
             {
-                return Failure("Order not found.", ServiceResponseType.NotFound);
+                return Failure(updated.ErrorMessage ?? "Tracking could not be updated.", ToResponseType(updated.Outcome));
             }
 
             var order = await GetOrderEntityAsync(id);
-            await LogAsync("Order.TrackingUpdated", id, "Order tracking updated.", request);
+            if (updated.Outcome == OrderTrackingTransitionOutcome.Applied)
+            {
+                await LogAsync("Order.TrackingUpdated", id, "Order tracking updated.", request);
+            }
             return Success((await MapOrdersAsync(new[] { order! })).Single(), "Order tracking updated successfully.");
         }
 
@@ -141,24 +138,29 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure("Order id is required.", ServiceResponseType.ValidationError);
             }
 
-            if (string.IsNullOrWhiteSpace(request.ShippingStatus) || !ShippingStatuses.Contains(request.ShippingStatus.Trim()))
+            if (string.IsNullOrWhiteSpace(request.FulfillmentStatus)
+                || !Enum.TryParse<FulfillmentStatus>(request.FulfillmentStatus, true, out var fulfillmentStatus)
+                || !Enum.IsDefined(fulfillmentStatus))
             {
-                return Failure("Shipping status is invalid.", ServiceResponseType.ValidationError);
+                return Failure("Fulfillment status is invalid.", ServiceResponseType.ValidationError);
             }
 
-            var updated = await _trackingService.UpdateShippingStatusAsync(
+            var updated = await _trackingService.TransitionFulfillmentAsync(
                 id,
-                request.ShippingStatus.Trim(),
+                fulfillmentStatus.ToString(),
                 request.ShippedOn,
                 request.DeliveredOn);
 
-            if (!updated)
+            if (!updated.Success)
             {
-                return Failure("Order not found.", ServiceResponseType.NotFound);
+                return Failure(updated.ErrorMessage ?? "Fulfillment could not be updated.", ToResponseType(updated.Outcome));
             }
 
             var order = await GetOrderEntityAsync(id);
-            await LogAsync("Order.ShippingStatusUpdated", id, "Order shipping status updated.", request);
+            if (updated.Outcome == OrderTrackingTransitionOutcome.Applied)
+            {
+                await LogAsync("Order.FulfillmentStatusUpdated", id, "Order fulfillment status updated.", request);
+            }
             return Success((await MapOrdersAsync(new[] { order! })).Single(), "Order shipping status updated successfully.");
         }
 
@@ -196,35 +198,37 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 : await _db.Orders.Include(order => order.Lines).AsNoTracking().FirstOrDefaultAsync(order => order.Id == id);
         }
 
-        private async Task<IReadOnlyList<GetOrder>> MapOrdersAsync(IReadOnlyCollection<Order> orders)
+        private Task<IReadOnlyList<GetOrder>> MapOrdersAsync(IReadOnlyCollection<Order> orders)
         {
-            var userIds = orders.Select(order => order.UserId).Where(userId => !string.IsNullOrWhiteSpace(userId)).Distinct().ToArray();
-            var users = await _db.Users
-                .AsNoTracking()
-                .Where(user => userIds.Contains(user.Id))
-                .Select(user => new { user.Id, user.Email, user.UserName, user.FullName })
-                .ToDictionaryAsync(user => user.Id, user => user);
-
-            return orders.Select(order =>
+            IReadOnlyList<GetOrder> result = orders.Select(order =>
             {
-                users.TryGetValue(order.UserId, out var user);
                 return new GetOrder
                 {
                     Id = order.Id,
                     Reference = order.Reference,
-                    Status = order.Status,
+                    OrderStatus = order.OrderStatus.ToString(),
+                    PaymentStatus = order.PaymentStatus.ToString(),
+                    PaymentMethod = order.PaymentMethod.ToString(),
+                    FulfillmentStatus = order.FulfillmentStatus.ToString(),
                     TotalAmount = order.TotalAmount,
+                    SubtotalAmount = order.SubtotalAmount,
+                    DiscountAmount = order.DiscountAmount,
+                    ShippingAmount = order.ShippingAmount,
+                    TaxAmount = order.TaxAmount,
+                    Currency = order.Currency,
                     CreatedOn = order.CreatedOn,
-                    ShippingStatus = order.ShippingStatus,
                     ShippingCarrier = order.ShippingCarrier,
                     TrackingNumber = order.TrackingNumber,
                     TrackingUrl = order.TrackingUrl,
                     ShippedOn = order.ShippedOn,
                     DeliveredOn = order.DeliveredOn,
                     UserId = order.UserId,
-                    CustomerName = string.IsNullOrWhiteSpace(user?.FullName) ? user?.UserName : user.FullName,
-                    CustomerEmail = user?.Email,
+                    CustomerName = order.CustomerNameSnapshot,
+                    CustomerEmail = order.CustomerEmailSnapshot,
+                    ShippingAddress = order.ShippingAddressSnapshot,
+                    BillingAddress = order.BillingAddressSnapshot,
                     AdminNote = order.AdminNote,
+                    Version = order.Version,
                     Lines = order.Lines.Select(line =>
                     {
                         return new GetOrderLine
@@ -243,6 +247,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
                     }),
                 };
             }).ToArray();
+            return Task.FromResult(result);
         }
 
         private async Task LogAsync(string action, Guid orderId, string summary, object metadata)
@@ -281,6 +286,16 @@ namespace BlazorShop.Infrastructure.Services.Admin
             return new ServiceResponse<GetOrder>(false, message)
             {
                 ResponseType = responseType,
+            };
+        }
+
+        private static ServiceResponseType ToResponseType(OrderTrackingTransitionOutcome outcome)
+        {
+            return outcome switch
+            {
+                OrderTrackingTransitionOutcome.NotFound => ServiceResponseType.NotFound,
+                OrderTrackingTransitionOutcome.ValidationError => ServiceResponseType.ValidationError,
+                _ => ServiceResponseType.Conflict,
             };
         }
     }

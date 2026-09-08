@@ -28,6 +28,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
                         UserId = userId,
                         Reference = "BS-89",
                         TotalAmount = 215m,
+                        SubtotalAmount = 215m,
+                        Currency = "EUR",
+                        CustomerNameSnapshot = "Original Customer",
+                        CustomerEmailSnapshot = "original@example.com",
                         Lines =
                         [
                             new OrderLine
@@ -61,6 +65,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
             var service = new OrderQueryService(orderRepository.Object, userManager.Object);
 
             var result = Assert.Single(await service.GetOrdersForUserAsync(userId));
+
+            Assert.Equal("Original Customer", result.CustomerName);
+            Assert.Equal("original@example.com", result.CustomerEmail);
+            userManager.Verify(manager => manager.GetUserByIdAsync(It.IsAny<string>()), Times.Never);
 
             var variantLine = Assert.Single(result.Lines, line => line.VariantId == variantId);
             Assert.Equal("Original Runner", variantLine.ProductName);

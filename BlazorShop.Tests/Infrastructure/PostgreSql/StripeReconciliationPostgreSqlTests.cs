@@ -34,7 +34,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -55,7 +55,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -83,7 +83,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -158,7 +158,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Failed,
-                PaymentOrderStatus.PaymentFailed,
+                OrderPaymentStatus.Failed,
                 InventoryReservationStatus.Released,
                 expectedStock: 5,
                 expectedEvents: 1);
@@ -176,7 +176,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Cancelled,
-                PaymentOrderStatus.Cancelled,
+                OrderPaymentStatus.Cancelled,
                 InventoryReservationStatus.Released,
                 expectedStock: 5,
                 expectedEvents: 1);
@@ -225,7 +225,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 2);
@@ -248,7 +248,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Failed,
-                PaymentOrderStatus.PaymentFailed,
+                OrderPaymentStatus.Failed,
                 InventoryReservationStatus.Released,
                 expectedStock: 5,
                 expectedEvents: 1);
@@ -279,7 +279,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -377,7 +377,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -411,7 +411,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Paid,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -443,9 +443,12 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             {
                 Id = Guid.NewGuid(),
                 UserId = "stripe-customer",
-                Status = PaymentOrderStatus.PendingPayment,
+                OrderStatus = OrderStatus.Pending,
+                PaymentStatus = OrderPaymentStatus.Pending,
+                PaymentMethod = OrderPaymentMethod.Stripe,
                 Reference = $"STRIPE-{Guid.NewGuid():N}",
                 TotalAmount = totalAmount,
+                SubtotalAmount = totalAmount,
                 Currency = currency,
                 Lines =
                 [
@@ -510,7 +513,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertStateAsync(
                 seed,
                 PaymentTransactionStatus.Pending,
-                PaymentOrderStatus.PendingPayment,
+                OrderPaymentStatus.Pending,
                 InventoryReservationStatus.Reserved,
                 expectedStock: 4,
                 expectedEvents: 1);
@@ -523,7 +526,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         private async Task AssertStateAsync(
             PaymentSeed seed,
             PaymentTransactionStatus paymentStatus,
-            string orderStatus,
+            OrderPaymentStatus orderStatus,
             InventoryReservationStatus reservationStatus,
             int expectedStock,
             int expectedEvents)
@@ -531,7 +534,16 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await using var context = _database.CreateContext();
             Assert.Equal(paymentStatus,
                 (await context.PaymentTransactions.FindAsync(seed.PaymentTransactionId))!.Status);
-            Assert.Equal(orderStatus, (await context.Orders.FindAsync(seed.OrderId))!.Status);
+            var order = (await context.Orders.FindAsync(seed.OrderId))!;
+            Assert.Equal(orderStatus, order.PaymentStatus);
+            Assert.Equal(
+                orderStatus switch
+                {
+                    OrderPaymentStatus.Paid => OrderStatus.Confirmed,
+                    OrderPaymentStatus.Failed or OrderPaymentStatus.Cancelled => OrderStatus.Cancelled,
+                    _ => OrderStatus.Pending,
+                },
+                order.OrderStatus);
             Assert.Equal(reservationStatus,
                 (await context.InventoryReservations.SingleAsync()).Status);
             Assert.Equal(expectedStock, (await context.Products.FindAsync(seed.ProductId))!.Quantity);

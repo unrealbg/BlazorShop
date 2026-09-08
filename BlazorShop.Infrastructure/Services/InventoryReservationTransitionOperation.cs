@@ -12,7 +12,8 @@ namespace BlazorShop.Infrastructure.Services
         public static async Task<InventoryTransitionResult> ApplyAsync(
             AppDbContext db,
             Order order,
-            string orderStatus,
+            OrderStatus orderStatus,
+            OrderPaymentStatus paymentStatus,
             InventoryReservationStatus reservationStatus,
             CancellationToken cancellationToken)
         {
@@ -22,14 +23,15 @@ namespace BlazorShop.Infrastructure.Services
 
             if (reservations.Count == 0)
             {
-                if (string.Equals(order.Status, orderStatus, StringComparison.Ordinal)
-                    || (string.Equals(order.Status, PaymentOrderStatus.Paid, StringComparison.Ordinal)
+                if ((order.OrderStatus == orderStatus && order.PaymentStatus == paymentStatus)
+                    || (order.PaymentStatus == OrderPaymentStatus.Paid
                         && reservationStatus == InventoryReservationStatus.Released))
                 {
                     return new InventoryTransitionResult(InventoryTransitionOutcome.AlreadyApplied);
                 }
 
-                order.Status = orderStatus;
+                order.OrderStatus = orderStatus;
+                order.PaymentStatus = paymentStatus;
                 return new InventoryTransitionResult(InventoryTransitionOutcome.Applied);
             }
 
@@ -43,7 +45,8 @@ namespace BlazorShop.Infrastructure.Services
                 }
 
                 if (reservations.All(reservation => reservation.Status == InventoryReservationStatus.Consumed)
-                    && string.Equals(order.Status, orderStatus, StringComparison.Ordinal))
+                    && order.OrderStatus == orderStatus
+                    && order.PaymentStatus == paymentStatus)
                 {
                     return new InventoryTransitionResult(InventoryTransitionOutcome.AlreadyApplied);
                 }
@@ -55,11 +58,12 @@ namespace BlazorShop.Infrastructure.Services
                     reservation.ConsumedOn = consumedOn;
                 }
 
-                order.Status = orderStatus;
+                order.OrderStatus = orderStatus;
+                order.PaymentStatus = paymentStatus;
                 return new InventoryTransitionResult(InventoryTransitionOutcome.Applied);
             }
 
-            if (string.Equals(order.Status, PaymentOrderStatus.Paid, StringComparison.Ordinal)
+            if (order.PaymentStatus == OrderPaymentStatus.Paid
                 || reservations.Any(reservation => reservation.Status == InventoryReservationStatus.Consumed))
             {
                 return new InventoryTransitionResult(InventoryTransitionOutcome.AlreadyApplied);
@@ -143,7 +147,8 @@ namespace BlazorShop.Infrastructure.Services
                 reservation.ReleasedOn = releasedOn;
             }
 
-            order.Status = orderStatus;
+            order.OrderStatus = orderStatus;
+            order.PaymentStatus = paymentStatus;
             return new InventoryTransitionResult(
                 InventoryTransitionOutcome.Applied,
                 restorationSkipped

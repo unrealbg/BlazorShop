@@ -9,12 +9,10 @@ namespace BlazorShop.Application.Services.Payment
     public class OrderQueryService : IOrderQueryService
     {
         private readonly IOrderRepository _orders;
-        private readonly IAppUserManager _users;
-
         public OrderQueryService(IOrderRepository orders, IAppUserManager users)
         {
             _orders = orders;
-            _users = users;
+            ArgumentNullException.ThrowIfNull(users);
         }
 
         public async Task<IEnumerable<GetOrder>> GetOrdersForUserAsync(string userId)
@@ -29,45 +27,42 @@ namespace BlazorShop.Application.Services.Payment
             return await MapWithUsersAsync(list);
         }
 
-        private async Task<IEnumerable<GetOrder>> MapWithUsersAsync(IEnumerable<Order> orders)
+        private Task<IEnumerable<GetOrder>> MapWithUsersAsync(IEnumerable<Order> orders)
         {
             var result = new List<GetOrder>();
             foreach (var o in orders)
             {
-                string? userName = null;
-                string? email = null;
-                if (!string.IsNullOrWhiteSpace(o.UserId))
-                {
-                    try
-                    {
-                        var u = await _users.GetUserByIdAsync(o.UserId);
-                        userName = u?.UserName;
-                        email = u?.Email;
-                    }
-                    catch { }
-                }
-
                 result.Add(new GetOrder
                 {
                     Id = o.Id,
                     Reference = o.Reference,
-                    Status = o.Status,
+                    OrderStatus = o.OrderStatus.ToString(),
+                    PaymentStatus = o.PaymentStatus.ToString(),
+                    PaymentMethod = o.PaymentMethod.ToString(),
+                    FulfillmentStatus = o.FulfillmentStatus.ToString(),
                     TotalAmount = o.TotalAmount,
+                    SubtotalAmount = o.SubtotalAmount,
+                    DiscountAmount = o.DiscountAmount,
+                    ShippingAmount = o.ShippingAmount,
+                    TaxAmount = o.TaxAmount,
+                    Currency = o.Currency,
                     CreatedOn = o.CreatedOn,
-                    ShippingStatus = o.ShippingStatus,
                     ShippingCarrier = o.ShippingCarrier,
                     TrackingNumber = o.TrackingNumber,
                     TrackingUrl = o.TrackingUrl,
                     ShippedOn = o.ShippedOn,
                     DeliveredOn = o.DeliveredOn,
                     UserId = o.UserId,
-                    CustomerName = userName,
-                    CustomerEmail = email,
+                    CustomerName = o.CustomerNameSnapshot,
+                    CustomerEmail = o.CustomerEmailSnapshot,
+                    ShippingAddress = o.ShippingAddressSnapshot,
+                    BillingAddress = o.BillingAddressSnapshot,
                     AdminNote = o.AdminNote,
+                    Version = o.Version,
                     Lines = o.Lines.Select(MapLine),
                 });
             }
-            return result;
+            return Task.FromResult<IEnumerable<GetOrder>>(result);
         }
 
         private static GetOrderLine MapLine(OrderLine line)

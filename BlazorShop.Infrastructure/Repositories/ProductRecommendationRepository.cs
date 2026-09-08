@@ -3,6 +3,7 @@ namespace BlazorShop.Infrastructure.Repositories
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Domain.Contracts;
     using BlazorShop.Domain.Entities;
+    using BlazorShop.Domain.Entities.Payment;
     using BlazorShop.Infrastructure.Data;
 
     using Microsoft.EntityFrameworkCore;
@@ -65,11 +66,14 @@ namespace BlazorShop.Infrastructure.Repositories
 
                 var relatedProductIds = await _context.OrderLines
                     .AsNoTracking()
+                    .Where(line => line.Order != null
+                        && (line.Order.OrderStatus == OrderStatus.Confirmed
+                            || line.Order.OrderStatus == OrderStatus.Completed))
                     .Where(ol => _context.OrderLines
                         .Any(ol2 => ol2.OrderId == ol.OrderId && ol2.ProductId == productId))
                     .Where(ol => ol.ProductId != productId)
                     .GroupBy(ol => ol.ProductId)
-                    .OrderByDescending(g => g.Count()) 
+                    .OrderByDescending(g => g.Count())
                     .Select(g => g.Key)
                     .Take(count)
                     .ToListAsync();

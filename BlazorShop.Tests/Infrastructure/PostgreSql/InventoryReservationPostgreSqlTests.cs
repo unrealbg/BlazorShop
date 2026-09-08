@@ -141,8 +141,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.True((await ReserveAsync(order)).Success);
 
             var results = await RunConcurrentlyAsync(
-                () => TransitionAsync(order.Id, PaymentOrderStatus.Cancelled, InventoryReservationStatus.Released),
-                () => TransitionAsync(order.Id, PaymentOrderStatus.Cancelled, InventoryReservationStatus.Released));
+                () => TransitionAsync(order.Id, OrderPaymentStatus.Cancelled, InventoryReservationStatus.Released),
+                () => TransitionAsync(order.Id, OrderPaymentStatus.Cancelled, InventoryReservationStatus.Released));
 
             Assert.All(results, result => Assert.True(result.Success));
             Assert.Single(results, result => result.Outcome == InventoryTransitionOutcome.Applied);
@@ -162,8 +162,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.True((await ReserveAsync(order)).Success);
 
             var results = await RunConcurrentlyAsync(
-                () => TransitionAsync(order.Id, PaymentOrderStatus.Paid, InventoryReservationStatus.Consumed),
-                () => TransitionAsync(order.Id, PaymentOrderStatus.Paid, InventoryReservationStatus.Consumed));
+                () => TransitionAsync(order.Id, OrderPaymentStatus.Paid, InventoryReservationStatus.Consumed),
+                () => TransitionAsync(order.Id, OrderPaymentStatus.Paid, InventoryReservationStatus.Consumed));
 
             Assert.All(results, result => Assert.True(result.Success));
             Assert.Single(results, result => result.Outcome == InventoryTransitionOutcome.Applied);
@@ -183,19 +183,19 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.True((await ReserveAsync(order)).Success);
             Assert.True((await TransitionAsync(
                 order.Id,
-                PaymentOrderStatus.Paid,
+                OrderPaymentStatus.Paid,
                 InventoryReservationStatus.Consumed)).Success);
 
             var release = await TransitionAsync(
                 order.Id,
-                PaymentOrderStatus.PaymentFailed,
+                OrderPaymentStatus.Failed,
                 InventoryReservationStatus.Released);
 
             Assert.True(release.Success);
             Assert.Equal(InventoryTransitionOutcome.AlreadyApplied, release.Outcome);
             await using var assertionContext = _database.CreateContext();
             Assert.Equal(3, (await assertionContext.Products.FindAsync(productId))!.Quantity);
-            Assert.Equal(PaymentOrderStatus.Paid, (await assertionContext.Orders.FindAsync(order.Id))!.Status);
+            Assert.Equal(OrderPaymentStatus.Paid, (await assertionContext.Orders.FindAsync(order.Id))!.PaymentStatus);
         }
 
         [Fact]
@@ -253,7 +253,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.False(result.Success);
             context.ChangeTracker.Clear();
             Assert.Equal(2, (await context.Products.FindAsync(productId))!.Quantity);
-            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(OrderPaymentStatus.Failed, (await context.Orders.SingleAsync()).PaymentStatus);
             Assert.Equal(
                 PaymentTransactionStatus.Failed,
                 (await context.PaymentTransactions.SingleAsync()).Status);
@@ -355,7 +355,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     await using var providerContext = _database.CreateContext();
                     var persistedOrder = await providerContext.Orders.FindAsync(initialization.OrderId);
                     Assert.NotNull(persistedOrder);
-                    Assert.Equal(PaymentOrderStatus.PendingPayment, persistedOrder.Status);
+                    Assert.Equal(OrderPaymentStatus.Pending, persistedOrder.PaymentStatus);
                     Assert.Equal(initialization.OrderReference, persistedOrder.Reference);
                     Assert.Equal(
                         InventoryReservationStatus.Reserved,
@@ -525,11 +525,11 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
             Assert.True((await TransitionAsync(
                 order.Id,
-                PaymentOrderStatus.Cancelled,
+                OrderPaymentStatus.Cancelled,
                 InventoryReservationStatus.Released)).Success);
             Assert.True((await TransitionAsync(
                 order.Id,
-                PaymentOrderStatus.Cancelled,
+                OrderPaymentStatus.Cancelled,
                 InventoryReservationStatus.Released)).Success);
 
             adminContext.ChangeTracker.Clear();
@@ -653,14 +653,14 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
             var result = await TransitionAsync(
                 order.Id,
-                PaymentOrderStatus.PaymentFailed,
+                OrderPaymentStatus.Failed,
                 InventoryReservationStatus.Released);
 
             Assert.True(result.Success);
             Assert.Equal(InventoryTransitionOutcome.Applied, result.Outcome);
             Assert.NotNull(result.ErrorMessage);
             await using var assertionContext = _database.CreateContext();
-            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await assertionContext.Orders.FindAsync(order.Id))!.Status);
+            Assert.Equal(OrderPaymentStatus.Failed, (await assertionContext.Orders.FindAsync(order.Id))!.PaymentStatus);
             Assert.Equal(
                 InventoryReservationStatus.Released,
                 (await assertionContext.InventoryReservations.SingleAsync()).Status);
@@ -679,7 +679,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
             var result = await service.TransitionOrderAsync(
                 order.Id,
-                PaymentOrderStatus.Cancelled,
+                OrderPaymentStatus.Cancelled,
                 InventoryReservationStatus.Released);
 
             Assert.Equal(InventoryTransitionOutcome.Applied, result.Outcome);
@@ -746,7 +746,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
         private async Task<InventoryTransitionResult> TransitionAsync(
             Guid orderId,
-            string orderStatus,
+            OrderPaymentStatus orderStatus,
             InventoryReservationStatus reservationStatus)
         {
             await using var context = _database.CreateContext();
@@ -883,13 +883,15 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
         private static Order CreateOrder(params (Guid ProductId, Guid? VariantId, int Quantity)[] lines)
         {
+            var totalAmount = lines.Sum(line => line.Quantity * 10m);
             return new Order
             {
                 Id = Guid.NewGuid(),
                 UserId = "inventory-test",
-                Status = PaymentOrderStatus.PendingPayment,
+                PaymentStatus = OrderPaymentStatus.Pending,
                 Reference = $"INV-{Guid.NewGuid():N}",
-                TotalAmount = lines.Sum(line => line.Quantity * 10m),
+                TotalAmount = totalAmount,
+                SubtotalAmount = totalAmount,
                 Currency = "EUR",
                 Lines = lines.Select(line => new OrderLine
                 {

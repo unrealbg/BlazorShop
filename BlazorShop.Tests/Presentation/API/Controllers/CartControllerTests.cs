@@ -335,8 +335,9 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
             trackingService
-                .Setup(service => service.UpdateTrackingAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(false);
+                .Setup(service => service.UpdateTrackingDetailsAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderTrackingTransitionResult(OrderTrackingTransitionOutcome.NotFound));
 
             var controller = new CartController(
                 cartService.Object,
@@ -351,7 +352,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 TrackingUrl = "https://example.com/track",
             });
 
-            Assert.IsType<NotFoundResult>(result);
+            Assert.IsType<NotFoundObjectResult>(result);
         }
 
         [Fact]
@@ -361,8 +362,9 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
             trackingService
-                .Setup(service => service.UpdateShippingStatusAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
-                .ReturnsAsync(true);
+                .Setup(service => service.TransitionFulfillmentAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderTrackingTransitionResult(OrderTrackingTransitionOutcome.Applied));
 
             var controller = new CartController(
                 cartService.Object,
@@ -372,11 +374,38 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
 
             var result = await controller.UpdateShippingStatus(Guid.NewGuid(), new UpdateShippingStatusRequest
             {
-                ShippingStatus = "Shipped",
+                FulfillmentStatus = "Shipped",
                 ShippedOn = DateTime.UtcNow,
             });
 
             Assert.IsType<NoContentResult>(result);
+        }
+
+        [Theory]
+        [InlineData(OrderTrackingTransitionOutcome.ValidationError, StatusCodes.Status400BadRequest)]
+        [InlineData(OrderTrackingTransitionOutcome.NotFound, StatusCodes.Status404NotFound)]
+        [InlineData(OrderTrackingTransitionOutcome.Conflict, StatusCodes.Status409Conflict)]
+        public async Task UpdateShippingStatus_DistinguishesValidationNotFoundAndConflict(
+            OrderTrackingTransitionOutcome outcome,
+            int expectedStatusCode)
+        {
+            var trackingService = new Mock<IOrderTrackingService>();
+            trackingService
+                .Setup(service => service.TransitionFulfillmentAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderTrackingTransitionResult(outcome, "Lifecycle failure"));
+            var controller = new CartController(
+                Mock.Of<ICartService>(),
+                Mock.Of<ICheckoutOrchestrator>(),
+                Mock.Of<IOrderQueryService>(),
+                trackingService.Object);
+
+            var result = await controller.UpdateShippingStatus(
+                Guid.NewGuid(),
+                new UpdateShippingStatusRequest { FulfillmentStatus = "Shipped" });
+
+            var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+            Assert.Equal(expectedStatusCode, objectResult.StatusCode);
         }
     }
 }

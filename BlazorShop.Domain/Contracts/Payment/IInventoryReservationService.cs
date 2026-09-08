@@ -17,7 +17,7 @@ namespace BlazorShop.Domain.Contracts.Payment
 
         Task<InventoryTransitionResult> TransitionOrderAsync(
             Guid orderId,
-            string orderStatus,
+            OrderPaymentStatus paymentStatus,
             InventoryReservationStatus reservationStatus,
             CancellationToken cancellationToken = default);
     }

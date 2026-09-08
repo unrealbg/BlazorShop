@@ -160,21 +160,13 @@ namespace BlazorShop.Infrastructure.Services
                     "The Stripe payment transaction's order does not exist.");
             }
 
-            var (orderStatus, reservationStatus) = targetStatus switch
-            {
-                PaymentTransactionStatus.Paid =>
-                    (PaymentOrderStatus.Paid, InventoryReservationStatus.Consumed),
-                PaymentTransactionStatus.Failed =>
-                    (PaymentOrderStatus.PaymentFailed, InventoryReservationStatus.Released),
-                PaymentTransactionStatus.Cancelled =>
-                    (PaymentOrderStatus.Cancelled, InventoryReservationStatus.Released),
-                _ => throw new InvalidOperationException("Unsupported local Stripe terminal state."),
-            };
+            var paymentTransition = OrderLifecyclePolicy.GetStripeTerminalTransition(order, targetStatus);
             var inventoryResult = await InventoryReservationTransitionOperation.ApplyAsync(
                 db,
                 order,
-                orderStatus,
-                reservationStatus,
+                paymentTransition.OrderStatus,
+                paymentTransition.PaymentStatus,
+                paymentTransition.ReservationStatus,
                 cancellationToken);
             if (inventoryResult.Outcome != InventoryTransitionOutcome.Applied)
             {
@@ -200,8 +192,8 @@ namespace BlazorShop.Infrastructure.Services
                 paymentTransaction.Id,
                 order.Id,
                 paymentTransaction.Status,
-                order.Status,
-                reservationStatus);
+                order.OrderStatus,
+                paymentTransition.ReservationStatus);
             return new StripePaymentStateTransitionResult(
                 StripePaymentStateTransitionOutcome.Applied,
                 paymentTransaction.Status);
