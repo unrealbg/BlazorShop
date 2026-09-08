@@ -4,6 +4,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using System.Data.Common;
     using System.Text.Json;
 
+    using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
@@ -498,6 +499,179 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await AssertUnresolvedSeedStateAsync(seed);
         }
 
+        [Fact]
+        public async Task LeaseTakeoverReturnsDispatchMarkerPersistedAfterPreAcquisitionRead()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var key = Guid.NewGuid();
+            var preparationBarrier = new ProviderPreparationBarrierStore(CreateStore());
+            var firstProvider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "The provider response was lost.",
+                    FailureKind: PaymentInitializationFailureKind.Ambiguous)));
+            var firstAttempt = ExecuteAsync(
+                checkout,
+                "customer-1",
+                key,
+                firstProvider,
+                idempotencyStore: preparationBarrier);
+            await preparationBarrier.PreparationReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await ExpireCheckoutLeaseAsync();
+
+            var acquisitionBarrier = new PreAcquisitionReadBarrierInterceptor();
+            var secondStore = CreateStore(acquisitionBarrier);
+            var secondProvider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Stripe authentication failed.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive)));
+            var secondAttempt = ExecuteAsync(
+                checkout,
+                "customer-1",
+                key,
+                secondProvider,
+                idempotencyStore: secondStore);
+            await acquisitionBarrier.ReadCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            preparationBarrier.ResumePreparation.TrySetResult();
+            Assert.Equal(CheckoutExecutionStatus.InProgress, (await firstAttempt).Status);
+            acquisitionBarrier.ResumeAcquisition.TrySetResult();
+            var retry = await secondAttempt;
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, retry.Status);
+            Assert.Single(firstProvider.Calls);
+            Assert.Single(secondProvider.Calls);
+            await using var context = _database.CreateContext();
+            Assert.Equal(PaymentTransactionStatus.Pending,
+                (await context.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(PaymentOrderStatus.PendingPayment, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(InventoryReservationStatus.Reserved,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(1, (await context.Products.FindAsync(productId))!.Quantity);
+            var record = await context.CheckoutIdempotencyRecords.SingleAsync();
+            Assert.NotNull(record.ProviderInitializationStartedOn);
+            Assert.Contains("requires reconciliation", record.OutcomeJson!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task StaleDefinitiveFailureCannotReleaseAfterNewOwnerCreatesPayableSession()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var key = Guid.NewGuid();
+            var pausingTransition = new PauseBeforeDefinitiveFailureTransitionService(
+                CreateStripeTransitionService());
+            var rejectedProvider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Initial request was rejected.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive)));
+            var staleAttempt = ExecuteAsync(
+                checkout,
+                "customer-1",
+                key,
+                rejectedProvider,
+                stripeTransitionService: pausingTransition);
+            await pausingTransition.TransitionReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            string fingerprint;
+            await using (var context = _database.CreateContext())
+            {
+                var record = await context.CheckoutIdempotencyRecords.SingleAsync();
+                fingerprint = record.RequestFingerprint;
+                record.LeaseExpiresOn = DateTime.UtcNow.AddSeconds(-1);
+                await context.SaveChangesAsync();
+            }
+
+            var takeoverStore = CreateStore();
+            var takeover = await takeoverStore.ClaimAsync(
+                "customer-1",
+                key,
+                fingerprint,
+                PaymentMethodIds.CreditCard);
+            Assert.Equal(CheckoutIdempotencyClaimStatus.Acquired, takeover.Status);
+            Assert.NotNull(takeover.Outcome?.DefinitiveInitialRejectionId);
+            var reconciliationMarker = new PersistedCheckoutOutcome(
+                1,
+                CheckoutExecutionStatus.InProgress,
+                new ServiceResponse<CheckoutResult>(false, "Requires reconciliation."));
+            Assert.True(await takeoverStore.SetPendingOutcomeAsync(
+                takeover.Record.Id,
+                takeover.LeaseOwnerId,
+                reconciliationMarker));
+            Assert.True(await takeoverStore.ReleaseLeaseAsync(
+                takeover.Record.Id,
+                takeover.LeaseOwnerId));
+
+            var payableProvider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(
+                    true,
+                    "https://checkout.stripe.test/payable",
+                    ProviderSessionId: "cs_payable",
+                    ProviderPaymentIntentId: "pi_payable")));
+            var payable = await ExecuteAsync(checkout, "customer-1", key, payableProvider);
+            Assert.True(payable.Success);
+            Assert.Equal("https://checkout.stripe.test/payable", payable.Payload!.RedirectUrl);
+
+            pausingTransition.ResumeTransition.TrySetResult();
+            Assert.Equal(CheckoutExecutionStatus.InProgress, (await staleAttempt).Status);
+
+            await using var assertionContext = _database.CreateContext();
+            var transaction = await assertionContext.PaymentTransactions.SingleAsync();
+            Assert.Equal(PaymentTransactionStatus.Pending, transaction.Status);
+            Assert.Equal("cs_payable", transaction.ProviderSessionId);
+            Assert.Equal(PaymentOrderStatus.PendingPayment,
+                (await assertionContext.Orders.SingleAsync()).Status);
+            Assert.Equal(InventoryReservationStatus.Reserved,
+                (await assertionContext.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(1, (await assertionContext.Products.FindAsync(productId))!.Quantity);
+        }
+
+        [Fact]
+        public async Task ProvenDefinitiveInitialRejectionRecoversAfterCrashAndReleasesExactlyOnce()
+        {
+            await _database.ResetDatabaseAsync();
+            var productId = await SeedProductAsync(quantity: 2);
+            var checkout = CreateCheckout(PaymentMethodIds.CreditCard, productId, quantity: 1);
+            var key = Guid.NewGuid();
+            var rejectedProvider = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Initial request was rejected.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive)));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => ExecuteAsync(
+                checkout,
+                "customer-1",
+                key,
+                rejectedProvider,
+                stripeTransitionService: new CrashBeforeDefinitiveFailureTransitionService()));
+            await ExpireCheckoutLeaseAsync();
+
+            var providerMustNotReopen = new RecordingPaymentService(_ => Task.FromResult(
+                new PaymentInitializationResult(true, "https://checkout.stripe.test/unsafe")));
+            var recovered = await ExecuteAsync(checkout, "customer-1", key, providerMustNotReopen);
+            var replay = await ExecuteAsync(checkout, "customer-1", key, providerMustNotReopen);
+
+            Assert.False(recovered.Success);
+            Assert.False(replay.Success);
+            Assert.True(replay.IsReplay);
+            Assert.Empty(providerMustNotReopen.Calls);
+            await using var context = _database.CreateContext();
+            Assert.Equal(PaymentTransactionStatus.Failed,
+                (await context.PaymentTransactions.SingleAsync()).Status);
+            Assert.Equal(PaymentOrderStatus.PaymentFailed, (await context.Orders.SingleAsync()).Status);
+            Assert.Equal(InventoryReservationStatus.Released,
+                (await context.InventoryReservations.SingleAsync()).Status);
+            Assert.Equal(2, (await context.Products.FindAsync(productId))!.Quantity);
+            Assert.Equal(CheckoutIdempotencyState.Failed,
+                (await context.CheckoutIdempotencyRecords.SingleAsync()).State);
+        }
+
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
@@ -834,6 +1008,19 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 (await assertionContext.CheckoutIdempotencyRecords.SingleAsync()).State);
         }
 
+        [Fact]
+        public async Task GenericLocalFailureWithoutDecisionFence_IsRejected()
+        {
+            var seed = await SeedAmbiguousStripeCheckoutAsync();
+
+            var transition = await CreateStripeTransitionService().TransitionAsync(
+                seed.PaymentTransactionId,
+                PaymentTransactionStatus.Failed);
+
+            Assert.Equal(StripePaymentStateTransitionOutcome.Conflict, transition.Outcome);
+            await AssertUnresolvedSeedStateAsync(seed);
+        }
+
         [Theory]
         [InlineData(PaymentTransactionStatus.Failed, PaymentOrderStatus.PaymentFailed)]
         [InlineData(PaymentTransactionStatus.Cancelled, PaymentOrderStatus.Cancelled)]
@@ -842,10 +1029,24 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             string orderStatus)
         {
             var seed = await SeedAmbiguousStripeCheckoutAsync();
-            var transition = await CreateStripeTransitionService().TransitionAsync(
-                seed.PaymentTransactionId,
-                paymentStatus);
-            Assert.Equal(StripePaymentStateTransitionOutcome.Applied, transition.Outcome);
+            if (paymentStatus == PaymentTransactionStatus.Failed)
+            {
+                Assert.Equal(
+                    StripePaymentReconciliationOutcome.Processed,
+                    await CreateStripeReconciliationService().ReconcileAsync(
+                        CreateStripeEvent(
+                            seed,
+                            "evt_failed_before_checkout_retry",
+                            "checkout.session.async_payment_failed",
+                            paymentStatus: null)));
+            }
+            else
+            {
+                var transition = await CreateStripeTransitionService().TransitionAsync(
+                    seed.PaymentTransactionId,
+                    paymentStatus);
+                Assert.Equal(StripePaymentStateTransitionOutcome.Applied, transition.Outcome);
+            }
             await ExpireCheckoutLeaseAsync();
 
             var retry = await ExecuteAsync(seed.Checkout, "customer-1", seed.Key, seed.Provider);
@@ -1015,13 +1216,21 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             PaymentTransactionStatus localTarget)
         {
             var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var authorization = localTarget == PaymentTransactionStatus.Failed
+                ? await CreateDefinitiveFailureAuthorizationAsync(seed)
+                : null;
             var webhookLock = new PaymentTransactionLockInterceptor();
             var reconciliationTask = CreateStripeReconciliationService(webhookLock).ReconcileAsync(
                 CreateStripeEvent(seed, $"evt_paid_wins_{localTarget}"));
             await webhookLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            var compensationTask = CreateStripeTransitionService().TransitionAsync(
-                seed.PaymentTransactionId,
-                localTarget);
+            var transitionService = CreateStripeTransitionService();
+            var compensationTask = authorization is null
+                ? transitionService.TransitionAsync(seed.PaymentTransactionId, localTarget)
+                : transitionService.TransitionDefinitiveInitialFailureAsync(
+                    seed.PaymentTransactionId,
+                    authorization.CheckoutIdempotencyRecordId,
+                    authorization.LeaseOwnerId,
+                    authorization.DecisionId);
             webhookLock.Release.SetResult();
 
             Assert.Equal(StripePaymentReconciliationOutcome.Processed, await reconciliationTask);
@@ -1046,10 +1255,14 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         public async Task LocalFailureWinningAgainstPaidWebhook_LeavesConsistentFailureAndRejectsEvent()
         {
             var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var authorization = await CreateDefinitiveFailureAuthorizationAsync(seed);
             var localLock = new PaymentTransactionLockInterceptor();
-            var compensationTask = CreateStripeTransitionService(localLock).TransitionAsync(
+            var compensationTask = CreateStripeTransitionService(localLock)
+                .TransitionDefinitiveInitialFailureAsync(
                 seed.PaymentTransactionId,
-                PaymentTransactionStatus.Failed);
+                authorization.CheckoutIdempotencyRecordId,
+                authorization.LeaseOwnerId,
+                authorization.DecisionId);
             await localLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var reconciliationTask = CreateStripeReconciliationService().ReconcileAsync(
                 CreateStripeEvent(seed, "evt_local_failure_wins"));
@@ -1078,6 +1291,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         public async Task WebhookFailureRacingLocalFailure_RestoresStockExactlyOnce()
         {
             var seed = await SeedAmbiguousStripeCheckoutAsync();
+            var authorization = await CreateDefinitiveFailureAuthorizationAsync(seed);
             var webhookLock = new PaymentTransactionLockInterceptor();
             var reconciliationTask = CreateStripeReconciliationService(webhookLock).ReconcileAsync(
                 CreateStripeEvent(
@@ -1086,9 +1300,12 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     "checkout.session.async_payment_failed",
                     paymentStatus: null));
             await webhookLock.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            var compensationTask = CreateStripeTransitionService().TransitionAsync(
+            var compensationTask = CreateStripeTransitionService()
+                .TransitionDefinitiveInitialFailureAsync(
                 seed.PaymentTransactionId,
-                PaymentTransactionStatus.Failed);
+                authorization.CheckoutIdempotencyRecordId,
+                authorization.LeaseOwnerId,
+                authorization.DecisionId);
             webhookLock.Release.SetResult();
 
             Assert.Equal(StripePaymentReconciliationOutcome.Processed, await reconciliationTask);
@@ -1248,6 +1465,38 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 .SetProperty(record => record.LeaseExpiresOn, DateTime.UtcNow.AddSeconds(-1)));
         }
 
+        private async Task<DefinitiveFailureAuthorization> CreateDefinitiveFailureAuthorizationAsync(
+            AmbiguousStripeCheckoutSeed seed)
+        {
+            string fingerprint;
+            await using (var context = _database.CreateContext())
+            {
+                fingerprint = (await context.CheckoutIdempotencyRecords.SingleAsync()).RequestFingerprint;
+            }
+
+            var store = CreateStore();
+            var claim = await store.ClaimAsync(
+                "customer-1",
+                seed.Key,
+                fingerprint,
+                PaymentMethodIds.CreditCard);
+            Assert.Equal(CheckoutIdempotencyClaimStatus.Acquired, claim.Status);
+            var decisionId = Guid.NewGuid();
+            var failure = new PersistedCheckoutOutcome(
+                1,
+                CheckoutExecutionStatus.BadRequest,
+                new ServiceResponse<CheckoutResult>(false, "Definitive initial rejection."),
+                decisionId);
+            Assert.True(await store.SetPendingOutcomeAsync(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                failure));
+            return new DefinitiveFailureAuthorization(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                decisionId);
+        }
+
         private StripePaymentStateTransitionService CreateStripeTransitionService(
             params IInterceptor[] interceptors) => new(
                 _database.CreateContextFactory(interceptors),
@@ -1320,7 +1569,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Guid key,
             IPaymentService? payment = null,
             IEmailService? email = null,
-            IPaymentTransactionStore? paymentTransactionStore = null)
+            IPaymentTransactionStore? paymentTransactionStore = null,
+            ICheckoutIdempotencyStore? idempotencyStore = null,
+            IStripePaymentStateTransitionService? stripeTransitionService = null)
         {
             await using var context = _database.CreateContext();
             var paymentMethods = new Mock<IPaymentMethodService>();
@@ -1335,11 +1586,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 payment ?? Mock.Of<IPaymentService>(),
                 users.Object,
                 new InventoryReservationService(_database.CreateContextFactory()),
-                CreateStore(),
+                idempotencyStore ?? CreateStore(),
                 paymentTransactionStore ?? new PaymentTransactionStore(_database.CreateContextFactory()),
-                new StripePaymentStateTransitionService(
-                    _database.CreateContextFactory(),
-                    Mock.Of<ILogger<StripePaymentStateTransitionService>>()),
+                stripeTransitionService ?? CreateStripeTransitionService(),
                 new OrderRepository(context),
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings
@@ -1358,8 +1607,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             return await orchestrator.CheckoutAsync(checkout, userId, key);
         }
 
-        private CheckoutIdempotencyStore CreateStore() => new(
-            _database.CreateContextFactory(),
+        private CheckoutIdempotencyStore CreateStore(params IInterceptor[] interceptors) => new(
+            _database.CreateContextFactory(interceptors),
             Options.Create(new CheckoutIdempotencyOptions
             {
                 RetentionDays = 14,
@@ -1508,6 +1757,172 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Guid PaymentTransactionId,
             long ExpectedAmountMinor,
             string Currency);
+
+        private sealed record DefinitiveFailureAuthorization(
+            Guid CheckoutIdempotencyRecordId,
+            Guid LeaseOwnerId,
+            Guid DecisionId);
+
+        private sealed class ProviderPreparationBarrierStore : ICheckoutIdempotencyStore
+        {
+            private readonly ICheckoutIdempotencyStore _inner;
+
+            public ProviderPreparationBarrierStore(ICheckoutIdempotencyStore inner)
+            {
+                _inner = inner;
+            }
+
+            public TaskCompletionSource PreparationReached { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource ResumePreparation { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task<CheckoutIdempotencyClaim> ClaimAsync(
+                string userId,
+                Guid idempotencyKey,
+                string requestFingerprint,
+                Guid paymentMethodId,
+                CancellationToken cancellationToken = default) =>
+                _inner.ClaimAsync(
+                    userId,
+                    idempotencyKey,
+                    requestFingerprint,
+                    paymentMethodId,
+                    cancellationToken);
+
+            public Task<bool> SetPendingOutcomeAsync(
+                Guid recordId,
+                Guid leaseOwnerId,
+                PersistedCheckoutOutcome outcome,
+                CancellationToken cancellationToken = default) =>
+                _inner.SetPendingOutcomeAsync(recordId, leaseOwnerId, outcome, cancellationToken);
+
+            public async Task<CheckoutProviderInitialization?> PrepareProviderInitializationAsync(
+                Guid recordId,
+                Guid leaseOwnerId,
+                StripeCheckoutInitialization proposedInitialization,
+                CancellationToken cancellationToken = default)
+            {
+                PreparationReached.TrySetResult();
+                await ResumePreparation.Task.WaitAsync(cancellationToken);
+                return await _inner.PrepareProviderInitializationAsync(
+                    recordId,
+                    leaseOwnerId,
+                    proposedInitialization,
+                    cancellationToken);
+            }
+
+            public Task<bool> CompleteAsync(
+                Guid recordId,
+                Guid leaseOwnerId,
+                PersistedCheckoutOutcome outcome,
+                CheckoutIdempotencyState terminalState,
+                CancellationToken cancellationToken = default) =>
+                _inner.CompleteAsync(recordId, leaseOwnerId, outcome, terminalState, cancellationToken);
+
+            public Task<bool> ReleaseLeaseAsync(
+                Guid recordId,
+                Guid leaseOwnerId,
+                CancellationToken cancellationToken = default) =>
+                _inner.ReleaseLeaseAsync(recordId, leaseOwnerId, cancellationToken);
+
+            public Task<CheckoutIdempotencyRecord?> GetAsync(
+                Guid recordId,
+                CancellationToken cancellationToken = default) =>
+                _inner.GetAsync(recordId, cancellationToken);
+
+            public PersistedCheckoutOutcome? ReadOutcome(CheckoutIdempotencyRecord record) =>
+                _inner.ReadOutcome(record);
+        }
+
+        private sealed class PreAcquisitionReadBarrierInterceptor : DbCommandInterceptor
+        {
+            private int _remainingBlocks = 1;
+
+            public TaskCompletionSource ReadCompleted { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource ResumeAcquisition { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public override async ValueTask<DbDataReader> ReaderExecutedAsync(
+                DbCommand command,
+                CommandExecutedEventData eventData,
+                DbDataReader result,
+                CancellationToken cancellationToken = default)
+            {
+                if (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
+                    && command.CommandText.Contains("CheckoutIdempotencyRecords", StringComparison.Ordinal)
+                    && Interlocked.Exchange(ref _remainingBlocks, 0) == 1)
+                {
+                    ReadCompleted.TrySetResult();
+                    await ResumeAcquisition.Task.WaitAsync(cancellationToken);
+                }
+
+                return result;
+            }
+        }
+
+        private sealed class PauseBeforeDefinitiveFailureTransitionService
+            : IStripePaymentStateTransitionService
+        {
+            private readonly IStripePaymentStateTransitionService _inner;
+
+            public PauseBeforeDefinitiveFailureTransitionService(
+                IStripePaymentStateTransitionService inner)
+            {
+                _inner = inner;
+            }
+
+            public TaskCompletionSource TransitionReached { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource ResumeTransition { get; } = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task<StripePaymentStateTransitionResult> TransitionAsync(
+                Guid paymentTransactionId,
+                PaymentTransactionStatus targetStatus,
+                CancellationToken cancellationToken = default) =>
+                _inner.TransitionAsync(paymentTransactionId, targetStatus, cancellationToken);
+
+            public async Task<StripePaymentStateTransitionResult>
+                TransitionDefinitiveInitialFailureAsync(
+                    Guid paymentTransactionId,
+                    Guid checkoutIdempotencyRecordId,
+                    Guid leaseOwnerId,
+                    Guid definitiveInitialRejectionId,
+                    CancellationToken cancellationToken = default)
+            {
+                TransitionReached.TrySetResult();
+                await ResumeTransition.Task.WaitAsync(cancellationToken);
+                return await _inner.TransitionDefinitiveInitialFailureAsync(
+                    paymentTransactionId,
+                    checkoutIdempotencyRecordId,
+                    leaseOwnerId,
+                    definitiveInitialRejectionId,
+                    cancellationToken);
+            }
+        }
+
+        private sealed class CrashBeforeDefinitiveFailureTransitionService
+            : IStripePaymentStateTransitionService
+        {
+            public Task<StripePaymentStateTransitionResult> TransitionAsync(
+                Guid paymentTransactionId,
+                PaymentTransactionStatus targetStatus,
+                CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Only definitive failure was expected.");
+
+            public Task<StripePaymentStateTransitionResult> TransitionDefinitiveInitialFailureAsync(
+                Guid paymentTransactionId,
+                Guid checkoutIdempotencyRecordId,
+                Guid leaseOwnerId,
+                Guid definitiveInitialRejectionId,
+                CancellationToken cancellationToken = default) =>
+                throw new InvalidOperationException("Simulated process crash before terminal mutation.");
+        }
 
         private sealed class PaymentTransactionLockInterceptor : DbCommandInterceptor
         {

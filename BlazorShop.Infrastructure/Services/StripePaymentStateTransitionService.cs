@@ -1,7 +1,9 @@
 namespace BlazorShop.Infrastructure.Services
 {
     using System.Data;
+    using System.Text.Json;
 
+    using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Services.Contracts.Payment;
     using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Domain.Entities.Payment;
@@ -12,6 +14,7 @@ namespace BlazorShop.Infrastructure.Services
 
     public sealed class StripePaymentStateTransitionService : IStripePaymentStateTransitionService
     {
+        private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ILogger<StripePaymentStateTransitionService> _logger;
 
@@ -46,18 +49,59 @@ namespace BlazorShop.Infrastructure.Services
                     "Stripe terminalization supports only Paid, Failed, or Cancelled.");
             }
 
+            if (targetStatus == PaymentTransactionStatus.Failed)
+            {
+                return new StripePaymentStateTransitionResult(
+                    StripePaymentStateTransitionOutcome.Conflict,
+                    null,
+                    "Local Stripe failure requires a fenced definitive-initial-rejection decision.");
+            }
+
             await using var strategyContext = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var executionStrategy = strategyContext.Database.CreateExecutionStrategy();
             return await executionStrategy.ExecuteAsync(
                 () => TransitionWithinTransactionAsync(
                     paymentTransactionId,
                     targetStatus,
+                    null,
+                    cancellationToken));
+        }
+
+        public async Task<StripePaymentStateTransitionResult> TransitionDefinitiveInitialFailureAsync(
+            Guid paymentTransactionId,
+            Guid checkoutIdempotencyRecordId,
+            Guid leaseOwnerId,
+            Guid definitiveInitialRejectionId,
+            CancellationToken cancellationToken = default)
+        {
+            if (paymentTransactionId == Guid.Empty
+                || checkoutIdempotencyRecordId == Guid.Empty
+                || leaseOwnerId == Guid.Empty
+                || definitiveInitialRejectionId == Guid.Empty)
+            {
+                return new StripePaymentStateTransitionResult(
+                    StripePaymentStateTransitionOutcome.Conflict,
+                    null,
+                    "A valid checkout lease and definitive rejection decision are required.");
+            }
+
+            await using var strategyContext = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var executionStrategy = strategyContext.Database.CreateExecutionStrategy();
+            return await executionStrategy.ExecuteAsync(
+                () => TransitionWithinTransactionAsync(
+                    paymentTransactionId,
+                    PaymentTransactionStatus.Failed,
+                    new DefinitiveInitialFailureAuthorization(
+                        checkoutIdempotencyRecordId,
+                        leaseOwnerId,
+                        definitiveInitialRejectionId),
                     cancellationToken));
         }
 
         private async Task<StripePaymentStateTransitionResult> TransitionWithinTransactionAsync(
             Guid paymentTransactionId,
             PaymentTransactionStatus targetStatus,
+            DefinitiveInitialFailureAuthorization? definitiveFailureAuthorization,
             CancellationToken cancellationToken)
         {
             await using var db = await _contextFactory.CreateDbContextAsync(cancellationToken);
@@ -66,7 +110,8 @@ namespace BlazorShop.Infrastructure.Services
                 cancellationToken);
 
             // Match webhook lock order after its event/session-specific locks:
-            // payment transaction, order, reservation, then product/variant inventory.
+            // payment transaction, optional checkout decision fence, order, reservation,
+            // then product/variant inventory.
             var paymentTransaction = (await db.PaymentTransactions
                 .FromSqlInterpolated($"SELECT * FROM \"PaymentTransactions\" WHERE \"Id\" = {paymentTransactionId} AND \"Provider\" = {PaymentProviderNames.Stripe} FOR UPDATE")
                 .ToListAsync(cancellationToken))
@@ -86,6 +131,20 @@ namespace BlazorShop.Infrastructure.Services
                 return new StripePaymentStateTransitionResult(
                     StripePaymentStateTransitionOutcome.AlreadyTerminal,
                     paymentTransaction.Status);
+            }
+
+            if (definitiveFailureAuthorization is not null)
+            {
+                var authorizationFailure = await ValidateDefinitiveInitialFailureAuthorizationAsync(
+                    db,
+                    paymentTransaction,
+                    definitiveFailureAuthorization,
+                    cancellationToken);
+                if (authorizationFailure is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return authorizationFailure;
+                }
             }
 
             var order = (await db.Orders
@@ -148,6 +207,60 @@ namespace BlazorShop.Infrastructure.Services
                 paymentTransaction.Status);
         }
 
+        private static async Task<StripePaymentStateTransitionResult?>
+            ValidateDefinitiveInitialFailureAuthorizationAsync(
+                AppDbContext db,
+                PaymentTransaction paymentTransaction,
+                DefinitiveInitialFailureAuthorization authorization,
+                CancellationToken cancellationToken)
+        {
+            // PaymentTransaction is locked first. The checkout decision is then fenced under
+            // the same transaction before Order and inventory rows are locked or mutated.
+            var checkoutRecord = (await db.CheckoutIdempotencyRecords
+                .FromSqlInterpolated($"SELECT * FROM \"CheckoutIdempotencyRecords\" WHERE \"Id\" = {authorization.CheckoutIdempotencyRecordId} FOR UPDATE")
+                .ToListAsync(cancellationToken))
+                .SingleOrDefault();
+            if (checkoutRecord is null
+                || checkoutRecord.OrderId != paymentTransaction.OrderId
+                || checkoutRecord.PaymentMethodId != PaymentMethodIds.CreditCard
+                || checkoutRecord.LeaseOwnerId != authorization.LeaseOwnerId
+                || checkoutRecord.State is not (CheckoutIdempotencyState.Processing
+                    or CheckoutIdempotencyState.LocalCommitted)
+                || !string.IsNullOrWhiteSpace(paymentTransaction.ProviderSessionId)
+                || !string.IsNullOrWhiteSpace(paymentTransaction.ProviderPaymentIntentId))
+            {
+                return new StripePaymentStateTransitionResult(
+                    StripePaymentStateTransitionOutcome.Conflict,
+                    paymentTransaction.Status,
+                    "The checkout lease or provider state no longer authorizes local failure compensation.");
+            }
+
+            PersistedCheckoutOutcome? outcome;
+            try
+            {
+                outcome = string.IsNullOrWhiteSpace(checkoutRecord.OutcomeJson)
+                    ? null
+                    : JsonSerializer.Deserialize<PersistedCheckoutOutcome>(
+                        checkoutRecord.OutcomeJson,
+                        SerializerOptions);
+            }
+            catch (JsonException)
+            {
+                outcome = null;
+            }
+
+            if (outcome?.Status != CheckoutExecutionStatus.BadRequest
+                || outcome.DefinitiveInitialRejectionId != authorization.DefinitiveInitialRejectionId)
+            {
+                return new StripePaymentStateTransitionResult(
+                    StripePaymentStateTransitionOutcome.Conflict,
+                    paymentTransaction.Status,
+                    "The durable definitive-rejection decision is missing or was superseded.");
+            }
+
+            return null;
+        }
+
         private static void ApplyTerminalStatus(
             PaymentTransaction paymentTransaction,
             PaymentTransactionStatus targetStatus)
@@ -159,5 +272,10 @@ namespace BlazorShop.Infrastructure.Services
             paymentTransaction.FailedOn = targetStatus == PaymentTransactionStatus.Failed ? now : null;
             paymentTransaction.CancelledOn = targetStatus == PaymentTransactionStatus.Cancelled ? now : null;
         }
+
+        private sealed record DefinitiveInitialFailureAuthorization(
+            Guid CheckoutIdempotencyRecordId,
+            Guid LeaseOwnerId,
+            Guid DefinitiveInitialRejectionId);
     }
 }

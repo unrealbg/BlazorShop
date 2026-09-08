@@ -8,6 +8,13 @@ namespace BlazorShop.Application.Services.Contracts.Payment
             Guid paymentTransactionId,
             PaymentTransactionStatus targetStatus,
             CancellationToken cancellationToken = default);
+
+        Task<StripePaymentStateTransitionResult> TransitionDefinitiveInitialFailureAsync(
+            Guid paymentTransactionId,
+            Guid checkoutIdempotencyRecordId,
+            Guid leaseOwnerId,
+            Guid definitiveInitialRejectionId,
+            CancellationToken cancellationToken = default);
     }
 
     public sealed record StripePaymentStateTransitionResult(

@@ -267,13 +267,17 @@ namespace BlazorShop.Infrastructure.Services
                             cancellationToken);
                     if (acquired == 1)
                     {
-                        existing.LeaseOwnerId = ownerId;
-                        existing.LeaseExpiresOn = now.AddSeconds(_options.LeaseSeconds);
+                        var acquiredRecord = await db.CheckoutIdempotencyRecords
+                            .AsNoTracking()
+                            .SingleAsync(
+                                record => record.Id == existing.Id
+                                    && record.LeaseOwnerId == ownerId,
+                                cancellationToken);
                         return new CheckoutIdempotencyClaim(
                             CheckoutIdempotencyClaimStatus.Acquired,
-                            existing,
+                            acquiredRecord,
                             ownerId,
-                            ReadOutcome(existing));
+                            ReadOutcome(acquiredRecord));
                     }
                 }
 

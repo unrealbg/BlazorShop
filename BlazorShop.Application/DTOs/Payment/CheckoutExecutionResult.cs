@@ -49,5 +49,6 @@ namespace BlazorShop.Application.DTOs.Payment
     public sealed record PersistedCheckoutOutcome(
         int Version,
         CheckoutExecutionStatus Status,
-        ServiceResponse<CheckoutResult> Response);
+        ServiceResponse<CheckoutResult> Response,
+        Guid? DefinitiveInitialRejectionId = null);
 }

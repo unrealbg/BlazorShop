@@ -1,5 +1,6 @@
 namespace BlazorShop.Tests.Application.Services.Payment
 {
+    using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
@@ -113,6 +114,15 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     new StripePaymentStateTransitionResult(
                         StripePaymentStateTransitionOutcome.Applied,
                         target));
+            _stripeTransitions.Setup(service => service.TransitionDefinitiveInitialFailureAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new StripePaymentStateTransitionResult(
+                    StripePaymentStateTransitionOutcome.Applied,
+                    PaymentTransactionStatus.Failed));
 
             _orchestrator = new CheckoutOrchestrator(
                 _products.Object,
@@ -368,9 +378,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.False(result.Success);
             Assert.Equal("Stripe unavailable", result.Message);
             Assert.NotNull(createdOrder);
-            _stripeTransitions.Verify(service => service.TransitionAsync(
+            _stripeTransitions.Verify(service => service.TransitionDefinitiveInitialFailureAsync(
                 It.IsAny<Guid>(),
-                PaymentTransactionStatus.Failed,
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()), Times.Once);
             _inventory.Verify(service => service.TransitionOrderAsync(
                 It.IsAny<Guid>(),
@@ -469,11 +481,46 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 It.IsAny<Guid>(),
                 It.IsAny<PaymentTransactionStatus>(),
                 It.IsAny<CancellationToken>()), Times.Never);
+            _stripeTransitions.Verify(service => service.TransitionDefinitiveInitialFailureAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()), Times.Never);
             _idempotency.Verify(store => store.SetPendingOutcomeAsync(
                 It.IsAny<Guid>(),
                 It.IsAny<Guid>(),
                 It.Is<PersistedCheckoutOutcome>(outcome => outcome.Status == CheckoutExecutionStatus.InProgress),
                 It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task LegacyBadRequestWithoutDefinitiveDecision_CannotAuthorizeInventoryRelease()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _idempotency.Setup(store => store.ReadOutcome(It.IsAny<CheckoutIdempotencyRecord>()))
+                .Returns(new PersistedCheckoutOutcome(
+                    1,
+                    CheckoutExecutionStatus.BadRequest,
+                    new ServiceResponse<CheckoutResult>(false, "Legacy failure.")));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
+            VerifyStripeWasNotCalled();
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<PaymentTransactionStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _stripeTransitions.Verify(service => service.TransitionDefinitiveInitialFailureAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]

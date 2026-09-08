@@ -413,23 +413,27 @@ namespace BlazorShop.Application.Services.Payment
             var pendingFailure = _idempotencyStore.ReadOutcome(claim.Record);
             if (pendingFailure?.Status == CheckoutExecutionStatus.BadRequest)
             {
-                if (mayHaveEarlierProviderSideEffects)
+                if (pendingFailure.DefinitiveInitialRejectionId.HasValue
+                    && string.IsNullOrWhiteSpace(paymentTransaction.ProviderSessionId)
+                    && string.IsNullOrWhiteSpace(paymentTransaction.ProviderPaymentIntentId))
                 {
-                    return await RecoverStripeProviderStateAsync(
+                    return await TerminalizeDefinitiveInitialStripeFailureAsync(
                         order,
                         paymentTransaction,
                         claim,
-                        initialization,
-                        "A prior Stripe request may have executed before its failure outcome was persisted.",
+                        pendingFailure,
+                        pendingFailure.DefinitiveInitialRejectionId.Value,
                         cancellationToken);
                 }
 
-                return await TerminalizeStripeAsync(
+                return await RecoverStripeProviderStateAsync(
                     order,
                     paymentTransaction,
                     claim,
-                    pendingFailure,
-                    PaymentTransactionStatus.Failed,
+                    initialization,
+                    pendingFailure.DefinitiveInitialRejectionId.HasValue
+                        ? "Provider identity exists, so the saved initial-rejection decision no longer authorizes local compensation."
+                        : "The stored failure outcome does not prove a definitive initial rejection without earlier provider side effects.",
                     cancellationToken);
             }
 
@@ -564,7 +568,11 @@ namespace BlazorShop.Application.Services.Payment
             string errorMessage,
             CancellationToken cancellationToken)
         {
-            var failure = CreateFailureOutcome(errorMessage);
+            var definitiveInitialRejectionId = Guid.NewGuid();
+            var failure = CreateFailureOutcome(errorMessage) with
+            {
+                DefinitiveInitialRejectionId = definitiveInitialRejectionId,
+            };
             if (!await _idempotencyStore.SetPendingOutcomeAsync(
                 claim.Record.Id,
                 claim.LeaseOwnerId,
@@ -574,13 +582,58 @@ namespace BlazorShop.Application.Services.Payment
                 return CheckoutExecutionResult.InProgress();
             }
 
-            return await TerminalizeStripeAsync(
+            return await TerminalizeDefinitiveInitialStripeFailureAsync(
                 order,
                 paymentTransaction,
                 claim,
                 failure,
-                PaymentTransactionStatus.Failed,
+                definitiveInitialRejectionId,
                 cancellationToken);
+        }
+
+        private async Task<CheckoutExecutionResult> TerminalizeDefinitiveInitialStripeFailureAsync(
+            Order order,
+            PaymentTransaction paymentTransaction,
+            CheckoutIdempotencyClaim claim,
+            PersistedCheckoutOutcome failure,
+            Guid definitiveInitialRejectionId,
+            CancellationToken cancellationToken)
+        {
+            var transition = await _stripePaymentStateTransitionService
+                .TransitionDefinitiveInitialFailureAsync(
+                    paymentTransaction.Id,
+                    claim.Record.Id,
+                    claim.LeaseOwnerId,
+                    definitiveInitialRejectionId,
+                    cancellationToken);
+
+            if (transition.PaymentStatus == PaymentTransactionStatus.Paid)
+            {
+                return await FinalizePaidStripeCheckoutAsync(order, claim, cancellationToken);
+            }
+
+            if (transition.PaymentStatus is PaymentTransactionStatus.Failed
+                or PaymentTransactionStatus.Cancelled)
+            {
+                return await FinalizeTerminalStripeFailureAsync(
+                    transition.PaymentStatus.Value,
+                    claim,
+                    cancellationToken,
+                    failure);
+            }
+
+            _logger.LogWarning(
+                "Could not apply definitive initial Stripe rejection {DefinitiveInitialRejectionId} for transaction {PaymentTransactionId}: {Outcome}, current state {PaymentStatus}, reason {Reason}",
+                definitiveInitialRejectionId,
+                paymentTransaction.Id,
+                transition.Outcome,
+                transition.PaymentStatus,
+                transition.ErrorMessage);
+            await _idempotencyStore.ReleaseLeaseAsync(
+                claim.Record.Id,
+                claim.LeaseOwnerId,
+                cancellationToken);
+            return CheckoutExecutionResult.InProgress();
         }
 
         private async Task<CheckoutExecutionResult> RecoverStripeProviderStateAsync(
