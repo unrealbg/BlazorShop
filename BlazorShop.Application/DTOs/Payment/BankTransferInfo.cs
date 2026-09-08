@@ -12,6 +12,8 @@ namespace BlazorShop.Application.DTOs.Payment
 
         public decimal Amount { get; set; }
 
+        public string Currency { get; set; } = string.Empty;
+
         public string? AdditionalInfo { get; set; }
     }
 }

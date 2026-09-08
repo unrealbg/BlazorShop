@@ -8,8 +8,16 @@ namespace BlazorShop.Infrastructure.Services
     public sealed record StripeWebhookEventData(
         string EventId,
         string EventType,
+        DateTime ProviderCreatedOn,
+        string? SessionId,
+        string? PaymentIntentId,
         Guid? OrderId,
-        string? PaymentStatus);
+        string? ClientReferenceId,
+        Guid? PaymentTransactionId,
+        string? PaymentStatus,
+        long? AmountTotal,
+        string? Currency,
+        string? SessionStatus);
 
     public sealed class StripeWebhookSignatureException : Exception
     {

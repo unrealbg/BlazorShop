@@ -303,6 +303,10 @@
                     await ClearCartAfterCheckoutAsync(checkout);
                     this.NavigationManager.NavigateTo(redirectUri.ToString(), true);
                     return;
+                case CheckoutPaymentKind.Stripe when result.Status == CheckoutStatus.Confirmed:
+                    await ClearCartAfterCheckoutAsync(checkout);
+                    this.NavigationManager.NavigateTo(BuildSuccessPath(result, "stripe"), true);
+                    return;
                 default:
                     this.NotificationService.NotifyError(
                         "The server returned an incomplete checkout result. Your cart was not cleared.",

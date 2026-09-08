@@ -49,6 +49,15 @@
                     $"{ClientAppOptions.SectionName}:BaseUrl must be an absolute URL.")
                 .ValidateOnStart();
 
+            services.AddOptions<CommerceOptions>()
+                .Bind(configuration.GetSection(CommerceOptions.SectionName))
+                .PostConfigure(options =>
+                    options.Currency = CurrencyMoney.NormalizeCurrency(options.Currency))
+                .Validate(
+                    options => CurrencyMoney.IsSupportedCurrency(options.Currency),
+                    $"{CommerceOptions.SectionName}:Currency must be one of EUR, GBP, or USD.")
+                .ValidateOnStart();
+
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
             services.AddScoped<IValidationService, ValidationService>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();

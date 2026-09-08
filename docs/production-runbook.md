@@ -84,6 +84,7 @@ Identity__RequireConfirmedEmail=true
 Stripe__Enabled=false
 Stripe__SecretKey=<secret>
 Stripe__WebhookSecret=<secret>
+Commerce__Currency=EUR
 EmailSettings__Enabled=true
 EmailSettings__From=shop@example.com
 EmailSettings__DisplayName=BlazorShop
@@ -188,6 +189,8 @@ Required environment variables before startup:
 - `BLAZORSHOP_STOREFRONT_BASE_URL`
 
 Card payments are disabled by default, which is appropriate for a demonstration deployment. Set `BLAZORSHOP_STRIPE_ENABLED=true` only when Stripe is intentionally enabled; in that case, `BLAZORSHOP_STRIPE_SECRET_KEY` and `BLAZORSHOP_STRIPE_WEBHOOK_SECRET` must also be populated from Stripe.
+
+`BLAZORSHOP_COMMERCE_CURRENCY` defines the immutable purchase currency copied to new orders and payment transactions. It defaults to `EUR` in the Compose template and startup accepts only the explicitly supported `EUR`, `GBP`, and `USD` codes.
 
 When `BLAZORSHOP_EMAIL_ENABLED=true` (the default), these are also required by application startup validation:
 

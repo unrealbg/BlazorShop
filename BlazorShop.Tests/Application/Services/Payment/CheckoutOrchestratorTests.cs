@@ -1,5 +1,6 @@
 namespace BlazorShop.Tests.Application.Services.Payment
 {
+    using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Payment;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Payment;
@@ -26,6 +27,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IAppUserManager> _users = new();
         private readonly Mock<IInventoryReservationService> _inventory = new();
         private readonly Mock<ICheckoutIdempotencyStore> _idempotency = new();
+        private readonly Mock<IPaymentTransactionStore> _paymentTransactions = new();
+        private readonly Mock<IStripePaymentStateTransitionService> _stripeTransitions = new();
         private readonly Mock<IOrderRepository> _orders = new();
         private readonly Mock<IEmailService> _email = new();
         private readonly CheckoutOrchestrator _orchestrator;
@@ -89,6 +92,37 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
             _orders.Setup(repository => repository.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync((Order?)null);
+            _paymentTransactions.Setup(store => store.GetOrCreateStripeAsync(
+                    It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid orderId, long amount, string currency, CancellationToken _) =>
+                    new PaymentTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        Provider = PaymentProviderNames.Stripe,
+                        ExpectedAmountMinor = amount,
+                        Currency = currency,
+                    });
+            _paymentTransactions.Setup(store => store.PersistProviderIdentityAsync(
+                    It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PaymentProviderIdentityPersistenceResult(
+                    PaymentProviderIdentityPersistenceOutcome.Persisted,
+                    PaymentTransactionStatus.Pending));
+            _stripeTransitions.Setup(service => service.TransitionAsync(
+                    It.IsAny<Guid>(), It.IsAny<PaymentTransactionStatus>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, PaymentTransactionStatus target, CancellationToken _) =>
+                    new StripePaymentStateTransitionResult(
+                        StripePaymentStateTransitionOutcome.Applied,
+                        target));
+            _stripeTransitions.Setup(service => service.TransitionDefinitiveInitialFailureAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new StripePaymentStateTransitionResult(
+                    StripePaymentStateTransitionOutcome.Applied,
+                    PaymentTransactionStatus.Failed));
 
             _orchestrator = new CheckoutOrchestrator(
                 _products.Object,
@@ -97,6 +131,8 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _users.Object,
                 _inventory.Object,
                 _idempotency.Object,
+                _paymentTransactions.Object,
+                _stripeTransitions.Object,
                 _orders.Object,
                 _email.Object,
                 Options.Create(new BankTransferSettings
@@ -108,6 +144,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 }),
                 Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
                 Options.Create(new CheckoutIdempotencyOptions()),
+                Options.Create(new CommerceOptions { Currency = "EUR" }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
         }
 
@@ -290,7 +327,11 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     Assert.Equal(PaymentOrderStatus.PendingPayment, createdOrder.Status);
                     providerInitialization = initialization;
                 })
-                .ReturnsAsync(new PaymentInitializationResult(true, "https://checkout.stripe.test/session"));
+                .ReturnsAsync(new PaymentInitializationResult(
+                    true,
+                    "https://checkout.stripe.test/session",
+                    ProviderSessionId: "cs_test",
+                    ProviderPaymentIntentId: "pi_test"));
 
             var result = await CheckoutAsync(
                 PaymentMethodIds.CreditCard,
@@ -330,13 +371,6 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     false,
                     ErrorMessage: "Stripe unavailable",
                     FailureKind: PaymentInitializationFailureKind.Definitive));
-            _inventory.Setup(service => service.TransitionOrderAsync(
-                    It.IsAny<Guid>(),
-                    PaymentOrderStatus.PaymentFailed,
-                    InventoryReservationStatus.Released,
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new InventoryTransitionResult(InventoryTransitionOutcome.Applied));
-
             var result = await CheckoutAsync(
                 PaymentMethodIds.CreditCard,
                 new CartLineRequest(product.Id, null, 1));
@@ -344,11 +378,17 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.False(result.Success);
             Assert.Equal("Stripe unavailable", result.Message);
             Assert.NotNull(createdOrder);
-            _inventory.Verify(service => service.TransitionOrderAsync(
-                createdOrder!.Id,
-                PaymentOrderStatus.PaymentFailed,
-                InventoryReservationStatus.Released,
+            _stripeTransitions.Verify(service => service.TransitionDefinitiveInitialFailureAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()), Times.Once);
+            _inventory.Verify(service => service.TransitionOrderAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<InventoryReservationStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]
@@ -390,6 +430,176 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 It.IsAny<string>(),
                 It.IsAny<InventoryReservationStatus>(),
                 It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task StripeDefinitiveRetryFailureAfterDurableDispatchMarker_RemainsNonTerminal()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _idempotency.Setup(store => store.ClaimAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((string userId, Guid key, string fingerprint, Guid paymentMethodId, CancellationToken _) =>
+                {
+                    var ownerId = Guid.NewGuid();
+                    return new CheckoutIdempotencyClaim(
+                        CheckoutIdempotencyClaimStatus.Acquired,
+                        new CheckoutIdempotencyRecord
+                        {
+                            Id = Guid.NewGuid(),
+                            UserId = userId,
+                            IdempotencyKey = key,
+                            RequestFingerprint = fingerprint,
+                            PaymentMethodId = paymentMethodId,
+                            OrderId = Guid.NewGuid(),
+                            OrderReference = $"STRIPE-{Guid.NewGuid():N}",
+                            LeaseOwnerId = ownerId,
+                            ProviderInitializationStartedOn = DateTime.UtcNow.AddMinutes(-1),
+                        },
+                        ownerId);
+                });
+            _payment.Setup(service => service.Pay(
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PaymentInitializationResult(
+                    false,
+                    ErrorMessage: "Stripe authentication failed.",
+                    FailureKind: PaymentInitializationFailureKind.Definitive));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
+            Assert.Contains("requires reconciliation", result.Message, StringComparison.OrdinalIgnoreCase);
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<PaymentTransactionStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _stripeTransitions.Verify(service => service.TransitionDefinitiveInitialFailureAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _idempotency.Verify(store => store.SetPendingOutcomeAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.Is<PersistedCheckoutOutcome>(outcome => outcome.Status == CheckoutExecutionStatus.InProgress),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task LegacyBadRequestWithoutDefinitiveDecision_CannotAuthorizeInventoryRelease()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _idempotency.Setup(store => store.ReadOutcome(It.IsAny<CheckoutIdempotencyRecord>()))
+                .Returns(new PersistedCheckoutOutcome(
+                    1,
+                    CheckoutExecutionStatus.BadRequest,
+                    new ServiceResponse<CheckoutResult>(false, "Legacy failure.")));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
+            VerifyStripeWasNotCalled();
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<PaymentTransactionStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _stripeTransitions.Verify(service => service.TransitionDefinitiveInitialFailureAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task StripeRetryDeadlineWithoutProviderIdentity_RemainsNonTerminal()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _idempotency.Setup(store => store.PrepareProviderInitializationAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, Guid _, StripeCheckoutInitialization initialization, CancellationToken _) =>
+                    new CheckoutProviderInitialization(DateTime.UtcNow.AddHours(-24), initialization));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.Equal(CheckoutExecutionStatus.InProgress, result.Status);
+            Assert.Contains("requires reconciliation", result.Message, StringComparison.OrdinalIgnoreCase);
+            VerifyStripeWasNotCalled();
+            _payment.Verify(service => service.RecoverAsync(
+                It.IsAny<StripePaymentRecoveryRequest>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<PaymentTransactionStatus>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _idempotency.Verify(store => store.SetPendingOutcomeAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<Guid>(),
+                It.Is<PersistedCheckoutOutcome>(outcome => outcome.Status == CheckoutExecutionStatus.InProgress),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task StripeRetryDeadlineWithConfirmedPaidProviderState_UsesAtomicPaidTransition()
+        {
+            var product = ConfigureProduct(price: 15m, quantity: 1);
+            ConfigurePaymentMethod(PaymentMethodIds.CreditCard, "Credit Card");
+            _paymentTransactions.Setup(store => store.GetOrCreateStripeAsync(
+                    It.IsAny<Guid>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid orderId, long amount, string currency, CancellationToken _) =>
+                    new PaymentTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        Provider = PaymentProviderNames.Stripe,
+                        ProviderSessionId = "cs_recovery",
+                        ProviderPaymentIntentId = "pi_recovery",
+                        ExpectedAmountMinor = amount,
+                        Currency = currency,
+                    });
+            _idempotency.Setup(store => store.PrepareProviderInitializationAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<StripeCheckoutInitialization>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Guid _, Guid _, StripeCheckoutInitialization initialization, CancellationToken _) =>
+                    new CheckoutProviderInitialization(DateTime.UtcNow.AddHours(-24), initialization));
+            _payment.Setup(service => service.RecoverAsync(
+                    It.IsAny<StripePaymentRecoveryRequest>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new StripePaymentRecoveryResult(
+                    StripePaymentRecoveryOutcome.Paid,
+                    "pi_recovery"));
+
+            var result = await CheckoutAsync(
+                PaymentMethodIds.CreditCard,
+                new CartLineRequest(product.Id, null, 1));
+
+            Assert.True(result.Success);
+            Assert.Equal(CheckoutStatus.Confirmed, result.Payload!.Status);
+            VerifyStripeWasNotCalled();
+            _stripeTransitions.Verify(service => service.TransitionAsync(
+                It.IsAny<Guid>(),
+                PaymentTransactionStatus.Paid,
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]

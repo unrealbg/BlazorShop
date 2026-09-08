@@ -45,6 +45,10 @@
 
         public DbSet<CheckoutIdempotencyRecord> CheckoutIdempotencyRecords { get; set; }
 
+        public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+
+        public DbSet<PaymentProviderEvent> PaymentProviderEvents { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

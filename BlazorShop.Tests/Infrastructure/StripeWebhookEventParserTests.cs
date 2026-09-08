@@ -16,6 +16,7 @@ namespace BlazorShop.Tests.Infrastructure
         {
             const string secret = "whsec_test";
             var orderId = Guid.NewGuid();
+            var paymentTransactionId = Guid.NewGuid();
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             var payload = $$"""
                 {
@@ -23,14 +24,21 @@ namespace BlazorShop.Tests.Infrastructure
                   "object": "event",
                   "api_version": "{{StripeConfiguration.ApiVersion}}",
                   "request": null,
+                  "created": {{timestamp}},
                   "type": "checkout.session.completed",
                   "data": {
                     "object": {
                       "id": "cs_test",
                       "object": "checkout.session",
+                      "amount_total": 12345,
+                      "client_reference_id": "{{orderId:D}}",
+                      "currency": "eur",
+                      "payment_intent": "pi_test",
                       "payment_status": "paid",
+                      "status": "complete",
                       "metadata": {
-                        "order_id": "{{orderId:D}}"
+                        "order_id": "{{orderId:D}}",
+                        "payment_transaction_id": "{{paymentTransactionId:D}}"
                       }
                     }
                   }
@@ -42,8 +50,16 @@ namespace BlazorShop.Tests.Infrastructure
 
             Assert.Equal("evt_test", result.EventId);
             Assert.Equal("checkout.session.completed", result.EventType);
+            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime, result.ProviderCreatedOn);
+            Assert.Equal("cs_test", result.SessionId);
+            Assert.Equal("pi_test", result.PaymentIntentId);
             Assert.Equal(orderId, result.OrderId);
+            Assert.Equal(orderId.ToString("D"), result.ClientReferenceId);
+            Assert.Equal(paymentTransactionId, result.PaymentTransactionId);
             Assert.Equal("paid", result.PaymentStatus);
+            Assert.Equal(12345, result.AmountTotal);
+            Assert.Equal("eur", result.Currency);
+            Assert.Equal("complete", result.SessionStatus);
         }
 
         [Fact]

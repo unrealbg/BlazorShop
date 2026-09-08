@@ -33,8 +33,10 @@ namespace BlazorShop.API.Controllers
             return result switch
             {
                 StripeWebhookHandlingResult.Processed => Ok(),
+                StripeWebhookHandlingResult.Duplicate => Ok(),
+                StripeWebhookHandlingResult.Rejected => Ok(),
                 StripeWebhookHandlingResult.Ignored => Ok(),
-                StripeWebhookHandlingResult.OrderNotFound => NotFound(),
+                StripeWebhookHandlingResult.TransientFailure => StatusCode(StatusCodes.Status500InternalServerError),
                 _ => BadRequest(),
             };
         }

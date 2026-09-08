@@ -19,6 +19,9 @@
     "SecretKey": "<set-in-secret-store-or-env>",
     "WebhookSecret": "<set-in-secret-store-or-env>"
   },
+  "Commerce": {
+    "Currency": "EUR"
+  },
   "EmailSettings": {
     "From": "<required-sender-address>",
     "DisplayName": "BlazorShop",

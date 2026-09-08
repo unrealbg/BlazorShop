@@ -7,5 +7,9 @@
             StripeCheckoutInitialization initialization,
             string providerIdempotencyKey,
             CancellationToken cancellationToken = default);
+
+        Task<StripePaymentRecoveryResult> RecoverAsync(
+            StripePaymentRecoveryRequest request,
+            CancellationToken cancellationToken = default);
     }
 }

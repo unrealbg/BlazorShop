@@ -61,6 +61,18 @@ namespace BlazorShop.Tests.Presentation.Payments
         }
 
         [Fact]
+        public void Cart_NavigatesRecoveredPaidStripeCheckoutToLocalSuccessPage()
+        {
+            var cart = ReadRepositoryFile(
+                "BlazorShop.Presentation/BlazorShop.Web/Pages/Payments/Cart.razor.cs");
+
+            Assert.Contains(
+                "case CheckoutPaymentKind.Stripe when result.Status == CheckoutStatus.Confirmed:",
+                cart);
+            Assert.Contains("BuildSuccessPath(result, \"stripe\")", cart);
+        }
+
+        [Fact]
         public void SuccessPage_IsPresentationOnlyAndCannotCreateAnotherOrder()
         {
             var success = ReadRepositoryFile(

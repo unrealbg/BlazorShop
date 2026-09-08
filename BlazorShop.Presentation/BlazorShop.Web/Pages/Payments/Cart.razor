@@ -184,7 +184,7 @@
                     <div><span class="font-semibold">Bank:</span> @_btInfo.BankName</div>
                     <div><span class="font-semibold">Beneficiary:</span> @_btInfo.Beneficiary</div>
                     <div><span class="font-semibold">IBAN:</span> @_btInfo.Iban</div>
-                    <div><span class="font-semibold">Amount:</span> @_btInfo.Amount.ToString("F2") EUR</div>
+                    <div><span class="font-semibold">Amount:</span> @_btInfo.Amount.ToString("F2") @_btInfo.Currency</div>
                     <div><span class="font-semibold">Reference:</span> @_btInfo.Reference</div>
                     @if (!string.IsNullOrWhiteSpace(_btInfo.AdditionalInfo))
                     {
