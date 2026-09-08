@@ -108,7 +108,7 @@ namespace BlazorShop.Tests.Infrastructure
         [InlineData("BlazorShop.Infrastructure/Services/InventoryReservationService.cs")]
         [InlineData("BlazorShop.Infrastructure/Services/StripePaymentReconciliationService.cs")]
         [InlineData("BlazorShop.Infrastructure/Services/StripePaymentStateTransitionService.cs")]
-        public void LockedOrderQueries_SelectPostgreSqlConcurrencyToken(string relativePath)
+        public void LockedOrderQueries_SelectConcurrencyToken(string relativePath)
         {
             var source = File.ReadAllText(Path.Combine(FindRepositoryRoot(), relativePath));
 
