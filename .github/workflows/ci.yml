@@ -127,10 +127,22 @@ jobs:
       - name: Create development HTTPS certificate
         run: dotnet dev-certs https
 
+      - name: Initialize E2E diagnostics
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/e2e | Out-Null
+          @(
+            "dotnet=$(dotnet --version)"
+            "node=$(node --version)"
+            "playwright=1.61.0"
+            "chromium=149.0.7827.55"
+            "postgres=16.13-alpine3.23"
+          ) | Set-Content artifacts/e2e/environment.txt
+
       - name: Install Playwright Chromium and operating-system dependencies
         run: >-
-          pwsh BlazorShop.E2E/bin/Release/net10.0/playwright.ps1
-          install --with-deps chromium
+          pwsh scripts/install-playwright-chromium.ps1
+          -InstallerPath BlazorShop.E2E/bin/Release/net10.0/playwright.ps1
 
       - name: Run browser E2E suite (first consecutive run)
         env:
