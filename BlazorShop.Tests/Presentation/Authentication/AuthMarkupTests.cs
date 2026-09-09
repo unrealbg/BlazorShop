@@ -32,6 +32,15 @@ namespace BlazorShop.Tests.Presentation.Authentication
         }
 
         [Fact]
+        public void FloatingTextInput_AssociatesVisibleLabelWithInput()
+        {
+            var component = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Web/Components/FormControls/FloatingTextInput.cs");
+
+            Assert.Contains("builder.AddAttribute(4, \"id\", resolvedInputId);", component);
+            Assert.Contains("builder.AddAttribute(12, \"for\", resolvedInputId);", component);
+        }
+
+        [Fact]
         public void WebShell_VersionsAssetsAndRevalidatesStaticFiles()
         {
             var index = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Web/wwwroot/index.html");

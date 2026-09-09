@@ -6,8 +6,20 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 try
 {
-    var postgres = builder.AddPostgres("postgres")
-        .WithDataVolume("blazorshop-postgres-data", isReadOnly: false);
+    var postgres = builder.AddPostgres("postgres");
+
+    var useVolumes = !bool.TryParse(builder.Configuration["UseVolumes"], out var configuredUseVolumes)
+        || configuredUseVolumes;
+    if (useVolumes)
+    {
+        postgres.WithDataVolume("blazorshop-postgres-data", isReadOnly: false);
+    }
+
+    var postgresImageTag = builder.Configuration["PostgresImageTag"];
+    if (!string.IsNullOrWhiteSpace(postgresImageTag))
+    {
+        postgres.WithImageTag(postgresImageTag);
+    }
 
     var database = postgres.AddDatabase("DefaultConnection", "blazorshop");
 
