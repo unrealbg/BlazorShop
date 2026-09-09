@@ -61,11 +61,9 @@ public sealed class StorefrontCheckoutTests(E2EApplicationFixture application) :
             var variantSelect = Page.GetByLabel("Choose a variant", new() { Exact = true });
             await variantSelect.SelectOptionAsync(data.VariantId.ToString("D", CultureInfo.InvariantCulture));
             await Expect(variantSelect).ToHaveValueAsync(data.VariantId.ToString("D", CultureInfo.InvariantCulture));
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true }).ClickAsync();
-            await Expect(Page.GetByText(
-                    $"Product {data.VariantProductName} (size {data.VariantSize}) added to cart",
-                    new() { Exact = true }))
-                .ToBeVisibleAsync();
+            await ProductPurchaseButton().ClickAsync();
+            await Expect(ProductCartFeedback())
+                .ToHaveTextAsync($"Product {data.VariantProductName} (size {data.VariantSize}) added to cart");
             await Page.GetByRole(AriaRole.Link, new() { Name = "View Cart", Exact = true }).ClickAsync();
 
             var variantLine = CartLine(data.VariantProductName);
@@ -100,11 +98,9 @@ public sealed class StorefrontCheckoutTests(E2EApplicationFixture application) :
             await Page.GotoAsync(ProductUrl(data.VariantProductSlug));
             await Page.GetByLabel("Choose a variant", new() { Exact = true })
                 .SelectOptionAsync(data.VariantId.ToString("D", CultureInfo.InvariantCulture));
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true }).ClickAsync();
-            await Expect(Page.GetByText(
-                    $"Product {data.VariantProductName} (size {data.VariantSize}) added to cart",
-                    new() { Exact = true }))
-                .ToBeVisibleAsync();
+            await ProductPurchaseButton().ClickAsync();
+            await Expect(ProductCartFeedback())
+                .ToHaveTextAsync($"Product {data.VariantProductName} (size {data.VariantSize}) added to cart");
             await Page.GetByRole(AriaRole.Link, new() { Name = "View Cart", Exact = true }).ClickAsync();
 
             var cartLine = CartLine(data.VariantProductName);
@@ -142,9 +138,19 @@ public sealed class StorefrontCheckoutTests(E2EApplicationFixture application) :
     private async Task AddProductToCartAsync(string productSlug, string productName)
     {
         await Page.GotoAsync(ProductUrl(productSlug));
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true }).ClickAsync();
-        await Expect(Page.GetByText($"Product {productName} added to cart", new() { Exact = true }))
-            .ToBeVisibleAsync();
+        await ProductPurchaseButton().ClickAsync();
+        await Expect(ProductCartFeedback()).ToHaveTextAsync($"Product {productName} added to cart");
+    }
+
+    private ILocator ProductPurchaseButton()
+    {
+        return Page.Locator("#purchase")
+            .GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true });
+    }
+
+    private ILocator ProductCartFeedback()
+    {
+        return Page.Locator("#product-cart-feedback");
     }
 
     private string ProductUrl(string slug)
