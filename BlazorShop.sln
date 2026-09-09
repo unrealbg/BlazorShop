@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorShop.ServiceDefaults"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorShop.Storefront", "BlazorShop.Presentation\BlazorShop.Storefront\BlazorShop.Storefront.csproj", "{4BD4E4A6-15E3-476B-9EE8-D1BDC07D844B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorShop.E2E", "BlazorShop.E2E\BlazorShop.E2E.csproj", "{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -155,6 +157,18 @@ Global
 		{4BD4E4A6-15E3-476B-9EE8-D1BDC07D844B}.Release|x64.Build.0 = Release|Any CPU
 		{4BD4E4A6-15E3-476B-9EE8-D1BDC07D844B}.Release|x86.ActiveCfg = Release|Any CPU
 		{4BD4E4A6-15E3-476B-9EE8-D1BDC07D844B}.Release|x86.Build.0 = Release|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Debug|x64.Build.0 = Debug|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Debug|x86.Build.0 = Debug|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Release|x64.ActiveCfg = Release|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Release|x64.Build.0 = Release|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Release|x86.ActiveCfg = Release|Any CPU
+		{A8C57D0F-862C-4EF4-B2E1-4A5E0BCDD037}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
