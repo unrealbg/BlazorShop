@@ -145,16 +145,27 @@ jobs:
           -InstallerPath BlazorShop.E2E/bin/Release/net10.0/playwright.ps1
 
       - name: Run browser E2E suite (first consecutive run)
+        shell: pwsh
         env:
           BLAZORSHOP_E2E_ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/e2e/run-1
-        run: >-
-          dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj
-          --configuration Release
-          --no-build
-          --no-restore
-          --logger "trx;LogFileName=e2e-run-1.trx"
-          --results-directory artifacts/e2e/test-results/run-1
-          --verbosity normal
+        run: |
+          $logPath = "artifacts/e2e/run-1/application-output.log"
+          New-Item -ItemType Directory -Force -Path (Split-Path $logPath) | Out-Null
+          & dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj `
+            --configuration Release `
+            --no-build `
+            --no-restore `
+            --logger "trx;LogFileName=e2e-run-1.trx" `
+            --results-directory artifacts/e2e/test-results/run-1 `
+            --verbosity normal 2>&1 | Tee-Object -FilePath $logPath
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) { exit $testExitCode }
+          if ((Get-Item $logPath).Length -eq 0) { throw "The E2E application log is empty." }
+          foreach ($resource in @("apiservice", "storefront", "adminclient", "postgres")) {
+            if (-not (Select-String -Path $logPath -Pattern "BlazorShop.AppHost.Resources.$resource" -SimpleMatch -Quiet)) {
+              throw "The E2E application log is missing output for resource '$resource'."
+            }
+          }
 
       - name: Verify mandatory browser scenarios (first run)
         shell: pwsh
@@ -163,16 +174,27 @@ jobs:
           -Path artifacts/e2e/test-results/run-1/e2e-run-1.trx
 
       - name: Run browser E2E suite (second consecutive run)
+        shell: pwsh
         env:
           BLAZORSHOP_E2E_ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/e2e/run-2
-        run: >-
-          dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj
-          --configuration Release
-          --no-build
-          --no-restore
-          --logger "trx;LogFileName=e2e-run-2.trx"
-          --results-directory artifacts/e2e/test-results/run-2
-          --verbosity normal
+        run: |
+          $logPath = "artifacts/e2e/run-2/application-output.log"
+          New-Item -ItemType Directory -Force -Path (Split-Path $logPath) | Out-Null
+          & dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj `
+            --configuration Release `
+            --no-build `
+            --no-restore `
+            --logger "trx;LogFileName=e2e-run-2.trx" `
+            --results-directory artifacts/e2e/test-results/run-2 `
+            --verbosity normal 2>&1 | Tee-Object -FilePath $logPath
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) { exit $testExitCode }
+          if ((Get-Item $logPath).Length -eq 0) { throw "The E2E application log is empty." }
+          foreach ($resource in @("apiservice", "storefront", "adminclient", "postgres")) {
+            if (-not (Select-String -Path $logPath -Pattern "BlazorShop.AppHost.Resources.$resource" -SimpleMatch -Quiet)) {
+              throw "The E2E application log is missing output for resource '$resource'."
+            }
+          }
 
       - name: Verify mandatory browser scenarios (second run)
         shell: pwsh

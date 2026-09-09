@@ -13,16 +13,13 @@ using BlazorShop.Infrastructure.Data;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 public sealed class E2EApplicationFixture : IAsyncLifetime
 {
     private const string PostgresImageTag = "16.13-alpine3.23";
     private const string UserRoleId = "b7af6842-02fa-4af4-8f61-ae04a49644a2";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
-    private readonly List<Task> logCaptureTasks = [];
     private DistributedApplication? application;
-    private CancellationTokenSource? logCaptureCancellation;
     private string? connectionString;
 
     public Uri StorefrontBaseUrl { get; private set; } = null!;
@@ -58,7 +55,6 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
 
         application = await builder.BuildAsync();
-        StartApplicationLogCapture();
         await application.StartAsync();
 
         await application.ResourceNotifications
@@ -235,7 +231,6 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         }
         finally
         {
-            await StopApplicationLogCaptureAsync();
             await application.DisposeAsync();
         }
     }
@@ -288,60 +283,6 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         }
 
         throw new TimeoutException($"The application endpoint {baseUri} did not become ready within {StartupTimeout}.");
-    }
-
-    private void StartApplicationLogCapture()
-    {
-        Directory.CreateDirectory(ArtifactDirectory);
-        logCaptureCancellation = new CancellationTokenSource();
-        var resourceLogger = application!.Services.GetRequiredService<ResourceLoggerService>();
-
-        foreach (var resourceName in new[] { "postgres", "apiservice", "storefront", "adminclient" })
-        {
-            var logPath = Path.Combine(ArtifactDirectory, $"{resourceName}.log");
-            logCaptureTasks.Add(CaptureResourceLogsAsync(
-                resourceLogger,
-                resourceName,
-                logPath,
-                logCaptureCancellation.Token));
-        }
-    }
-
-    private async Task StopApplicationLogCaptureAsync()
-    {
-        if (logCaptureCancellation is null)
-        {
-            return;
-        }
-
-        await logCaptureCancellation.CancelAsync();
-        await Task.WhenAll(logCaptureTasks);
-        logCaptureCancellation.Dispose();
-    }
-
-    private static async Task CaptureResourceLogsAsync(
-        ResourceLoggerService resourceLogger,
-        string resourceName,
-        string logPath,
-        CancellationToken cancellationToken)
-    {
-        await using var writer = new StreamWriter(logPath, append: false);
-
-        try
-        {
-            await foreach (var batch in resourceLogger.WatchAsync(resourceName).WithCancellation(cancellationToken))
-            {
-                foreach (var line in batch)
-                {
-                    await writer.WriteLineAsync(line.ToString());
-                }
-
-                await writer.FlushAsync(cancellationToken);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
     }
 
     private static string ResolveArtifactDirectory()
