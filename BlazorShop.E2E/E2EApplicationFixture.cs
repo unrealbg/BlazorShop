@@ -43,9 +43,14 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         var apiResource = builder.Resources
             .OfType<ProjectResource>()
             .Single(resource => resource.Name == "apiservice");
+        var storefrontResource = builder.Resources
+            .OfType<ProjectResource>()
+            .Single(resource => resource.Name == "storefront");
 
         builder.CreateResourceBuilder(apiResource)
             .WithEnvironment("Jwt__Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)));
+        builder.CreateResourceBuilder(storefrontResource)
+            .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
 
         application = await builder.BuildAsync();
         await application.StartAsync();
