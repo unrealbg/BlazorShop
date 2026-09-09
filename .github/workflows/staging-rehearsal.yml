@@ -1,0 +1,109 @@
+name: Staging Upgrade and Restore Rehearsal
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/staging-rehearsal.yml"
+      - "BlazorShop.StagingRehearsal/**"
+      - "rehearsal/**"
+      - "scripts/install-playwright-chromium.ps1"
+      - "scripts/verify-staging-rehearsal-results.ps1"
+      - "docs/staging-upgrade-restore-rehearsal.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-rehearsal-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upgrade-restore-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout rehearsal tooling
+        uses: actions/checkout@v6
+        with:
+          path: tooling
+          persist-credentials: false
+
+      - name: Checkout exact historical application baseline
+        uses: actions/checkout@v6
+        with:
+          ref: df8a5e19d12728f0228e293404d6e2ceee743db7
+          path: application-baseline
+          persist-credentials: false
+
+      - name: Checkout exact target application version
+        uses: actions/checkout@v6
+        with:
+          ref: 8370f817857648f475041228ea6eaf228a3b9e34
+          path: application-target
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: application-target/global.json
+
+      - name: Record hosted runner and SDK evidence
+        shell: bash
+        working-directory: tooling
+        run: |
+          mkdir -p artifacts/staging-rehearsal/reports
+          {
+            echo "runner_image=ubuntu-24.04"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            dotnet --info
+          } > artifacts/staging-rehearsal/reports/host-tooling.txt
+
+      - name: Restore attach-only browser project
+        working-directory: tooling
+        run: dotnet restore BlazorShop.StagingRehearsal/BlazorShop.StagingRehearsal.csproj
+
+      - name: Build attach-only browser project
+        working-directory: tooling
+        run: >-
+          dotnet build BlazorShop.StagingRehearsal/BlazorShop.StagingRehearsal.csproj
+          --configuration Release
+          --no-restore
+          -warnaserror
+
+      - name: Record browser test package versions
+        working-directory: tooling
+        run: >-
+          dotnet list BlazorShop.StagingRehearsal/BlazorShop.StagingRehearsal.csproj
+          package
+          --include-transitive
+          > artifacts/staging-rehearsal/reports/browser-packages.txt
+
+      - name: Install matching Playwright Chromium and system dependencies
+        working-directory: tooling
+        run: >-
+          pwsh scripts/install-playwright-chromium.ps1
+          -InstallerPath BlazorShop.StagingRehearsal/bin/Release/net10.0/playwright.ps1
+
+      - name: Run isolated upgrade and restore rehearsal
+        shell: bash
+        run: |
+          mkdir -p tooling/artifacts/staging-rehearsal/logs
+          set +e
+          bash tooling/rehearsal/run-staging-rehearsal.sh \
+            tooling application-baseline application-target \
+            2>&1 | tee tooling/artifacts/staging-rehearsal/logs/runner.log
+          rehearsal_exit=${PIPESTATUS[0]}
+          exit "$rehearsal_exit"
+
+      - name: Upload sanitized rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-upgrade-restore-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tooling/artifacts/staging-rehearsal
+          if-no-files-found: error
+          retention-days: 14
