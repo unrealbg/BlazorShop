@@ -149,7 +149,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     Assert.DoesNotContain(
                         ArchiveMigration,
                         await failedAttemptContext.Database.GetAppliedMigrationsAsync());
-                    Assert.Equal([committedRow], await ReadRowsAsync(failedAttemptContext, LegacyTable));
+                    AssertArchivedRows([committedRow], await ReadRowsAsync(failedAttemptContext, LegacyTable));
                 }
 
                 await blockerTransaction.RollbackAsync();
@@ -335,9 +335,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         {
             Assert.False(await TableExistsAsync(context, LegacyTable));
             Assert.True(await TableExistsAsync(context, ArchiveTable));
-            Assert.Equal(
-                expectedRows.OrderBy(row => row.Id),
-                (await ReadRowsAsync(context, ArchiveTable)).OrderBy(row => row.Id));
+            AssertArchivedRows(expectedRows, await ReadRowsAsync(context, ArchiveTable));
             Assert.Equal(expectedComment, await GetTableCommentAsync(context, ArchiveTable));
         }
 
@@ -347,10 +345,31 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         {
             Assert.True(await TableExistsAsync(context, LegacyTable));
             Assert.False(await TableExistsAsync(context, ArchiveTable));
-            Assert.Equal(
-                expectedRows.OrderBy(row => row.Id),
-                (await ReadRowsAsync(context, LegacyTable)).OrderBy(row => row.Id));
+            AssertArchivedRows(expectedRows, await ReadRowsAsync(context, LegacyTable));
             Assert.Null(await GetTableCommentAsync(context, LegacyTable));
+        }
+
+        private static void AssertArchivedRows(
+            IReadOnlyCollection<ArchivedCheckoutRow> expectedRows,
+            IReadOnlyCollection<ArchivedCheckoutRow> actualRows)
+        {
+            var expected = expectedRows.OrderBy(row => row.Id).ToArray();
+            var actual = actualRows.OrderBy(row => row.Id).ToArray();
+            Assert.Equal(expected.Length, actual.Length);
+
+            for (var index = 0; index < expected.Length; index++)
+            {
+                Assert.Equal(expected[index].Id, actual[index].Id);
+                Assert.Equal(expected[index].ProductId, actual[index].ProductId);
+                Assert.Equal(expected[index].Quantity, actual[index].Quantity);
+                Assert.Equal(expected[index].UserId, actual[index].UserId);
+
+                // PostgreSQL stores timestamp values at microsecond precision. Compare the exact
+                // persisted instant without treating unsupported sub-microsecond CLR ticks as data loss.
+                Assert.Equal(
+                    expected[index].CreatedOn.ToUniversalTime().Ticks / TimeSpan.TicksPerMicrosecond,
+                    actual[index].CreatedOn.ToUniversalTime().Ticks / TimeSpan.TicksPerMicrosecond);
+            }
         }
 
         private static async Task<IReadOnlyList<ArchivedCheckoutRow>> ReadRowsAsync(
