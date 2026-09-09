@@ -89,6 +89,99 @@ jobs:
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
 
+  browser-e2e:
+    if: github.event_name != 'pull_request' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
+
+      - name: Install Web build dependencies from lockfile
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: npm ci --include=dev
+
+      - name: Restore browser E2E project
+        run: dotnet restore BlazorShop.E2E/BlazorShop.E2E.csproj
+
+      - name: Build browser E2E project
+        run: >-
+          dotnet build BlazorShop.E2E/BlazorShop.E2E.csproj
+          --configuration Release
+          --no-restore
+          -warnaserror
+
+      - name: Create development HTTPS certificate
+        run: dotnet dev-certs https
+
+      - name: Install Playwright Chromium and operating-system dependencies
+        run: >-
+          pwsh BlazorShop.E2E/bin/Release/net10.0/playwright.ps1
+          install --with-deps chromium
+
+      - name: Run browser E2E suite (first consecutive run)
+        env:
+          BLAZORSHOP_E2E_ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/e2e/run-1
+        run: >-
+          dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+          --logger "trx;LogFileName=e2e-run-1.trx"
+          --results-directory artifacts/e2e/test-results/run-1
+          --verbosity normal
+
+      - name: Verify mandatory browser scenarios (first run)
+        shell: pwsh
+        run: >-
+          ./scripts/verify-e2e-results.ps1
+          -Path artifacts/e2e/test-results/run-1/e2e-run-1.trx
+
+      - name: Run browser E2E suite (second consecutive run)
+        env:
+          BLAZORSHOP_E2E_ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/e2e/run-2
+        run: >-
+          dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+          --logger "trx;LogFileName=e2e-run-2.trx"
+          --results-directory artifacts/e2e/test-results/run-2
+          --verbosity normal
+
+      - name: Verify mandatory browser scenarios (second run)
+        shell: pwsh
+        run: >-
+          ./scripts/verify-e2e-results.ps1
+          -Path artifacts/e2e/test-results/run-2/e2e-run-2.trx
+
+      - name: Report E2E PostgreSQL image
+        run: >-
+          docker image inspect postgres:16.13-alpine3.23
+          --format 'tag={{index .RepoTags 0}} digests={{json .RepoDigests}}'
+
+      - name: Upload browser E2E reports and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/e2e
+          if-no-files-found: error
+          retention-days: 14
+
   postgres16-archive:
     runs-on: ubuntu-latest
     env:

@@ -17,6 +17,7 @@ BlazorShop is an open-source, opinionated .NET 10 e-commerce starter and referen
 - [API & Docs](#api--docs)
 - [Screenshots](#screenshots)
 - [Contributing](#contributing)
+- [Browser E2E Tests](#browser-e2e-tests)
 - [Demo](#demo)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
@@ -205,7 +206,11 @@ Runtime notes:
    dotnet test BlazorShop.sln -c Release
    ```
 
-The existing automated test suite covers application services, authentication, payment/cart behavior, repositories/infrastructure and migration/model consistency. Browser E2E coverage is tracked separately in #37.
+The existing automated test suite covers application services, authentication, payment/cart behavior, repositories/infrastructure and migration/model consistency. The separate Chromium suite exercises the real Storefront-to-Web checkout-start flow; see [Browser E2E Tests](#browser-e2e-tests).
+
+## Browser E2E Tests
+
+`BlazorShop.E2E` uses Microsoft.Playwright, the existing Aspire AppHost and a disposable PostgreSQL 16 database to exercise navigation, product and variant cart behavior, persistence after reload, anonymous login handoff, UI login and authenticated checkout start. Browser installation, local commands, CI behavior and diagnostic artifacts are documented in [docs/browser-e2e.md](docs/browser-e2e.md).
 
 ## Project Structure
 - **BlazorShop.Domain** – Core entities and contracts
@@ -218,6 +223,7 @@ The existing automated test suite covers application services, authentication, p
 - **BlazorShop.AppHost** – Microsoft Aspire local orchestrator for API + Storefront + Web + PostgreSQL
 - **BlazorShop.ServiceDefaults** – Shared Aspire defaults for telemetry, health checks, service discovery, and HTTP resilience
 - **BlazorShop.Tests** – Automated unit/service/infrastructure tests
+- **BlazorShop.E2E** – Isolated Playwright Chromium tests for the real checkout-start browser flow
 
 ## API & Docs
 - Swagger UI is available when the API runs in Development at `/swagger`.
