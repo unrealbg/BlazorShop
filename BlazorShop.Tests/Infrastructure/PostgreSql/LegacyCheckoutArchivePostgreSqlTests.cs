@@ -40,7 +40,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         {
             await using (var context = _database.CreateContext())
             {
-                await context.Database.EnsureDeletedAsync();
+                await ResetSchemaAsync(context);
             }
 
             using var provider = CreateBootstrapProvider();
@@ -67,7 +67,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 new DateTime(2024, 2, 3, 4, 5, 6, DateTimeKind.Utc));
             await using (var context = _database.CreateContext())
             {
-                await context.Database.EnsureDeletedAsync();
+                await ResetSchemaAsync(context);
                 await context.Database.MigrateAsync(InitialMigration);
                 await InsertLegacyRowsAsync(context, [legacyRow]);
                 await context.Database.ExecuteSqlRawAsync("DROP TABLE \"__EFMigrationsHistory\";");
@@ -290,6 +290,15 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     _database.ConnectionString,
                     npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)))
                 .BuildServiceProvider();
+        }
+
+        private static Task ResetSchemaAsync(AppDbContext context)
+        {
+            return context.Database.ExecuteSqlRawAsync(
+                """
+                DROP SCHEMA IF EXISTS public CASCADE;
+                CREATE SCHEMA public;
+                """);
         }
 
         private static async Task InsertLegacyRowsAsync(
