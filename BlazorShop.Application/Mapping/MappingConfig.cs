@@ -81,7 +81,6 @@
             this.CreateMap<LoginUser, AppUser>();
 
             this.CreateMap<PaymentMethod, GetPaymentMethod>();
-            this.CreateMap<CreateOrderItem, OrderItem>();
         }
     }
 }

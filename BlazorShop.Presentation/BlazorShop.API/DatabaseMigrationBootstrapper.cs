@@ -13,6 +13,9 @@ namespace BlazorShop.API
         private const string EfProductVersion = "10.0.0";
         private const string MigrationHistoryTableName = "__EFMigrationsHistory";
 
+        // This describes the historical, pre-EF-history initial schema only. CheckoutOrderItems
+        // remains required here so a genuine legacy database can be baselined before the #95
+        // migration atomically renames it to its operational archive. It is not a runtime dependency.
         private static readonly string[] InitialSchemaTables =
         [
             "AspNetRoles",

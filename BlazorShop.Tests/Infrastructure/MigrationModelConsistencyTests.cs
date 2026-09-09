@@ -104,6 +104,64 @@ namespace BlazorShop.Tests.Infrastructure
                 $"Runtime model differs from migration snapshot: {string.Join(", ", operations.Select(operation => operation.GetType().Name))}");
         }
 
+        [Fact]
+        public void RuntimeModel_DoesNotExposeLegacyCheckoutHistoryOrItsArchive()
+        {
+            using var context = CreateContext();
+
+            Assert.DoesNotContain(
+                context.Model.GetEntityTypes(),
+                entity => entity.ClrType.FullName == "BlazorShop.Domain.Entities.Payment.OrderItem");
+            Assert.DoesNotContain(
+                context.Model.GetEntityTypes(),
+                entity => entity.GetTableName() is "CheckoutOrderItems" or "LegacyCheckoutOrderItemsArchive");
+        }
+
+        [Fact]
+        public void ProductionSource_HasNoActiveLegacyCheckoutHistoryDependency()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var sourceRoots = new[]
+            {
+                "BlazorShop.Domain",
+                "BlazorShop.Application",
+                "BlazorShop.Infrastructure",
+                "BlazorShop.Presentation",
+            };
+            var forbiddenTokens = new[]
+            {
+                "CreateOrderItem",
+                "GetOrderItem",
+                "SaveCheckoutHistory",
+                "GetAllCheckoutHistory",
+                "GetCheckoutHistoryByUserId",
+                "CartRepository",
+                "save-checkout",
+                "user/order-items",
+                "order-items",
+            };
+
+            var activeSourceFiles = sourceRoots
+                .Select(root => Path.Combine(repositoryRoot, root))
+                .SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+                .Where(path => !path.Contains(
+                    $"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}",
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.EndsWith(
+                    "DatabaseMigrationBootstrapper.cs",
+                    StringComparison.OrdinalIgnoreCase));
+
+            var violations = activeSourceFiles
+                .SelectMany(path => forbiddenTokens
+                    .Where(token => File.ReadAllText(path).Contains(token, StringComparison.Ordinal))
+                    .Select(token => $"{Path.GetRelativePath(repositoryRoot, path)}: {token}"))
+                .ToArray();
+
+            Assert.True(
+                violations.Length == 0,
+                $"Active legacy checkout-history dependencies remain: {string.Join(" | ", violations)}");
+        }
+
         [Theory]
         [InlineData("BlazorShop.Infrastructure/Services/InventoryReservationService.cs")]
         [InlineData("BlazorShop.Infrastructure/Services/StripePaymentReconciliationService.cs")]

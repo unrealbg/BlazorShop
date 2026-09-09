@@ -11,6 +11,7 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
 
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.Mvc.Routing;
 
     using Moq;
 
@@ -18,6 +19,25 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
 
     public class CartControllerTests
     {
+        [Fact]
+        public void Routes_ExposeAuthoritativeOrderHistoryWithoutLegacyHistoryEndpoints()
+        {
+            var routeTemplates = typeof(CartController)
+                .GetMethods()
+                .SelectMany(method => method.GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true))
+                .Cast<HttpMethodAttribute>()
+                .Select(attribute => attribute.Template)
+                .Where(template => template is not null)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            Assert.Contains("checkout", routeTemplates);
+            Assert.Contains("user/orders", routeTemplates);
+            Assert.Contains("orders", routeTemplates);
+            Assert.DoesNotContain("save-checkout", routeTemplates);
+            Assert.DoesNotContain("order-items", routeTemplates);
+            Assert.DoesNotContain("user/order-items", routeTemplates);
+        }
+
         [Fact]
         public async Task Checkout_ReturnsTypedResultOwnedByAuthenticatedUser()
         {
@@ -41,7 +61,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .ReturnsAsync(CheckoutExecutionResult.Succeeded(
                     new ServiceResponse<CheckoutResult>(true) { Payload = typedResult }));
             var controller = new CartController(
-                Mock.Of<ICartService>(),
                 orchestrator.Object,
                 Mock.Of<IOrderQueryService>(),
                 Mock.Of<IOrderTrackingService>())
@@ -79,7 +98,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         {
             var orchestrator = new Mock<ICheckoutOrchestrator>();
             var controller = new CartController(
-                Mock.Of<ICartService>(),
                 orchestrator.Object,
                 Mock.Of<IOrderQueryService>(),
                 Mock.Of<IOrderTrackingService>())
@@ -171,39 +189,9 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
             Assert.Equal("true", controller.Response.Headers["Idempotency-Replayed"]);
         }
 
-        [Fact]
-        public async Task SaveCheckout_ReturnsUnauthorized_WhenUserIdClaimIsMissing()
-        {
-            var cartService = new Mock<ICartService>();
-            var orderQueryService = new Mock<IOrderQueryService>();
-            var trackingService = new Mock<IOrderTrackingService>();
-
-            var controller = new CartController(
-                cartService.Object,
-                Mock.Of<ICheckoutOrchestrator>(),
-                orderQueryService.Object,
-                trackingService.Object)
-            {
-                ControllerContext = new ControllerContext
-                {
-                    HttpContext = new DefaultHttpContext
-                    {
-                        User = new ClaimsPrincipal(new ClaimsIdentity())
-                    }
-                }
-            };
-
-            var result = await controller.SaveCheckout(Array.Empty<CreateOrderItem>());
-
-            var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
-            Assert.Equal("User ID is invalid or not found.", unauthorized.Value);
-            cartService.Verify(service => service.SaveCheckoutHistoryAsync(It.IsAny<string>(), It.IsAny<IEnumerable<CreateOrderItem>>()), Times.Never);
-        }
-
         private static CartController CreateAuthenticatedController(ICheckoutOrchestrator orchestrator)
         {
             return new CartController(
-                Mock.Of<ICartService>(),
                 orchestrator,
                 Mock.Of<IOrderQueryService>(),
                 Mock.Of<IOrderTrackingService>())
@@ -223,54 +211,8 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         }
 
         [Fact]
-        public async Task SaveCheckout_UsesAuthenticatedUserIdInsteadOfClientPayload()
-        {
-            var cartService = new Mock<ICartService>();
-            var orderQueryService = new Mock<IOrderQueryService>();
-            var trackingService = new Mock<IOrderTrackingService>();
-            var orderItems = new[]
-            {
-                new CreateOrderItem
-                {
-                    ProductId = Guid.NewGuid(),
-                    Quantity = 1,
-                    UserId = "spoofed-user",
-                }
-            };
-
-            cartService
-                .Setup(service => service.SaveCheckoutHistoryAsync("user-1", orderItems))
-                .ReturnsAsync(new ServiceResponse(true, "Checkout history saved successfully"));
-
-            var controller = new CartController(
-                cartService.Object,
-                Mock.Of<ICheckoutOrchestrator>(),
-                orderQueryService.Object,
-                trackingService.Object)
-            {
-                ControllerContext = new ControllerContext
-                {
-                    HttpContext = new DefaultHttpContext
-                    {
-                        User = new ClaimsPrincipal(new ClaimsIdentity(
-                        [
-                            new Claim(ClaimTypes.NameIdentifier, "user-1"),
-                        ],
-                        authenticationType: "TestAuth"))
-                    }
-                }
-            };
-
-            var result = await controller.SaveCheckout(orderItems);
-
-            Assert.IsType<OkObjectResult>(result);
-            cartService.Verify(service => service.SaveCheckoutHistoryAsync("user-1", orderItems), Times.Once);
-        }
-
-        [Fact]
         public async Task GetUserOrders_ReturnsOkEmptyCollection_WhenUserHasNoOrders()
         {
-            var cartService = new Mock<ICartService>();
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
 
@@ -279,7 +221,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .ReturnsAsync(Array.Empty<GetOrder>());
 
             var controller = new CartController(
-                cartService.Object,
                 Mock.Of<ICheckoutOrchestrator>(),
                 orderQueryService.Object,
                 trackingService.Object)
@@ -307,7 +248,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         [Fact]
         public async Task GetAllOrders_ReturnsOkEmptyCollection_WhenThereAreNoOrders()
         {
-            var cartService = new Mock<ICartService>();
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
 
@@ -316,7 +256,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .ReturnsAsync(Array.Empty<GetOrder>());
 
             var controller = new CartController(
-                cartService.Object,
                 Mock.Of<ICheckoutOrchestrator>(),
                 orderQueryService.Object,
                 trackingService.Object);
@@ -331,7 +270,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         [Fact]
         public async Task UpdateTracking_ReturnsNotFound_WhenOrderDoesNotExist()
         {
-            var cartService = new Mock<ICartService>();
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
             trackingService
@@ -340,7 +278,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .ReturnsAsync(new OrderTrackingTransitionResult(OrderTrackingTransitionOutcome.NotFound));
 
             var controller = new CartController(
-                cartService.Object,
                 Mock.Of<ICheckoutOrchestrator>(),
                 orderQueryService.Object,
                 trackingService.Object);
@@ -358,7 +295,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         [Fact]
         public async Task UpdateShippingStatus_ReturnsNoContent_WhenOrderExists()
         {
-            var cartService = new Mock<ICartService>();
             var orderQueryService = new Mock<IOrderQueryService>();
             var trackingService = new Mock<IOrderTrackingService>();
             trackingService
@@ -367,7 +303,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                 .ReturnsAsync(new OrderTrackingTransitionResult(OrderTrackingTransitionOutcome.Applied));
 
             var controller = new CartController(
-                cartService.Object,
                 Mock.Of<ICheckoutOrchestrator>(),
                 orderQueryService.Object,
                 trackingService.Object);
@@ -395,7 +330,6 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
                     It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new OrderTrackingTransitionResult(outcome, "Lifecycle failure"));
             var controller = new CartController(
-                Mock.Of<ICartService>(),
                 Mock.Of<ICheckoutOrchestrator>(),
                 Mock.Of<IOrderQueryService>(),
                 trackingService.Object);

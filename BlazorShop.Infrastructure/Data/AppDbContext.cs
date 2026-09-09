@@ -33,8 +33,6 @@
 
         public DbSet<PaymentMethod> PaymentMethods { get; set; }
 
-        public DbSet<OrderItem> CheckoutOrderItems { get; set; }
-
         public DbSet<NewsletterSubscriber> NewsletterSubscribers { get; set; }
 
         public DbSet<Order> Orders { get; set; }
