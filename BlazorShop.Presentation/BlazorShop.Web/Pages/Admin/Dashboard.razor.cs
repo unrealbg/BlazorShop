@@ -47,12 +47,12 @@
         private DateTime _metricsFrom = DateTime.UtcNow.Date.AddDays(-13);
         private DateTime _metricsTo = DateTime.UtcNow.Date;
 
-        private bool _showEdit; 
+        private bool _showEdit;
         private GetOrder? _editOrder;
         private string _carrier = string.Empty;
         private string _trackingNumber = string.Empty;
         private string _trackingUrl = string.Empty;
-        private string _shippingStatus = "PendingShipment";
+        private string _shippingStatus = "NotStarted";
 
         [Inject] private IAppJsInterop JsInterop { get; set; } = default!;
         [Inject] private IMetricsClient MetricsClient { get; set; } = default!;
@@ -94,14 +94,19 @@
         private void ComputeStats()
         {
             _countOrders = _orders.Count;
-            _totalRevenue = _orders.Sum(o => o.TotalAmount);
+            _totalRevenue = _orders
+                .Where(o => string.Equals(o.PaymentStatus, "Paid", StringComparison.Ordinal))
+                .Sum(o => o.TotalAmount);
             var today = DateTime.UtcNow.Date;
-            _todayRevenue = _orders.Where(o => o.CreatedOn.Date == today).Sum(o => o.TotalAmount);
-            _pendingCount = _orders.Count(o => string.Equals(o.ShippingStatus, "PendingShipment", StringComparison.OrdinalIgnoreCase));
-            _shippedCount = _orders.Count(o => string.Equals(o.ShippingStatus, "Shipped", StringComparison.OrdinalIgnoreCase));
-            _inTransitCount = _orders.Count(o => string.Equals(o.ShippingStatus, "InTransit", StringComparison.OrdinalIgnoreCase));
-            _ofdCount = _orders.Count(o => string.Equals(o.ShippingStatus, "OutForDelivery", StringComparison.OrdinalIgnoreCase));
-            _deliveredCount = _orders.Count(o => string.Equals(o.ShippingStatus, "Delivered", StringComparison.OrdinalIgnoreCase));
+            _todayRevenue = _orders
+                .Where(o => o.CreatedOn.Date == today
+                    && string.Equals(o.PaymentStatus, "Paid", StringComparison.Ordinal))
+                .Sum(o => o.TotalAmount);
+            _pendingCount = _orders.Count(o => string.Equals(o.FulfillmentStatus, "NotStarted", StringComparison.OrdinalIgnoreCase));
+            _shippedCount = _orders.Count(o => string.Equals(o.FulfillmentStatus, "Shipped", StringComparison.OrdinalIgnoreCase));
+            _inTransitCount = _orders.Count(o => string.Equals(o.FulfillmentStatus, "InTransit", StringComparison.OrdinalIgnoreCase));
+            _ofdCount = _orders.Count(o => string.Equals(o.FulfillmentStatus, "OutForDelivery", StringComparison.OrdinalIgnoreCase));
+            _deliveredCount = _orders.Count(o => string.Equals(o.FulfillmentStatus, "Delivered", StringComparison.OrdinalIgnoreCase));
             _recentOrders = _orders.OrderByDescending(o => o.CreatedOn).Take(50).ToList();
         }
 
@@ -109,7 +114,7 @@
         {
             IEnumerable<GetOrder> q = _recentOrders;
             if (!string.IsNullOrWhiteSpace(_statusFilter))
-                q = q.Where(o => string.Equals(o.ShippingStatus, _statusFilter, StringComparison.OrdinalIgnoreCase));
+                q = q.Where(o => string.Equals(o.FulfillmentStatus, _statusFilter, StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrWhiteSpace(_refQuery))
                 q = q.Where(o => o.Reference.Contains(_refQuery, StringComparison.OrdinalIgnoreCase));
             if (_fromDate.HasValue)
@@ -123,8 +128,8 @@
                 ("Reference", false) => q.OrderByDescending(o => o.Reference),
                 ("TotalAmount", true) => q.OrderBy(o => o.TotalAmount),
                 ("TotalAmount", false) => q.OrderByDescending(o => o.TotalAmount),
-                ("ShippingStatus", true) => q.OrderBy(o => o.ShippingStatus),
-                ("ShippingStatus", false) => q.OrderByDescending(o => o.ShippingStatus),
+                ("FulfillmentStatus", true) => q.OrderBy(o => o.FulfillmentStatus),
+                ("FulfillmentStatus", false) => q.OrderByDescending(o => o.FulfillmentStatus),
                 ("CreatedOn", true) => q.OrderBy(o => o.CreatedOn),
                 _ => q.OrderByDescending(o => o.CreatedOn)
             };
@@ -150,6 +155,7 @@
         private void BuildTopProducts()
         {
             _topProducts = _orders
+                .Where(o => string.Equals(o.PaymentStatus, "Paid", StringComparison.Ordinal))
                 .SelectMany(o => o.Lines)
                 .GroupBy(l => l.ProductName ?? "(Unknown)")
                 .Select(g => (Name: g.Key, Quantity: g.Sum(x => x.Quantity), Revenue: g.Sum(x => x.LineTotal)))
@@ -164,8 +170,33 @@
             _carrier = order.ShippingCarrier ?? string.Empty;
             _trackingNumber = order.TrackingNumber ?? string.Empty;
             _trackingUrl = order.TrackingUrl ?? string.Empty;
-            _shippingStatus = order.ShippingStatus ?? "PendingShipment";
+            _shippingStatus = order.FulfillmentStatus ?? "NotStarted";
             _showEdit = true;
+        }
+
+        private static IReadOnlyList<string> GetAllowedFulfillmentStatuses(GetOrder? order)
+        {
+            if (order is null)
+            {
+                return ["NotStarted"];
+            }
+
+            var eligible = string.Equals(order.OrderStatus, "Confirmed", StringComparison.Ordinal)
+                && (string.Equals(order.PaymentMethod, "CashOnDelivery", StringComparison.Ordinal)
+                    || string.Equals(order.PaymentStatus, "Paid", StringComparison.Ordinal));
+            if (!eligible)
+            {
+                return [order.FulfillmentStatus];
+            }
+
+            return order.FulfillmentStatus switch
+            {
+                "NotStarted" => ["NotStarted", "Shipped"],
+                "Shipped" => ["Shipped", "InTransit"],
+                "InTransit" => ["InTransit", "OutForDelivery", "Delivered"],
+                "OutForDelivery" => ["OutForDelivery", "Delivered"],
+                _ => [order.FulfillmentStatus],
+            };
         }
 
         private async Task SaveEditAsync()
@@ -173,7 +204,7 @@
             if (_editOrder is null) return;
             var client = await this.HttpClientHelper.GetPrivateClientAsync();
             var tApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/tracking", Type = Constant.ApiCallType.Update, Model = new { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl } };
-            var sApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/shipping-status", Type = Constant.ApiCallType.Update, Model = new { ShippingStatus = _shippingStatus } };
+            var sApi = new ApiCall { Client = client, Route = $"{Constant.Cart.GetAllOrders}/{_editOrder.Id}/shipping-status", Type = Constant.ApiCallType.Update, Model = new { FulfillmentStatus = _shippingStatus } };
 
             var tRes = await this.ApiCallHelper.ApiCallTypeCall<object>(tApi);
             var sRes = await this.ApiCallHelper.ApiCallTypeCall<object>(sApi);
@@ -395,12 +426,15 @@
 
         private async Task ExportCsvAsync()
         {
-            var header = "Created,Reference,Status,Total,Tracking";
+            var header = "Created,Reference,OrderStatus,PaymentStatus,FulfillmentStatus,Total,Currency,Tracking";
             var lines = _orders.Select(o => string.Join(',',
                 o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
                 Escape(o.Reference),
-                Escape(o.ShippingStatus),
+                Escape(o.OrderStatus),
+                Escape(o.PaymentStatus),
+                Escape(o.FulfillmentStatus),
                 o.TotalAmount.ToString("F2"),
+                Escape(o.Currency),
                 Escape(!string.IsNullOrWhiteSpace(o.TrackingUrl) ? o.TrackingUrl! : o.TrackingNumber ?? "")));
             var csv = string.Join("\n", new[] { header }.Concat(lines));
             await JsInterop.DownloadFileAsync($"orders_{DateTime.UtcNow:yyyyMMddHHmm}.csv", csv, "text/csv;charset=utf-8");

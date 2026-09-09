@@ -113,7 +113,7 @@ namespace BlazorShop.Infrastructure.Services
                 }
 
                 var existingOrder = (await db.Orders
-                    .FromSqlInterpolated($"SELECT * FROM \"Orders\" WHERE \"Id\" = {order.Id} FOR UPDATE")
+                    .FromSqlInterpolated($"SELECT *, xmin FROM \"Orders\" WHERE \"Id\" = {order.Id} FOR UPDATE")
                     .ToListAsync(cancellationToken))
                     .SingleOrDefault();
                 if (existingOrder is not null)
@@ -275,7 +275,7 @@ namespace BlazorShop.Infrastructure.Services
 
         public async Task<InventoryTransitionResult> TransitionOrderAsync(
             Guid orderId,
-            string orderStatus,
+            OrderPaymentStatus paymentStatus,
             InventoryReservationStatus reservationStatus,
             CancellationToken cancellationToken = default)
         {
@@ -300,7 +300,7 @@ namespace BlazorShop.Infrastructure.Services
                     if (await VerifyTransitionAsync(
                         db,
                         orderId,
-                        orderStatus,
+                        paymentStatus,
                         reservationStatus,
                         cancellationToken))
                     {
@@ -315,7 +315,7 @@ namespace BlazorShop.Infrastructure.Services
                     cancellationToken);
 
                 var order = (await db.Orders
-                    .FromSqlInterpolated($"SELECT * FROM \"Orders\" WHERE \"Id\" = {orderId} FOR UPDATE")
+                    .FromSqlInterpolated($"SELECT *, xmin FROM \"Orders\" WHERE \"Id\" = {orderId} FOR UPDATE")
                     .ToListAsync(cancellationToken))
                     .SingleOrDefault();
                 if (order is null)
@@ -327,10 +327,13 @@ namespace BlazorShop.Infrastructure.Services
                         cancellationToken);
                 }
 
+                var orderStatus = OrderLifecyclePolicy.GetOrderStatusAfterPayment(order, paymentStatus);
+
                 var result = await InventoryReservationTransitionOperation.ApplyAsync(
                     db,
                     order,
                     orderStatus,
+                    paymentStatus,
                     reservationStatus,
                     cancellationToken);
                 if (result.Outcome is InventoryTransitionOutcome.AlreadyApplied
@@ -366,7 +369,9 @@ namespace BlazorShop.Infrastructure.Services
                 .AsNoTracking()
                 .Where(item => item.OrderId == requestedOrder.Id)
                 .ToListAsync(cancellationToken);
-            if (!string.Equals(persistedOrder.Status, requestedOrder.Status, StringComparison.Ordinal)
+            if (persistedOrder.OrderStatus != requestedOrder.OrderStatus
+                || persistedOrder.PaymentStatus != requestedOrder.PaymentStatus
+                || persistedOrder.PaymentMethod != requestedOrder.PaymentMethod
                 || !string.Equals(persistedOrder.UserId, requestedOrder.UserId, StringComparison.Ordinal)
                 || !string.Equals(persistedOrder.Reference, requestedOrder.Reference, StringComparison.Ordinal)
                 || reservations.Count != targets.Count)
@@ -393,14 +398,15 @@ namespace BlazorShop.Infrastructure.Services
         private static async Task<bool> VerifyTransitionAsync(
             AppDbContext db,
             Guid orderId,
-            string orderStatus,
+            OrderPaymentStatus paymentStatus,
             InventoryReservationStatus reservationStatus,
             CancellationToken cancellationToken)
         {
             var order = await db.Orders
                 .AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
-            if (order is null || !string.Equals(order.Status, orderStatus, StringComparison.Ordinal))
+            if (order is null
+                || order.PaymentStatus != paymentStatus)
             {
                 return false;
             }

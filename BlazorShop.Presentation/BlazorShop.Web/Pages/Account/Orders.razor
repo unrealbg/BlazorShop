@@ -29,7 +29,7 @@
         <div class="mt-8 space-y-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <a href="/account/orders" class="bs-button bs-button-secondary">Back to all orders</a>
-                <span class="bs-chip-solid">@SelectedOrder.ShippingStatus</span>
+                <span class="bs-chip-solid">@SelectedOrder.FulfillmentStatus</span>
             </div>
 
             <article class="bs-panel p-6">
@@ -44,11 +44,13 @@
                     </div>
                     <div>
                         <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</div>
-                        <div class="mt-2 font-semibold text-slate-950">@SelectedOrder.Status</div>
+                        <div class="mt-2 font-semibold text-slate-950">@SelectedOrder.OrderStatus</div>
+                        <div class="mt-1 text-sm text-slate-600">Payment: @SelectedOrder.PaymentStatus</div>
+                        <div class="mt-1 text-sm text-slate-600">Fulfillment: @SelectedOrder.FulfillmentStatus</div>
                     </div>
                     <div>
                         <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total</div>
-                        <div class="mt-2 font-semibold text-slate-950">€ @SelectedOrder.TotalAmount.ToString("F2")</div>
+                        <div class="mt-2 font-semibold text-slate-950">@SelectedOrder.Currency @SelectedOrder.TotalAmount.ToString("F2")</div>
                     </div>
                 </div>
 
@@ -58,8 +60,8 @@
                             <tr class="bg-slate-50 text-left">
                                 <th class="px-4 py-3">Product</th>
                                 <th class="px-4 py-3">Qty</th>
-                                <th class="px-4 py-3">Unit (€)</th>
-                                <th class="px-4 py-3">Total (€)</th>
+                                <th class="px-4 py-3">Unit (@SelectedOrder.Currency)</th>
+                                <th class="px-4 py-3">Total (@SelectedOrder.Currency)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200 bg-white">
@@ -80,6 +82,14 @@
                             }
                         </tbody>
                     </table>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-2 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 sm:grid-cols-5">
+                    <div>Subtotal: @SelectedOrder.Currency @SelectedOrder.SubtotalAmount.ToString("F2")</div>
+                    <div>Discount: @SelectedOrder.Currency @SelectedOrder.DiscountAmount.ToString("F2")</div>
+                    <div>Shipping: @SelectedOrder.Currency @SelectedOrder.ShippingAmount.ToString("F2")</div>
+                    <div>Tax: @SelectedOrder.Currency @SelectedOrder.TaxAmount.ToString("F2")</div>
+                    <div class="font-semibold">Total: @SelectedOrder.Currency @SelectedOrder.TotalAmount.ToString("F2")</div>
                 </div>
 
                 <div class="mt-6 text-sm text-slate-600">
@@ -116,13 +126,15 @@
                         <div>
                             <div class="flex flex-wrap items-center gap-3">
                                 <h2 class="text-xl font-bold text-slate-950">@order.Reference</h2>
-                                <span class="bs-chip">@order.ShippingStatus</span>
+                                <span class="bs-chip">Order: @order.OrderStatus</span>
+                                <span class="bs-chip">Payment: @order.PaymentStatus</span>
+                                <span class="bs-chip">Fulfillment: @order.FulfillmentStatus</span>
                             </div>
                             <p class="mt-2 text-sm leading-6 text-slate-600">Placed @order.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
                         </div>
 
                         <div class="text-sm text-slate-600 lg:text-right">
-                            <div>Total: <span class="font-semibold text-slate-950">€ @order.TotalAmount.ToString("F2")</span></div>
+                            <div>Total: <span class="font-semibold text-slate-950">@order.Currency @order.TotalAmount.ToString("F2")</span></div>
                             <div class="bs-action-row mt-2 lg:justify-end">
                                 <a href="@($"/account/orders/{order.Id}")" class="bs-button bs-button-primary">View details</a>
                                 @if (!string.IsNullOrWhiteSpace(order.TrackingUrl))
@@ -143,7 +155,7 @@
                                     <div class="mt-1 text-xs text-slate-500">@line.VariantLabel</div>
                                 }
                                 <div class="mt-1">Qty: @line.Quantity</div>
-                                <div class="mt-1">Line total: € @line.LineTotal.ToString("F2")</div>
+                                <div class="mt-1">Line total: @order.Currency @line.LineTotal.ToString("F2")</div>
                             </div>
                         }
                     </div>

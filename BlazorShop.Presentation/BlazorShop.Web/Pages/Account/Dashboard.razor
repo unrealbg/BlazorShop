@@ -65,13 +65,15 @@
                                 <div>
                                     <div class="flex flex-wrap items-center gap-3">
                                         <h3 class="text-lg font-bold text-slate-950">@order.Reference</h3>
-                                        <span class="bs-chip">@order.ShippingStatus</span>
+                                        <span class="bs-chip">Order: @order.OrderStatus</span>
+                                        <span class="bs-chip">Payment: @order.PaymentStatus</span>
+                                        <span class="bs-chip">Fulfillment: @order.FulfillmentStatus</span>
                                     </div>
                                     <p class="mt-2 text-sm leading-6 text-slate-600">Placed @order.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
                                 </div>
 
                                 <div class="text-sm text-slate-600 lg:text-right">
-                                    <div>Total: <span class="font-semibold text-slate-950">€ @order.TotalAmount.ToString("F2")</span></div>
+                                    <div>Total: <span class="font-semibold text-slate-950">@order.Currency @order.TotalAmount.ToString("F2")</span></div>
                                     <div class="mt-1">Items: <span class="font-semibold text-slate-950">@order.Lines.Sum(line => line.Quantity)</span></div>
                                 </div>
                             </div>

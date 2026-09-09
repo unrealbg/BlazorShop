@@ -95,7 +95,7 @@ namespace BlazorShop.Infrastructure.Services
             ledger.PaymentTransactionId = paymentTransaction.Id;
             ledger.OrderId = paymentTransaction.OrderId;
             var order = (await db.Orders
-                .FromSqlInterpolated($"SELECT * FROM \"Orders\" WHERE \"Id\" = {paymentTransaction.OrderId} FOR UPDATE")
+                .FromSqlInterpolated($"SELECT *, xmin FROM \"Orders\" WHERE \"Id\" = {paymentTransaction.OrderId} FOR UPDATE")
                 .ToListAsync(cancellationToken))
                 .SingleOrDefault();
             if (order is null)
@@ -196,21 +196,13 @@ namespace BlazorShop.Infrastructure.Services
                     cancellationToken);
             }
 
-            var (orderStatus, reservationStatus) = target.Status.Value switch
-            {
-                PaymentTransactionStatus.Paid =>
-                    (PaymentOrderStatus.Paid, InventoryReservationStatus.Consumed),
-                PaymentTransactionStatus.Failed =>
-                    (PaymentOrderStatus.PaymentFailed, InventoryReservationStatus.Released),
-                PaymentTransactionStatus.Cancelled =>
-                    (PaymentOrderStatus.Cancelled, InventoryReservationStatus.Released),
-                _ => throw new InvalidOperationException("Pending is not a terminal provider transition."),
-            };
+            var paymentTransition = OrderLifecyclePolicy.GetStripeTerminalTransition(order, target.Status.Value);
             var inventoryResult = await InventoryReservationTransitionOperation.ApplyAsync(
                 db,
                 order,
-                orderStatus,
-                reservationStatus,
+                paymentTransition.OrderStatus,
+                paymentTransition.PaymentStatus,
+                paymentTransition.ReservationStatus,
                 cancellationToken);
             if (inventoryResult.Outcome != InventoryTransitionOutcome.Applied)
             {

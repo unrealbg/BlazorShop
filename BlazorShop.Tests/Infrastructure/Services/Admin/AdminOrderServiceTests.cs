@@ -25,7 +25,7 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
             await using var context = CreateContext();
             var service = CreateService(context);
 
-            var result = await service.UpdateShippingStatusAsync(Guid.NewGuid(), new UpdateShippingStatusRequest { ShippingStatus = "Lost" });
+            var result = await service.UpdateShippingStatusAsync(Guid.NewGuid(), new UpdateShippingStatusRequest { FulfillmentStatus = "Lost" });
 
             Assert.False(result.Success);
             Assert.Equal(ServiceResponseType.ValidationError, result.ResponseType);
@@ -134,10 +134,20 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
         private static AdminOrderService CreateService(AppDbContext context)
         {
             var tracking = new Mock<IOrderTrackingService>();
-            tracking.Setup(service => service.UpdateTrackingAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(true);
-            tracking.Setup(service => service.UpdateShippingStatusAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
-                .ReturnsAsync(true);
+            tracking.Setup(service => service.UpdateTrackingDetailsAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderTrackingTransitionResult(OrderTrackingTransitionOutcome.Applied));
+            tracking.Setup(service => service.TransitionFulfillmentAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new OrderTrackingTransitionResult(OrderTrackingTransitionOutcome.Applied));
 
             var audit = new Mock<IAdminAuditService>();
             audit.Setup(service => service.LogAsync(It.IsAny<CreateAdminAuditLogDto>()))

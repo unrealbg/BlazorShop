@@ -8,7 +8,7 @@
       <div>
         <p class="bs-section-kicker">Admin</p>
         <h2 class="mt-2 text-2xl font-bold text-slate-950">Orders by customer</h2>
-        <p class="mt-3 text-sm leading-6 text-slate-600">Review grouped customer orders, shipping state, and tracking details without leaving the admin surface.</p>
+        <p class="mt-3 text-sm leading-6 text-slate-600">Review grouped customer orders, payment and fulfillment state, and tracking details without leaving the admin surface.</p>
       </div>
       <div class="bs-toolbar-cluster">
         <input class="border rounded px-2 py-1 text-sm w-60" placeholder="Search name/email" @bind="_customerQuery" />
@@ -54,7 +54,7 @@
               </div>
               <div class="text-right shrink-0">
                 <div class="text-sm">Orders: <b>@g.Count()</b></div>
-                <div class="text-sm">Total: <b>EUR @g.Sum(x => x.TotalAmount).ToString("F2")</b></div>
+                <div class="text-sm">Total: <b>@string.Join(", ", g.GroupBy(x => x.Currency).Select(currency => $"{currency.Key} {currency.Sum(x => x.TotalAmount):F2}"))</b></div>
               </div>
             </button>
 
@@ -72,7 +72,9 @@
                         <button class="bs-subtle-action-link text-xs" @onclick="() => OpenDetailsDialog(o)">Details</button>
                       </div>
                       <div class="text-sm">
-                        <span class="mr-3">Status: <b>@o.ShippingStatus</b></span>
+                        <span class="mr-3">Order: <b>@o.OrderStatus</b></span>
+                        <span class="mr-3">Payment: <b>@o.PaymentStatus</b></span>
+                        <span class="mr-3">Fulfillment: <b>@o.FulfillmentStatus</b></span>
                         <button class="bs-subtle-action-link" @onclick="() => OpenTrackDialog(o)">Edit</button>
                       </div>
                     </div>
@@ -89,8 +91,8 @@
                           <tr class="bg-neutral-50 text-left">
                             <th class="px-2 py-1">Product</th>
                             <th class="px-2 py-1">Qty</th>
-                            <th class="px-2 py-1">Unit (EUR)</th>
-                            <th class="px-2 py-1">Total (EUR)</th>
+                            <th class="px-2 py-1">Unit</th>
+                            <th class="px-2 py-1">Total</th>
                             <th class="px-2 py-1">Tracking</th>
                           </tr>
                         </thead>
@@ -106,8 +108,8 @@
                                 }
                               </td>
                               <td class="px-2 py-1">@l.Quantity</td>
-                              <td class="px-2 py-1">@l.UnitPrice.ToString("F2")</td>
-                              <td class="px-2 py-1">@((l.UnitPrice * l.Quantity).ToString("F2"))</td>
+                              <td class="px-2 py-1">@o.Currency @l.UnitPrice.ToString("F2")</td>
+                              <td class="px-2 py-1">@o.Currency @l.LineTotal.ToString("F2")</td>
                               <td class="px-2 py-1">
                                 <div class="flex items-center gap-2">
                                   @if (!string.IsNullOrWhiteSpace(o.TrackingUrl))
@@ -134,7 +136,7 @@
                           }
                         </tbody>
                       </table>
-                      <div class="mt-2 text-right text-sm font-semibold">Order Total: EUR @o.TotalAmount.ToString("F2")</div>
+                      <div class="mt-2 text-right text-sm font-semibold">Order Total: @o.Currency @o.TotalAmount.ToString("F2")</div>
                       <div class="text-right text-xs text-neutral-600">
                         @if (o.ShippedOn.HasValue) {<span class="mr-3">Shipped: @o.ShippedOn.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>}
                         @if (o.DeliveredOn.HasValue) {<span>Delivered: @o.DeliveredOn.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>}
@@ -171,12 +173,11 @@
         <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
         <button class="bs-subtle-action-link shrink-0 text-xs" @onclick="() => CopyAsync(_trackingUrl)">Copy</button>
       </div>
-      <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
-        <option>PendingShipment</option>
-        <option>Shipped</option>
-        <option>InTransit</option>
-        <option>OutForDelivery</option>
-        <option>Delivered</option>
+      <select class="border rounded w-full px-2 py-1" @bind="_fulfillmentStatus">
+        @foreach (var status in GetAllowedFulfillmentStatuses(_editOrder))
+        {
+          <option value="@status">@status</option>
+        }
       </select>
       <textarea class="border rounded w-full px-2 py-1 min-h-24" placeholder="Admin note" @bind="_adminNote"></textarea>
     </div>
@@ -203,7 +204,9 @@
         </section>
         <section class="bs-panel-soft p-4">
           <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fulfillment</div>
-          <div class="mt-2 text-slate-950">@_detailsOrder.ShippingStatus</div>
+          <div class="mt-2 text-slate-950">Order: @_detailsOrder.OrderStatus</div>
+          <div class="mt-1 text-slate-700">Payment: @_detailsOrder.PaymentStatus (@_detailsOrder.PaymentMethod)</div>
+          <div class="mt-1 text-slate-700">Fulfillment: @_detailsOrder.FulfillmentStatus</div>
           <div class="mt-1 text-slate-600">@_detailsOrder.ShippingCarrier @_detailsOrder.TrackingNumber</div>
           <div class="mt-1 break-all text-slate-500">@_detailsOrder.TrackingUrl</div>
         </section>
@@ -230,6 +233,13 @@
           </tbody>
         </table>
       </div>
+      <div class="mt-4 grid grid-cols-2 gap-2 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 sm:grid-cols-5">
+        <div>Subtotal: @_detailsOrder.Currency @_detailsOrder.SubtotalAmount.ToString("F2")</div>
+        <div>Discount: @_detailsOrder.Currency @_detailsOrder.DiscountAmount.ToString("F2")</div>
+        <div>Shipping: @_detailsOrder.Currency @_detailsOrder.ShippingAmount.ToString("F2")</div>
+        <div>Tax: @_detailsOrder.Currency @_detailsOrder.TaxAmount.ToString("F2")</div>
+        <div class="font-semibold">Total: @_detailsOrder.Currency @_detailsOrder.TotalAmount.ToString("F2")</div>
+      </div>
       <div class="mt-4 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">@(!string.IsNullOrWhiteSpace(_detailsOrder.AdminNote) ? _detailsOrder.AdminNote : "No admin note.")</div>
     }
   </Body>
@@ -248,7 +258,7 @@
   private string _carrier = string.Empty;
   private string _trackingNumber = string.Empty;
   private string _trackingUrl = string.Empty;
-  private string _shippingStatus = "PendingShipment";
+  private string _fulfillmentStatus = "NotStarted";
   private string? _adminNote;
   private bool _showDetailsDialog;
   private GetOrder? _detailsOrder;
@@ -317,7 +327,7 @@
     _carrier = order.ShippingCarrier ?? string.Empty;
     _trackingNumber = order.TrackingNumber ?? string.Empty;
     _trackingUrl = order.TrackingUrl ?? string.Empty;
-    _shippingStatus = order.ShippingStatus;
+    _fulfillmentStatus = order.FulfillmentStatus;
     _adminNote = order.AdminNote;
     _showDialog = true;
   }
@@ -326,6 +336,31 @@
   {
     _detailsOrder = order;
     _showDetailsDialog = true;
+  }
+
+  private static IReadOnlyList<string> GetAllowedFulfillmentStatuses(GetOrder? order)
+  {
+    if (order is null)
+    {
+      return ["NotStarted"];
+    }
+
+    var eligible = string.Equals(order.OrderStatus, "Confirmed", StringComparison.Ordinal)
+      && (string.Equals(order.PaymentMethod, "CashOnDelivery", StringComparison.Ordinal)
+        || string.Equals(order.PaymentStatus, "Paid", StringComparison.Ordinal));
+    if (!eligible)
+    {
+      return [order.FulfillmentStatus];
+    }
+
+    return order.FulfillmentStatus switch
+    {
+      "NotStarted" => ["NotStarted", "Shipped"],
+      "Shipped" => ["Shipped", "InTransit"],
+      "InTransit" => ["InTransit", "OutForDelivery", "Delivered"],
+      "OutForDelivery" => ["OutForDelivery", "Delivered"],
+      _ => [order.FulfillmentStatus],
+    };
   }
 
   private async Task SaveAsync()
@@ -337,7 +372,7 @@
     try
     {
       var tRes = await AdminOrderService.UpdateTrackingAsync(_editOrder.Id, new UpdateTrackingRequest { Carrier = _carrier, TrackingNumber = _trackingNumber, TrackingUrl = _trackingUrl });
-      var sRes = await AdminOrderService.UpdateShippingStatusAsync(_editOrder.Id, new UpdateShippingStatusRequest { ShippingStatus = _shippingStatus });
+      var sRes = await AdminOrderService.UpdateShippingStatusAsync(_editOrder.Id, new UpdateShippingStatusRequest { FulfillmentStatus = _fulfillmentStatus });
       var nRes = await AdminOrderService.UpdateAdminNoteAsync(_editOrder.Id, new UpdateOrderAdminNote { AdminNote = _adminNote });
 
       _showDialog = false;
@@ -381,13 +416,14 @@
         o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
         o.CustomerName ?? string.Empty,
         o.CustomerEmail ?? string.Empty,
-        o.Status,
-        o.ShippingStatus,
+        o.OrderStatus,
+        o.PaymentStatus,
+        o.FulfillmentStatus,
         o.TotalAmount.ToString("F2"),
         o.TrackingNumber ?? string.Empty,
       });
 
-    var csv = string.Join(Environment.NewLine, new[] { "Reference,Created,Customer,Email,Status,ShippingStatus,Total,Tracking" }
+    var csv = string.Join(Environment.NewLine, new[] { "Reference,Created,Customer,Email,OrderStatus,PaymentStatus,FulfillmentStatus,Total,Tracking" }
       .Concat(rows.Select(row => string.Join(",", row.Select(EscapeCsv)))));
 
     await JS.InvokeVoidAsync("navigator.clipboard.writeText", csv);

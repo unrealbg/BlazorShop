@@ -2,7 +2,7 @@ namespace BlazorShop.Web.Shared.Models.Payment
 {
     public class UpdateShippingStatusRequest
     {
-        public string ShippingStatus { get; set; } = string.Empty;
+        public string FulfillmentStatus { get; set; } = string.Empty;
 
         public DateTime? ShippedOn { get; set; }
 

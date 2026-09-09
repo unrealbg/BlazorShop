@@ -4,6 +4,7 @@ namespace BlazorShop.Application.Services
     using BlazorShop.Application.Services.Contracts;
     using BlazorShop.Domain.Contracts.Newsletters;
     using BlazorShop.Domain.Contracts.Payment;
+    using BlazorShop.Domain.Entities.Payment;
 
     using System.Linq;
 
@@ -17,7 +18,9 @@ namespace BlazorShop.Application.Services
         {
             var range = NormalizeRange(fromUtc, toUtc);
             var orders = await _orderRepository.GetByDateRangeAsync(range.FromInclusiveUtc, range.ToInclusiveUtc);
-            var data = orders.Select(o => (Timestamp: EnsureUtc(o.CreatedOn), Value: o.TotalAmount));
+            var data = orders
+                .Where(order => order.PaymentStatus == OrderPaymentStatus.Paid)
+                .Select(o => (Timestamp: EnsureUtc(o.CreatedOn), Value: o.TotalAmount));
             return await BuildSeriesAsync("Sales", granularity, range, data, isSalesSeries: true);
         }
 
@@ -50,7 +53,9 @@ namespace BlazorShop.Application.Services
             if (isSalesSeries)
             {
                 var prevOrders = await _orderRepository.GetByDateRangeAsync(previousRange.FromInclusiveUtc, previousRange.ToInclusiveUtc);
-                previousSource = prevOrders.Select(o => (Timestamp: EnsureUtc(o.CreatedOn), Value: o.TotalAmount));
+                previousSource = prevOrders
+                    .Where(order => order.PaymentStatus == OrderPaymentStatus.Paid)
+                    .Select(o => (Timestamp: EnsureUtc(o.CreatedOn), Value: o.TotalAmount));
             }
             else
             {

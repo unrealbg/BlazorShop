@@ -34,14 +34,16 @@ namespace BlazorShop.Tests.Application.Services
                 .Select(offset => new Order
                 {
                     CreatedOn = from.AddDays(offset).AddHours(10),
-                    TotalAmount = offset + 1
+                    TotalAmount = offset + 1,
+                    PaymentStatus = OrderPaymentStatus.Paid,
                 })
                 .ToList();
             var previousOrders = Enumerable.Range(0, 7)
                 .Select(offset => new Order
                 {
                     CreatedOn = from.AddDays(offset - 7).AddHours(10),
-                    TotalAmount = 1
+                    TotalAmount = 1,
+                    PaymentStatus = OrderPaymentStatus.Paid,
                 })
                 .ToList();
 

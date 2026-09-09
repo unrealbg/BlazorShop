@@ -104,6 +104,18 @@ namespace BlazorShop.Tests.Infrastructure
                 $"Runtime model differs from migration snapshot: {string.Join(", ", operations.Select(operation => operation.GetType().Name))}");
         }
 
+        [Theory]
+        [InlineData("BlazorShop.Infrastructure/Services/InventoryReservationService.cs")]
+        [InlineData("BlazorShop.Infrastructure/Services/StripePaymentReconciliationService.cs")]
+        [InlineData("BlazorShop.Infrastructure/Services/StripePaymentStateTransitionService.cs")]
+        public void LockedOrderQueries_SelectConcurrencyToken(string relativePath)
+        {
+            var source = File.ReadAllText(Path.Combine(FindRepositoryRoot(), relativePath));
+
+            Assert.Contains("SELECT *, xmin FROM \\\"Orders\\\"", source);
+            Assert.DoesNotContain("SELECT * FROM \\\"Orders\\\"", source);
+        }
+
         private static ModelSnapshot CreateSnapshot()
         {
             var assembly = typeof(AppDbContext).Assembly;
@@ -124,6 +136,22 @@ namespace BlazorShop.Tests.Infrastructure
                 .Options;
 
             return new AppDbContext(options);
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "BlazorShop.sln")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new InvalidOperationException("Unable to locate BlazorShop.sln from the test output directory.");
         }
 
         private static IConfiguration CreateConfiguration()
