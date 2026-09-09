@@ -17,10 +17,15 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
     public sealed class PostgreSqlFixture : IAsyncLifetime
     {
-        private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
+        public const string DefaultImage = "postgres:17-alpine";
+        public const string ImageEnvironmentVariable = "BLAZORSHOP_TEST_POSTGRES_IMAGE";
+
+        private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(ResolveImage())
             .Build();
 
         public string ConnectionString => _container.GetConnectionString();
+
+        public string Image { get; } = ResolveImage();
 
         public async Task InitializeAsync()
         {
@@ -93,6 +98,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     "Categories"
                 CASCADE;
                 """);
+        }
+
+        private static string ResolveImage()
+        {
+            return Environment.GetEnvironmentVariable(ImageEnvironmentVariable) is { Length: > 0 } configured
+                ? configured
+                : DefaultImage;
         }
     }
 }

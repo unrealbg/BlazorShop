@@ -453,11 +453,13 @@ Safety note:
 Run this checklist before promoting a release candidate.
 
 1. Run `dotnet test BlazorShop.sln -c Release`.
-2. Run `dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"` against the actual running storefront environment with `BLAZORSHOP_SEO_SMOKE_BASE_URL` and any required route overrides set.
-3. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
-4. Run `docker compose -f compose.production.yml build api web`.
-5. Apply database migrations before opening traffic. In the standard runtime path this repository applies migrations on API startup, but if your deployment process separates migration execution from app startup, run that migration step explicitly and verify it completed successfully.
-6. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
+2. Verify the focused archive suite passes on the Compose PostgreSQL 16 image and the full regression suite passes on PostgreSQL 17; retain the image digest output from CI.
+3. Run `npm ci --include=dev`, the full-tree high/critical npm audit gate, and the separate runtime-only audit described in `docs/dependency-security.md`.
+4. Run `dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"` against the actual running storefront environment with `BLAZORSHOP_SEO_SMOKE_BASE_URL` and any required route overrides set.
+5. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
+6. Run `docker compose -f compose.production.yml build api web`.
+7. Apply database migrations before opening traffic. In the standard runtime path this repository applies migrations on API startup, but if your deployment process separates migration execution from app startup, run that migration step explicitly and verify it completed successfully.
+8. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
 
 Suggested smoke-test focus:
 
@@ -466,7 +468,7 @@ Suggested smoke-test focus:
 - Log out and confirm the browser session becomes anonymous again.
 - Upload a test image, restart or replace the API container, and confirm the file still exists under the mounted uploads volume.
 
-The GitHub Actions workflow `ci` runs the `build-test` job, which already covers the Release build/test pass, production compose rendering, and both production image builds. The checklist above intentionally adds the migration and post-deploy smoke-test steps that CI cannot prove on its own.
+The GitHub Actions workflow `ci` runs the full PostgreSQL 17 regression suite, npm audit gates, Release build, production Compose rendering, and API/Storefront/Web image builds. Its focused `postgres16-archive` job runs the archive safety suite on the production Compose database version. The checklist above intentionally retains backup rehearsal and post-deploy smoke-test steps that CI cannot prove on its own.
 
 ## Deployment Checklist
 

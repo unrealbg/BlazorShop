@@ -25,6 +25,10 @@ PostgreSQL renames the existing table in place inside the EF migration transacti
 
 The runtime EF model deliberately does not map either the old table or the archive. The generated idempotent migration script uses EF migration history to apply the rename once. The `Down` migration renames the same table back to `CheckoutOrderItems`, preserving its rows; it is a data-preserving schema rollback, not rolling-version compatibility.
 
+Release-readiness integration coverage executes the real EF migration in both directions on PostgreSQL 17 and on the exact PostgreSQL 16 image tag used by production Compose. It verifies raw legacy fields, migration history, the archive comment, and representative order lines/snapshots, payment/provider identities and events, reservations, idempotency records, and product/variant stock after archive, downgrade, and reapply. The EF-generated reverse SQL (`archive -> previous`) is also executed once against a disposable database. Reverse SQL is not claimed to be idempotent.
+
+Separate-connection writer tests prove the lock boundary rather than relying on elapsed time: an observer confirms the migration's ungranted `AccessExclusiveLock` on `CheckoutOrderItems` and the blocking backend through `pg_locks` and `pg_blocking_pids`. A legacy insert committed before the lock is granted appears once in the archive; a rolled-back insert does not appear. Cancelling a blocked migration leaves the original table, rows, and migration history intact, and a retry after releasing the writer applies once.
+
 ## Operator inspection and export
 
 The archive is operational data, not an application query source. Inspect it read-only after the migration:
@@ -56,3 +60,5 @@ Cutover procedure:
 5. Verify migration history, archive row count and representative field values; then verify authoritative checkout and customer/admin order routes.
 
 For rollback, first stop the new binaries, run the migration `Down` to rename the archive back with its data intact, and deploy the matching old binaries. Do not run old and new writers concurrently. Any operator changes made directly to the archive after cutover are outside the automated rollback guarantee.
+
+The concurrency coverage applies only to writers already in flight when the rename requests its lock; it does not authorize old binaries after cutover. A tested schema downgrade is not a restore of external Stripe state, application activity that happened after the migration, or a database backup. Backup creation and restoration must still be rehearsed separately in staging before production deployment; this repository's automated tests do not claim that rehearsal has happened.

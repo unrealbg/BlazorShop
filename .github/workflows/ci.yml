@@ -28,6 +28,31 @@ jobs:
           cache: npm
           cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
 
+      - name: Install Web build dependencies from lockfile
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: npm ci --include=dev
+
+      - name: Audit shipped npm runtime dependencies
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: |
+          mkdir -p ../../artifacts/npm-audit
+          npm audit --omit=dev --audit-level=high --json > ../../artifacts/npm-audit/runtime.json
+
+      - name: Audit full npm build dependency tree
+        if: always()
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: |
+          mkdir -p ../../artifacts/npm-audit
+          npm audit --include=dev --audit-level=high --json > ../../artifacts/npm-audit/full.json
+
+      - name: Upload full npm audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/npm-audit/*.json
+          if-no-files-found: error
+
       - name: Restore
         run: dotnet restore BlazorShop.sln
 
@@ -36,6 +61,9 @@ jobs:
 
       - name: Test
         run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Report PostgreSQL 17 regression image
+        run: docker image inspect postgres:17-alpine --format 'tag=postgres:17-alpine digests={{json .RepoDigests}}'
 
       - name: Validate production compose config
         env:
@@ -60,3 +88,36 @@ jobs:
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
+
+  postgres16-archive:
+    runs-on: ubuntu-latest
+    env:
+      BLAZORSHOP_TEST_POSTGRES_IMAGE: postgres:16.13-alpine3.23
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore BlazorShop.sln
+
+      - name: Build archive tests
+        run: dotnet build BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-restore
+
+      - name: Test archive migration on PostgreSQL 16
+        run: >-
+          dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj
+          --configuration Release
+          --no-build
+          --filter "FullyQualifiedName~LegacyCheckoutArchive"
+          --verbosity normal
+
+      - name: Report PostgreSQL 16 Compose image
+        run: >-
+          docker image inspect "$BLAZORSHOP_TEST_POSTGRES_IMAGE"
+          --format 'tag={{index .RepoTags 0}} digests={{json .RepoDigests}}'
