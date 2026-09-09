@@ -37,6 +37,9 @@ jobs:
       - name: Test
         run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --verbosity normal
 
+      - name: Report PostgreSQL 17 regression image
+        run: docker image inspect postgres:17-alpine --format 'tag=postgres:17-alpine digests={{json .RepoDigests}}'
+
       - name: Validate production compose config
         env:
           BLAZORSHOP_DB_PASSWORD: ci-db-password
@@ -60,3 +63,43 @@ jobs:
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
+
+  postgres16-archive:
+    runs-on: ubuntu-latest
+    env:
+      BLAZORSHOP_TEST_POSTGRES_IMAGE: postgres:16.13-alpine3.23
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
+
+      - name: Restore
+        run: dotnet restore BlazorShop.sln
+
+      - name: Build archive tests
+        run: dotnet build BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-restore
+
+      - name: Test archive migration on PostgreSQL 16
+        run: >-
+          dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj
+          --configuration Release
+          --no-build
+          --filter "FullyQualifiedName~LegacyCheckoutArchive"
+          --verbosity normal
+
+      - name: Report PostgreSQL 16 Compose image
+        run: >-
+          docker image inspect "$BLAZORSHOP_TEST_POSTGRES_IMAGE"
+          --format 'tag={{index .RepoTags 0}} digests={{json .RepoDigests}}'
