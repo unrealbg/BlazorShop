@@ -225,8 +225,14 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         try
         {
             var resourceLogger = application.Services.GetRequiredService<ResourceLoggerService>();
-            await application.StopAsync();
-            await ExportApplicationLogsAsync(resourceLogger);
+            try
+            {
+                await ExportApplicationLogsAsync(resourceLogger);
+            }
+            finally
+            {
+                await application.StopAsync();
+            }
         }
         catch (ObjectDisposedException)
         {
