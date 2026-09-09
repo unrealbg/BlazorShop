@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: ${REHEARSAL_POSTGRES_IMAGE:?REHEARSAL_POSTGRES_IMAGE is required}
+    environment:
+      POSTGRES_DB: ${REHEARSAL_DB_NAME:?REHEARSAL_DB_NAME is required}
+      POSTGRES_USER: ${REHEARSAL_DB_USER:?REHEARSAL_DB_USER is required}
+      POSTGRES_PASSWORD: ${REHEARSAL_DB_PASSWORD:?REHEARSAL_DB_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - primary-postgres-data:/var/lib/postgresql/data
+    networks:
+      - rehearsal
+
+  restore-postgres:
+    profiles: ["restore"]
+    image: ${REHEARSAL_POSTGRES_IMAGE:?REHEARSAL_POSTGRES_IMAGE is required}
+    environment:
+      POSTGRES_DB: ${REHEARSAL_DB_NAME:?REHEARSAL_DB_NAME is required}
+      POSTGRES_USER: ${REHEARSAL_DB_USER:?REHEARSAL_DB_USER is required}
+      POSTGRES_PASSWORD: ${REHEARSAL_DB_PASSWORD:?REHEARSAL_DB_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - restore-postgres-data:/var/lib/postgresql/data
+    networks:
+      - rehearsal
+
+  api:
+    image: ${REHEARSAL_API_IMAGE:?REHEARSAL_API_IMAGE is required}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=${REHEARSAL_DB_HOST:-postgres};Port=5432;Database=${REHEARSAL_DB_NAME};Username=${REHEARSAL_DB_USER};Password=${REHEARSAL_DB_PASSWORD}
+      Jwt__Key: ${REHEARSAL_JWT_KEY:?REHEARSAL_JWT_KEY is required}
+      Jwt__Issuer: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
+      Jwt__Audience: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
+      ClientApp__BaseUrl: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
+      Identity__RequireConfirmedAccount: "false"
+      Identity__RequireConfirmedEmail: "false"
+      Stripe__Enabled: "false"
+      Stripe__SecretKey: ""
+      Stripe__WebhookSecret: ""
+      Demo__Enabled: "false"
+      EmailSettings__Enabled: "false"
+      Runtime__Cors__AllowedOrigins__0: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
+      Runtime__ForwardedHeaders__Enabled: "false"
+      Runtime__Health__ExposeInProduction: "true"
+      Runtime__Security__EnableHsts: "false"
+      Runtime__Security__EnableHttpsRedirection: "false"
+      Runtime__Security__RefreshTokenCookieName: blazorshop-rehearsal-refresh
+      Runtime__Security__RefreshTokenCookieSameSite: Lax
+      Runtime__RateLimiting__Enabled: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${REHEARSAL_API_PORT:?REHEARSAL_API_PORT is required}:8080"
+    volumes:
+      - uploads-data:/app/uploads
+      - data-protection-keys:/root/.aspnet/DataProtection-Keys
+    networks:
+      - rehearsal
+
+  storefront:
+    image: ${REHEARSAL_STOREFRONT_IMAGE:?REHEARSAL_STOREFRONT_IMAGE is required}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      Api__BaseUrl: http://api:8080/api/
+      ClientApp__BaseUrl: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
+      PublicUrl__BaseUrl: ${REHEARSAL_STOREFRONT_URL:?REHEARSAL_STOREFRONT_URL is required}
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${REHEARSAL_STOREFRONT_PORT:?REHEARSAL_STOREFRONT_PORT is required}:8080"
+    networks:
+      - rehearsal
+
+  web:
+    image: ${REHEARSAL_WEB_IMAGE:?REHEARSAL_WEB_IMAGE is required}
+    environment:
+      BLAZORSHOP_STOREFRONT_BASE_URL: ${REHEARSAL_STOREFRONT_URL:?REHEARSAL_STOREFRONT_URL is required}
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${REHEARSAL_WEB_PORT:?REHEARSAL_WEB_PORT is required}:80"
+    networks:
+      - rehearsal
+
+volumes:
+  primary-postgres-data:
+  restore-postgres-data:
+  uploads-data:
+  data-protection-keys:
+
+networks:
+  rehearsal:
