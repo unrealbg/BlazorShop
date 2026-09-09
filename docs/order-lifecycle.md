@@ -8,7 +8,7 @@ Issue #94 separates three facts that were previously stored in `Orders.Status` a
 | --- | --- | --- |
 | Order | `Pending`, `Confirmed`, `Completed`, `Cancelled` | `Confirmed` means the shop accepted the order. `Completed` means a paid order was delivered. Neither state is a synonym for payment or inventory consumption. |
 | Payment | `Pending`, `Paid`, `Failed`, `Cancelled` | The commercial payment state. Stripe changes it only through the coordinated payment transition. Delivery never changes it. |
-| Fulfillment | `NotStarted`, `Shipped`, `InTransit`, `OutForDelivery`, `Delivered` | Physical fulfillment only. The supported forward paths are `NotStarted -> Shipped -> InTransit -> OutForDelivery -> Delivered` and `InTransit -> Delivered`. |
+| Fulfillment | `NotStarted`, `Shipped`, `InTransit`, `OutForDelivery`, `Delivered`, `ReviewRequired` | Physical fulfillment only. The normal forward paths are `NotStarted -> Shipped -> InTransit -> OutForDelivery -> Delivered` and `InTransit -> Delivered`. `ReviewRequired` is a blocked diagnostic state used only when a legacy value cannot be mapped safely. |
 | Inventory reservation | `Reserved`, `Consumed`, `Released` | Inventory ownership. Consumption is not proof of payment: COD consumes inventory while payment remains pending. |
 
 ## Checkout and payment transitions
@@ -23,7 +23,7 @@ Issue #94 separates three facts that were previously stored in `Orders.Status` a
 | Paid order is delivered | `Completed` | unchanged (`Paid`) | `Delivered` | unchanged |
 | COD order is delivered | `Confirmed` | unchanged (`Pending`) | `Delivered` | unchanged (`Consumed`) |
 
-Unpaid Stripe and bank-transfer orders are not eligible for fulfillment. Confirmed COD orders are eligible because collection happens at delivery. Repeating an already-applied fulfillment transition is idempotent and does not rewrite timestamps. Backward transitions, skipped transitions other than `InTransit -> Delivered`, invalid enum values, and shipping a cancelled/completed order are rejected as conflicts or validation errors. There is no generic payment-status setter or generic order cancellation path.
+Unpaid Stripe and bank-transfer orders are not eligible for fulfillment. Confirmed COD orders are eligible because collection happens at delivery. Repeating an already-applied fulfillment transition is idempotent and does not rewrite timestamps. Backward transitions, skipped transitions other than `InTransit -> Delivered`, invalid enum values, and shipping a cancelled/completed or `ReviewRequired` order are rejected as conflicts or validation errors. There is no generic payment-status setter or generic order cancellation path.
 
 ## Purchase-time snapshots
 
@@ -37,7 +37,11 @@ The migration preserves the old strings in read-only `LegacyStatus` and `LegacyS
 
 Payment mapping is conservative: a `Paid` payment transaction is required to backfill `PaymentStatus = Paid`. Transaction failure/cancellation and the old explicit `PaymentFailed`/`Cancelled` values map to the matching terminal payment state. A legacy `Paid` order string without provider evidence remains `PaymentStatus = Pending`. Stripe transactions identify Stripe; durable checkout records identify COD or bank transfer; otherwise payment method is `Unknown`.
 
-Known fulfillment values are retained, including `InTransit` and `OutForDelivery`; `PendingShipment`, legacy `Cancelled`, and unknown strings map to `NotStarted`. Paid-and-delivered orders map to `Completed`; paid orders and reliably identified COD/bank orders map to `Confirmed`; failed/cancelled orders map to `Cancelled`; unresolved records remain `Pending`. Existing totals, currency, provider identity, reservations, timestamps, and stock are not changed. Existing totals are copied to subtotal and the new zero-value components preserve the total equation.
+The five values accepted by the legacy admin contract are mapped case-insensitively: `PendingShipment` becomes `NotStarted`, while `Shipped`, `InTransit`, `OutForDelivery`, and `Delivered` retain their meaning. Their original spelling remains in `LegacyShippingStatus`. Any null or genuinely unknown legacy shipping value maps to `ReviewRequired`; this state blocks tracking and fulfillment changes instead of making a paid order newly eligible to ship. Paid-and-delivered orders map to `Completed`; paid orders and reliably identified COD/bank orders map to `Confirmed`; failed/cancelled orders map to `Cancelled`; unresolved records remain `Pending`.
+
+The legacy service allowed `Shipped`, `InTransit`, and `OutForDelivery` with no `ShippedOn`. For only those migration-marked rows, a forward delivery transition may preserve `ShippedOn = null` as an explicitly unknown historical timestamp and record the real `DeliveredOn`. A migrated `Shipped` row may therefore move directly to `Delivered`; no shipment date is invented and the shipment is not replayed merely to populate a field. New orders have no legacy marker and retain the strict transition and timestamp rules. Repeated delivery remains idempotent and preserves the first timestamps.
+
+Existing totals, currency, provider identity, reservations, timestamps, and stock are not changed by the migration or fulfillment operations. Existing totals are copied to subtotal and the new zero-value components preserve the total equation. Payment success is never inferred from a shipping value.
 
 ## Deployment and compatibility
 

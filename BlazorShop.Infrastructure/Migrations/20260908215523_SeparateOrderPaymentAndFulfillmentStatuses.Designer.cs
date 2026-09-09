@@ -647,7 +647,7 @@ namespace BlazorShop.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_Orders_DiscountAmount_NonNegative", "\"DiscountAmount\" >= 0");
 
-                            t.HasCheckConstraint("CK_Orders_FulfillmentStatus", "\"FulfillmentStatus\" IN ('NotStarted', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered')");
+                            t.HasCheckConstraint("CK_Orders_FulfillmentStatus", "\"FulfillmentStatus\" IN ('NotStarted', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered', 'ReviewRequired')");
 
                             t.HasCheckConstraint("CK_Orders_OrderStatus", "\"OrderStatus\" IN ('Pending', 'Confirmed', 'Completed', 'Cancelled')");
 

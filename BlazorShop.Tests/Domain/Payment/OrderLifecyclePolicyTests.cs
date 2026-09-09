@@ -61,6 +61,16 @@ namespace BlazorShop.Tests.Domain.Payment
             Assert.Null(reason);
         }
 
+        [Fact]
+        public void LegacyReviewRequiredOrder_CannotBeFulfilled()
+        {
+            var order = CreateOrder(OrderPaymentMethod.Stripe, OrderPaymentStatus.Paid);
+            order.FulfillmentStatus = FulfillmentStatus.ReviewRequired;
+
+            Assert.False(OrderLifecyclePolicy.CanFulfill(order, out var reason));
+            Assert.Contains("manual review", reason);
+        }
+
         [Theory]
         [InlineData(OrderStatus.Cancelled)]
         [InlineData(OrderStatus.Completed)]

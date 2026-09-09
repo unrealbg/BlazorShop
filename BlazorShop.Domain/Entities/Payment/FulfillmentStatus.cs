@@ -7,5 +7,6 @@ namespace BlazorShop.Domain.Entities.Payment
         InTransit,
         OutForDelivery,
         Delivered,
+        ReviewRequired,
     }
 }

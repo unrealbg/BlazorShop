@@ -31,7 +31,7 @@ namespace BlazorShop.Infrastructure.Data.Configurations
                     "\"PaymentMethod\" IN ('Unknown', 'CashOnDelivery', 'BankTransfer', 'Stripe')");
                 table.HasCheckConstraint(
                     "CK_Orders_FulfillmentStatus",
-                    "\"FulfillmentStatus\" IN ('NotStarted', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered')");
+                    "\"FulfillmentStatus\" IN ('NotStarted', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered', 'ReviewRequired')");
             });
 
             builder.Property(order => order.Currency).HasMaxLength(3).IsFixedLength();

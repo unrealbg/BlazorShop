@@ -6,6 +6,12 @@ namespace BlazorShop.Domain.Entities.Payment
         {
             ArgumentNullException.ThrowIfNull(order);
 
+            if (order.FulfillmentStatus == FulfillmentStatus.ReviewRequired)
+            {
+                reason = "The legacy fulfillment state requires manual review before fulfillment can continue.";
+                return false;
+            }
+
             if (order.OrderStatus is OrderStatus.Cancelled or OrderStatus.Completed)
             {
                 reason = $"Orders in {order.OrderStatus} state cannot be fulfilled.";
@@ -49,6 +55,38 @@ namespace BlazorShop.Domain.Entities.Payment
                 (FulfillmentStatus.OutForDelivery, FulfillmentStatus.Delivered) => true,
                 _ => false,
             };
+        }
+
+        public static bool CanTransitionFulfillment(
+            Order order,
+            FulfillmentStatus target,
+            out bool alreadyApplied)
+        {
+            ArgumentNullException.ThrowIfNull(order);
+
+            if (CanTransitionFulfillment(order.FulfillmentStatus, target, out alreadyApplied))
+            {
+                return true;
+            }
+
+            return target == FulfillmentStatus.Delivered
+                && order.FulfillmentStatus == FulfillmentStatus.Shipped
+                && HasLegacyUnknownShippedOn(order);
+        }
+
+        public static bool HasLegacyUnknownShippedOn(Order order)
+        {
+            ArgumentNullException.ThrowIfNull(order);
+
+            if (order.ShippedOn.HasValue || string.IsNullOrWhiteSpace(order.LegacyShippingStatus))
+            {
+                return false;
+            }
+
+            var legacyStatus = order.LegacyShippingStatus.Trim();
+            return legacyStatus.Equals("Shipped", StringComparison.OrdinalIgnoreCase)
+                || legacyStatus.Equals("InTransit", StringComparison.OrdinalIgnoreCase)
+                || legacyStatus.Equals("OutForDelivery", StringComparison.OrdinalIgnoreCase);
         }
 
         public static CoordinatedPaymentTransition GetStripeTerminalTransition(

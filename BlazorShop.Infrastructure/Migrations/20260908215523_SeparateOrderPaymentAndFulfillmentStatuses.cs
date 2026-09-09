@@ -143,12 +143,13 @@ namespace BlazorShop.Infrastructure.Migrations
                         WHEN o."LegacyStatus" = 'Cancelled' THEN 'Cancelled'
                         ELSE 'Pending'
                     END,
-                    "FulfillmentStatus" = CASE o."LegacyShippingStatus"
-                        WHEN 'Shipped' THEN 'Shipped'
-                        WHEN 'InTransit' THEN 'InTransit'
-                        WHEN 'OutForDelivery' THEN 'OutForDelivery'
-                        WHEN 'Delivered' THEN 'Delivered'
-                        ELSE 'NotStarted'
+                    "FulfillmentStatus" = CASE LOWER(BTRIM(COALESCE(o."LegacyShippingStatus", '')))
+                        WHEN 'pendingshipment' THEN 'NotStarted'
+                        WHEN 'shipped' THEN 'Shipped'
+                        WHEN 'intransit' THEN 'InTransit'
+                        WHEN 'outfordelivery' THEN 'OutForDelivery'
+                        WHEN 'delivered' THEN 'Delivered'
+                        ELSE 'ReviewRequired'
                     END,
                     "SubtotalAmount" = o."TotalAmount";
 
@@ -184,7 +185,7 @@ namespace BlazorShop.Infrastructure.Migrations
             migrationBuilder.AddCheckConstraint(
                 name: "CK_Orders_FulfillmentStatus",
                 table: "Orders",
-                sql: "\"FulfillmentStatus\" IN ('NotStarted', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered')");
+                sql: "\"FulfillmentStatus\" IN ('NotStarted', 'Shipped', 'InTransit', 'OutForDelivery', 'Delivered', 'ReviewRequired')");
 
             migrationBuilder.AddCheckConstraint(
                 name: "CK_Orders_OrderStatus",

@@ -125,7 +125,7 @@ namespace BlazorShop.Infrastructure.Services
                 return new(OrderTrackingTransitionOutcome.Conflict, reason);
             }
 
-            if (!OrderLifecyclePolicy.CanTransitionFulfillment(order.FulfillmentStatus, target, out _))
+            if (!OrderLifecyclePolicy.CanTransitionFulfillment(order, target, out _))
             {
                 return new(
                     OrderTrackingTransitionOutcome.Conflict,
@@ -149,7 +149,9 @@ namespace BlazorShop.Infrastructure.Services
             if (target == FulfillmentStatus.Delivered)
             {
                 var effectiveDeliveredOn = deliveredOn ?? now;
-                if (!order.ShippedOn.HasValue || effectiveDeliveredOn < order.ShippedOn.Value)
+                var hasLegacyUnknownShippedOn = OrderLifecyclePolicy.HasLegacyUnknownShippedOn(order);
+                if ((!order.ShippedOn.HasValue && !hasLegacyUnknownShippedOn)
+                    || (order.ShippedOn.HasValue && effectiveDeliveredOn < order.ShippedOn.Value))
                 {
                     return new(OrderTrackingTransitionOutcome.ValidationError, "DeliveredOn cannot precede ShippedOn.");
                 }
