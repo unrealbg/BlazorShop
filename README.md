@@ -225,6 +225,7 @@ The existing automated test suite covers application services, authentication, p
 - Health endpoints, rate limiting, forwarded headers, HSTS/HTTPS behavior and refresh-token cookie policy are configuration-driven.
 - Production deployment references:
   - `docs/production-runbook.md`
+  - `docs/dependency-security.md`
   - `docs/production.appsettings.example.json`
   - `docs/storefront.production.appsettings.example.json`
   - `compose.production.yml`

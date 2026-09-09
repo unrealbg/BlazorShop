@@ -85,6 +85,31 @@ jobs:
           cache: npm
           cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
 
+      - name: Install Web build dependencies from lockfile
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: npm ci --include=dev
+
+      - name: Audit shipped npm runtime dependencies
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: |
+          mkdir -p ../../artifacts/npm-audit
+          npm audit --omit=dev --audit-level=high --json > ../../artifacts/npm-audit/runtime.json
+
+      - name: Audit full npm build dependency tree
+        if: always()
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: |
+          mkdir -p ../../artifacts/npm-audit
+          npm audit --include=dev --audit-level=high --json > ../../artifacts/npm-audit/full.json
+
+      - name: Upload full npm audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/npm-audit/*.json
+          if-no-files-found: error
+
       - name: Restore
         run: dotnet restore BlazorShop.sln
 
