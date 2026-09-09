@@ -50,6 +50,7 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
 
         builder.CreateResourceBuilder(apiResource)
             .WithEnvironment("Jwt__Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)))
+            .WithEnvironment("Runtime__Security__EnableHttpsRedirection", "false")
             .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
