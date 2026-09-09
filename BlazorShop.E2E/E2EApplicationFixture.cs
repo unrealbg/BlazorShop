@@ -36,6 +36,7 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             "--environment=Development",
             "--UseVolumes=false",
             $"--PostgresImageTag={PostgresImageTag}",
+            "--ApiLaunchProfile=http",
             "--DcpPublisher:RandomizePorts=false",
         };
 

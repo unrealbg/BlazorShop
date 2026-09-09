@@ -23,7 +23,12 @@ try
 
     var database = postgres.AddDatabase("DefaultConnection", "blazorshop");
 
-    var apiService = builder.AddProject<Projects.BlazorShop_API>("apiservice")
+    var apiLaunchProfile = builder.Configuration["ApiLaunchProfile"];
+    var apiService = string.IsNullOrWhiteSpace(apiLaunchProfile)
+        ? builder.AddProject<Projects.BlazorShop_API>("apiservice")
+        : builder.AddProject<Projects.BlazorShop_API>("apiservice", apiLaunchProfile);
+
+    apiService
         .WithExternalHttpEndpoints()
         .WithReference(database)
         .WaitFor(database);
