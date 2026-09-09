@@ -36,7 +36,7 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             "--environment=Development",
             "--UseVolumes=false",
             $"--PostgresImageTag={PostgresImageTag}",
-            "--ApiLaunchProfile=http",
+            "--ApiLaunchProfile=e2e",
             "--DcpPublisher:RandomizePorts=false",
         };
 
@@ -49,7 +49,8 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             .Single(resource => resource.Name == "storefront");
 
         builder.CreateResourceBuilder(apiResource)
-            .WithEnvironment("Jwt__Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)));
+            .WithEnvironment("Jwt__Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)))
+            .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
 
