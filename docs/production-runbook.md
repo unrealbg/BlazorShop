@@ -483,6 +483,7 @@ The GitHub Actions workflow `ci` runs the `build-test` job, which already covers
 11. Upload a test image and confirm it still exists after an API container restart.
 12. If Stripe is enabled, register `https://<api-host>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`; store its signing secret in `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`.
 13. If Stripe is enabled, complete a Stripe test checkout and verify that the pending order becomes `Paid` only after the signed webhook is received.
+14. For the #95 checkout-history cleanup, follow the non-rolling [legacy archive cutover and rollback procedure](legacy-checkout-archive.md): back up the database, drain old writers, migrate, deploy matching binaries, and verify the archive before restoring traffic.
 
 ## GitHub Branch Protection
 

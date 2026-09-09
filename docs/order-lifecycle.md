@@ -45,7 +45,7 @@ Existing totals, currency, provider identity, reservations, timestamps, and stoc
 
 ## Deployment and compatibility
 
-Deploy the database migration before starting the new application version, with checkout/webhook traffic quiesced during the cutover. This change is not rolling-version compatible: the previous application writes the removed legacy column names while the new application writes the split columns. Take a database backup and review legacy rows whose payment method resolves to `Unknown` before deployment. The historical `CheckoutOrderItems` table and routes are unchanged.
+Deploy the database migration before starting the new application version, with checkout/webhook traffic quiesced during the cutover. This change is not rolling-version compatible: the previous application writes the removed legacy column names while the new application writes the split columns. Take a database backup and review legacy rows whose payment method resolves to `Unknown` before deployment. Issue #95 subsequently removes the separate `CheckoutOrderItems` runtime model and routes while preserving its rows in an operational archive; follow the dedicated [legacy checkout-history archive cutover](legacy-checkout-archive.md).
 
 The order API contract now exposes `orderStatus`, `paymentStatus`, `paymentMethod`, and `fulfillmentStatus` instead of the ambiguous `status` and `shippingStatus` fields. The existing routes remain unchanged; the shipping-status request body now uses `fulfillmentStatus`. Old persisted checkout outcome JSON is unchanged and remains replayable.
 

@@ -46,58 +46,5 @@
             return response;
         }
 
-        public async Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems)
-        {
-            var privateClient = await _httpClientHelper.GetPrivateClientAsync();
-            var apiCallModel = new ApiCall
-            {
-                Route = Constant.Cart.SaveCart,
-                Type = Constant.ApiCallType.Post,
-                Client = privateClient,
-                Id = null!,
-                Model = orderItems
-            };
-
-            var result = await _apiCallHelper.ApiCallTypeCall<IEnumerable<CreateOrderItem>>(apiCallModel);
-
-            return result is null || !result.IsSuccessStatusCode
-                       ? _apiCallHelper.ConnectionError()
-                       : await _apiCallHelper.GetServiceResponse<ServiceResponse>(result);
-        }
-
-        public async Task<QueryResult<IEnumerable<GetOrderItem>>> GetOrderItemsAsync()
-        {
-            var client = await _httpClientHelper.GetPrivateClientAsync();
-            var currentApiCall = new ApiCall
-            {
-                Route = Constant.Cart.GetOrderItems,
-                Type = Constant.ApiCallType.Get,
-                Client = client,
-                Model = null!,
-                Id = null!
-            };
-
-            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return await _apiCallHelper.GetQueryResult<IEnumerable<GetOrderItem>>(
-                result,
-                "We couldn't load order items right now. Please try again.");
-        }
-
-        public async Task<QueryResult<IEnumerable<GetOrderItem>>> GetCheckoutHistoryByUserId()
-        {
-            var client = await _httpClientHelper.GetPrivateClientAsync();
-            var currentApiCall = new ApiCall
-            {
-                Route = Constant.Cart.GetUserOrderItems,
-                Type = Constant.ApiCallType.Get,
-                Client = client,
-                Model = null!,
-                Id = null!
-            };
-            var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);
-            return await _apiCallHelper.GetQueryResult<IEnumerable<GetOrderItem>>(
-                result,
-                "We couldn't load your order history right now. Please try again.");
-        }
     }
 }

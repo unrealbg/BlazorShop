@@ -43,7 +43,6 @@ Current high-priority work:
 - #92 — checkout idempotency
 - #93 — Stripe reconciliation and webhook idempotency
 - #94 — separate order/payment/fulfillment lifecycle states
-- #95 — remove the legacy `CheckoutOrderItems` persistence path
 
 Additional production/UX work remains tracked in GitHub Issues. The issue tracker is treated as the current implementation backlog; README features describe what exists on `master`, not planned functionality.
 
@@ -67,7 +66,7 @@ Additional production/UX work remains tracked in GitHub Issues. The issue tracke
   - Multiple payment methods: Stripe (card), Cash on Delivery, Bank Transfer
   - Bank transfer instructions via email with order reference
 - Orders & Tracking
-  - Persistent orders/order lines and customer order history
+  - One authoritative `Orders`/`OrderLines` persistence model for customer/admin history, with immutable purchase-time snapshots
   - Admin order management
   - Shipping status, carrier tracking number and tracking URL updates
 - Newsletter
@@ -95,7 +94,7 @@ These are known areas being actively hardened; see the linked issues for the sou
 - **Inventory concurrency (#90):** atomic reservation/decrement behavior is still being implemented to prevent overselling under concurrent checkout.
 - **Checkout lifecycle (#91, #92):** checkout is being moved to a fully authoritative server-side, order-first and idempotent flow.
 - **Stripe reconciliation (#93):** signed Checkout Session events are durably deduplicated and reconciled against immutable local order, payment, provider-identity, amount, and currency state.
-- **Legacy checkout history (#95):** `Orders`/`OrderLines` are the direction of travel, but the older `CheckoutOrderItems` persistence path still exists and is scheduled for removal.
+- **Legacy checkout archive (#95):** old checkout-history rows are retained losslessly as an operational archive that is deliberately outside runtime order history; see [the archive policy and cutover procedure](docs/legacy-checkout-archive.md).
 
 ## Technologies Used
 - .NET 10, ASP.NET Core Web API

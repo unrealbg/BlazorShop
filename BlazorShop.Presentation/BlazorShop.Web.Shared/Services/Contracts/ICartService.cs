@@ -6,11 +6,5 @@
     public interface ICartService
     {
         Task<ServiceResponse<CheckoutResult>> Checkout(Checkout checkout);
-
-        Task<ServiceResponse> SaveCheckoutHistory(IEnumerable<CreateOrderItem> orderItems);
-
-        Task<QueryResult<IEnumerable<GetOrderItem>>> GetOrderItemsAsync();
-
-        Task<QueryResult<IEnumerable<GetOrderItem>>> GetCheckoutHistoryByUserId();
     }
 }

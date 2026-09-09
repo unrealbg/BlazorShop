@@ -14,18 +14,15 @@
     [ApiController]
     public class CartController : ControllerBase
     {
-        private readonly ICartService _cartService;
         private readonly ICheckoutOrchestrator _checkoutOrchestrator;
         private readonly IOrderQueryService _orderQueryService;
         private readonly IOrderTrackingService _trackingService;
 
         public CartController(
-            ICartService cartService,
             ICheckoutOrchestrator checkoutOrchestrator,
             IOrderQueryService orderQueryService,
             IOrderTrackingService trackingService)
         {
-            _cartService = cartService;
             _checkoutOrchestrator = checkoutOrchestrator;
             _orderQueryService = orderQueryService;
             _trackingService = trackingService;
@@ -80,58 +77,6 @@
                     this.Conflict(result.Response),
                 _ => this.StatusCode(StatusCodes.Status500InternalServerError),
             };
-        }
-
-        /// <summary>
-        /// Save the checkout history
-        /// </summary>
-        /// <param name="orderItems">The list of products to save </param>
-        /// <returns>The result of the save </returns>
-        [HttpPost("save-checkout")]
-        [Authorize(Roles = "User")]
-        public async Task<IActionResult> SaveCheckout(IEnumerable<CreateOrderItem> orderItems)
-        {
-            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                return this.Unauthorized("User ID is invalid or not found.");
-            }
-
-            var result = await _cartService.SaveCheckoutHistoryAsync(userId, orderItems);
-            return result.Success ? this.Ok(result) : this.BadRequest(result);
-        }
-
-        /// <summary>
-        /// Get all order items
-        /// </summary>
-        /// <returns>The ordered items </returns>
-        [HttpGet("order-items")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetAllCheckoutHistory()
-        {
-            var result = await _cartService.GetOrderItemsAsync();
-            return result.Any() ? this.Ok(result) : this.NotFound();
-        }
-
-        /// <summary>
-        /// Get order items for the logged-in user
-        /// </summary>
-        /// <returns>The ordered items for the user</returns>
-        [HttpGet("user/order-items")]
-        [Authorize(Roles = "User, Admin")]
-        public async Task<IActionResult> GetUserOrderItems()
-        {
-            // Извличане на userId от токена
-            var userId = this.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                return this.Unauthorized("User ID is invalid or not found.");
-            }
-
-            var result = await _cartService.GetCheckoutHistoryByUserId(userId);
-            return result.Any() ? this.Ok(result) : this.NotFound("No orders found for the user.");
         }
 
         /// <summary>

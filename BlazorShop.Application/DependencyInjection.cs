@@ -62,7 +62,6 @@
             services.AddScoped<IValidationService, ValidationService>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();
 
-            services.AddScoped<ICartService, CartService>();
             services.AddScoped<ICheckoutOrchestrator, CheckoutOrchestrator>();
             services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 

@@ -162,8 +162,6 @@
 
             services.AddScoped<ICategoryRepository, CategoryRepository>();
 
-            services.AddScoped<ICart, CartRepository>();
-
             // Product recommendations
             services.AddScoped<IProductRecommendationRepository, ProductRecommendationRepository>();
 
