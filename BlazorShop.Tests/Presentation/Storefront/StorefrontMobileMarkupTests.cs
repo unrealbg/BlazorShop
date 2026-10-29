@@ -46,11 +46,11 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Contains("data-unit-price=\"@UnitPriceValue\"", card);
             Assert.Contains("#purchase", card);
             Assert.Contains("No image available", card);
-            Assert.Contains("p-5 shadow-lg sm:p-8", productPage);
-            Assert.Contains("text-3xl font-extrabold", productPage);
-            Assert.Contains("grid grid-cols-2 gap-3 sm:flex", productPage);
-            Assert.Contains("p-5 shadow-lg sm:p-8", categoryPage);
-            Assert.Contains("text-3xl font-extrabold", categoryPage);
+            Assert.Contains("bs-v2-detail-layout", productPage);
+            Assert.Contains("bs-v2-detail-buy-actions", productPage);
+            Assert.Contains("bs-v2-detail-field", productPage);
+            Assert.Contains("bs-v2-category-intro", categoryPage);
+            Assert.Contains("bs-v2-category-toolbar", categoryPage);
             Assert.Contains("p-5 shadow-lg sm:p-8", cartPage);
             Assert.Contains("min-h-11 w-full", cartPage);
         }

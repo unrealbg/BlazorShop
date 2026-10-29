@@ -79,7 +79,38 @@ public sealed class StorefrontVisualTests(E2EApplicationFixture application) : P
                 }
 
                 await CapturePageAsync(Path.Combine(directory, $"category-{width}.png"));
+
+                await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, $"product/{data.SimpleProductSlug}").ToString());
+                await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = data.SimpleProductName, Exact = true }))
+                    .ToBeVisibleAsync();
+                await Expect(Page.Locator(".bs-v2-detail-image").GetByRole(AriaRole.Img, new() { Name = "No product image available" }))
+                    .ToBeVisibleAsync();
+                await Expect(Page.Locator("#purchase").GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true }))
+                    .ToBeVisibleAsync();
+                Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"));
+                await CapturePageAsync(Path.Combine(directory, $"product-{width}.png"));
+
+                await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, $"product/{data.VariantProductSlug}").ToString());
+                await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = data.VariantProductName, Exact = true }))
+                    .ToBeVisibleAsync();
+                await Expect(Page.GetByLabel("Choose a variant", new() { Exact = true })).ToBeVisibleAsync();
+                Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"));
+                await CapturePageAsync(Path.Combine(directory, $"variant-product-{width}.png"));
             }
+
+            var missingCategory = await Page.GotoAsync(
+                new Uri(application.StorefrontBaseUrl, $"category/missing-{data.CategorySlug}").ToString());
+            Assert.NotNull(missingCategory);
+            Assert.Equal(404, missingCategory.Status);
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Category not found", Exact = true }))
+                .ToBeVisibleAsync();
+
+            var missingProduct = await Page.GotoAsync(
+                new Uri(application.StorefrontBaseUrl, $"product/missing-{data.SimpleProductSlug}").ToString());
+            Assert.NotNull(missingProduct);
+            Assert.Equal(404, missingProduct.Status);
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Product not found", Exact = true }))
+                .ToBeVisibleAsync();
 
             await Page.GotoAsync(application.StorefrontBaseUrl.ToString());
             var simpleCard = Page.GetByRole(AriaRole.Article).Filter(new() { HasText = data.SimpleProductName });
