@@ -1,9 +1,9 @@
 @if (Products.Count > 0)
 {
-    <ul class="grid gap-5 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
+    <ul class="bs-v2-product-grid">
         @foreach (var product in Products)
         {
-            <li class="h-full">
+            <li>
                 <ProductCard Product="product" />
             </li>
         }
@@ -11,9 +11,7 @@
 }
 else
 {
-    <div class="rounded-md bg-blue-50 px-6 py-5 text-center text-sm text-blue-800 shadow">
-        @EmptyMessage
-    </div>
+    <div class="bs-v2-empty" role="status">@EmptyMessage</div>
 }
 
 @code {
