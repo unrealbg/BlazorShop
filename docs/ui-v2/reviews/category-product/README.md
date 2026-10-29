@@ -18,15 +18,18 @@ Both page components retain their original `@code` blocks (API lookups, route pa
 
 The existing `#purchase`, `#product-variant-select`, `#product-cart-feedback`, `data-storefront-add-to-cart`, `data-storefront-variant-select`, `data-product-*`, `data-unit-price`, `data-size-value`, `data-feedback-target` and `data-variant-select` contracts are preserved.
 
-## Validation status
+## Validation and visual evidence
 
-**Pending exact-head GitHub CI and Code Analysis.** The agent environment does not include a local .NET SDK or Docker; no local build/test claims are made. GitHub Actions is the authoritative validation for the PR head. Before Ready for Review, confirm all of the following from actual run artifacts:
+**Validated implementation head `f724d5fce25ad5beb7a0fb676cdc3760467c7d81`:**
+- [Complete CI run 40956077247](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247) — PASS. Release restore/build with warnings as errors, **694 passed / 10 opt-in live smoke skipped / zero failed**, PostgreSQL 16 archive regression, PostgreSQL 17 integration tests, Compose config, all three container builds and published storefront assets.
+- [Code Analysis run 40956077257](https://github.com/unrealbg/BlazorShop/actions/runs/40956077257) — PASS.
+- [Browser E2E TRX and screenshots](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247/artifacts/12932784319): **4/4 passed in each of two consecutive runs**. Both TRX files were inspected: no skipped/failed E2E scenarios. The route test covers 320/390/768/1440px category, simple product, and variant product captures, real API-backed seed data, missing-image state, 404 status, and no horizontal overflow.
+- [npm audit JSON](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247/artifacts/12933687145): runtime and full tree both report **0 vulnerabilities**.
+- [NuGet audit JSON](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247/artifacts/12933082377): **11 projects, 0 vulnerable packages**.
 
-- Release restore/build with warnings as errors, unit/integration tests, PostgreSQL 16 archive + PostgreSQL 17 regressions.
-- NuGet transitive audit and npm full-tree/runtime audits; container builds and Compose verification.
-- Four mandatory Playwright scenarios twice consecutively, including the extended responsive captures and 404 checks.
-- Code Analysis and all required PR checks green on the same final head.
-- Review actual screenshot artifacts against `docs/ui-v2/category.html` and `product.html`. Capture differences and residual risks before approval.
+The screenshots from both runs were reviewed. The desktop category intro and two-column product layout, missing-image fallback, mobile stacking and purchase controls match the approved presentation direction. The actual fixture category contains two products, so no fake 24-product cards, stock labels or promotional claims appear. Mobile 320px related-product cards remain two-column under the #110 shared grid, with text wrapping but no page overflow. This is a visual difference from the single-card prototype mock, not a commerce regression.
+
+**Final-head rule:** The above results validate `f724d5f...`, before a one-line singular-option copy correction and this documentation update. The [PR #114 final validation record](https://github.com/unrealbg/BlazorShop/pull/114) must link the *new* successful CI/Code Analysis runs on its final head before marking Ready for Review. Do not use these historical runs as proof for a different SHA. The agent environment has no local .NET SDK or Docker; GitHub Actions supplies executable verification.
 
 ## Known boundaries
 
