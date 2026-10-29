@@ -19,55 +19,56 @@ else if (_isNotFound)
 }
 else if (_product is not null)
 {
-    <section class="mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-6 sm:pt-10 lg:px-8">
-        <BreadcrumbNav Items="_breadcrumbs" ClassName="mb-4" />
+    <div class="bs-v2-detail bs-v2-container">
+        <BreadcrumbNav Items="_breadcrumbs" ClassName="bs-v2-route-breadcrumb" />
 
-        <div class="grid gap-5 sm:gap-8 lg:grid-cols-[1fr_1fr]">
-            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-4 shadow-lg sm:p-6">
-                <div class="relative aspect-[4/3] overflow-hidden rounded-2xl bg-neutral-50">
-                    <img src="@_product.Image" alt="@_product.Name" class="absolute inset-0 h-full w-full object-contain" />
+        <div class="bs-v2-detail-layout">
+            <section class="bs-v2-detail-gallery" aria-label="Product image">
+                <div class="bs-v2-detail-image">
+                    @if (!string.IsNullOrWhiteSpace(_product.Image))
+                    {
+                        <img src="@_product.Image" alt="@_product.Name" decoding="async" />
+                    }
+                    else
+                    {
+                        <span class="bs-v2-image-placeholder" role="img" aria-label="No product image available">No image available</span>
+                    }
                 </div>
-            </div>
+            </section>
 
-            <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-5 shadow-lg sm:p-8">
+            <section class="bs-v2-detail-info" aria-labelledby="product-title">
                 @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug))
                 {
-                    <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500 hover:text-neutral-900">@_product.Category.Name</a>
+                    <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="bs-v2-detail-category">@_product.Category.Name</a>
                 }
                 else if (!string.IsNullOrWhiteSpace(_product.Category?.Name))
                 {
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">@_product.Category.Name</p>
+                    <p class="bs-v2-detail-category">@_product.Category.Name</p>
                 }
 
                 @if (IsFreshArrival)
                 {
-                    <div class="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]">
-                        <span class="inline-block rounded bg-green-600/90 px-2 py-0.5 text-white">New</span>
-                    </div>
+                    <span class="bs-v2-detail-new">New arrival</span>
                 }
 
-                <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">@_product.Name</h1>
-                <div class="mt-5">
-                    <div class="text-sm text-neutral-500">@PrimaryPriceLabel</div>
-                    <div class="mt-1 text-3xl font-black text-neutral-900 sm:text-4xl">€ @_product.Price</div>
-                </div>
+                <h1 id="product-title">@_product.Name</h1>
+                <p class="bs-v2-detail-price-label">@PrimaryPriceLabel</p>
+                <p class="bs-v2-detail-price">€ @_product.Price</p>
+                <p class="bs-v2-detail-variant-summary">@VariantSummary</p>
 
-                <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-neutral-600">
-                    <span class="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 font-semibold text-neutral-700">@VariantSummary</span>
-                </div>
+                @if (!string.IsNullOrWhiteSpace(_product.Description))
+                {
+                    <p class="bs-v2-detail-description">@_product.Description</p>
+                }
 
-                <p class="mt-6 text-base leading-7 text-neutral-700">@_product.Description</p>
-
-                <div id="purchase" class="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 sm:p-5">
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Add to Cart</p>
-                    <p class="mt-2 text-sm leading-6 text-neutral-700">@PurchaseMessage</p>
-
+                <div id="purchase" class="bs-v2-detail-purchase">
+                    <h2>Add to Cart</h2>
+                    <p>@PurchaseMessage</p>
                     @if (_product.Variants.Any())
                     {
-                        <div class="mt-4">
-                            <label for="product-variant-select" class="block text-sm font-semibold text-neutral-900">Choose a variant</label>
+                        <div class="bs-v2-detail-field">
+                            <label for="product-variant-select">Choose a variant</label>
                             <select id="product-variant-select"
-                                    class="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black/10"
                                     data-storefront-variant-select>
                                 <option value="">Select a size</option>
                                 @foreach (var variant in _product.Variants)
@@ -82,9 +83,9 @@ else if (_product is not null)
                         </div>
                     }
 
-                    <div class="mt-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+                    <div class="bs-v2-detail-buy-actions">
                         <button type="button"
-                                class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-3 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto sm:px-4"
+                                class="bs-v2-button bs-v2-button-primary"
                                 data-storefront-add-to-cart
                                 data-default-label="Add to Cart"
                                 data-success-label="Added"
@@ -95,93 +96,71 @@ else if (_product is not null)
                                 data-feedback-target="#product-cart-feedback">
                             Add to Cart
                         </button>
-
-                        <a href="@CartUrl" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-3 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto sm:px-4">
-                            View Cart
-                        </a>
+                        <a href="@CartUrl" class="bs-v2-button bs-v2-button-secondary">View Cart</a>
                     </div>
-
-                    <p id="product-cart-feedback" class="mt-3 text-sm font-medium text-emerald-700" aria-live="polite"></p>
+                    <p id="product-cart-feedback" class="bs-v2-detail-feedback" aria-live="polite"></p>
                 </div>
 
                 @if (_product.Variants.Any())
                 {
-                    <div class="mt-8">
-                        <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Available Variants</h2>
-                        <ul class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <section class="bs-v2-detail-variants" aria-labelledby="product-variants-title">
+                        <h2 id="product-variants-title">Available Variants</h2>
+                        <ul>
                             @foreach (var variant in _product.Variants)
                             {
-                                <li class="rounded-2xl border border-neutral-200 bg-neutral-50/80 px-4 py-3 text-sm text-neutral-700">
-                                    <div class="font-semibold text-neutral-900">@variant.SizeValue</div>
-                                    <div class="mt-1">@ScaleLabel(variant.SizeScale)</div>
-                                    <div class="mt-2 font-semibold text-neutral-900">€ @(variant.Price ?? _product.Price)</div>
+                                <li>
+                                    <strong>@variant.SizeValue</strong>
+                                    <span>@ScaleLabel(variant.SizeScale)</span>
+                                    <span>€ @(variant.Price ?? _product.Price)</span>
                                 </li>
                             }
                         </ul>
-                    </div>
+                    </section>
                 }
 
-                <div class="mt-8 grid gap-3 sm:flex sm:flex-wrap">
+                <nav class="bs-v2-detail-links" aria-label="More shopping options">
                     @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
                     {
-                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto">
-                            Back to @_product.Category.Name
-                        </a>
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="bs-v2-button bs-v2-button-secondary">Back to @_product.Category.Name</a>
                     }
+                    <a href="@StorefrontRoutes.NewReleases" class="bs-v2-button bs-v2-button-secondary">Browse New Releases</a>
+                    <a href="@StorefrontRoutes.TodaysDeals" class="bs-v2-button bs-v2-button-secondary">See Today's Deals</a>
+                </nav>
 
-                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto">
-                        Browse New Releases
-                    </a>
-
-                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100 sm:w-auto">
-                        See Today's Deals
-                    </a>
-                </div>
-
-                <div class="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
-                    Questions about sizing, delivery, or returns? Visit <a href="@StorefrontRoutes.CustomerService" class="font-semibold underline">Customer Service</a> before you place your order.
-                </div>
-            </div>
+                <p class="bs-v2-detail-help">
+                    Questions about sizing, delivery, or returns? Visit
+                    <a href="@StorefrontRoutes.CustomerService">Customer Service</a> before you place your order.
+                </p>
+            </section>
         </div>
-    </section>
 
-    <SeoContentSection Title="@ProductSeoContentTitle"
-                       Eyebrow="Product Details"
-                       Content="@_product.SeoContent" />
+        <SeoContentSection Title="@ProductSeoContentTitle"
+                           Eyebrow="Product Details"
+                           Content="@_product.SeoContent"
+                           ClassName="bs-v2-route-seo" />
 
-    <section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
-        <div class="rounded-3xl border border-neutral-200/70 bg-white/90 p-5 shadow-lg sm:p-8">
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Keep Exploring</p>
-
+        <section class="bs-v2-related" aria-labelledby="related-products-title">
+            <p class="bs-v2-eyebrow">Keep Exploring</p>
             @if (_relatedProducts.Count > 0)
             {
-                <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">More from @_product.Category?.Name</h2>
-                <div class="mt-8">
-                    <ProductGrid Products="_relatedProducts" EmptyMessage="No additional related products are available right now." />
-                </div>
+                <h2 id="related-products-title">More from @_product.Category?.Name</h2>
+                <ProductGrid Products="_relatedProducts"
+                             EmptyMessage="No additional related products are available right now." />
             }
             else
             {
-                <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-neutral-900">Keep browsing the public catalog</h2>
-                <div class="mt-6 grid gap-3 sm:flex sm:flex-wrap">
+                <h2 id="related-products-title">Keep browsing the public catalog</h2>
+                <nav class="bs-v2-detail-links" aria-label="Continue browsing">
                     @if (!string.IsNullOrWhiteSpace(_product.Category?.Slug) && !string.IsNullOrWhiteSpace(_product.Category?.Name))
                     {
-                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-4 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto">
-                            Explore @_product.Category.Name
-                        </a>
+                        <a href="@StorefrontRoutes.Category(_product.Category.Slug)" class="bs-v2-button bs-v2-button-secondary">Explore @_product.Category.Name</a>
                     }
-
-                    <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto">
-                        Browse New Releases
-                    </a>
-
-                    <a href="@StorefrontRoutes.TodaysDeals" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-white px-4 py-2 font-semibold text-neutral-900 ring-1 ring-black/5 hover:bg-neutral-100 sm:w-auto">
-                        See Today's Deals
-                    </a>
-                </div>
+                    <a href="@StorefrontRoutes.NewReleases" class="bs-v2-button bs-v2-button-primary">Browse New Releases</a>
+                    <a href="@StorefrontRoutes.TodaysDeals" class="bs-v2-button bs-v2-button-secondary">See Today's Deals</a>
+                </nav>
             }
-        </div>
-    </section>
+        </section>
+    </div>
 }
 
 @code {
