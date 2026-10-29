@@ -114,7 +114,7 @@ jobs:
             --env ClientApp__BaseUrl=https://account.shop.example.com/ \
             --env PublicUrl__BaseUrl=https://shop.example.com/ blazorshop-storefront:ci
           trap 'docker logs storefront-assets; docker rm --force storefront-assets' EXIT
-          curl --fail --retry 15 --retry-connrefused --retry-delay 1 --max-time 5 http://127.0.0.1:18080/ui-v2/hero-chair.svg --output /tmp/storefront-hero.svg
+          curl --fail --retry 15 --retry-all-errors --retry-connrefused --retry-delay 1 --max-time 5 http://127.0.0.1:18080/ui-v2/hero-chair.svg --output /tmp/storefront-hero.svg
           grep -q 'Modern armchair and side table' /tmp/storefront-hero.svg
           curl --fail --max-time 5 'http://127.0.0.1:18080/css/ui-v2-storefront.css?v=smoke' --output /tmp/storefront-v2.css
           grep -q 'bs-v2-shell' /tmp/storefront-v2.css
