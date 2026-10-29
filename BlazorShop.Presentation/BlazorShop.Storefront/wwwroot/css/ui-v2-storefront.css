@@ -258,3 +258,19 @@
     .bs-v2-detail-links .bs-v2-button { flex: 1 1 100%; }
     .bs-v2-detail-image { min-height: 190px; }
 }
+.bs-v2-listing { padding-block: 32px 44px; }
+.bs-v2-listing-intro { padding: 28px 24px 36px; text-align: center; }
+.bs-v2-listing-intro h1 { margin: 10px 0 14px; color: #111827; font-size: clamp(2rem,4vw,2.75rem); font-weight: 750; line-height: 1.15; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.bs-v2-listing-description { max-width: 640px; margin: 0 auto; color: #64748b; line-height: 1.7; }
+.bs-v2-listing-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 24px; }
+.bs-v2-listing-deals .bs-v2-listing-intro { margin-bottom: 30px; padding: 32px; border: 1px solid var(--bs-v2-line); border-radius: 12px; background: linear-gradient(120deg,#fff7ed,#fff); text-align: left; }
+.bs-v2-listing-deals .bs-v2-listing-description { margin-inline: 0; }
+.bs-v2-listing-deals .bs-v2-listing-links { justify-content: flex-start; }
+.bs-v2-listing-deals .bs-v2-eyebrow { color: #9a3412; }
+.bs-v2-listing-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
+.bs-v2-listing-toolbar h2 { margin: 0; color: #111827; font-size: 1.5rem; font-weight: 700; letter-spacing: -.025em; }
+@media (max-width: 640px) {
+    .bs-v2-listing { padding-block: 20px 28px; }
+    .bs-v2-listing-intro,.bs-v2-listing-deals .bs-v2-listing-intro { padding: 24px 16px; }
+    .bs-v2-listing-links .bs-v2-button { flex: 1 1 160px; }
+}
