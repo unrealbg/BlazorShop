@@ -98,6 +98,20 @@ public sealed class StorefrontVisualTests(E2EApplicationFixture application) : P
                 await CapturePageAsync(Path.Combine(directory, $"variant-product-{width}.png"));
             }
 
+            var missingCategory = await Page.GotoAsync(
+                new Uri(application.StorefrontBaseUrl, $"category/missing-{data.CategorySlug}").ToString());
+            Assert.NotNull(missingCategory);
+            Assert.Equal(404, missingCategory.Status);
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Category not found", Exact = true }))
+                .ToBeVisibleAsync();
+
+            var missingProduct = await Page.GotoAsync(
+                new Uri(application.StorefrontBaseUrl, $"product/missing-{data.SimpleProductSlug}").ToString());
+            Assert.NotNull(missingProduct);
+            Assert.Equal(404, missingProduct.Status);
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Product not found", Exact = true }))
+                .ToBeVisibleAsync();
+
             await Page.GotoAsync(application.StorefrontBaseUrl.ToString());
             var simpleCard = Page.GetByRole(AriaRole.Article).Filter(new() { HasText = data.SimpleProductName });
             await simpleCard.GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true }).ClickAsync();
