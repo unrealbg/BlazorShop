@@ -1,38 +1,53 @@
-# PR A — Category and product detail (Issue #112)
+# UI v2 — Category and product details
 
-Implementation: [PR #114](https://github.com/unrealbg/BlazorShop/pull/114). Baseline: merged [PR #110](https://github.com/unrealbg/BlazorShop/pull/110), `master` at `fdc4fa56823099cb773a6a95f84d1c1e63102653`.
+Implementation: [PR #114](https://github.com/unrealbg/BlazorShop/pull/114), based on merged [PR #110](https://github.com/unrealbg/BlazorShop/pull/110) and `master` at `fdc4fa56823099cb773a6a95f84d1c1e63102653`.
 
 ## Scope and design references
 
-This is the **presentation-only** category/product slice of [the UI v2 roadmap](https://github.com/unrealbg/BlazorShop/issues/113). It follows `docs/ui-v2/category.html`, `product.html`, `components.html`, `styles.css`, `polish.css` and `consistency.css`, while reusing the SSR shell, product cards, and live API data from #110.
+The presentation follows `docs/ui-v2/category.html`, `product.html`, `components.html`, `styles.css`, `polish.css` and `consistency.css`, reusing the existing SSR shell, product cards and live API data.
 
-- `Pages/CategoryPage.razor`: compact breadcrumb, pale blue category introduction, actual name/meta-description/count, real new-arrival/deals navigation, live product grid and category SEO content below the grid. No prototype-only sort control (the current category endpoint does not supply sorting).
-- `Pages/ProductPage.razor`: responsive gallery and truthful missing-image state, actual product/category/price/description, supported variant select and price metadata, preserved Add to Cart / View Cart JavaScript hooks, real related products, SEO content and customer-service link. No invented SKU, color, stock badge, review rating, discount or quantity selector.
-- `wwwroot/css/ui-v2-storefront.css`: page-scoped typography, color, spacing, controls, gallery and responsive layout at <=980/640px. The stylesheet remains versioned by the existing `App.razor` pipeline.
-- `BlazorShop.Tests/Presentation/Storefront/StorefrontMobileMarkupTests.cs` and `StorefrontCategoryProductV2MarkupTests.cs`: responsive markup, 404/503 and SEO contract guards, variant/cart attributes, focus styles.
-- `BlazorShop.E2E/StorefrontVisualTests.cs`: live database-backed category and simple/variant product screenshots at **320/390/768/1440px**, visible purchase/variant controls, missing-image state, no horizontal overflow, and missing category/product 404 assertions. Existing checkout E2E still exercises cart persistence, variants, anonymous login handoff and checkout.
+- `Pages/CategoryPage.razor`: breadcrumbs, category introduction, actual name/description/product count, existing New Releases/deals navigation, published product grid and category SEO content. The existing endpoint's product order is preserved; no unsupported sorting control is introduced.
+- `Pages/ProductPage.razor`: responsive image area and missing-image state, actual product/category/price/description, existing variant selector and purchase controls, related products, SEO content and support link. No fabricated ratings, discounts, stock labels, image thumbnails or quantity selector.
+- `wwwroot/css/ui-v2-storefront.css`: scoped page typography, colors, spacing, gallery, controls and responsive layouts.
+- `StorefrontCategoryProductV2MarkupTests.cs` and `StorefrontMobileMarkupTests.cs`: markup, SEO/status and variant/cart contract guards.
+- `BlazorShop.E2E/StorefrontVisualTests.cs`: category and simple/variant product captures at 320/390/768/1440px, visible purchase controls, missing-image state, overflow and missing-route HTTP 404 assertions. Existing scenarios retain cart persistence, variant, sign-in and checkout coverage.
 
 ## Contract preservation
 
-Both page components retain their original `@code` blocks (API lookups, route parameters, SEO composers, structured data, 404/503 response headers, related-product query, cart price/variant metadata) unchanged. No render-mode changes, API/domain/database/migration/security/checkout/payment edits, new features, or production operations.
+The components retain the existing API lookups, route parameters, SEO/structured-data composers, HTTP 404/503 behavior, related-product query and cart metadata. No changes to render modes, public API contracts, domain rules, schema, migrations, authentication, payment, inventory or checkout logic.
 
-The existing `#purchase`, `#product-variant-select`, `#product-cart-feedback`, `data-storefront-add-to-cart`, `data-storefront-variant-select`, `data-product-*`, `data-unit-price`, `data-size-value`, `data-feedback-target` and `data-variant-select` contracts are preserved.
+The existing `#purchase`, `#product-variant-select`, `#product-cart-feedback`, `data-storefront-add-to-cart`, `data-storefront-variant-select`, `data-product-*`, `data-unit-price`, `data-size-value`, `data-feedback-target` and `data-variant-select` contracts remain in place.
 
-## Validation and visual evidence
+## Revision and validation evidence
 
-**Validated implementation head `f724d5fce25ad5beb7a0fb676cdc3760467c7d81`:**
-- [Complete CI run 40956077247](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247) — PASS. Release restore/build with warnings as errors, **694 passed / 10 opt-in live smoke skipped / zero failed**, PostgreSQL 16 archive regression, PostgreSQL 17 integration tests, Compose config, all three container builds and published storefront assets.
-- [Code Analysis run 40956077257](https://github.com/unrealbg/BlazorShop/actions/runs/40956077257) — PASS.
-- [Browser E2E TRX and screenshots](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247/artifacts/12932784319): **4/4 passed in each of two consecutive runs**. Both TRX files were inspected: no skipped/failed E2E scenarios. The route test covers 320/390/768/1440px category, simple product, and variant product captures, real API-backed seed data, missing-image state, 404 status, and no horizontal overflow.
-- [npm audit JSON](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247/artifacts/12933687145): runtime and full tree both report **0 vulnerabilities**.
-- [NuGet audit JSON](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247/artifacts/12933082377): **11 projects, 0 vulnerable packages**.
+Initially reviewed implementation: `f724d5fce25ad5beb7a0fb676cdc3760467c7d81`, with successful [CI](https://github.com/unrealbg/BlazorShop/actions/runs/40956077247) and [Code Analysis](https://github.com/unrealbg/BlazorShop/actions/runs/40956077257).
 
-The screenshots from both runs were reviewed. The desktop category intro and two-column product layout, missing-image fallback, mobile stacking and purchase controls match the approved presentation direction. The actual fixture category contains two products, so no fake 24-product cards, stock labels or promotional claims appear. Mobile 320px related-product cards remain two-column under the #110 shared grid, with text wrapping but no page overflow. This is a visual difference from the single-card prototype mock, not a commerce regression.
+Latest verified revision before this documentation-only closure update: **`59e85a7e9ffe9f3555bd45e91edbb3bf168fd1ce`**. Relative to the initially reviewed implementation, it contains the existing singular-option copy correction described below and documentation changes. Both workflows passed at that exact revision:
 
-**Final-head rule:** The above results validate `f724d5f...`, before a one-line singular-option copy correction and this documentation update. The [PR #114 final validation record](https://github.com/unrealbg/BlazorShop/pull/114) must link the *new* successful CI/Code Analysis runs on its final head before marking Ready for Review. Do not use these historical runs as proof for a different SHA. The agent environment has no local .NET SDK or Docker; GitHub Actions supplies executable verification.
+- [Complete CI run 40956916606](https://github.com/unrealbg/BlazorShop/actions/runs/40956916606).
+- [Code Analysis run 40956916574](https://github.com/unrealbg/BlazorShop/actions/runs/40956916574).
 
-## Known boundaries
+| Check | Result at the verified revision |
+| --- | --- |
+| Release restore/build, warnings as errors | Passed; zero build warnings/errors |
+| Unit/integration suite, including PostgreSQL 17 regressions | 694 passed, 10 opt-in live smoke tests skipped, zero failed |
+| PostgreSQL 16 archive regression | 11/11 passed |
+| Playwright regression suite | 4/4 passed twice consecutively; both strict scenario verifiers passed |
+| npm runtime and complete dependency-tree audits | Zero vulnerabilities in both JSON reports |
+| NuGet transitive audit | 11 projects, zero vulnerable packages or audit problems |
+| Container builds, Compose validation and published storefront asset checks | Passed |
+| Code Analysis | Passed |
 
-Only Chromium E2E is automated in the current pipeline; Firefox/WebKit, physical devices, a full accessibility audit, production API smoke tests, and VPS proxy/cookie/domain checks are separate release gates. No production data, real payments or deployment are involved. The category endpoint's existing product order and the product page's current single image are authoritative; the prototype's mock sort, thumbnail gallery, rating and stock labels are intentionally not implemented.
+Evidence: [browser TRX files and screenshots](https://github.com/unrealbg/BlazorShop/actions/runs/40956916606/artifacts/12933279028), [npm audit JSON](https://github.com/unrealbg/BlazorShop/actions/runs/40956916606/artifacts/12932784733), [NuGet audit JSON](https://github.com/unrealbg/BlazorShop/actions/runs/40956916606/artifacts/12933688130). Browser logs confirm all four named scenarios and both mandatory verifications; downloaded audit reports confirm the counts above.
 
-**Review checkpoint:** Keep PR #114 Draft until CI, screenshots and evidence are verified; then mark Ready for Review and stop. No merge or VPS deployment is authorized by this PR.
+The [PR validation record](https://github.com/unrealbg/BlazorShop/pull/114) identifies the final PR head and its matching successful workflow runs. Results for an earlier revision are distinguished from verification of the final documentation commit. This closure update changes only the review document.
+
+## Visual evidence and remaining limitations
+
+- Captures cover 320/390/768/1440px category, simple-product and variant-product layouts. The scenario products exercise the missing-image fallback; a visual check of product details populated with real product images remains outstanding. Gallery crop, proportions and image loading must be assessed with that data before considering image presentation fully verified. This limitation does not add scope to this PR.
+- The initially reviewed revision displays **“1 options”** for a single variant. Existing commit [`fe7824888e358642f3cabc19f94edd16e2fa1131`](https://github.com/unrealbg/BlazorShop/commit/fe7824888e358642f3cabc19f94edd16e2fa1131) changes this to **“1 option”** with one markup-line change. It is included in the verified revision above. No further application-code change is part of this documentation closure.
+- The 320px related-product grid retains two columns from the shared foundation; labels wrap without page overflow. This differs from the single-card prototype presentation.
+- Chromium is covered. Firefox/WebKit, physical devices, a full accessibility audit and live production smoke tests remain unverified. The ten opt-in live smoke tests are skipped, rather than reported as passed.
+- The category endpoint's existing product order and the product page's current single image remain authoritative. Prototype-only sorting, thumbnail-gallery behavior, ratings and stock claims are not implemented.
+
+No merge, release or deployment is included in this change.
