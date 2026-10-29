@@ -79,6 +79,23 @@ public sealed class StorefrontVisualTests(E2EApplicationFixture application) : P
                 }
 
                 await CapturePageAsync(Path.Combine(directory, $"category-{width}.png"));
+
+                await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, $"product/{data.SimpleProductSlug}").ToString());
+                await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = data.SimpleProductName, Exact = true }))
+                    .ToBeVisibleAsync();
+                await Expect(Page.Locator(".bs-v2-detail-image").GetByRole(AriaRole.Img, new() { Name = "No product image available" }))
+                    .ToBeVisibleAsync();
+                await Expect(Page.Locator("#purchase").GetByRole(AriaRole.Button, new() { Name = "Add to Cart", Exact = true }))
+                    .ToBeVisibleAsync();
+                Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"));
+                await CapturePageAsync(Path.Combine(directory, $"product-{width}.png"));
+
+                await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, $"product/{data.VariantProductSlug}").ToString());
+                await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = data.VariantProductName, Exact = true }))
+                    .ToBeVisibleAsync();
+                await Expect(Page.GetByLabel("Choose a variant", new() { Exact = true })).ToBeVisibleAsync();
+                Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"));
+                await CapturePageAsync(Path.Combine(directory, $"variant-product-{width}.png"));
             }
 
             await Page.GotoAsync(application.StorefrontBaseUrl.ToString());
