@@ -64,7 +64,7 @@
 .bs-v2-benefit-icon { flex: 0 0 34px; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #dfe5ec; border-radius: 50%; color: var(--bs-v2-blue); font-weight: 800; }
 .bs-v2-benefit strong { display: block; color: #111827; font-size: .85rem; }
 .bs-v2-benefit span:not(.bs-v2-benefit-icon) { display: block; color: var(--bs-v2-muted); font-size: .73rem; }
-.bs-v2-home-section { padding: 38px 0; color: var(--bs-v2-ink); }
+.bs-v2-home-section { padding: 38px 0; scroll-margin-top: 140px; color: var(--bs-v2-ink); }
 .bs-v2-home-categories { background: var(--bs-v2-surface); }
 .bs-v2-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 21px; }
 .bs-v2-section-heading h2 { margin: 0; font-size: 1.5rem; font-weight: 680; letter-spacing: -.025em; }

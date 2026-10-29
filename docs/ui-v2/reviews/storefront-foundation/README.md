@@ -31,7 +31,7 @@ Completed the foundation presentation: shared SSR shell/header/mobile navigation
 | `Components/Layout/StorefrontHeader.razor` | Supported routes, responsive navigation and skip link |
 | `Components/Layout/StorefrontAccountMenu.razor` | Account label alongside the existing session-aware menu |
 | `Components/Layout/StorefrontFooter.razor` | Navy footer; anonymous Sign in/Register, authenticated My Account and role-appropriate Admin Panel links |
-| `Components/Public/HeroBanner.razor` | Prototype artwork/proportions; Shop now targets the live `#latest` grid, New arrivals targets `/new-releases` |
+| `Components/Public/HeroBanner.razor` | Prototype artwork/proportions; Shop now targets the live `#latest` grid with a sticky-header scroll offset, New arrivals targets `/new-releases` |
 | `Pages/Home.razor` | Products before collections, live category links, remove obsolete visual helper |
 | `Components/Catalog/ProductCard.razor` | Image/title/price/actions layout, semantic heading, honest missing-image state |
 | `Components/Catalog/ProductGrid.razor` | Responsive shared grid and empty state from the initial slice |

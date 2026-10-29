@@ -30,6 +30,11 @@ public sealed class StorefrontVisualTests(E2EApplicationFixture application) : P
                 await hero.GetByRole(AriaRole.Link, new() { Name = "Shop now", Exact = true }).ClickAsync();
                 await Expect(Page).ToHaveURLAsync(new Uri(application.StorefrontBaseUrl, "#latest").ToString());
                 await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Latest Products", Exact = true })).ToBeInViewportAsync();
+                var productsHeading = await Page.Locator("#home-products-heading").BoundingBoxAsync();
+                var header = await Page.Locator(".bs-v2-storefront-header").BoundingBoxAsync();
+                Assert.NotNull(productsHeading);
+                Assert.NotNull(header);
+                Assert.True(productsHeading.Y >= header.Y + header.Height, "Shop now must leave the product heading below the sticky header.");
                 await hero.GetByRole(AriaRole.Link, new() { Name = "New arrivals", Exact = true }).ClickAsync();
                 await Expect(Page).ToHaveURLAsync(new Uri(application.StorefrontBaseUrl, "new-releases").ToString());
                 await Page.GotoAsync(application.StorefrontBaseUrl.ToString());
