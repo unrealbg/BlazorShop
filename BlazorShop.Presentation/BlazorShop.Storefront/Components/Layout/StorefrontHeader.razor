@@ -1,4 +1,5 @@
 <header class="bs-v2-storefront-header">
+    <a class="bs-v2-skip-link" href="#main-content">Skip to content</a>
     <div class="bs-v2-header-main bs-v2-container">
         <a href="@StorefrontRoutes.Home" class="bs-v2-brand" aria-label="BlazorShop public shop home">Blazor<span>Shop</span></a>
 
@@ -20,22 +21,22 @@
 
     <div class="bs-v2-navline">
         <nav class="bs-v2-container bs-v2-desktop-nav" aria-label="Primary shop navigation">
-            <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" ActiveClass="is-active">HOME</NavLink>
-            <NavLink href="@StorefrontRoutes.NewReleases" ActiveClass="is-active">NEW ARRIVALS</NavLink>
-            <NavLink href="@StorefrontRoutes.TodaysDeals" ActiveClass="is-active">TODAY'S DEALS</NavLink>
-            <NavLink href="@StorefrontRoutes.About" ActiveClass="is-active">ABOUT</NavLink>
-            <NavLink href="@StorefrontRoutes.CustomerService" ActiveClass="is-active">CUSTOMER SERVICE</NavLink>
+            <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" ActiveClass="is-active">Home</NavLink>
+            <NavLink href="@StorefrontRoutes.NewReleases" ActiveClass="is-active">New Releases</NavLink>
+            <NavLink href="@StorefrontRoutes.TodaysDeals" ActiveClass="is-active">Today's Deals</NavLink>
+            <NavLink href="@StorefrontRoutes.About" ActiveClass="is-active">About</NavLink>
+            <NavLink href="@StorefrontRoutes.CustomerService" ActiveClass="is-active">Customer Service</NavLink>
         </nav>
     </div>
 
     <details class="bs-v2-mobile-nav">
         <summary>Browse shop <span aria-hidden="true">☰</span></summary>
         <nav aria-label="Mobile shop navigation">
-            <a href="@StorefrontRoutes.Home">Home</a>
-            <a href="@StorefrontRoutes.NewReleases">New Arrivals</a>
-            <a href="@StorefrontRoutes.TodaysDeals">Today's Deals</a>
-            <a href="@StorefrontRoutes.About">About</a>
-            <a href="@StorefrontRoutes.CustomerService">Customer Service</a>
+            <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" ActiveClass="is-active">Home</NavLink>
+            <NavLink href="@StorefrontRoutes.NewReleases" ActiveClass="is-active">New Releases</NavLink>
+            <NavLink href="@StorefrontRoutes.TodaysDeals" ActiveClass="is-active">Today's Deals</NavLink>
+            <NavLink href="@StorefrontRoutes.About" ActiveClass="is-active">About</NavLink>
+            <NavLink href="@StorefrontRoutes.CustomerService" ActiveClass="is-active">Customer Service</NavLink>
         </nav>
     </details>
 </header>

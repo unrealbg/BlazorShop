@@ -113,7 +113,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl?.ToString());
             Assert.True(response.Headers.TryGetValues("X-Robots-Tag", out var robotsHeaderValues));
             Assert.Contains("noindex, nofollow", robotsHeaderValues);
-            Assert.Contains("bs-storefront-header", html);
+            Assert.Contains("bs-v2-storefront-header", html);
             Assert.True(
                 document.RobotsMetaContent is null || string.Equals(document.RobotsMetaContent, "noindex,nofollow", StringComparison.Ordinal),
                 $"Unexpected 404 robots meta value '{document.RobotsMetaContent}'.");

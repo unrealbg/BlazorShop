@@ -1,0 +1,31 @@
+<footer class="bs-v2-footer">
+    <div class="bs-v2-container">
+        <div class="bs-v2-footer-grid">
+            <div>
+                <a class="bs-v2-brand" href="@StorefrontRoutes.Home">Blazor<span>Shop</span></a>
+                <p>Discover products, explore collections and keep track of your orders with BlazorShop.</p>
+            </div>
+            <nav aria-label="Footer shop navigation">
+                <h2>Shop</h2>
+                <a href="@StorefrontRoutes.Home">Home</a>
+                <a href="@StorefrontRoutes.NewReleases">New Releases</a>
+                <a href="@StorefrontRoutes.TodaysDeals">Today's Deals</a>
+                <a href="@StorefrontRoutes.Cart">Cart</a>
+            </nav>
+            <nav aria-label="Footer support navigation">
+                <h2>Support</h2>
+                <a href="@StorefrontRoutes.CustomerService">Customer Service</a>
+                <a href="@StorefrontRoutes.Faq">FAQ</a>
+                <a href="@StorefrontRoutes.About">About</a>
+            </nav>
+            <nav aria-label="Footer information navigation">
+                <h2>Information</h2>
+                <a href="@StorefrontRoutes.SignIn">Sign in</a>
+                <a href="@StorefrontRoutes.Register">Register</a>
+                <a href="@StorefrontRoutes.Privacy">Privacy</a>
+                <a href="@StorefrontRoutes.Terms">Terms</a>
+            </nav>
+        </div>
+        <p class="bs-v2-footer-copyright">© @DateTime.UtcNow.Year BlazorShop. All rights reserved.</p>
+    </div>
+</footer>

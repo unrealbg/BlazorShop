@@ -9,18 +9,18 @@ namespace BlazorShop.Tests.Presentation.Storefront
         {
             var markup = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/Components/Layout/StorefrontHeader.razor");
 
-            Assert.Contains("<header class=\"bs-storefront-header relative text-neutral-100\">", markup);
-            Assert.Contains("bs-storefront-header__shell", markup);
-            Assert.Contains("bs-storefront-header__desktop relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8", markup);
-            Assert.Contains("bs-storefront-header__mobile relative mx-auto max-w-7xl px-4 py-3 sm:px-6", markup);
-            Assert.Contains("bs-storefront-header__desktop", markup);
-            Assert.Contains("bs-storefront-header__mobile", markup);
+            Assert.Contains("<header class=\"bs-v2-storefront-header\">", markup);
+            Assert.Contains("aria-label=\"Primary shop navigation\"", markup);
+            Assert.Contains("aria-label=\"Mobile shop navigation\"", markup);
+            Assert.Contains("<details class=\"bs-v2-mobile-nav\">", markup);
+            Assert.Contains("data-storefront-cart-badge", markup);
+            Assert.Contains("<StorefrontAccountMenu />", markup);
+            Assert.Contains("href=\"@StorefrontRoutes.Cart\"", markup);
             Assert.DoesNotContain("bs-storefront-header__backdrop", markup);
             Assert.DoesNotContain("HeaderShell", markup);
             Assert.DoesNotContain("@<>", markup);
             Assert.DoesNotContain("</>", markup);
-            Assert.Contains("BLAZORSHOP", markup);
-            Assert.Contains("PUBLIC SHOP", markup);
+            Assert.Contains("aria-label=\"BlazorShop public shop home\"", markup);
             Assert.Contains("Home", markup);
             Assert.Contains("New Releases", markup);
             Assert.Contains("Today's Deals", markup);
@@ -98,7 +98,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
             var markup = ReadRepositoryFile("BlazorShop.Presentation/BlazorShop.Storefront/Components/Layout/MainLayout.razor");
 
             Assert.Contains("<StorefrontHeader />", markup);
-            Assert.Contains("<main class=\"bs-storefront-main flex-1\">", markup);
+            Assert.Contains("<main id=\"main-content\" class=\"bs-storefront-main flex-1\" tabindex=\"-1\">", markup);
+            Assert.Contains("<StorefrontFooter />", markup);
             Assert.DoesNotContain("WorkspaceHeader", markup);
             Assert.DoesNotContain("Back to shop", markup);
             Assert.DoesNotContain("clip-diagonal", markup);

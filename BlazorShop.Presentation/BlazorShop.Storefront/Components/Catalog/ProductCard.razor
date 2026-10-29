@@ -2,7 +2,14 @@
     @if (!string.IsNullOrWhiteSpace(ProductUrl))
     {
         <a href="@ProductUrl" class="bs-v2-product-image" aria-label="View @Product.Name">
-            <img src="@Product.Image" alt="@Product.Name" loading="lazy" />
+            @if (!string.IsNullOrWhiteSpace(Product.Image))
+            {
+                <img src="@Product.Image" alt="@Product.Name" loading="lazy" decoding="async" />
+            }
+            else
+            {
+                <span class="bs-v2-image-placeholder">No image available</span>
+            }
             @if (IsNewArrival)
             {
                 <span class="bs-v2-product-badge">New</span>
@@ -12,7 +19,14 @@
     else
     {
         <div class="bs-v2-product-image">
-            <img src="@Product.Image" alt="@Product.Name" loading="lazy" />
+            @if (!string.IsNullOrWhiteSpace(Product.Image))
+            {
+                <img src="@Product.Image" alt="@Product.Name" loading="lazy" decoding="async" />
+            }
+            else
+            {
+                <span class="bs-v2-image-placeholder">No image available</span>
+            }
         </div>
     }
 
@@ -30,7 +44,7 @@
         }
         @if (!string.IsNullOrWhiteSpace(ProductUrl))
         {
-            <a href="@ProductUrl" class="bs-v2-product-title">@Product.Name</a>
+            <h2 class="bs-v2-product-title"><a href="@ProductUrl">@Product.Name</a></h2>
         }
         else
         {
