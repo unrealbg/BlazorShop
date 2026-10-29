@@ -1,4 +1,3 @@
-@inject IStorefrontSessionResolver SessionResolver
 @inject IStorefrontClientAppUrlResolver ClientAppUrlResolver
 
 <details class="bs-storefront-account-menu">
@@ -42,10 +41,6 @@
 </details>
 
 @code {
-    private StorefrontSessionInfo _session = StorefrontSessionInfo.Anonymous;
-
-    protected override async Task OnInitializedAsync()
-    {
-        _session = await SessionResolver.GetCurrentUserAsync();
-    }
+    [CascadingParameter]
+    private StorefrontSessionInfo _session { get; set; } = StorefrontSessionInfo.Anonymous;
 }

@@ -26,6 +26,13 @@ public sealed class StorefrontVisualTests(E2EApplicationFixture application) : P
                 await Page.GotoAsync(application.StorefrontBaseUrl.ToString());
                 await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Discover great products.", Exact = true }))
                     .ToBeVisibleAsync();
+                var hero = Page.Locator(".bs-v2-hero-actions");
+                await hero.GetByRole(AriaRole.Link, new() { Name = "Shop now", Exact = true }).ClickAsync();
+                await Expect(Page).ToHaveURLAsync(new Uri(application.StorefrontBaseUrl, "#latest").ToString());
+                await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Latest Products", Exact = true })).ToBeInViewportAsync();
+                await hero.GetByRole(AriaRole.Link, new() { Name = "New arrivals", Exact = true }).ClickAsync();
+                await Expect(Page).ToHaveURLAsync(new Uri(application.StorefrontBaseUrl, "new-releases").ToString());
+                await Page.GotoAsync(application.StorefrontBaseUrl.ToString());
                 Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"));
                 var art = Page.GetByRole(AriaRole.Img, new() { Name = "Modern armchair and side table", Exact = true });
                 Assert.True(await art.EvaluateAsync<bool>("img => img.complete && img.naturalWidth > 0"));

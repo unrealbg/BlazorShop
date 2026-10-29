@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
+@inject IStorefrontSessionResolver SessionResolver
 
+<CascadingValue Value="_session">
 <div class="bs-storefront-shell bs-v2-shell">
     <StorefrontHeader />
 
@@ -33,3 +35,13 @@
 
     <StorefrontFooter />
 </div>
+</CascadingValue>
+
+@code {
+    private StorefrontSessionInfo _session = StorefrontSessionInfo.Anonymous;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _session = await SessionResolver.GetCurrentUserAsync();
+    }
+}

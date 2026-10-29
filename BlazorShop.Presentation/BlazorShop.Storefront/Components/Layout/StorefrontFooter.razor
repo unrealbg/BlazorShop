@@ -1,3 +1,5 @@
+@inject IStorefrontClientAppUrlResolver ClientAppUrlResolver
+
 <footer class="bs-v2-footer">
     <div class="bs-v2-container">
         <div class="bs-v2-footer-grid">
@@ -20,8 +22,19 @@
             </nav>
             <nav aria-label="Footer information navigation">
                 <h2>Information</h2>
-                <a href="@StorefrontRoutes.SignIn">Sign in</a>
-                <a href="@StorefrontRoutes.Register">Register</a>
+                @if (_session.IsAuthenticated)
+                {
+                    <a href="@ClientAppUrlResolver.ResolveUrl("/account")">My Account</a>
+                    @if (_session.IsAdmin)
+                    {
+                        <a href="@ClientAppUrlResolver.ResolveUrl("/admin")">Admin Panel</a>
+                    }
+                }
+                else
+                {
+                    <a href="@StorefrontRoutes.SignIn">Sign in</a>
+                    <a href="@StorefrontRoutes.Register">Register</a>
+                }
                 <a href="@StorefrontRoutes.Privacy">Privacy</a>
                 <a href="@StorefrontRoutes.Terms">Terms</a>
             </nav>
@@ -29,3 +42,8 @@
         <p class="bs-v2-footer-copyright">© @DateTime.UtcNow.Year BlazorShop. All rights reserved.</p>
     </div>
 </footer>
+
+@code {
+    [CascadingParameter]
+    private StorefrontSessionInfo _session { get; set; } = StorefrontSessionInfo.Anonymous;
+}

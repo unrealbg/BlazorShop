@@ -54,10 +54,31 @@ jobs:
           if-no-files-found: error
 
       - name: Restore
-        run: dotnet restore BlazorShop.sln
+        run: dotnet restore BlazorShop.sln -warnaserror
+
+      - name: Audit full NuGet dependency tree
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/nuget-audit | Out-Null
+          dotnet list BlazorShop.sln package --vulnerable --include-transitive --format json --no-restore > artifacts/nuget-audit/full.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $audit = Get-Content artifacts/nuget-audit/full.json -Raw | ConvertFrom-Json
+          if (-not $audit.projects) { throw 'NuGet audit did not return any projects.' }
+          if ($audit.problems) { throw 'NuGet audit reported problems; see full.json.' }
+          $findings = @($audit.projects | ForEach-Object { $_.frameworks } | ForEach-Object { $_.topLevelPackages; $_.transitivePackages } | Where-Object { $_.vulnerabilities })
+          if ($findings.Count -gt 0) { throw "NuGet audit found $($findings.Count) vulnerable packages; see full.json." }
+          Write-Host 'NuGet audit: zero vulnerable packages.'
+
+      - name: Upload NuGet audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/nuget-audit/*.json
+          if-no-files-found: error
 
       - name: Build
-        run: dotnet build BlazorShop.sln --configuration Release --no-restore
+        run: dotnet build BlazorShop.sln --configuration Release --no-restore -warnaserror
 
       - name: Test
         run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --verbosity normal
@@ -85,6 +106,20 @@ jobs:
 
       - name: Build Storefront container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Storefront/Dockerfile -t blazorshop-storefront:ci .
+
+      - name: Verify published Storefront static assets
+        run: |
+          docker run --detach --name storefront-assets --publish 127.0.0.1:18080:8080 \
+            --env Api__BaseUrl=https://api.shop.example.com/api/ \
+            --env ClientApp__BaseUrl=https://account.shop.example.com/ \
+            --env PublicUrl__BaseUrl=https://shop.example.com/ blazorshop-storefront:ci
+          trap 'docker logs storefront-assets; docker rm --force storefront-assets' EXIT
+          curl --fail --retry 15 --retry-connrefused --retry-delay 1 --max-time 5 http://127.0.0.1:18080/ui-v2/hero-chair.svg --output /tmp/storefront-hero.svg
+          grep -q 'Modern armchair and side table' /tmp/storefront-hero.svg
+          curl --fail --max-time 5 'http://127.0.0.1:18080/css/ui-v2-storefront.css?v=smoke' --output /tmp/storefront-v2.css
+          grep -q 'bs-v2-shell' /tmp/storefront-v2.css
+          curl --fail --max-time 5 'http://127.0.0.1:18080/css/site.css?v=smoke' --output /tmp/storefront-site.css
+          test -s /tmp/storefront-site.css
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
