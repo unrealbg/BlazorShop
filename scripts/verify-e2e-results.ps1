@@ -8,7 +8,8 @@ $ErrorActionPreference = 'Stop'
 $expectedTests = @(
     'BlazorShop.E2E.StorefrontCheckoutTests.HomeCategoryAndProductNavigation_ShowsSeededCatalogContent',
     'BlazorShop.E2E.StorefrontCheckoutTests.Cart_AddsProductAndVariantAndPersistsQuantityAfterReload',
-    'BlazorShop.E2E.StorefrontCheckoutTests.CheckoutStart_AnonymousLoginThenAuthenticatedCheckoutPreservesCart'
+    'BlazorShop.E2E.StorefrontCheckoutTests.CheckoutStart_AnonymousLoginThenAuthenticatedCheckoutPreservesCart',
+    'BlazorShop.E2E.StorefrontVisualTests.StorefrontFoundation_ResponsiveNavigationAndCommerce'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

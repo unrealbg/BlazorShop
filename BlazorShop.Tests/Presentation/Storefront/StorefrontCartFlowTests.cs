@@ -109,6 +109,43 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Contains("data-storefront-toast-template", content, StringComparison.Ordinal);
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task ShellAccountLinks_ReflectSessionWithoutDuplicateRefresh(bool authenticated, bool admin)
+        {
+            var resolver = new StubStorefrontSessionResolver(new StorefrontSessionInfo(authenticated, admin, "Customer", "customer@example.com"));
+            using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IStorefrontSessionResolver>();
+                services.RemoveAll<IStorefrontClientAppUrlResolver>();
+                services.AddScoped<IStorefrontSessionResolver>(_ => resolver);
+                services.AddScoped<IStorefrontClientAppUrlResolver>(_ => new StubStorefrontClientAppUrlResolver("https://account.example.com/"));
+            }));
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(factory);
+            using var response = await client.GetAsync(StorefrontRoutes.Home);
+            var html = await response.Content.ReadAsStringAsync();
+            var footer = html[html.IndexOf("<footer", StringComparison.Ordinal)..html.IndexOf("</footer>", StringComparison.Ordinal)];
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(1, resolver.Calls);
+            if (authenticated)
+            {
+                Assert.Contains("href=\"https://account.example.com/account\">My Account", footer);
+                Assert.DoesNotContain("href=\"/signin\"", footer);
+                Assert.DoesNotContain("href=\"/register\"", footer);
+                Assert.Equal(admin, footer.Contains("href=\"https://account.example.com/admin\">Admin Panel", StringComparison.Ordinal));
+            }
+            else
+            {
+                Assert.Contains("href=\"/signin\">Sign in", footer);
+                Assert.Contains("href=\"/register\">Register", footer);
+                Assert.DoesNotContain("My Account", footer);
+                Assert.DoesNotContain("Admin Panel", footer);
+            }
+        }
+
         [Fact]
         public async Task CommerceScript_RegistersToastAndCartPageSupport()
         {
@@ -154,6 +191,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
         {
             private readonly StorefrontSessionInfo _sessionInfo;
 
+            public int Calls { get; private set; }
+
             public StubStorefrontSessionResolver(StorefrontSessionInfo sessionInfo)
             {
                 _sessionInfo = sessionInfo;
@@ -161,6 +200,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
             public Task<StorefrontSessionInfo> GetCurrentUserAsync(CancellationToken cancellationToken = default)
             {
+                Calls++;
                 return Task.FromResult(_sessionInfo);
             }
         }

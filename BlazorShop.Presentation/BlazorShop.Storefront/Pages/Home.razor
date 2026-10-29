@@ -14,65 +14,46 @@
 }
 else
 {
-    <section class="mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 sm:pt-10 lg:px-8">
-        <div class="text-center">
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Shop Categories</p>
-            <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900">Browse by Category</h2>
-            <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Explore the same BlazorShop collections and jump straight into public product pages.</p>
+    <section id="latest" class="bs-v2-home-section" aria-labelledby="home-products-heading">
+        <div class="bs-v2-container">
+            <div class="bs-v2-section-heading">
+                <div>
+                    <p class="bs-v2-eyebrow">Curated for you</p>
+                    <h2 id="home-products-heading">Latest Products</h2>
+                </div>
+                <a href="@StorefrontRoutes.NewReleases">View all <span aria-hidden="true">→</span></a>
+            </div>
+            <ProductGrid Products="_latestProducts" EmptyMessage="No published products are available yet." />
         </div>
-
-        @if (FeaturedCategories.Count > 0)
-        {
-            <div class="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 lg:grid-cols-3">
-                @for (var index = 0; index < FeaturedCategories.Count; index++)
-                {
-                    var category = FeaturedCategories[index];
-
-                    <a href="@StorefrontRoutes.Category(category.Slug)" class="group relative rounded-xl border border-neutral-200 bg-white/90 px-4 py-4 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 grid h-10 w-10 place-items-center rounded-full text-white @GetCategoryBadgeClass(index)">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 7h18M3 12h18M3 17h18" />
-                                </svg>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="font-semibold leading-snug text-neutral-900">@category.Name</div>
-                                <div class="mt-1 text-xs uppercase tracking-[0.18em] text-neutral-500">Browse</div>
-                                <p class="mt-2 text-sm leading-6 text-neutral-700">@GetCategorySummary(category)</p>
-                            </div>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="mt-1 h-4 w-4 text-neutral-400 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6" /></svg>
-                        </div>
-                    </a>
-                }
-            </div>
-
-            <div class="mt-6 flex justify-center">
-                <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 items-center justify-center rounded bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">See New Releases</a>
-            </div>
-        }
-        else
-        {
-            <div class="mt-8 rounded-md bg-blue-50 px-6 py-5 text-center text-sm text-blue-800 shadow">
-                No published categories are available right now.
-            </div>
-        }
     </section>
 
-    <section id="latest" class="relative z-[1]">
-        <div class="mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 sm:pb-12 sm:pt-8 lg:px-8">
-            <div class="text-center">
-                <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Published Catalog</p>
-                <h2 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900">Latest Products</h2>
-                <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Fresh products, clear prices, and direct links into the catalog.</p>
+    <section class="bs-v2-home-section bs-v2-home-categories" aria-labelledby="home-categories-heading">
+        <div class="bs-v2-container">
+            <div class="bs-v2-section-heading">
+                <div>
+                    <p class="bs-v2-eyebrow">Explore collections</p>
+                    <h2 id="home-categories-heading">Browse by Category</h2>
+                </div>
+                <a href="@StorefrontRoutes.NewReleases">New arrivals <span aria-hidden="true">→</span></a>
             </div>
 
-            <div class="mt-6 sm:mt-8">
-                <ProductGrid Products="_latestProducts" EmptyMessage="No published products are available yet." />
-            </div>
-
-            <div class="mt-8 flex justify-center">
-                <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 items-center justify-center rounded bg-amber-500 px-4 py-2 font-semibold text-white hover:bg-amber-600">See All New Releases</a>
-            </div>
+            @if (FeaturedCategories.Count > 0)
+            {
+                <div class="bs-v2-category-grid">
+                    @foreach (var category in FeaturedCategories)
+                    {
+                        <a href="@StorefrontRoutes.Category(category.Slug)" class="bs-v2-category-panel" aria-label="@category.Name">
+                            <strong>@category.Name</strong>
+                            <span>@GetCategorySummary(category)</span>
+                            <span class="bs-v2-category-link">Explore collection <span aria-hidden="true">→</span></span>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="bs-v2-empty">No published categories are available right now.</div>
+            }
         </div>
     </section>
 }
@@ -133,17 +114,6 @@ else
         _categories = categoriesResult.Value ?? [];
         _latestProducts = latestProductsResult.Value?.Items ?? [];
         _structuredData = await structuredDataTask;
-    }
-
-    private static string GetCategoryBadgeClass(int index)
-    {
-        return (index % 4) switch
-        {
-            0 => "bg-sky-500",
-            1 => "bg-amber-500",
-            2 => "bg-emerald-500",
-            _ => "bg-neutral-900",
-        };
     }
 
     private static string GetCategorySummary(GetCategory category)
