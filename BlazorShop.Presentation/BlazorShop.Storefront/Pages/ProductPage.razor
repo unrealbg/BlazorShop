@@ -54,7 +54,7 @@ else if (_product is not null)
                 <h1 id="product-title">@_product.Name</h1>
                 <p class="bs-v2-detail-price-label">@PrimaryPriceLabel</p>
                 <p class="bs-v2-detail-price">€ @_product.Price</p>
-                <p class="bs-v2-detail-variant-summary">@VariantSummary</p>
+                <p class="bs-v2-detail-variant-summary">@(_product.Variants.Count() == 1 ? "1 option" : VariantSummary)</p>
 
                 @if (!string.IsNullOrWhiteSpace(_product.Description))
                 {
