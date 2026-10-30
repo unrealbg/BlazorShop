@@ -6,6 +6,7 @@
     using BlazorShop.Domain.Contracts.Payment;
     using BlazorShop.Web.Services;
     using BlazorShop.Web.Shared;
+    using BlazorShop.Web.Shared.CookieStorage;
     using BlazorShop.Web.Shared.Models.Notifications;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
@@ -20,6 +21,8 @@
         private IEnumerable<GetPaymentMethod> _paymentMethods = [];
         private bool _isCartLoading;
         private string? _cartLoadError;
+        private string? _cartCookieWarning;
+        private bool _hasTotalOverflow;
         private bool _isPaymentMethodsLoading;
         private string? _paymentMethodsError;
         private bool _isSavingCart;
@@ -46,12 +49,11 @@
             _paymentMethodsError = null;
             _showPaymentDialog = false;
 
-            _myCarts = [];
             var cartJson = await this.CookieStorageService.GetAsync(Constant.Cart.Name);
-            if (!string.IsNullOrEmpty(cartJson))
-            {
-                _myCarts = JsonSerializer.Deserialize<List<ProcessCart>>(cartJson) ?? [];
-            }
+            var parsedCart = CartCookieParser.Parse(cartJson);
+            _myCarts = parsedCart.Items.ToList();
+            _cartCookieWarning = parsedCart.IsMalformed ? CartCookieParser.MalformedMessage
+                : parsedCart.HasInvalidItems ? CartCookieParser.InvalidItemsMessage : null;
 
             if (!await this.LoadCartProductsAsync())
             {
@@ -86,11 +88,20 @@
 
         private bool HasUnavailableCartLines => _cartLines.Any(line => line.IsUnavailable);
 
-        private decimal CartGrandTotal => _cartLines.Sum(line => line.LineTotal);
+        private string CartGrandTotalDisplay => _hasTotalOverflow ? "Unavailable" : $"€ {_cartLines.Sum(line => line.LineTotal):F2}";
 
         private void BuildCartLines()
         {
             _cartLines = CheckoutCartLineMapper.Build(_myCarts, _products);
+            try
+            {
+                _ = _cartLines.Sum(line => line.LineTotal);
+                _hasTotalOverflow = false;
+            }
+            catch (OverflowException)
+            {
+                _hasTotalOverflow = true;
+            }
         }
 
         private async Task<bool> LoadCartProductsAsync()

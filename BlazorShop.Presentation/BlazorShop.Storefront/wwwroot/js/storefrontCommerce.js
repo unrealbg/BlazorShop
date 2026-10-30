@@ -1,5 +1,6 @@
 (function () {
   const cartCookieName = "my-cart";
+  const maxCookieQuantity = 2147483647; // Existing ProcessCart.Quantity / checkout Int32 contract.
   const buttonSelector = "[data-storefront-add-to-cart]";
   const badgeSelector = "[data-storefront-cart-badge]";
   const cartRemoveSelector = "[data-storefront-cart-remove]";
@@ -24,7 +25,8 @@
     for (const cookie of cookies) {
       const trimmedCookie = cookie.trim();
       if (trimmedCookie.startsWith(encodedName)) {
-        return decodeURIComponent(trimmedCookie.substring(encodedName.length));
+        const value = trimmedCookie.substring(encodedName.length);
+        try { return decodeURIComponent(value); } catch { return value; }
       }
     }
 
@@ -80,7 +82,42 @@
 
     try {
       const parsed = JSON.parse(rawCart);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      const items = new Map();
+      const rejected = new Set();
+      const property = (item, name) => item[name] ?? item[name[0].toLowerCase() + name.slice(1)];
+      const guid = (value) => typeof value === "string"
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())
+        && value.trim() !== "00000000-0000-0000-0000-000000000000" ? value.trim().toLowerCase() : null;
+      for (const item of parsed) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+        const productId = guid(property(item, "ProductId"));
+        const rawVariant = property(item, "VariantId");
+        const variantId = rawVariant == null ? null : guid(rawVariant);
+        const quantity = property(item, "Quantity");
+        if (!productId || (rawVariant != null && !variantId)
+          || !Number.isInteger(quantity) || quantity <= 0 || quantity > maxCookieQuantity) continue;
+        const key = `${productId}:${variantId || ""}`;
+        if (rejected.has(key)) continue;
+        const existing = items.get(key);
+        if (existing) {
+          if (existing.Quantity + quantity > maxCookieQuantity) {
+            items.delete(key);
+            rejected.add(key);
+          } else {
+            existing.Quantity += quantity;
+          }
+        } else {
+          const size = property(item, "SizeValue");
+          const price = property(item, "UnitPrice");
+          items.set(key, {
+            ProductId: productId, VariantId: variantId, Quantity: quantity,
+            SizeValue: typeof size === "string" ? size : null,
+            UnitPrice: typeof price === "number" && Number.isFinite(price) && Math.abs(price) <= 7.922816251426434e28 ? price : null
+          });
+        }
+      }
+      return Array.from(items.values());
     } catch {
       return [];
     }
@@ -314,6 +351,12 @@
     let toastLevel = "success";
 
     if (existingItem) {
+      if (getItemQuantity(existingItem) >= maxCookieQuantity) {
+        const message = "The requested quantity is too large.";
+        setFeedback(button, message, true);
+        showToast("error", "Cart", message);
+        return;
+      }
       setItemQuantity(existingItem, getItemQuantity(existingItem) + payload.Quantity);
       feedbackMessage = `Increased quantity of ${formatCartLabel(productName, payload.SizeValue)}`;
       toastLevel = "info";
@@ -369,7 +412,7 @@
     const productId = (input.dataset.productId || "").trim();
     const variantId = (input.dataset.variantId || "").trim();
     const productName = formatCartLabel(input.dataset.productName, input.dataset.sizeValue);
-    const nextQuantity = parseInteger(input.value, Number.NaN);
+    const nextQuantity = input.value.trim() === "" ? Number.NaN : Number(input.value);
     const currentQuantity = parseInteger(input.getAttribute("value"), 1);
 
     if (!productId) {
@@ -377,7 +420,7 @@
       return;
     }
 
-    if (!Number.isFinite(nextQuantity) || nextQuantity < 0) {
+    if (!Number.isInteger(nextQuantity) || nextQuantity < 0 || nextQuantity > maxCookieQuantity) {
       input.value = String(currentQuantity);
       showToast("error", "Cart", "Enter a valid quantity.");
       return;

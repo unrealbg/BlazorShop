@@ -268,6 +268,90 @@ public sealed class StorefrontCheckoutTests(E2EApplicationFixture application) :
         });
     }
 
+    [Fact]
+    public async Task CartCookie_InvalidInputRecoveryAndCheckoutHandoff()
+    {
+        await RunScenarioAsync(nameof(CartCookie_InvalidInputRecoveryAndCheckoutHandoff), async data =>
+        {
+            var errors = new List<string>();
+            Page.PageError += (_, error) => errors.Add(error);
+            var root = new DirectoryInfo(AppContext.BaseDirectory);
+            while (root is not null && !File.Exists(Path.Combine(root.FullName, "BlazorShop.sln")))
+            {
+                root = root.Parent;
+            }
+
+            Assert.NotNull(root);
+            using var cases = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root.FullName, "tests", "fixtures", "cart-cookie-cases.json")));
+            foreach (var item in cases.RootElement.EnumerateArray())
+            {
+                var json = item.GetProperty("json").GetString()!.Replace("$product", data.SimpleProductId.ToString("D"), StringComparison.Ordinal)
+                    .Replace("$other", data.VariantProductId.ToString("D"), StringComparison.Ordinal);
+                await SetCartCookieAsync(json);
+                var before = Assert.Single(await Context.CookiesAsync(), cookie => cookie.Name == "my-cart").Value;
+                var response = await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "my-cart").ToString());
+                Assert.NotNull(response);
+                Assert.Equal(200, response.Status);
+                var count = item.GetProperty("quantity").GetInt64();
+                await Expect(Page.Locator(".bs-v2-cart-intro .bs-v2-count")).ToHaveTextAsync($"{count} {(count == 1 ? "item" : "items")} in cart");
+                await Expect(Page.Locator(".bs-v2-cart-line")).ToHaveCountAsync(item.GetProperty("items").GetInt32());
+                await Expect(Page.Locator("[data-storefront-cart-badge]")).ToHaveTextAsync(count > 99 ? "99+" : count.ToString(CultureInfo.InvariantCulture));
+                Assert.Equal(before, Assert.Single(await Context.CookiesAsync(), cookie => cookie.Name == "my-cart").Value);
+            }
+
+            await Context.AddCookiesAsync([new Cookie { Name = "my-cart", Value = "%E0%A4", Url = application.StorefrontBaseUrl.ToString() }]);
+            await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "my-cart").ToString());
+            await Expect(Page.Locator(".bs-v2-cart-intro .bs-v2-count")).ToHaveTextAsync("0 items in cart");
+            await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("We couldn't read the saved cart cookie");
+            await Expect(Page.Locator("[data-storefront-cart-badge]")).ToHaveTextAsync("0");
+
+            await SetCartCookieAsync($"[{{\"ProductId\":\"{data.SimpleProductId}\",\"Quantity\":2147483647}}]");
+            await Page.GotoAsync(ProductUrl(data.SimpleProductSlug));
+            var maximumCookie = Assert.Single(await Context.CookiesAsync(), cookie => cookie.Name == "my-cart").Value;
+            await ProductPurchaseButton().ClickAsync();
+            await Expect(ProductCartFeedback()).ToHaveTextAsync("The requested quantity is too large.");
+            Assert.Equal(maximumCookie, Assert.Single(await Context.CookiesAsync(), cookie => cookie.Name == "my-cart").Value);
+            await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "my-cart").ToString());
+            var maximumInput = Page.Locator(".bs-v2-cart-line").GetByRole(AriaRole.Spinbutton);
+            foreach (var invalidQuantity in new[] { "2147483648", "1.5", "" })
+            {
+                await maximumInput.FillAsync(invalidQuantity);
+                await maximumInput.PressAsync("Tab");
+                await Expect(maximumInput).ToHaveValueAsync("2147483647");
+                Assert.Equal(maximumCookie, Assert.Single(await Context.CookiesAsync(), cookie => cookie.Name == "my-cart").Value);
+            }
+
+            var mixed = $"[null,{{\"ProductId\":\"{data.SimpleProductId}\",\"Quantity\":2,\"UnitPrice\":0.01}},{{\"ProductId\":\"{data.SimpleProductId}\",\"Quantity\":1}},{{\"ProductId\":\"{data.VariantProductId}\",\"VariantId\":\"{data.VariantId}\",\"Quantity\":3,\"UnitPrice\":0.01}}]";
+            await SetCartCookieAsync(mixed);
+            await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "my-cart").ToString());
+            await AssertCartTotalsAsync(6, data.SimpleProductPrice * 3 + data.VariantPrice * 3);
+            await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Some saved cart items were invalid");
+            await Page.GetByRole(AriaRole.Link, new() { Name = "Continue to Checkout", Exact = true }).ClickAsync();
+            await Expect(Page).ToHaveURLAsync(new Regex("/authentication/login/account/checkout$"));
+            await Page.GetByLabel("Email Address", new() { Exact = true }).FillAsync(data.UserEmail);
+            await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(data.UserPassword);
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Login", Exact = true }).ClickAsync();
+            await Expect(Page).ToHaveURLAsync(new Regex("/account/checkout$"));
+            var simple = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = data.SimpleProductName });
+            var variant = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = data.VariantProductName });
+            await Expect(simple.GetByRole(AriaRole.Spinbutton)).ToHaveValueAsync("3");
+            await Expect(simple).ToContainTextAsync($"€ {Money(data.SimpleProductPrice * 3)}");
+            await Expect(variant).ToContainTextAsync(data.VariantSku);
+            await Expect(variant.GetByRole(AriaRole.Spinbutton)).ToHaveValueAsync("3");
+            await Expect(variant).ToContainTextAsync($"€ {Money(data.VariantPrice * 3)}");
+            Assert.Equal(Uri.EscapeDataString(mixed), Assert.Single(await Context.CookiesAsync(), cookie => cookie.Name == "my-cart").Value);
+            await simple.GetByRole(AriaRole.Spinbutton).FillAsync("4");
+            await simple.GetByRole(AriaRole.Spinbutton).PressAsync("Tab");
+            await Expect(simple.GetByRole(AriaRole.Spinbutton)).ToHaveValueAsync("4");
+            await AssertCartCookieLineAsync(data.VariantProductId, data.VariantId, 3);
+            await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "my-cart").ToString());
+            await AssertCartTotalsAsync(7, data.SimpleProductPrice * 4 + data.VariantPrice * 3);
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Clear Cart", Exact = true }).ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Your cart is empty", Exact = true })).ToBeVisibleAsync();
+            Assert.Empty(errors);
+        });
+    }
+
     private ILocator CartVariantLine(Guid variantId)
     {
         return Page.Locator($".bs-v2-cart-line:has([data-storefront-cart-quantity][data-variant-id='{variantId:D}'])");

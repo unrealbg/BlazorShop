@@ -55,6 +55,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
         public HttpStatusCode CartProductsStatusCode { get; init; } = HttpStatusCode.OK;
 
+        public bool CartConnectionInterrupted { get; init; }
+
         public GetPublicCatalogSitemap Sitemap { get; init; } = CreateSitemap();
 
         public IReadOnlyDictionary<string, SeoRedirectResolutionDto> Redirects { get; init; } = CreateRedirects();
@@ -319,6 +321,11 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
                 if (TryGetGuidId(path, "/product/single/", out var productId))
                 {
+                    if (_scenario.CartConnectionInterrupted)
+                    {
+                        throw new HttpRequestException("Simulated catalog connection interruption.");
+                    }
+
                     if (_scenario.CartProductsStatusCode != HttpStatusCode.OK)
                     {
                         return CreateStatusResponseAsync(_scenario.CartProductsStatusCode, request);

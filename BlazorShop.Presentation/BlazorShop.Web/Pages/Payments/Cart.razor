@@ -3,6 +3,10 @@
 @attribute [Authorize]
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-6">
+    @if (!string.IsNullOrWhiteSpace(_cartCookieWarning))
+    {
+        <div role="alert" class="mt-4 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-800">@_cartCookieWarning</div>
+    }
     @if (_isCartLoading)
     {
         <div class="mt-16 rounded-xl bg-amber-100/60 p-6">
@@ -25,6 +29,10 @@
         <div class="mt-6 rounded-xl bg-amber-100/60">
             <div class="p-6">
                 <h4 class="text-center text-xl font-bold">My Cart</h4>
+                @if (_hasTotalOverflow)
+                {
+                    <div role="alert" class="mt-4 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-800">Some cart totals cannot be displayed safely. Review quantities before checkout.</div>
+                }
                 @if (HasUnavailableCartLines)
                 {
                     <div class="mt-4 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-800 shadow-sm">
@@ -73,7 +81,7 @@
                                                disabled="@IsCartLineBusy(line.ProductId, line.VariantId)"
                                                @onchange="(e) => HandleInputChange(e, line.ProductId, line.VariantId)" />
                                     </td>
-                                    <td class="px-3 py-2">€ @line.LineTotal.ToString("F2")</td>
+                                    <td class="px-3 py-2">@line.LineTotalDisplay</td>
                                     <td class="px-3 py-2 text-center">
                                         <button class="text-red-600 hover:text-red-700 disabled:opacity-60" title="Remove" @onclick="() => RemoveCartItem(line.ProductId, line.VariantId)" disabled="@IsCartLineBusy(line.ProductId, line.VariantId)">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-1 0l-1 12a2 2 0 01-2 2h-2a2 2 0 01-2-2L8 7"/></svg>
@@ -92,7 +100,7 @@
                     </div>
                 }
                 <div class="mt-4 flex items-center justify-between">
-                    <h4 class="text-lg font-bold">Total: € @CartGrandTotal.ToString("F2")</h4>
+                    <h4 class="text-lg font-bold">Total: @CartGrandTotalDisplay</h4>
                     <div>
                         <AuthorizeView>
                             <Authorized>

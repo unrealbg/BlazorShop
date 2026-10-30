@@ -1,10 +1,10 @@
 namespace BlazorShop.Storefront.Pages
 {
     using System.Globalization;
-    using System.Text.Json;
 
     using BlazorShop.Storefront.Services;
     using BlazorShop.Web.Shared;
+    using BlazorShop.Web.Shared.CookieStorage;
     using BlazorShop.Web.Shared.Models.Payment;
     using BlazorShop.Web.Shared.Models.Product;
 
@@ -14,6 +14,7 @@ namespace BlazorShop.Storefront.Pages
     {
         private readonly List<CartAlert> _alerts = [];
         private IReadOnlyList<CartLine> _lines = [];
+        private decimal? _grandTotal = 0m;
 
         [CascadingParameter]
         private HttpContext? HttpContext { get; set; }
@@ -22,9 +23,9 @@ namespace BlazorShop.Storefront.Pages
 
         private IReadOnlyList<CartLine> Lines => _lines;
 
-        private int ItemCount => _lines.Sum(line => line.Quantity);
+        private long ItemCount => _lines.Sum(line => (long)line.Quantity);
 
-        private string GrandTotalDisplay => _lines.Sum(line => line.LineTotal).ToString("0.00", CultureInfo.InvariantCulture);
+        private string GrandTotalDisplay => _grandTotal.HasValue ? $"EUR {_grandTotal.Value.ToString("0.00", CultureInfo.InvariantCulture)}" : "Unavailable";
 
         private string CheckoutUrl => StorefrontRoutes.Checkout;
 
@@ -36,29 +37,28 @@ namespace BlazorShop.Storefront.Pages
             var cartItems = ReadCartItems(HttpContext?.Request.Cookies[Constant.Cart.Name]);
             var productsById = await LoadProductsAsync(cartItems);
             _lines = BuildLines(cartItems, productsById);
+            try
+            {
+                _grandTotal = _lines.Sum(line => line.LineTotal);
+            }
+            catch (OverflowException)
+            {
+                _grandTotal = null;
+                _alerts.Add(new CartAlert("error", "Some cart totals cannot be displayed safely. Review quantities before checkout."));
+            }
         }
 
         private List<ProcessCart> ReadCartItems(string? rawCart)
         {
-            if (string.IsNullOrWhiteSpace(rawCart))
-            {
-                return [];
-            }
-
-            try
-            {
-                return JsonSerializer.Deserialize<List<ProcessCart>>(rawCart)
-                    ?.Where(item => item.ProductId != Guid.Empty && item.Quantity > 0)
-                    .ToList()
-                    ?? [];
-            }
-            catch (JsonException)
+            var result = CartCookieParser.Parse(rawCart);
+            if (result.HasInvalidItems)
             {
                 _alerts.Add(new CartAlert(
-                    "error",
-                    "We couldn't read the saved cart cookie. Add the items again to continue."));
-                return [];
+                    result.IsMalformed ? "error" : "warning",
+                    result.IsMalformed ? CartCookieParser.MalformedMessage : CartCookieParser.InvalidItemsMessage));
             }
+
+            return result.Items.ToList();
         }
 
         private async Task<Dictionary<Guid, GetProduct>> LoadProductsAsync(IEnumerable<ProcessCart> cartItems)
@@ -172,7 +172,20 @@ namespace BlazorShop.Storefront.Pages
 
             public string UnitPriceDisplay => UnitPrice.ToString("0.00", CultureInfo.InvariantCulture);
 
-            public string LineTotalDisplay => LineTotal.ToString("0.00", CultureInfo.InvariantCulture);
+            public string LineTotalDisplay
+            {
+                get
+                {
+                    try
+                    {
+                        return $"EUR {LineTotal.ToString("0.00", CultureInfo.InvariantCulture)}";
+                    }
+                    catch (OverflowException)
+                    {
+                        return "Unavailable";
+                    }
+                }
+            }
 
             public string? VariantLabel
             {

@@ -1,0 +1,198 @@
+[
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "null",
+    "json": "[null]",
+    "quantity": 0
+  },
+  {
+    "items": 1,
+    "invalid": true,
+    "name": "mixed-null",
+    "json": "[null,{\"ProductId\":\"$product\",\"Quantity\":2}]",
+    "quantity": 2
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "syntax",
+    "json": "{broken",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "root-object",
+    "json": "{}",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "root-null",
+    "json": "null",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "root-string",
+    "json": "\"cart\"",
+    "quantity": 0
+  },
+  {
+    "items": 1,
+    "invalid": true,
+    "name": "scalar-entry",
+    "json": "[1,\"item\",true,[],{\"ProductId\":\"$product\",\"Quantity\":2}]",
+    "quantity": 2
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "empty-product",
+    "json": "[{\"ProductId\":\"00000000-0000-0000-0000-000000000000\",\"Quantity\":2}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "bad-product-type",
+    "json": "[{\"ProductId\":42,\"Quantity\":2}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "bad-product-guid",
+    "json": "[{\"ProductId\":\"not-a-guid\",\"Quantity\":2}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "empty-variant",
+    "json": "[{\"ProductId\":\"$product\",\"VariantId\":\"00000000-0000-0000-0000-000000000000\",\"Quantity\":1}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "bad-variant-type",
+    "json": "[{\"ProductId\":\"$product\",\"VariantId\":[],\"Quantity\":1}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "zero-quantity",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":0}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "negative-quantity",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":-1}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "quantity-string",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":\"2\"}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "quantity-fraction",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":1.5}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "quantity-outside-int",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2147483648}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "quantity-huge",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":1e100}]",
+    "quantity": 0
+  },
+  {
+    "items": 0,
+    "invalid": true,
+    "name": "quantity-infinite",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":1e999}]",
+    "quantity": 0
+  },
+  {
+    "items": 1,
+    "invalid": true,
+    "name": "metadata-type",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2,\"SizeValue\":{},\"UnitPrice\":\"tampered\"}]",
+    "quantity": 2
+  },
+  {
+    "items": 1,
+    "invalid": true,
+    "name": "metadata-overflow",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2,\"UnitPrice\":1e100}]",
+    "quantity": 2
+  },
+  {
+    "items": 1,
+    "invalid": false,
+    "name": "duplicate",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2},{\"ProductId\":\"$product\",\"Quantity\":3}]",
+    "quantity": 5
+  },
+  {
+    "items": 1,
+    "invalid": true,
+    "name": "duplicate-overflow",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2147483647},{\"ProductId\":\"$product\",\"Quantity\":2},{\"ProductId\":\"$other\",\"Quantity\":3},{\"ProductId\":\"$product\",\"Quantity\":2}]",
+    "quantity": 3
+  },
+  {
+    "items": 2,
+    "invalid": false,
+    "name": "large-distinct",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2147483647},{\"ProductId\":\"$other\",\"Quantity\":2147483647}]",
+    "quantity": 4294967294
+  },
+  {
+    "items": 1,
+    "invalid": false,
+    "name": "valid",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2}]",
+    "quantity": 2
+  },
+  {
+    "items": 0,
+    "invalid": false,
+    "name": "empty",
+    "json": "[]",
+    "quantity": 0
+  },
+  {
+    "items": 1,
+    "invalid": false,
+    "name": "camel-case",
+    "json": "[{\"productId\":\"$product\",\"quantity\":2}]",
+    "quantity": 2
+  },
+  {
+    "items": 1,
+    "invalid": false,
+    "name": "integral-number",
+    "json": "[{\"ProductId\":\"$product\",\"Quantity\":2.0}]",
+    "quantity": 2
+  }
+]

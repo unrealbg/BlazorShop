@@ -322,6 +322,72 @@ namespace BlazorShop.Tests.Presentation.Storefront
             return $"my-cart={Uri.EscapeDataString(cartJson)}";
         }
 
+        [Theory]
+        [InlineData("[null]")]
+        [InlineData("[null,{\"ProductId\":\"22222222-2222-2222-2222-222222222222\",\"Quantity\":2}]")]
+        public async Task CartRoute_NullCookieEntriesDoNotReturn500(string json)
+        {
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory);
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", $"my-cart={Uri.EscapeDataString(json)}");
+            using var response = await client.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Theory]
+        [MemberData(nameof(BlazorShop.Tests.Presentation.Payments.CartCookieParserTests.Cases), MemberType = typeof(BlazorShop.Tests.Presentation.Payments.CartCookieParserTests))]
+        public async Task CartRoute_InvalidCookieMatrixPreservesSafeRowsAndPrivacy(string name, string json, int items, long quantity, bool invalid)
+        {
+            Assert.NotEmpty(name);
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory);
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", $"my-cart={Uri.EscapeDataString(json)}");
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl?.ToString());
+            Assert.Contains("noindex,nofollow", html, StringComparison.Ordinal);
+            Assert.False(response.Headers.Contains("Set-Cookie"));
+            Assert.Equal(items, html.Split("data-storefront-cart-remove", StringSplitOptions.None).Length - 1);
+            Assert.Contains($"{quantity} item", html, StringComparison.Ordinal);
+            if (invalid)
+            {
+                Assert.Contains("role=\"alert\"", html, StringComparison.Ordinal);
+            }
+        }
+
+        [Fact]
+        public async Task CartRoute_UnrepresentableApiTotalRendersUnavailableInsteadOf500()
+        {
+            var product = new StorefrontSeoAuditScenario().Product;
+            product.Price = decimal.MaxValue;
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory, new StorefrontSeoAuditScenario { Product = product });
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", CreateCartCookieHeader(new ProcessCart { ProductId = product.Id, Quantity = int.MaxValue, UnitPrice = 0.01m }));
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("totals cannot be displayed safely", html, StringComparison.Ordinal);
+            Assert.Contains("<dd>Unavailable</dd>", html, StringComparison.Ordinal);
+            Assert.Contains("value=\"2147483647\"", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("EUR 0.01", html, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task CartRoute_ConnectionInterruptionWithNullEntryRetainsUnavailableRow()
+        {
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory, new StorefrontSeoAuditScenario { CartConnectionInterrupted = true });
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", $"my-cart={Uri.EscapeDataString("[null,{\"ProductId\":\"22222222-2222-2222-2222-222222222222\",\"Quantity\":2}]")}");
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("Unavailable item", html, StringComparison.Ordinal);
+            Assert.Contains("2 items in cart", html, StringComparison.Ordinal);
+            Assert.False(response.Headers.Contains("Set-Cookie"));
+        }
+
         private HttpClient CreateCheckoutClient(StorefrontSessionInfo sessionInfo, string clientAppBaseUrl = "https://account.example.com/")
         {
             var configuredFactory = _factory.WithWebHostBuilder(builder =>

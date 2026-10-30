@@ -85,7 +85,7 @@
                         <div class="bs-v2-cart-line-controls">
                             <dl class="bs-v2-cart-prices">
                                 <div><dt>Unit Price</dt><dd>EUR @line.UnitPriceDisplay</dd></div>
-                                <div><dt>Line Total</dt><dd>EUR @line.LineTotalDisplay</dd></div>
+                                <div><dt>Line Total</dt><dd>@line.LineTotalDisplay</dd></div>
                             </dl>
                             <div class="bs-v2-cart-line-actions">
                                 <div class="bs-v2-cart-quantity">
@@ -123,8 +123,8 @@
             <h2 id="cart-summary-heading">Order Summary</h2>
             <dl class="bs-v2-cart-totals">
                 <div><dt>Items</dt><dd>@ItemCount</dd></div>
-                <div><dt>Subtotal</dt><dd>EUR @GrandTotalDisplay</dd></div>
-                <div class="bs-v2-cart-total"><dt>Total</dt><dd>EUR @GrandTotalDisplay</dd></div>
+                <div><dt>Subtotal</dt><dd>@GrandTotalDisplay</dd></div>
+                <div class="bs-v2-cart-total"><dt>Total</dt><dd>@GrandTotalDisplay</dd></div>
             </dl>
             <div class="bs-v2-cart-summary-actions">
                 @if (Lines.Count > 0)

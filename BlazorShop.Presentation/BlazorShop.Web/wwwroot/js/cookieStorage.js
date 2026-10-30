@@ -26,7 +26,13 @@ export function getCookie(name) {
   for (const cookie of cookies) {
     const trimmedCookie = cookie.trim();
     if (trimmedCookie.startsWith(nameEQ)) {
-      return decodeURIComponent(trimmedCookie.substring(nameEQ.length));
+      const value = trimmedCookie.substring(nameEQ.length);
+      try {
+        return decodeURIComponent(value);
+      } catch (error) {
+        if (name === "my-cart") return value;
+        throw error;
+      }
     }
   }
 
