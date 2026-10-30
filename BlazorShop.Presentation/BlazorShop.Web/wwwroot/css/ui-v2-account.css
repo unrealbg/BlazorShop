@@ -60,6 +60,8 @@
 .v2-confirmation { width: min(100%, 640px); text-align: center; }
 .v2-registration { width: min(100%, 980px); display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, .65fr); gap: 22px; align-items: start; }
 .v2-registration .v2-auth-card { width: 100%; }
+.v2-registration .v2-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2-registration .v2-field-full { grid-column: 1 / -1; }
 .v2-registration-aside { padding: 26px; background: #f8fafc; border: 1px solid var(--v2-line); border-radius: 14px; }
 .v2-registration-aside h2 { margin-top: 8px; font-size: 1.25rem; }
 .v2-confirmation-icon { display: grid; place-items: center; width: 64px; height: 64px; margin: 24px auto; border-radius: 50%; background: #eff6ff; color: var(--v2-primary); font-size: 2rem; }
@@ -79,7 +81,7 @@
 .v2-workspace .bs-card-link { display: block; }
 .v2-workspace .bs-card-link:hover { border-color: #a9c7f2; }
 .v2-account .v2-content-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 22px; margin-top: 12px; }
-.v2-account .v2-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; }
+.v2-account .v2-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; gap: 18px; }
 .v2-account :is(.v2-content-grid, .v2-dashboard-grid) > * { min-width: 0; }
 .v2-workspace :is(h1, h2, h3, p, td, dd, .bs-chip, .bs-chip-solid, .bs-chip-accent) { overflow-wrap: anywhere; }
 .v2-workspace :is(.bs-chip, .bs-chip-solid, .bs-chip-accent) { display: inline-flex; border-radius: 6px; padding: 4px 9px; background: #eff6ff; color: #175cc5; border: 1px solid #dbeafe; font-size: .72rem; line-height: 1.5; font-weight: 650; }
@@ -99,6 +101,7 @@
     .v2-registration { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
+    .v2-registration .v2-form { grid-template-columns: 1fr; }
     .v2-workspace-container { width: calc(100% - 28px); }
     .v2-workspace-header > div { gap: 12px; flex-wrap: wrap; min-height: 68px; }
     .v2-header-actions { gap: 12px; }

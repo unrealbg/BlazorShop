@@ -114,8 +114,12 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
             await Page.GetByRole(AriaRole.Button, new() { Name = "Update password", Exact = true }).ClickAsync();
             await Expect(Page.Locator(".validation-message")).ToContainTextAsync(["Passwords do not match."]);
             await Page.GetByLabel("Confirm new password", new() { Exact = true }).FillAsync(password);
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Update password", Exact = true }).ClickAsync();
-            await Expect(Page.GetByLabel("Current password", new() { Exact = true })).ToHaveValueAsync("");
+            var changed = await Page.RunAndWaitForResponseAsync(
+                () => Page.GetByRole(AriaRole.Button, new() { Name = "Update password", Exact = true }).ClickAsync(),
+                response => response.Url.EndsWith("/api/authentication/change-password", StringComparison.Ordinal) && response.Request.Method == "POST");
+            Assert.Equal(200, changed.Status);
+            using var result = JsonDocument.Parse(await changed.TextAsync());
+            Assert.True(result.RootElement.GetProperty("success").GetBoolean(), "Password change must succeed through the real API.");
             await Page.Locator(".v2-account-nav a[href='/account/notifications']").ClickAsync();
             await Expect(Page.Locator("#account-content")).ToContainTextAsync("Password updated");
             await CaptureAsync("notifications-event", 390);
@@ -245,8 +249,10 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
         Assert.Equal("solid", await skip.EvaluateAsync<string>("element => getComputedStyle(element).outlineStyle"));
         await skip.PressAsync("Enter");
         await Expect(Page.Locator("main")).ToBeFocusedAsync();
+        await Page.Locator("main").EvaluateAsync("element => element.blur()");
+        await Page.EvaluateAsync("scrollTo(0, 0)");
         var directory = Path.Combine(application.ArtifactDirectory, "ui-v2-account");
         Directory.CreateDirectory(directory);
-        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{state}-{width}.png"), FullPage = true });
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{state}-{width}.png"), FullPage = true, Mask = [Page.Locator("input[type='password']")] });
     }
 }

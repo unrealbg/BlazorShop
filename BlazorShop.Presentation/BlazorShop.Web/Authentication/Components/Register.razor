@@ -13,12 +13,12 @@
     }
     <EditForm Model="_user" OnValidSubmit="HandleRegister" class="v2-form" aria-busy="@_isLoading">
         <DataAnnotationsValidator />
-        <ValidationSummary role="alert" />
-        <div>
+        <ValidationSummary role="alert" class="v2-field-full" />
+        <div class="v2-field-full">
             <FloatingTextInput @bind-Value="_user.FullName" Label="Full Name" autocomplete="name" aria-describedby="register-name-error" />
             <div id="register-name-error"><ValidationMessage For="@(() => _user.FullName)" /></div>
         </div>
-        <div>
+        <div class="v2-field-full">
             <FloatingTextInput @bind-Value="_user.Email" Label="Email Address" Type="email" autocomplete="email" aria-describedby="register-email-error" />
             <div id="register-email-error"><ValidationMessage For="@(() => _user.Email)" /></div>
         </div>
@@ -30,7 +30,7 @@
             <FloatingTextInput @bind-Value="_user.ConfirmPassword" Label="Confirm Password" Type="password" autocomplete="new-password" aria-describedby="register-confirm-error" />
             <div id="register-confirm-error"><ValidationMessage For="@(() => _user.ConfirmPassword)" /></div>
         </div>
-        <button type="submit" class="bs-button bs-button-primary v2-full" disabled="@_isLoading">@(_isLoading ? "Creating account..." : "Register")</button>
+        <button type="submit" class="bs-button bs-button-primary v2-full v2-field-full" disabled="@_isLoading">@(_isLoading ? "Creating account..." : "Register")</button>
     </EditForm>
     <p class="v2-auth-footer">Already have an account? <a href="/authentication/login/account">Sign in</a></p>
     <p class="v2-muted v2-small">After registration, check your email to confirm your account.</p>
