@@ -6,7 +6,10 @@ function readCookie(name) {
   const ca = document.cookie.split(';');
   for (let i = 0; i < ca.length; i++) {
     let c = ca[i].trim();
-    if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length));
+    if (c.indexOf(nameEQ) === 0) {
+      const value = c.substring(nameEQ.length);
+      try { return decodeURIComponent(value); } catch { return value; }
+    }
   }
   return null;
 }

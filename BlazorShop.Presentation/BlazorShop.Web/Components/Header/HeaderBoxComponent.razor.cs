@@ -1,11 +1,10 @@
 ﻿namespace BlazorShop.Web.Components.Header
 {
     using System.Security.Claims;
-    using System.Text.Json;
 
     using BlazorShop.Web.Shared;
     using BlazorShop.Web.Shared.CookieStorage.Contracts;
-    using BlazorShop.Web.Shared.Models.Payment;
+    using BlazorShop.Web.Shared.CookieStorage;
 
     using Microsoft.AspNetCore.Components;
     using Microsoft.AspNetCore.Components.Authorization;
@@ -82,11 +81,7 @@
         {
             try
             {
-                var items = JsonSerializer.Deserialize<List<ProcessCart>>(json) ?? new();
-                _cartCount = items
-                    .Select(i => new { i.ProductId, i.VariantId })
-                    .Distinct()
-                    .Count();
+                _cartCount = CartCookieParser.Parse(json).Items.Count;
             }
             catch
             {

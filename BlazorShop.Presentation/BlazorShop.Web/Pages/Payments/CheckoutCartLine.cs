@@ -14,6 +14,21 @@ namespace BlazorShop.Web.Pages.Payments
     {
         public decimal LineTotal => UnitPrice * Quantity;
 
+        public string LineTotalDisplay
+        {
+            get
+            {
+                try
+                {
+                    return $"€ {LineTotal:F2}";
+                }
+                catch (OverflowException)
+                {
+                    return "Unavailable";
+                }
+            }
+        }
+
         public string? VariantLabel
         {
             get
