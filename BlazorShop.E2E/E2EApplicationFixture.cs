@@ -220,6 +220,27 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             password);
     }
 
+    public async Task<(Guid Id, string Sku, string Size, decimal Price)> SeedCartVariantAsync(E2ETestData data)
+    {
+        await using var dbContext = CreateDbContext();
+        var product = await dbContext.Products.SingleAsync(candidate => candidate.Id == data.SimpleProductId);
+        product.Image = "/images/products/meridian-daypack.webp";
+        var variant = new ProductVariant
+        {
+            Id = Guid.NewGuid(),
+            ProductId = data.VariantProductId,
+            Sku = $"{data.VariantSku}-SECOND",
+            SizeScale = SizeScale.ShoesUS,
+            SizeValue = "11",
+            Color = "Green",
+            Price = data.VariantPrice + 5m,
+            Stock = 20,
+        };
+        dbContext.ProductVariants.Add(variant);
+        await dbContext.SaveChangesAsync();
+        return (variant.Id, variant.Sku, variant.SizeValue, variant.Price.Value);
+    }
+
     public async Task RemoveScenarioAsync(E2ETestData data)
     {
         await using var dbContext = CreateDbContext();
