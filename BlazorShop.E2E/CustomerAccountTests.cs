@@ -84,7 +84,7 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
                     await Expect(Page.Locator("#account-content h1")).ToBeVisibleAsync();
                     if (state is "orders" or "order-detail" or "overview")
                     {
-                        await Expect(Page.Locator("#account-content")).ToContainTextAsync(data.VariantProductName);
+                        await Expect(Page.Locator("#account-content")).ToContainTextAsync(state == "overview" ? $"UI-{data.SimpleProductSlug}" : data.VariantProductName);
                         await Expect(Page.Locator("#account-content")).ToContainTextAsync("Paid");
                         await Expect(Page.Locator("#account-content")).ToContainTextAsync("Shipped");
                     }

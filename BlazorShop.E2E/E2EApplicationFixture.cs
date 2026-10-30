@@ -283,6 +283,8 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
     {
         await using var db = CreateDbContext();
         var role = await db.Roles.SingleAsync(candidate => candidate.Name == "Admin");
+        var customerRoles = await db.UserRoles.Where(candidate => candidate.UserId == data.UserId).ToListAsync();
+        db.UserRoles.RemoveRange(customerRoles);
         db.UserRoles.Add(new IdentityUserRole<string> { UserId = data.UserId, RoleId = role.Id });
         await db.SaveChangesAsync();
     }
