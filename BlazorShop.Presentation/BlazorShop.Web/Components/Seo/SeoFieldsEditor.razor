@@ -3,40 +3,40 @@
 <div class="space-y-5">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
-            <label class="block text-xs text-neutral-600 mb-1">Slug</label>
-            <InputText @bind-Value="Model.Slug" class="w-full border rounded px-3 py-2" />
-            <ValidationMessage For="@(() => Model.Slug)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-51">Slug</label>
+            <InputText id="admin-seofieldseditor-51" @bind-Value="Model.Slug" class="w-full border rounded px-3 py-2" aria-describedby="admin-seofieldseditor-51-error" />
+            <div id="admin-seofieldseditor-51-error" role="status"><ValidationMessage For="@(() => Model.Slug)" /></div>
             <div class="mt-1 text-xs text-neutral-500">Required when the entry is published.</div>
         </div>
         <div>
-            <label class="block text-xs text-neutral-600 mb-1">Canonical URL</label>
-            <InputText @bind-Value="Model.CanonicalUrl" class="w-full border rounded px-3 py-2" />
-            <ValidationMessage For="@(() => Model.CanonicalUrl)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-52">Canonical URL</label>
+            <InputText id="admin-seofieldseditor-52" @bind-Value="Model.CanonicalUrl" class="w-full border rounded px-3 py-2" aria-describedby="admin-seofieldseditor-52-error" />
+            <div id="admin-seofieldseditor-52-error" role="status"><ValidationMessage For="@(() => Model.CanonicalUrl)" /></div>
         </div>
         <div>
-            <label class="block text-xs text-neutral-600 mb-1">Meta Title</label>
-            <InputText @bind-Value="Model.MetaTitle" class="w-full border rounded px-3 py-2" />
-            <ValidationMessage For="@(() => Model.MetaTitle)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-53">Meta Title</label>
+            <InputText id="admin-seofieldseditor-53" @bind-Value="Model.MetaTitle" class="w-full border rounded px-3 py-2" aria-describedby="admin-seofieldseditor-53-error" />
+            <div id="admin-seofieldseditor-53-error" role="status"><ValidationMessage For="@(() => Model.MetaTitle)" /></div>
         </div>
         <div>
-            <label class="block text-xs text-neutral-600 mb-1">Open Graph Title</label>
-            <InputText @bind-Value="Model.OgTitle" class="w-full border rounded px-3 py-2" />
-            <ValidationMessage For="@(() => Model.OgTitle)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-54">Open Graph Title</label>
+            <InputText id="admin-seofieldseditor-54" @bind-Value="Model.OgTitle" class="w-full border rounded px-3 py-2" aria-describedby="admin-seofieldseditor-54-error" />
+            <div id="admin-seofieldseditor-54-error" role="status"><ValidationMessage For="@(() => Model.OgTitle)" /></div>
         </div>
         <div>
-            <label class="block text-xs text-neutral-600 mb-1">Meta Description</label>
-            <InputTextArea @bind-Value="Model.MetaDescription" class="w-full border rounded px-3 py-2 min-h-28" />
-            <ValidationMessage For="@(() => Model.MetaDescription)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-55">Meta Description</label>
+            <InputTextArea id="admin-seofieldseditor-55" @bind-Value="Model.MetaDescription" class="w-full border rounded px-3 py-2 min-h-28" aria-describedby="admin-seofieldseditor-55-error" />
+            <div id="admin-seofieldseditor-55-error" role="status"><ValidationMessage For="@(() => Model.MetaDescription)" /></div>
         </div>
         <div>
-            <label class="block text-xs text-neutral-600 mb-1">Open Graph Description</label>
-            <InputTextArea @bind-Value="Model.OgDescription" class="w-full border rounded px-3 py-2 min-h-28" />
-            <ValidationMessage For="@(() => Model.OgDescription)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-56">Open Graph Description</label>
+            <InputTextArea id="admin-seofieldseditor-56" @bind-Value="Model.OgDescription" class="w-full border rounded px-3 py-2 min-h-28" aria-describedby="admin-seofieldseditor-56-error" />
+            <div id="admin-seofieldseditor-56-error" role="status"><ValidationMessage For="@(() => Model.OgDescription)" /></div>
         </div>
         <div class="lg:col-span-2">
-            <label class="block text-xs text-neutral-600 mb-1">Open Graph Image</label>
-            <InputText @bind-Value="Model.OgImage" class="w-full border rounded px-3 py-2" />
-            <ValidationMessage For="@(() => Model.OgImage)" />
+            <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-57">Open Graph Image</label>
+            <InputText id="admin-seofieldseditor-57" @bind-Value="Model.OgImage" class="w-full border rounded px-3 py-2" aria-describedby="admin-seofieldseditor-57-error" />
+            <div id="admin-seofieldseditor-57-error" role="status"><ValidationMessage For="@(() => Model.OgImage)" /></div>
         </div>
     </div>
 
@@ -65,9 +65,9 @@
     </div>
 
     <div>
-        <label class="block text-xs text-neutral-600 mb-1">SEO Content</label>
-        <InputTextArea @bind-Value="Model.SeoContent" class="w-full border rounded px-3 py-2 min-h-40" />
-        <ValidationMessage For="@(() => Model.SeoContent)" />
+        <label class="block text-xs text-neutral-600 mb-1" for="admin-seofieldseditor-58">SEO Content</label>
+        <InputTextArea id="admin-seofieldseditor-58" @bind-Value="Model.SeoContent" class="w-full border rounded px-3 py-2 min-h-40" aria-describedby="admin-seofieldseditor-58-error" />
+        <div id="admin-seofieldseditor-58-error" role="status"><ValidationMessage For="@(() => Model.SeoContent)" /></div>
     </div>
 </div>
 

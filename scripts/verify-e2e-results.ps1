@@ -17,7 +17,16 @@ $expectedTests = @(
     'BlazorShop.E2E.CustomerAccountTests.CustomerAccount_ResponsiveOrdersProfilePasswordAndNotifications',
     'BlazorShop.E2E.CustomerAccountTests.CustomerOrders_LoadingEmptyErrorAndRetry',
     'BlazorShop.E2E.CustomerAccountTests.AdminAndDemo_LoginRefreshLogoutAndSessionIsolation',
-    'BlazorShop.E2E.AdminOperationsTests.AdminScreens_ResponsiveNavigationAndData'
+    'BlazorShop.E2E.AdminOperationsTests.AdminScreens_ResponsiveNavigationAndData',
+    'BlazorShop.E2E.AdminOperationsTests.AdminProducts_UploadCrudVariantsAndSeo',
+    'BlazorShop.E2E.AdminOperationsTests.AdminCategories_CrudSeoAndConfirmation',
+    'BlazorShop.E2E.AdminOperationsTests.AdminInventory_PaginationAuthorityAndConflict',
+    'BlazorShop.E2E.AdminOperationsTests.AdminDashboardAndOrders_MetricsExportAndTracking',
+    'BlazorShop.E2E.AdminOperationsTests.AdminUsers_SearchRolesLockAndAudit',
+    'BlazorShop.E2E.AdminOperationsTests.AdminAuthorization_CustomerDeniedAndDemoSessionBound',
+    'BlazorShop.E2E.AdminOperationsTests.AdminSeo_MetadataAndRedirectCrud',
+    'BlazorShop.E2E.AdminOperationsTests.AdminSettings_StoreOrdersNotificationsAndReadOnlySystem',
+    'BlazorShop.E2E.AdminOperationsTests.AdminFeedback_LoadingEmptyFailureAndRetry'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

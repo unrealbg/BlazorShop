@@ -3,7 +3,7 @@
 
 <PageTitle>Admin Settings</PageTitle>
 
-<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<section class="v2-admin-page">
     <header class="bs-panel bs-page-hero p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -23,11 +23,11 @@
 
     @if (_isLoading)
     {
-        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading settings...</div>
+        <div role="status" class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading settings...</div>
     }
     else if (!string.IsNullOrWhiteSpace(_loadError))
     {
-        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+        <div role="alert" class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
             <div>@_loadError</div>
             <button class="bs-button bs-button-primary mt-4" @onclick="LoadAsync">Retry</button>
         </div>
@@ -40,17 +40,17 @@
                 case SettingsTab.Store:
                     <EditForm Model="_store" OnValidSubmit="SaveStoreAsync">
                         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Store name</label><InputText @bind-Value="_store.StoreName" /></div>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support email</label><InputText @bind-Value="_store.StoreSupportEmail" /></div>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support phone</label><InputText @bind-Value="_store.StoreSupportPhone" /></div>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Default currency</label><InputText @bind-Value="_store.DefaultCurrency" /></div>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Default culture</label><InputText @bind-Value="_store.DefaultCulture" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-1">Store name</label><InputText id="admin-settings-1" @bind-Value="_store.StoreName" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-2">Support email</label><InputText id="admin-settings-2" @bind-Value="_store.StoreSupportEmail" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-3">Support phone</label><InputText id="admin-settings-3" @bind-Value="_store.StoreSupportPhone" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-4">Default currency</label><InputText id="admin-settings-4" @bind-Value="_store.DefaultCurrency" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-5">Default culture</label><InputText id="admin-settings-5" @bind-Value="_store.DefaultCulture" /></div>
                             <label class="flex items-center gap-3 rounded border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
                                 <InputCheckbox @bind-Value="_store.MaintenanceModeEnabled" class="h-4 w-4" />
                                 <span>Maintenance mode</span>
                             </label>
                             <div class="lg:col-span-2">
-                                <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Maintenance message</label><InputTextArea @bind-Value="_store.MaintenanceMessage" class="min-h-28" /></div>
+                                <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-6">Maintenance message</label><InputTextArea id="admin-settings-6" @bind-Value="_store.MaintenanceMessage" class="min-h-28" /></div>
                             </div>
                         </div>
                         <div class="bs-action-row mt-6 justify-end">
@@ -66,8 +66,8 @@
                                 <span>Guest checkout</span>
                             </label>
                             <div>
-                                <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Default shipping status</label>
-                                <InputSelect @bind-Value="_orders.DefaultShippingStatus">
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-7">Default shipping status</label>
+                                <InputSelect id="admin-settings-7" @bind-Value="_orders.DefaultShippingStatus">
                                     <option>PendingShipment</option>
                                     <option>Shipped</option>
                                     <option>InTransit</option>
@@ -79,7 +79,7 @@
                                 <InputCheckbox @bind-Value="_orders.AutoConfirmPaidOrders" class="h-4 w-4" />
                                 <span>Auto-confirm paid orders</span>
                             </label>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Order reference prefix</label><InputText @bind-Value="_orders.OrderReferencePrefix" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-8">Order reference prefix</label><InputText id="admin-settings-8" @bind-Value="_orders.OrderReferencePrefix" /></div>
                         </div>
                         <div class="mt-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Guest checkout is disabled because checkout currently requires a signed-in account.</div>
                         <div class="bs-action-row mt-6 justify-end">
@@ -90,9 +90,9 @@
                 case SettingsTab.Notifications:
                     <EditForm Model="_notifications" OnValidSubmit="SaveNotificationsAsync">
                         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SMTP host</label><InputText @bind-Value="_notifications.SmtpHost" /></div>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From email</label><InputText @bind-Value="_notifications.SmtpFromEmail" /></div>
-                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From display name</label><InputText @bind-Value="_notifications.SmtpFromDisplayName" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-9">SMTP host</label><InputText id="admin-settings-9" @bind-Value="_notifications.SmtpHost" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-10">From email</label><InputText id="admin-settings-10" @bind-Value="_notifications.SmtpFromEmail" /></div>
+                            <div><label class="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" for="admin-settings-11">From display name</label><InputText id="admin-settings-11" @bind-Value="_notifications.SmtpFromDisplayName" /></div>
                             <div class="rounded border border-slate-200 px-4 py-3 text-sm">
                                 <div class="font-semibold text-slate-900">Secrets</div>
                                 <div class="mt-1 text-slate-600">@(_settings.Notifications.SecretsConfigured ? "Configured outside the admin API." : "No SMTP secret is configured.")</div>

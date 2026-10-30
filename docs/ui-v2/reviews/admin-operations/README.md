@@ -11,7 +11,7 @@ Baseline: `807a6d6ab0c888ccf4b697a2c7ae982143217374`, including customer account
 | Dashboard | Actual order totals, fulfillment counts, sales/traffic series, periods/granularity, sorting, CSV copy/export and existing order editing. No additional KPIs. |
 | Products | Existing catalog/category queries and grouping; create/edit/delete gates and confirmations; image upload; separate variants and SEO tabs. Inventory remains the stock authority. |
 | Categories | Existing category CRUD, delete confirmation and separate SEO editor. No hierarchy capability is invented. |
-| Inventory | Existing paged filters, authoritative product/variant stock, version-bearing update requests and conflict responses. No reservation or stock policy changes. |
+| Inventory | Existing paged filters, authoritative product/variant stock, expected-value concurrency (`ExpectedQuantity` / `ExpectedStock`) in update requests and conflict responses. No reservation or stock policy changes. |
 | Orders | Existing query/grouping/filter/sort/copy/export, snapshots, details and edit dialogs. Tracking, fulfillment and admin-note requests retain their existing handlers and server rules. |
 | Users | Existing search/role/lock filters, pagination, details, role selection, lock/unlock, confirmation, password-change requirement and deactivation. Existing Identity and audit services remain unchanged. |
 | SEO/redirects | One component retains both routes, metadata/canonical/OG/organization fields, redirect CRUD/deactivation, validation and delete confirmation. |

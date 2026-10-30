@@ -1,0 +1,71 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<dialog class="v2-admin-dialog v2-admin-dialog--@Size" aria-labelledby="@_titleId" @ref="_dialog">
+    @if (IsVisible)
+    {
+        <header class="v2-admin-dialog-header">
+            <div id="@_titleId">@Header</div>
+            @if (ShowCloseButton)
+            {
+                <button type="button" class="v2-admin-close" aria-label="Close" @onclick="CloseAsync">×</button>
+            }
+        </header>
+        <div class="v2-admin-dialog-body">@Body</div>
+        @if (Footer is not null)
+        {
+            <footer class="v2-admin-dialog-footer">@Footer</footer>
+        }
+    }
+</dialog>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public RenderFragment? Header { get; set; }
+    [Parameter] public RenderFragment? Body { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public bool CloseOnBackdrop { get; set; } = true;
+    [Parameter] public bool ShowCloseButton { get; set; } = true;
+    [Parameter] public string Size { get; set; } = "md";
+
+    private readonly string _titleId = $"admin-dialog-{Guid.NewGuid():N}";
+    private ElementReference _dialog;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<AdminDialog>? _reference;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/adminUi.js");
+            _reference = DotNetObjectReference.Create(this);
+        }
+
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("setDialogOpen", _dialog, IsVisible, CloseOnBackdrop, _reference);
+        }
+    }
+
+    [JSInvokable]
+    public async Task CloseAsync()
+    {
+        if (!IsVisible) return;
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+        await OnClose.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("disposeDialog", _dialog);
+            await _module.DisposeAsync();
+        }
+
+        _reference?.Dispose();
+    }
+}

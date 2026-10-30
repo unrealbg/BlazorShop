@@ -1,59 +1,57 @@
-@inject BlazorShop.Web.Services.Contracts.IPublicStorefrontUrlResolver StorefrontUrlResolver
+@inject IPublicStorefrontUrlResolver StorefrontUrlResolver
 @inherits LayoutComponentBase
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 
-<div class="bs-product-shell bs-mode-workspace bs-mode-operations min-h-screen flex flex-col text-slate-900">
+<div class="v2-admin" @ref="_shell">
     <Toast />
-
-    <WorkspaceHeader BrandHref="/admin" ModeLabel="ADMIN OPERATIONS">
-        <PrimaryNavigation>
-            <NavLink href="/admin" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Dashboard</NavLink>
-            <NavLink href="/admin/orders" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Orders</NavLink>
-            <NavLink href="/admin/products" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Products</NavLink>
-            <NavLink href="/admin/categories" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Categories</NavLink>
-            <NavLink href="/admin/inventory" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Inventory</NavLink>
-            <NavLink href="/admin/users" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Users</NavLink>
-            <NavLink href="/admin/seo" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">SEO</NavLink>
-            <NavLink href="/admin/redirects" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Redirects</NavLink>
-            <NavLink href="/admin/settings" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Settings</NavLink>
-            <NavLink href="/admin/audit" class="rounded-md px-3 py-1.5 text-neutral-200 transition-colors hover:bg-white/10 hover:text-white" ActiveClass="bg-white/20 text-white">Audit</NavLink>
-        </PrimaryNavigation>
-        <Actions>
-            <a href="@ShopHref" class="inline-flex items-center rounded-md border border-white/20 px-4 py-2 font-semibold text-white hover:bg-white/10" title="Back to shop">Back to shop</a>
-            <details class="relative">
-                <summary class="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15" aria-label="Admin menu">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="8" r="4" /><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
-                    <span class="sr-only">Admin menu</span>
-                </summary>
-
-                <div class="absolute right-0 z-30 mt-3 w-72 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 text-white shadow-2xl ring-1 ring-black/30">
-                    <div class="border-b border-white/10 px-4 py-4">
-                        <div class="text-sm font-semibold">Admin workspace</div>
-                    </div>
-
-                    <div class="p-2 text-sm">
-                        <a href="/account" class="block rounded-xl px-3 py-2 transition hover:bg-white/10">Account</a>
-                        <a href="/authentication/logout" class="mt-1 block rounded-xl px-3 py-2 transition hover:bg-white/10">Sign out</a>
-                    </div>
-                </div>
-            </details>
-        </Actions>
-        <MobileActions>
-            <a href="@ShopHref" class="inline-flex items-center rounded-md border border-white/20 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10" title="Back to shop">Shop</a>
-        </MobileActions>
-        <MobilePanelActions>
-            <a href="@ShopHref" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Back to shop</a>
-            <a href="/account" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Account</a>
-            <a href="/authentication/logout" class="rounded-md px-3 py-2 font-semibold text-neutral-100 hover:bg-white/10">Sign out</a>
-        </MobilePanelActions>
-    </WorkspaceHeader>
-
-    <main class="bs-workspace-page bs-shell-stage flex-1">
-        @Body
-    </main>
-
-    <Footer />
+    <a class="v2-admin-skip" href="@(NavigationManager.Uri.Split('#')[0] + "#admin-content")" @onclick="FocusContentAsync" @onclick:preventDefault>Skip to content</a>
+    <aside class="v2-admin-sidebar">
+        <a href="/admin" class="v2-admin-brand">Blazor<span>Shop</span><small>ADMIN WORKSPACE</small></a>
+        <nav aria-label="Admin navigation"><AdminNavigation /></nav>
+    </aside>
+    <div class="v2-admin-workspace">
+        <WorkspaceHeader BrandHref="/admin" ModeLabel="ADMIN OPERATIONS">
+            <PrimaryNavigation><AdminNavigation /></PrimaryNavigation>
+            <Actions>
+                <a href="@ShopHref" class="v2-admin-header-link">Back to shop</a>
+                <a href="/account" class="v2-admin-header-link">Account</a>
+                <a href="/authentication/logout" class="v2-admin-header-link">Sign out</a>
+            </Actions>
+            <MobileActions><a href="@ShopHref" class="v2-admin-header-link">Shop</a></MobileActions>
+            <MobilePanelActions>
+                <a href="@ShopHref">Back to shop</a>
+                <a href="/account">Account</a>
+                <a href="/authentication/logout">Sign out</a>
+            </MobilePanelActions>
+        </WorkspaceHeader>
+        <main id="admin-content" tabindex="-1" @ref="_content">@Body</main>
+    </div>
 </div>
 
 @code {
+    private ElementReference _shell;
+    private ElementReference _content;
+    private IJSObjectReference? _module;
     private string ShopHref => StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver);
+
+    private async Task FocusContentAsync() => await _content.FocusAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/adminUi.js");
+            await _module.InvokeVoidAsync("initializeShell", _shell);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("disposeShell", _shell);
+            await _module.DisposeAsync();
+        }
+    }
 }

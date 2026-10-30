@@ -6,9 +6,9 @@ using Microsoft.Playwright;
 using Microsoft.Playwright.Xunit;
 
 [Collection(E2ECollection.Name)]
-public sealed class AdminOperationsTests(E2EApplicationFixture application) : PageTest
+public sealed partial class AdminOperationsTests(E2EApplicationFixture application) : PageTest
 {
-    public override BrowserNewContextOptions ContextOptions() => new() { IgnoreHTTPSErrors = true, Locale = "en-US" };
+    public override BrowserNewContextOptions ContextOptions() => new() { IgnoreHTTPSErrors = true, Locale = "en-US", Permissions = ["clipboard-read", "clipboard-write"] };
 
     [Fact]
     public async Task AdminScreens_ResponsiveNavigationAndData()
@@ -25,10 +25,46 @@ public sealed class AdminOperationsTests(E2EApplicationFixture application) : Pa
                 foreach (var path in new[] { "admin", "admin/products", "admin/categories", "admin/inventory", "admin/orders", "admin/users", "admin/seo", "admin/redirects", "admin/settings", "admin/audit" })
                 {
                     await GoAsync(path);
-                    await Expect(Page.Locator("main h1, main h2").First).ToBeVisibleAsync();
+                    await Expect(Page.Locator("main h1")).ToBeVisibleAsync();
                     await Expect(Page.Locator("main").GetByText(new Regex("^Loading ", RegexOptions.IgnoreCase))).ToHaveCountAsync(0);
+                    if (path == "admin/products")
+                    {
+                        await Page.GetByLabel("Search products...").FillAsync(data.CategoryName.Split(' ')[^1]);
+                        await Page.GetByRole(AriaRole.Heading, new() { Level = 1 }).ClickAsync();
+                        await Page.GetByRole(AriaRole.Button, new() { Name = "Expand All", Exact = true }).ClickAsync();
+                        await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = data.SimpleProductName })).ToBeVisibleAsync();
+                    }
+                    if (path == "admin/inventory") await FilterInventoryAsync(data.CategoryName.Split(' ')[^1]);
+                    await AssertFitsAsync();
                     await CaptureAsync(path.Replace('/', '-'), width);
                 }
+                await GoAsync("admin/categories");
+                var add = Page.GetByRole(AriaRole.Button, new() { Name = "Add Category", Exact = true });
+                await add.ClickAsync();
+                await Expect(Dialog.GetByLabel("Category Name")).ToBeFocusedAsync();
+                await Dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+                await Expect(Dialog.Locator(".validation-message")).ToBeVisibleAsync();
+                Assert.False(string.IsNullOrWhiteSpace(await Dialog.GetByLabel("Category Name").GetAttributeAsync("aria-describedby")));
+                for (var tab = 0; tab < 7; tab++)
+                {
+                    await Page.Keyboard.PressAsync("Tab");
+                    Assert.True(await Dialog.EvaluateAsync<bool>("d => d.contains(document.activeElement)"));
+                }
+                await AssertFitsAsync();
+                await CaptureAsync("category-validation-dialog", width);
+                await Page.Keyboard.PressAsync("Escape");
+                await Expect(Dialog).ToHaveCountAsync(0);
+                await Expect(add).ToBeFocusedAsync();
+                if (width < 1100)
+                {
+                    await Page.Locator(".bs-workspace-header__menu summary").ClickAsync();
+                    await Page.Locator(".bs-workspace-header__mobile-panel").GetByRole(AriaRole.Link, new() { Name = "Inventory", Exact = true }).ClickAsync();
+                    await Expect(Page.Locator(".bs-workspace-header__menu")).Not.ToHaveAttributeAsync("open", "");
+                    await Expect(Page.Locator("main h1")).ToHaveTextAsync("Inventory");
+                }
+                await Page.Locator(".v2-admin-skip").FocusAsync();
+                await Page.Keyboard.PressAsync("Enter");
+                await Expect(Page.Locator("#admin-content")).ToBeFocusedAsync();
             }
         }
         finally { await application.RemoveScenarioAsync(data); }
@@ -48,8 +84,37 @@ public sealed class AdminOperationsTests(E2EApplicationFixture application) : Pa
     private async Task CaptureAsync(string state, int width)
     {
         await Page.EvaluateAsync("document.fonts.ready");
-        var directory = Path.Combine(application.ArtifactDirectory, "ui-v2-admin-before");
+        var directory = Path.Combine(application.ArtifactDirectory, "ui-v2-admin");
         Directory.CreateDirectory(directory);
-        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{state}-{width}.png"), FullPage = true, Mask = [Page.Locator("input[type='password']")] });
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{state}-{width}.png"), FullPage = true, Mask = [Page.Locator("input[type='password']"), Page.Locator("dialog[open] pre"), Page.Locator("dialog[open] div:has(> dt:text-is('IP')) dd, dialog[open] div:has(> dt:text-is('User agent')) dd"), Page.Locator("#admin-settings-9, #admin-settings-10")] });
     }
+
+    private ILocator Dialog => Page.Locator("dialog[open]");
+    private ILocator Row(string text) => Page.GetByRole(AriaRole.Row).Filter(new() { HasText = text });
+    private static ILocator Button(ILocator scope, string text) => scope.GetByRole(AriaRole.Button, new() { Name = text, Exact = true });
+    private async Task FilterInventoryAsync(string text)
+    {
+        await Page.GetByLabel("Search product or SKU").FillAsync(text);
+        await Button(Page.Locator("main"), "Apply").ClickAsync();
+        await Expect(Page.GetByText("Loading inventory...", new() { Exact = true })).ToHaveCountAsync(0);
+    }
+
+    private async Task AssertFitsAsync()
+    {
+        Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth + 1"), "Admin page overflows horizontally.");
+        var clipped = await Page.Locator("main .bs-table-shell, dialog[open]").EvaluateAllAsync<string[]>("els => els.filter(e => e.scrollWidth > e.clientWidth + 2).map(e => e.tagName + ':' + e.className)");
+        Assert.Empty(clipped);
+    }
+
+    private async Task CaptureWidthsAsync(string state)
+    {
+        foreach (var width in new[] { 320, 390, 768, 1440 })
+        {
+            await Page.SetViewportSizeAsync(width, 1000);
+            await AssertFitsAsync();
+            await CaptureAsync(state, width);
+        }
+    }
+
+    private async Task<Dictionary<string, string>> HeadersAsync() => new() { ["Authorization"] = $"Bearer {await Page.EvaluateAsync<string>("sessionStorage.getItem('token')")}" };
 }

@@ -1,0 +1,26 @@
+@if (!string.IsNullOrWhiteSpace(Source) && !_failed)
+{
+    <img src="@ImageSource" alt="@Alt" class="@Class" @onerror="() => _failed = true" />
+}
+else
+{
+    <span class="v2-admin-image-fallback" role="img" aria-label="No product image">No image</span>
+}
+
+@code {
+    [Parameter] public string? Source { get; set; }
+    [Parameter] public string Alt { get; set; } = "Product image";
+    [Parameter] public string? Class { get; set; }
+
+    private string? _previousSource;
+    private bool _failed;
+    private string? ImageSource => Uri.TryCreate(Source, UriKind.Absolute, out var absolute) && absolute.Scheme is "https" or "http"
+        ? Source
+        : HttpClientHelper.GetPublicClient().BaseAddress is { } api ? new Uri(api, Source!).AbsoluteUri : Source;
+
+    protected override void OnParametersSet()
+    {
+        if (_previousSource != Source) _failed = false;
+        _previousSource = Source;
+    }
+}

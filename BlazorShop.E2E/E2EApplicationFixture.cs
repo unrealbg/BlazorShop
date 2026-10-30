@@ -289,9 +289,16 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         await db.SaveChangesAsync();
     }
 
+    public async Task WithAdminDatabaseAsync(Func<AppDbContext, Task> action)
+    {
+        await using var db = CreateDbContext();
+        await action(db);
+    }
+
     public async Task RemoveScenarioAsync(E2ETestData data)
     {
         await using var dbContext = CreateDbContext();
+        dbContext.AdminAuditLogs.RemoveRange(await dbContext.AdminAuditLogs.Where(entry => entry.ActorUserId == data.UserId).ToListAsync());
         var orders = await dbContext.Orders.Where(order => order.UserId == data.UserId).ToListAsync();
         dbContext.Orders.RemoveRange(orders);
         var user = await dbContext.Users.SingleOrDefaultAsync(candidate => candidate.Id == data.UserId);
