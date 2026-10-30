@@ -178,6 +178,7 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
                 {
                     await GoAsync("account/orders");
                     await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "No orders yet", Exact = true })).ToBeVisibleAsync();
+                    await VerifyDemoRefreshRetryAsync();
                 }
                 await RefreshThroughBrowserAsync(target);
                 var token = await Page.EvaluateAsync<string>("sessionStorage.getItem('token')");
@@ -226,6 +227,57 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
         Assert.Equal(200, (await refreshed).Status);
         await Expect(Page).ToHaveURLAsync(new Regex($"/{Regex.Escape(path)}$"));
         await Expect(Page.Locator("h1").First).ToBeVisibleAsync();
+    }
+
+    private async Task VerifyDemoRefreshRetryAsync()
+    {
+        Assert.Equal(application.WebBaseUrl.Scheme, application.ApiBaseUrl.Scheme);
+        Assert.Equal(application.WebBaseUrl.Host, application.ApiBaseUrl.Host);
+        Assert.NotEqual(application.WebBaseUrl.Port, application.ApiBaseUrl.Port);
+        var cookie = Assert.Single(await Context.CookiesAsync(application.ApiBaseUrl.ToString()), candidate => candidate.Name == "blazorshop-demo-session");
+        Assert.True(cookie.Secure && cookie.HttpOnly && cookie.SameSite == SameSiteAttribute.Lax);
+        var requestCount = 0;
+        var cookiePresent = new List<bool>();
+        var refreshed = Page.WaitForResponseAsync(response => response.Url.EndsWith("/api/authentication/refresh-token", StringComparison.Ordinal) && response.Request.Method == "POST");
+        await Page.RouteAsync("**/api/cart/user/orders", async route =>
+        {
+            if (route.Request.Method != "GET")
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            var headers = await route.Request.AllHeadersAsync();
+            cookiePresent.Add(headers.TryGetValue("cookie", out var value) && value.Contains($"{cookie.Name}={cookie.Value}", StringComparison.Ordinal));
+            if (++requestCount == 1)
+            {
+                // Exercise the existing refresh/retry path without altering any server authentication policy.
+                await route.FulfillAsync(new()
+                {
+                    Status = 401,
+                    ContentType = "application/json",
+                    Body = "{}",
+                    Headers = new Dictionary<string, string>
+                    {
+                        ["Access-Control-Allow-Origin"] = application.WebBaseUrl.GetLeftPart(UriPartial.Authority),
+                        ["Access-Control-Allow-Credentials"] = "true",
+                    },
+                });
+            }
+            else
+            {
+                await route.ContinueAsync();
+            }
+        });
+        try
+        {
+            await GoAsync("account/orders");
+            Assert.Equal(200, (await refreshed).Status);
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "No orders yet", Exact = true })).ToBeVisibleAsync();
+            Assert.Equal(2, requestCount);
+            Assert.True(cookiePresent.Count == 2 && cookiePresent.All(present => present), "Both initial and retried private requests must carry the active demo cookie.");
+        }
+        finally { await Page.UnrouteAsync("**/api/cart/user/orders"); }
     }
 
     private async Task SignOutAsync()

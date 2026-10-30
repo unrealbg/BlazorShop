@@ -16,6 +16,8 @@ Authentication component code-behind, account operation handlers, `EditForm`, Da
 
 `DemoTokenValidation`, `DemoSessionMiddleware`, bearer configuration, demo lifecycle, role policies, redirect resolver, refresh-token/logout cleanup, Domain, Application, schema and production configuration are unchanged. Demo actions remain available in an expandable section of the sign-in form.
 
+The private HttpClient also uses the existing `BrowserCredentialsHandler`, inside the unchanged `RefreshTokenHandler`. This restores delivery of the existing session cookie on permitted cross-origin API calls, including a retry after refresh. No origins, CORS policy, cookie attributes, tokens or server validation rules change. The browser fixture uses HTTPS on the same hostname with different ports: cross-origin and same-site. Its regression verifies the existing Secure/HttpOnly/SameSite=Lax cookie on both private attempts, a successful real refresh and a successful retried API response. A controlled first-response 401 triggers the existing retry path. This does not claim support for unrelated cross-site hosting.
+
 ## Verification
 
 The seven existing mandatory Playwright scenarios remain. Four additional mandatory scenarios exercise access forms/registration/confirmation, account operations and responsive orders, loading/empty/error/retry states, and customer/admin/demo login/refresh/logout/session isolation. The strict TRX verifier requires all eleven, passing in both consecutive suite runs.
