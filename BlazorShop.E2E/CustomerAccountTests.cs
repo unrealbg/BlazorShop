@@ -306,6 +306,7 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
         Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"), $"Horizontal overflow in {state} at {width}px.");
         Assert.True(await Page.Locator(".v2-workspace input, .v2-auth-card, .v2-account-nav, .v2-account .bs-panel, .v2-account table").EvaluateAllAsync<bool>("elements => elements.every(element => { const bounds = element.getBoundingClientRect(); return bounds.left >= -1 && bounds.right <= innerWidth + 1; })"), $"Clipped content in {state} at {width}px.");
         var skip = Page.GetByRole(AriaRole.Link, new() { Name = "Skip to content", Exact = true });
+        await Page.Keyboard.PressAsync("Tab");
         await skip.FocusAsync();
         Assert.Equal("solid", await skip.EvaluateAsync<string>("element => getComputedStyle(element).outlineStyle"));
         await skip.PressAsync("Enter");
