@@ -6,8 +6,8 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
                 <p class="bs-section-kicker">Admin</p>
-                <h1 class="mt-2 text-2xl font-bold text-slate-950">SEO management</h1>
-                <p class="mt-3 text-sm leading-6 text-neutral-600">Manage site-wide metadata defaults and redirect governance without touching storefront routing.</p>
+                <h1 class="mt-2 text-2xl font-bold text-slate-950">@(_activeTab == SeoAdminTab.Redirects ? "Redirects" : "SEO management")</h1>
+                <p class="mt-3 text-sm leading-6 text-neutral-600">Manage default search metadata and redirect rules.</p>
             </div>
             <div class="flex items-center gap-2 text-sm text-neutral-500">
                 <span class="bs-chip-solid">Admin only</span>

@@ -2,6 +2,7 @@ const shells = new WeakMap();
 const dialogs = new WeakMap();
 
 export function initializeShell(shell) {
+    if (!shell?.isConnected) return;
     if (shells.has(shell)) return;
     const onClick = event => {
         if (event.target.closest('.bs-workspace-header__mobile-panel a')) {
@@ -20,6 +21,7 @@ export function disposeShell(shell) {
 }
 
 export function setDialogOpen(dialog, open, closeOnBackdrop, reference) {
+    if (!dialog?.isConnected) return;
     let state = dialogs.get(dialog);
     if (!state) {
         state = { reference, closeOnBackdrop };
@@ -34,8 +36,23 @@ export function setDialogOpen(dialog, open, closeOnBackdrop, reference) {
                 state.reference.invokeMethodAsync('CloseAsync');
             }
         };
+        state.keydown = event => {
+            if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+            const controls = [...dialog.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
+                .filter(element => element.tabIndex >= 0 && !element.matches(':disabled, [type="hidden"]') && element.getClientRects().length > 0);
+            const first = controls[0];
+            const last = controls.at(-1);
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
         dialog.addEventListener('cancel', state.cancel);
         dialog.addEventListener('click', state.click);
+        dialog.addEventListener('keydown', state.keydown);
         dialogs.set(dialog, state);
     }
     state.closeOnBackdrop = closeOnBackdrop;
@@ -55,6 +72,7 @@ export function disposeDialog(dialog) {
     if (!state) return;
     dialog.removeEventListener('cancel', state.cancel);
     dialog.removeEventListener('click', state.click);
+    dialog.removeEventListener('keydown', state.keydown);
     if (dialog.open) dialog.close();
     if (state.invoker?.isConnected) state.invoker.focus();
     dialogs.delete(dialog);

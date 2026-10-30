@@ -353,7 +353,7 @@
       <input aria-label="Carrier" class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
       <input aria-label="Tracking Number" class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
       <input aria-label="Tracking Url" class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
-      <select aria-label="shipping Status" class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
+      <select aria-label="Shipping status" class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
         @foreach (var status in GetAllowedFulfillmentStatuses(_editOrder))
         {
           <option value="@status">@status</option>

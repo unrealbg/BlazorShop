@@ -62,12 +62,15 @@
 .v2-admin canvas { max-width: 100%; }
 .v2-admin pre { white-space: pre-wrap; word-break: break-word; }
 .v2-admin .bs-toast-card { border: 1px solid var(--admin-line); border-radius: 10px; }
+.v2-admin:has(dialog[open]) > .bs-toast-stack { visibility: hidden; }
+.v2-admin-dialog-feedback { margin-bottom: 16px; padding: 12px 14px; border: 1px solid #bfdbfe; border-radius: 7px; color: #1e40af; background: #eff6ff; }
+.v2-admin-dialog-feedback-error { border-color: #fecaca; color: #991b1b; background: #fef2f2; }
 .v2-admin-dialog { width: min(540px, calc(100% - 28px)); max-width: calc(100% - 28px); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #dfe5ec; border-radius: 12px; background: white; color: #111827; box-shadow: 0 24px 80px #0f172a40; }
 .v2-admin-dialog--sm { width: min(440px, calc(100% - 28px)); }
 .v2-admin-dialog--lg { width: min(720px, calc(100% - 28px)); }
 .v2-admin-dialog--xl { width: min(1000px, calc(100% - 28px)); }
 .v2-admin-dialog::backdrop { background: #0b12209c; }
-.v2-admin-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #dfe5ec; }
+.v2-admin-dialog-header { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #dfe5ec; background: white; }
 .v2-admin-dialog-header h5 { font-size: 1.15rem; font-weight: 650; }
 .v2-admin-close { min-width: 44px; min-height: 44px; border: 1px solid #dfe5ec; border-radius: 7px; background: white; font-size: 1.6rem; color: #475569; }
 .v2-admin-dialog-body { padding: 22px; }
@@ -80,7 +83,7 @@
     .v2-admin { grid-template-columns: minmax(0, 1fr); }
     .v2-admin-sidebar { display: none; }
     .v2-admin .bs-workspace-header__desktop { display: none; }
-    .v2-admin .bs-workspace-header__mobile { display: grid; padding: 12px 18px; }
+    .v2-admin .bs-workspace-header__mobile { display: flex; gap: 8px; padding: 12px 18px; }
     .v2-admin .bs-workspace-header__mobile-panel { max-height: 75vh; overflow-y: auto; }
     .v2-admin #admin-content { padding: 22px 18px; }
 }

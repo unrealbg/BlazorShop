@@ -14,13 +14,18 @@ else
 
     private string? _previousSource;
     private bool _failed;
-    private string? ImageSource => Uri.TryCreate(Source, UriKind.Absolute, out var absolute) && absolute.Scheme is "https" or "http"
-        ? Source
-        : HttpClientHelper.GetPublicClient().BaseAddress is { } api ? new Uri(api, Source!).AbsoluteUri : Source;
+    private string? ImageSource;
 
     protected override void OnParametersSet()
     {
-        if (_previousSource != Source) _failed = false;
+        if (_previousSource == Source) return;
+        _failed = false;
         _previousSource = Source;
+        ImageSource = Source;
+        if (Source?.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            using var client = HttpClientHelper.GetPublicClient();
+            if (client.BaseAddress is { } api) ImageSource = new Uri(api, Source).AbsoluteUri;
+        }
     }
 }

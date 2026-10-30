@@ -22,7 +22,7 @@ public sealed partial class AdminOperationsTests
             await Dialog.GetByLabel("Price", new() { Exact = true }).FillAsync("18.75");
             await Dialog.GetByLabel("Product Description").FillAsync("Synthetic admin workflow product.");
             await Dialog.GetByLabel("Category", new() { Exact = true }).SelectOptionAsync(data.CategoryId.ToString());
-            var uploaded = Page.WaitForResponseAsync(r => r.Url.Contains("/api/fileupload/image", StringComparison.OrdinalIgnoreCase) && r.Request.Method == "POST");
+            var uploaded = Page.WaitForResponseAsync(r => r.Url.Contains("/api/upload/image", StringComparison.OrdinalIgnoreCase) && r.Request.Method == "POST");
             await Dialog.Locator("input[type=file]").SetInputFilesAsync(new FilePayload
             {
                 Name = "synthetic-product.webp", MimeType = "image/webp",
@@ -45,7 +45,7 @@ public sealed partial class AdminOperationsTests
             await Button(Dialog, "Finish").ClickAsync();
             await Page.GetByLabel("Search products...").FillAsync(name);
             await Page.Locator("main h1").ClickAsync();
-            await Button(Page.Locator("main"), "Expand All").ClickAsync();
+            await Expect(Button(Page.Locator("main"), "Collapse All")).ToBeVisibleAsync();
             await Row(name).GetByTitle("Edit", new() { Exact = true }).ClickAsync();
             await Dialog.GetByLabel("Product Name", new() { Exact = true }).FillAsync(name + " edited");
             var variantRow = Dialog.GetByRole(AriaRole.Row).Filter(new() { HasText = $"UI-{data.CategorySlug}" });
@@ -57,9 +57,13 @@ public sealed partial class AdminOperationsTests
             await Expect(Dialog).ToHaveCountAsync(0);
             await Row(name + " edited").GetByTitle("Edit", new() { Exact = true }).ClickAsync();
             await Button(Dialog, "SEO").ClickAsync();
+            await Dialog.GetByLabel("Slug", new() { Exact = true }).FillAsync($"admin-product-{data.CategorySlug}");
             await Dialog.GetByLabel("Meta Title", new() { Exact = true }).FillAsync("Synthetic product metadata");
+            var productSeo = Page.WaitForResponseAsync(r => r.Request.Method == "PUT" && r.Url.Contains("/api/admin/products/", StringComparison.Ordinal) && r.Url.EndsWith("/seo", StringComparison.Ordinal));
             await Button(Dialog, "Save SEO").ClickAsync();
+            Assert.Equal(200, (await productSeo).Status);
             await Expect(Button(Dialog, "Save SEO")).ToBeEnabledAsync();
+            await application.WithAdminDatabaseAsync(async db => Assert.Equal("Synthetic product metadata", (await db.Products.SingleAsync(p => p.CategoryId == data.CategoryId && p.Name == name + " edited")).MetaTitle));
             await CaptureWidthsAsync("product-seo");
             await Button(Dialog, "Catalog").ClickAsync();
             await Button(Dialog.GetByRole(AriaRole.Row).Filter(new() { HasText = $"UI-{data.CategorySlug}" }), "Delete").ClickAsync();
@@ -107,9 +111,13 @@ public sealed partial class AdminOperationsTests
             await Expect(Dialog).ToHaveCountAsync(0);
             await Row(name).GetByTitle("Edit", new() { Exact = true }).ClickAsync();
             await Button(Dialog, "SEO").ClickAsync();
+            await Dialog.GetByLabel("Slug", new() { Exact = true }).FillAsync($"admin-category-{Guid.NewGuid():N}");
             await Dialog.GetByLabel("Meta Title", new() { Exact = true }).FillAsync("Synthetic category metadata");
+            var categorySeo = Page.WaitForResponseAsync(r => r.Request.Method == "PUT" && r.Url.Contains("/api/admin/categories/", StringComparison.Ordinal) && r.Url.EndsWith("/seo", StringComparison.Ordinal));
             await Button(Dialog, "Save SEO").ClickAsync();
+            Assert.Equal(200, (await categorySeo).Status);
             await Expect(Button(Dialog, "Save SEO")).ToBeEnabledAsync();
+            await application.WithAdminDatabaseAsync(async db => Assert.Equal("Synthetic category metadata", (await db.Categories.SingleAsync(c => c.Name == name + " edited")).MetaTitle));
             await CaptureWidthsAsync("category-seo");
             await Page.Keyboard.PressAsync("Escape");
             await Row(name).GetByTitle("Delete", new() { Exact = true }).ClickAsync();
@@ -150,7 +158,7 @@ public sealed partial class AdminOperationsTests
             await Expect(Page.Locator("main article")).ToHaveCountAsync(20);
             await Page.GetByLabel("Low", new() { Exact = true }).CheckAsync();
             await Button(Page.Locator("main"), "Apply").ClickAsync();
-            await Expect(Page.Locator("main article")).ToHaveCountAsync(6);
+            await Expect(Page.Locator("main article")).ToHaveCountAsync(5);
             await Page.GetByLabel("Out", new() { Exact = true }).CheckAsync();
             await Button(Page.Locator("main"), "Apply").ClickAsync();
             await Expect(Page.Locator("main article")).ToHaveCountAsync(1);
@@ -170,7 +178,7 @@ public sealed partial class AdminOperationsTests
             var response = Page.WaitForResponseAsync(r => r.Request.Method == "PUT" && r.Url.Contains("/admin/inventory/variant/", StringComparison.Ordinal));
             await Button(Dialog, "Save").ClickAsync();
             Assert.Equal(409, (await response).Status);
-            await Expect(Page.GetByText("Variant stock changed after it was loaded. Refresh inventory and try again.", new() { Exact = true })).ToBeVisibleAsync();
+            await Expect(Dialog.GetByRole(AriaRole.Alert)).ToContainTextAsync("Variant stock changed after it was loaded. Refresh inventory and try again.");
             await CaptureWidthsAsync("inventory-conflict");
             await application.WithAdminDatabaseAsync(async db => Assert.Equal(21, (await db.ProductVariants.SingleAsync(v => v.Id == data.VariantId)).Stock));
             await Button(Dialog, "Cancel").ClickAsync();

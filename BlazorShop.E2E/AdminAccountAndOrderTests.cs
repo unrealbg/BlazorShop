@@ -151,7 +151,7 @@ public sealed partial class AdminOperationsTests
                 await denied.DisposeAsync();
             }
             await GoAsync("authentication/logout");
-            await Expect(Page).ToHaveURLAsync(new Regex("/authentication/login$"));
+            await Expect(Page).ToHaveURLAsync(new Regex("/authentication/login/account$"));
             await Page.GetByText("Explore a demo workspace", new() { Exact = true }).ClickAsync();
             await Button(Page.Locator("main"), "Administrator demo").ClickAsync();
             await Expect(Page).ToHaveURLAsync(new Regex("/admin$"));
@@ -169,7 +169,7 @@ public sealed partial class AdminOperationsTests
             }
             finally { await isolated.DisposeAsync(); }
             await GoAsync("authentication/logout");
-            await Expect(Page).ToHaveURLAsync(new Regex("/authentication/login$"));
+            await Expect(Page).ToHaveURLAsync(new Regex("/authentication/login/account$"));
             var ended = await Context.APIRequest.GetAsync(endpoint, new() { Headers = headers });
             Assert.Equal(401, ended.Status);
             await ended.DisposeAsync();

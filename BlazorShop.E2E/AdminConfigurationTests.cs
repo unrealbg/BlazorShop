@@ -1,6 +1,7 @@
 namespace BlazorShop.E2E;
 
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 
@@ -74,7 +75,7 @@ public sealed partial class AdminOperationsTests
             await SaveAndCheckAsync("Save Store", "admin/settings/store");
             Assert.Equal("Synthetic administration store", (await ReadApiAsync("admin/settings")).GetProperty("store").GetProperty("storeName").GetString());
             await Button(Page.Locator("main"), "Orders").ClickAsync();
-            await Expect(Page.GetByLabel("Allow guest checkout")).ToBeDisabledAsync();
+            await Expect(Page.GetByLabel("Guest checkout", new() { Exact = true })).ToBeDisabledAsync();
             await Page.GetByLabel("Order reference prefix").FillAsync("UIREG");
             await SaveAndCheckAsync("Save Orders", "admin/settings/orders");
             Assert.Equal("UIREG", (await ReadApiAsync("admin/settings")).GetProperty("orders").GetProperty("orderReferencePrefix").GetString());
@@ -114,6 +115,7 @@ public sealed partial class AdminOperationsTests
         var data = await application.SeedScenarioAsync();
         await application.GrantScenarioAdminAsync(data);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var usersQuery = new Regex(@"/api/admin/users\?");
         try
         {
             await LoginAsync(data);
@@ -121,7 +123,7 @@ public sealed partial class AdminOperationsTests
             await FilterInventoryAsync($"no-product-{Guid.NewGuid():N}");
             await Expect(Page.GetByText("No inventory items found.", new() { Exact = true })).ToBeVisibleAsync();
             await CaptureWidthsAsync("inventory-empty");
-            await Page.RouteAsync("**/api/admin/users?*", async route => { await release.Task.WaitAsync(TimeSpan.FromSeconds(60)); await route.AbortAsync(); });
+            await Page.RouteAsync(usersQuery, async route => { await release.Task.WaitAsync(TimeSpan.FromSeconds(60)); await route.AbortAsync(); });
             await GoAsync("admin/users");
             await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Loading users..." })).ToBeVisibleAsync();
             await CaptureWidthsAsync("users-loading");
@@ -129,7 +131,7 @@ public sealed partial class AdminOperationsTests
             await Expect(Button(Page.Locator("main"), "Retry")).ToBeVisibleAsync();
             await Expect(Page.GetByRole(AriaRole.Alert)).ToBeVisibleAsync();
             await CaptureWidthsAsync("users-error");
-            await Page.UnrouteAsync("**/api/admin/users?*");
+            await Page.UnrouteAsync(usersQuery);
             await Button(Page.Locator("main"), "Retry").ClickAsync();
             await Expect(Page.Locator("tbody tr").First).ToBeVisibleAsync();
             await Page.GetByLabel("Search email or name").FillAsync($"no-user-{Guid.NewGuid():N}");

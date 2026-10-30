@@ -55,6 +55,9 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             .WithEnvironment("Runtime__Security__EnableHttpsRedirection", "false")
             .WithEnvironment("Demo__Enabled", "true")
             .WithEnvironment("EmailSettings__Enabled", "false")
+            .WithEnvironment("EmailSettings__From", "browser@example.test")
+            .WithEnvironment("EmailSettings__SmtpServer", "smtp.example.test")
+            .WithEnvironment("EmailSettings__DisplayName", "Synthetic browser store")
             .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
@@ -250,11 +253,14 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
     public async Task<Guid> SeedAccountOrderAsync(E2ETestData data)
     {
         await using var db = CreateDbContext();
+        var user = await db.Users.SingleAsync(candidate => candidate.Id == data.UserId);
         var order = new Order
         {
             UserId = data.UserId,
             Reference = $"UI-{data.SimpleProductSlug}",
             Currency = "EUR",
+            CustomerNameSnapshot = user.FullName,
+            CustomerEmailSnapshot = user.Email,
             OrderStatus = OrderStatus.Confirmed,
             PaymentStatus = OrderPaymentStatus.Paid,
             FulfillmentStatus = FulfillmentStatus.Shipped,

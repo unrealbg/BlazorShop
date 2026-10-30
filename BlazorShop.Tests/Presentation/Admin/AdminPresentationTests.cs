@@ -4,6 +4,8 @@ using System.Reflection;
 using BlazorShop.Web.Components.Shared;
 using BlazorShop.Web.Layout;
 using BlazorShop.Web.Shared.Helper.Contracts;
+using BlazorShop.Web.Shared.Services.Contracts;
+using BlazorShop.Web.Shared.Toast;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,6 +77,7 @@ public sealed class AdminPresentationTests
     [Theory]
     [InlineData("/uploads/synthetic.png", "https://api.example.test/uploads/synthetic.png")]
     [InlineData("https://images.example.test/item.webp", "https://images.example.test/item.webp")]
+    [InlineData("/images/products/metro-runner.webp", "/images/products/metro-runner.webp")]
     public async Task ProductImage_UsesExistingApiOriginForRelativeUploadPaths(string source, string expected)
     {
         using var services = CreateServices(typeof(AdminProductImage));
@@ -85,6 +88,22 @@ public sealed class AdminPresentationTests
         {
             var component = await renderer.RenderComponentAsync<AdminProductImage>(ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(AdminProductImage.Source)] = source }));
             Assert.Contains($"src=\"{expected}\"", component.ToHtmlString());
+        });
+    }
+
+    [Fact]
+    public async Task DialogFeedback_AnnouncesErrorsInsideModalAndEscapesMessageMarkup()
+    {
+        using var services = CreateServices(typeof(AdminDialogFeedback));
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var component = await renderer.RenderComponentAsync<AdminDialogFeedback>();
+            Mock.Get(services.GetRequiredService<IToastService>()).Raise(service => service.OnShow += null, new ToastEventArgs(ToastLevel.Error, "Stock changed <retry>", "Inventory", ToastIcon.Error, ToastPosition.TopRight, false, 5000));
+            var html = component.ToHtmlString();
+            Assert.Contains("role=\"alert\"", html);
+            Assert.Contains("Stock changed &lt;retry&gt;", html);
+            Assert.DoesNotContain("<retry>", html);
         });
     }
 

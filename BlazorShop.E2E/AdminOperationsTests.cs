@@ -27,11 +27,12 @@ public sealed partial class AdminOperationsTests(E2EApplicationFixture applicati
                     await GoAsync(path);
                     await Expect(Page.Locator("main h1")).ToBeVisibleAsync();
                     await Expect(Page.Locator("main").GetByText(new Regex("^Loading ", RegexOptions.IgnoreCase))).ToHaveCountAsync(0);
+                    await Expect(Page.Locator("main [role=alert]")).ToHaveCountAsync(0);
                     if (path == "admin/products")
                     {
                         await Page.GetByLabel("Search products...").FillAsync(data.CategoryName.Split(' ')[^1]);
                         await Page.GetByRole(AriaRole.Heading, new() { Level = 1 }).ClickAsync();
-                        await Page.GetByRole(AriaRole.Button, new() { Name = "Expand All", Exact = true }).ClickAsync();
+                        await Expect(Button(Page.Locator("main"), "Collapse All")).ToBeVisibleAsync();
                         await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = data.SimpleProductName })).ToBeVisibleAsync();
                     }
                     if (path == "admin/inventory") await FilterInventoryAsync(data.CategoryName.Split(' ')[^1]);
@@ -111,6 +112,7 @@ public sealed partial class AdminOperationsTests(E2EApplicationFixture applicati
         foreach (var width in new[] { 320, 390, 768, 1440 })
         {
             await Page.SetViewportSizeAsync(width, 1000);
+            await Dialog.EvaluateAllAsync("dialogs => dialogs.forEach(dialog => dialog.scrollTop = 0)");
             await AssertFitsAsync();
             await CaptureAsync(state, width);
         }
