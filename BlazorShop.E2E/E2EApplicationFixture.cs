@@ -77,7 +77,7 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         }
     }
 
-    public async Task<E2ETestData> SeedScenarioAsync()
+    public async Task<E2ETestData> SeedScenarioAsync(bool includeListingSamples = false)
     {
         var suffix = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)[..10];
         var categoryId = Guid.NewGuid();
@@ -110,6 +110,7 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             Name = simpleProductName,
             Slug = simpleProductSlug,
             Description = simpleProductDescription,
+            Image = includeListingSamples ? "/images/products/metro-runner.webp" : null,
             Price = 12.50m,
             Quantity = 20,
             CreatedOn = DateTime.UtcNow,
@@ -161,6 +162,34 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         await using var dbContext = CreateDbContext();
         dbContext.Categories.Add(category);
         dbContext.Products.AddRange(simpleProduct, variantProduct);
+        if (includeListingSamples)
+        {
+            dbContext.Products.Add(new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Unpublished {simpleProductName}",
+                Slug = $"unpublished-{simpleProductSlug}",
+                Description = "Unpublished listing regression sample.",
+                Price = 9.00m,
+                Quantity = 5,
+                CreatedOn = DateTime.UtcNow,
+                IsPublished = false,
+                CategoryId = categoryId,
+            });
+            dbContext.Products.Add(new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Older {simpleProductName}",
+                Slug = $"older-{simpleProductSlug}",
+                Description = "Product outside the New Releases window.",
+                Price = 9.00m,
+                Quantity = 5,
+                CreatedOn = DateTime.UtcNow.AddDays(-8),
+                PublishedOn = DateTime.UtcNow.AddDays(-8),
+                IsPublished = true,
+                CategoryId = categoryId,
+            });
+        }
         dbContext.ProductVariants.Add(variant);
         dbContext.Users.Add(user);
         dbContext.UserRoles.Add(new IdentityUserRole<string>

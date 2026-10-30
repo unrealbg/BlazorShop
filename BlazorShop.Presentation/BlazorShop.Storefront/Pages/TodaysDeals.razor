@@ -5,36 +5,33 @@
 
 <SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
-<section class="mx-auto max-w-7xl px-4 pb-6 pt-6 sm:px-6 sm:pt-10 lg:px-8">
-    <div class="text-center">
-        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-500">Today's Deals</p>
-        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-neutral-900 sm:text-4xl">Hot Deals You Can't Miss</h1>
-        <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-neutral-700">Current featured deals and fast-moving picks across the BlazorShop catalog.</p>
-
-        <div class="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center sm:justify-center">
-            <a href="@StorefrontRoutes.NewReleases" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-neutral-900 px-3 py-2 font-semibold text-white hover:bg-neutral-800 sm:w-auto sm:px-4">See New Releases</a>
-            <a href="@StorefrontRoutes.Home" class="inline-flex min-h-11 w-full items-center justify-center rounded bg-amber-500 px-3 py-2 font-semibold text-white hover:bg-amber-600 sm:w-auto sm:px-4">Back to Home</a>
-        </div>
-    </div>
-</section>
-
-<section class="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+<div class="bs-v2-container bs-v2-listing bs-v2-listing-deals">
     @if (_isServiceUnavailable)
     {
         <ServiceUnavailableState Title="Today's deals are temporarily unavailable"
-                                 Message="The storefront is running, but the catalog API is not reachable right now. Start the API project or AppHost and refresh this page." />
+                                 Message="We couldn't load the products right now. Please try again shortly." />
     }
     else
     {
-        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 class="text-2xl font-extrabold tracking-tight text-neutral-900">Featured Picks</h2>
-            <span class="inline-flex items-center rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-neutral-700 shadow">@_products.Count deals</span>
-        </div>
+        <header class="bs-v2-listing-intro">
+            <p class="bs-v2-eyebrow">Today's Deals</p>
+            <h1>Today's Featured Picks</h1>
+            <p class="bs-v2-listing-description">Explore the latest picks at current catalog prices.</p>
+            <nav class="bs-v2-listing-links" aria-label="Today's Deals navigation">
+                <a href="@StorefrontRoutes.NewReleases" class="bs-v2-button bs-v2-button-secondary">See New Releases</a>
+                <a href="@StorefrontRoutes.Home" class="bs-v2-button bs-v2-button-primary">Back to Home</a>
+            </nav>
+        </header>
 
-        <ProductGrid Products="_products" EmptyMessage="No deal selections are available right now." />
+        <section aria-labelledby="listing-products-heading">
+            <div class="bs-v2-listing-toolbar">
+                <h2 id="listing-products-heading">Featured Picks</h2>
+                <span class="bs-v2-count" role="status">@_products.Count @(_products.Count == 1 ? "product" : "products")</span>
+            </div>
+            <ProductGrid Products="_products" EmptyMessage="No deal selections are available right now." />
+        </section>
     }
-</section>
-
+</div>
 @code {
     private bool _isServiceUnavailable;
     private IReadOnlyList<GetCatalogProduct> _products = [];

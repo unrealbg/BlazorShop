@@ -29,6 +29,8 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
         public const string BaseUrl = "https://shop.example.com";
 
+        public Action<Uri>? RequestObserver { get; init; }
+
         public HttpStatusCode CategoriesStatusCode { get; init; } = HttpStatusCode.OK;
 
         public HttpStatusCode CatalogProductsStatusCode { get; init; } = HttpStatusCode.OK;
@@ -280,6 +282,11 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
+                if (request.RequestUri is { } uri)
+                {
+                    _scenario.RequestObserver?.Invoke(uri);
+                }
+
                 var path = request.RequestUri?.AbsolutePath ?? string.Empty;
 
                 if (path.EndsWith("/public/seo/redirects/resolve", StringComparison.OrdinalIgnoreCase))
