@@ -64,7 +64,8 @@ namespace BlazorShop.Web
             builder.Services.AddHttpClient(
                 Constant.ApiClient.PrivateName,
                 client => { client.BaseAddress = apiBaseAddress; }
-            ).AddHttpMessageHandler<RefreshTokenHandler>();
+            ).AddHttpMessageHandler<RefreshTokenHandler>()
+             .AddHttpMessageHandler<BrowserCredentialsHandler>();
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddAuthorizationCore();
             builder.Services.AddScoped<ICartService, CartService>();

@@ -12,7 +12,11 @@ $expectedTests = @(
     'BlazorShop.E2E.StorefrontVisualTests.StorefrontFoundation_ResponsiveNavigationAndCommerce',
     'BlazorShop.E2E.StorefrontListingTests.ListingPages_ResponsiveImagesNavigationAndVariantCommerce',
     'BlazorShop.E2E.StorefrontCheckoutTests.Cart_ResponsiveVariantsRemovalClearAndInvalidStates',
-    'BlazorShop.E2E.StorefrontCheckoutTests.CartCookie_InvalidInputRecoveryAndCheckoutHandoff'
+    'BlazorShop.E2E.StorefrontCheckoutTests.CartCookie_InvalidInputRecoveryAndCheckoutHandoff',
+    'BlazorShop.E2E.CustomerAccountTests.AccessForms_ResponsiveValidationRegistrationAndConfirmation',
+    'BlazorShop.E2E.CustomerAccountTests.CustomerAccount_ResponsiveOrdersProfilePasswordAndNotifications',
+    'BlazorShop.E2E.CustomerAccountTests.CustomerOrders_LoadingEmptyErrorAndRetry',
+    'BlazorShop.E2E.CustomerAccountTests.AdminAndDemo_LoginRefreshLogoutAndSessionIsolation'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

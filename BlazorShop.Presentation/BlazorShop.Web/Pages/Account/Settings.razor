@@ -4,14 +4,14 @@
 
 <PageTitle>Account Settings</PageTitle>
 
-<section class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+<section class="v2-page">
     <header class="bs-panel bs-page-hero p-6 sm:p-8">
         <p class="bs-section-kicker">Account Settings</p>
         <h1 class="bs-section-title mt-3">Security and account access</h1>
         <p class="bs-section-copy mt-4">Use this page for password changes and account actions. Public shopping remains separate on the storefront.</p>
     </header>
 
-    <div class="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+    <div class="v2-content-grid">
         <section class="bs-panel p-6">
             <div>
                 <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Password</p>
@@ -26,19 +26,19 @@
                 }
                 <ValidationSummary class="text-sm text-red-700" />
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700">Current password</label>
-                    <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.CurrentPassword" />
-                    <ValidationMessage For="@(() => _changePasswordModel.CurrentPassword)" />
+                    <label for="current-password" class="mb-1 block text-sm font-medium text-slate-700">Current password</label>
+                    <InputText id="current-password" type="password" autocomplete="current-password" aria-describedby="current-password-error" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.CurrentPassword" />
+                    <div id="current-password-error"><ValidationMessage For="@(() => _changePasswordModel.CurrentPassword)" /></div>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700">New password</label>
-                    <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.NewPassword" />
-                    <ValidationMessage For="@(() => _changePasswordModel.NewPassword)" />
+                    <label for="new-password" class="mb-1 block text-sm font-medium text-slate-700">New password</label>
+                    <InputText id="new-password" type="password" autocomplete="new-password" aria-describedby="new-password-error" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.NewPassword" />
+                    <div id="new-password-error"><ValidationMessage For="@(() => _changePasswordModel.NewPassword)" /></div>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-700">Confirm new password</label>
-                    <InputText type="password" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.ConfirmPassword" />
-                    <ValidationMessage For="@(() => _changePasswordModel.ConfirmPassword)" />
+                    <label for="confirm-password" class="mb-1 block text-sm font-medium text-slate-700">Confirm new password</label>
+                    <InputText id="confirm-password" type="password" autocomplete="new-password" aria-describedby="confirm-password-error" class="w-full rounded-xl border border-slate-300 px-4 py-3" @bind-Value="_changePasswordModel.ConfirmPassword" />
+                    <div id="confirm-password-error"><ValidationMessage For="@(() => _changePasswordModel.ConfirmPassword)" /></div>
                 </div>
                 <button type="submit" class="bs-button bs-button-primary disabled:opacity-60 disabled:cursor-not-allowed" disabled="@IsChangingPassword">@(IsChangingPassword ? "Updating password..." : "Update password")</button>
             </EditForm>
