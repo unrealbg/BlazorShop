@@ -27,8 +27,16 @@ namespace BlazorShop.API.Demo
             IOptions<DemoOptions> optionsAccessor)
         {
             var options = optionsAccessor.Value;
+            // This unvalidated marker can only deny a request; JWT authentication validates and binds it later.
+            var tokenSessionId = ReadDemoSessionClaim(httpContext.Request.Headers.Authorization);
             if (!options.Enabled)
             {
+                if (tokenSessionId is not null)
+                {
+                    await WriteProblemAsync(httpContext, StatusCodes.Status401Unauthorized, "Demo access tokens require an active demo workspace.");
+                    return;
+                }
+
                 await _next(httpContext);
                 return;
             }
@@ -45,11 +53,10 @@ namespace BlazorShop.API.Demo
             }
 
             var token = !string.IsNullOrWhiteSpace(headerToken) ? headerToken : cookieToken;
-            var tokenSessionId = ReadDemoSessionClaim(httpContext.Request.Headers.Authorization);
 
             if (string.IsNullOrWhiteSpace(token))
             {
-                if (!string.IsNullOrWhiteSpace(tokenSessionId))
+                if (tokenSessionId is not null)
                 {
                     await WriteProblemAsync(httpContext, StatusCodes.Status401Unauthorized, "The demo session cookie is missing.");
                     return;
@@ -76,8 +83,9 @@ namespace BlazorShop.API.Demo
 
             await using (lease)
             {
-                if (!string.IsNullOrWhiteSpace(tokenSessionId)
-                    && !string.Equals(tokenSessionId, lease.Context.Id, StringComparison.Ordinal))
+                if (tokenSessionId is not null
+                    && (string.IsNullOrWhiteSpace(tokenSessionId)
+                        || !string.Equals(tokenSessionId, lease.Context.Id, StringComparison.Ordinal)))
                 {
                     await WriteProblemAsync(httpContext, StatusCodes.Status401Unauthorized, "The access token belongs to another demo session.");
                     return;
@@ -130,7 +138,13 @@ namespace BlazorShop.API.Demo
             try
             {
                 var token = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeader["Bearer ".Length..].Trim());
-                return token.Claims.FirstOrDefault(claim => claim.Type == DemoSessionConstants.ClaimType)?.Value;
+                var claims = token.Claims.Where(claim => claim.Type == DemoSessionConstants.ClaimType).Take(2).ToArray();
+                return claims.Length switch
+                {
+                    0 => null,
+                    1 => claims[0].Value,
+                    _ => string.Empty,
+                };
             }
             catch
             {

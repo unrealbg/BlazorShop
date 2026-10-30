@@ -115,6 +115,7 @@
                 }).AddJwtBearer(opt =>
                 {
                     opt.SaveToken = true;
+                    opt.Events.OnTokenValidated = DemoTokenValidation.ValidateAsync;
                     opt.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
