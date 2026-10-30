@@ -4,7 +4,7 @@
 
 <PageTitle>Orders</PageTitle>
 
-<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<section class="v2-page">
     <header class="bs-panel bs-page-hero p-6 sm:p-8">
         <p class="bs-section-kicker">Orders</p>
         <h1 class="bs-section-title mt-3">@(SelectedOrder is null ? "Order history" : $"Order {SelectedOrder.Reference}")</h1>
@@ -13,11 +13,11 @@
 
     @if (_loading)
     {
-        <div class="bs-panel mt-8 px-6 py-10 text-center text-slate-600">Loading orders...</div>
+        <div class="bs-panel mt-8 px-6 py-10 text-center text-slate-600" role="status">Loading orders...</div>
     }
     else if (!string.IsNullOrWhiteSpace(_errorMessage))
     {
-        <div class="mt-8 rounded border border-red-200 bg-red-50 px-6 py-6 text-center text-sm text-red-700">
+        <div class="mt-8 rounded border border-red-200 bg-red-50 px-6 py-6 text-center text-sm text-red-700" role="alert">
             <div>@_errorMessage</div>
             <div class="mt-4">
                 <button type="button" class="bs-button bs-button-primary" @onclick="RetryLoadAsync">Retry</button>
@@ -68,16 +68,18 @@
                             @foreach (var line in SelectedOrder.Lines)
                             {
                                 <tr>
-                                    <td class="px-4 py-3">
+                                    <td class="px-4 py-3" data-label="Product">
+                                        <div>
                                         <div>@line.ProductName</div>
                                         @if (!string.IsNullOrWhiteSpace(line.VariantLabel))
                                         {
                                             <div class="mt-1 text-xs text-slate-500">@line.VariantLabel</div>
                                         }
+                                        </div>
                                     </td>
-                                    <td class="px-4 py-3">@line.Quantity</td>
-                                    <td class="px-4 py-3">@line.UnitPrice.ToString("F2")</td>
-                                    <td class="px-4 py-3">@line.LineTotal.ToString("F2")</td>
+                                    <td class="px-4 py-3" data-label="Qty">@line.Quantity</td>
+                                    <td class="px-4 py-3" data-label="Unit">@line.UnitPrice.ToString("F2")</td>
+                                    <td class="px-4 py-3" data-label="Total">@line.LineTotal.ToString("F2")</td>
                                 </tr>
                             }
                         </tbody>

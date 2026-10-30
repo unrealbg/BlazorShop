@@ -9,6 +9,7 @@ using Aspire.Hosting.Testing;
 
 using BlazorShop.Domain.Entities;
 using BlazorShop.Domain.Entities.Identity;
+using BlazorShop.Domain.Entities.Payment;
 using BlazorShop.Infrastructure.Data;
 
 using Microsoft.AspNetCore.Identity;
@@ -25,6 +26,8 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
     public Uri StorefrontBaseUrl { get; private set; } = null!;
 
     public Uri WebBaseUrl { get; private set; } = null!;
+
+    public Uri ApiBaseUrl { get; private set; } = null!;
 
     public string ArtifactDirectory { get; } = ResolveArtifactDirectory();
 
@@ -50,6 +53,8 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         builder.CreateResourceBuilder(apiResource)
             .WithEnvironment("Jwt__Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)))
             .WithEnvironment("Runtime__Security__EnableHttpsRedirection", "false")
+            .WithEnvironment("Demo__Enabled", "true")
+            .WithEnvironment("EmailSettings__Enabled", "false")
             .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
@@ -63,6 +68,7 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
 
         StorefrontBaseUrl = application.GetEndpoint("storefront", "https");
         WebBaseUrl = application.GetEndpoint("adminclient", "https");
+        ApiBaseUrl = application.GetEndpoint("apiservice", "https");
         connectionString = await application.GetConnectionStringAsync("DefaultConnection");
 
         await WaitForHttpReadyAsync(StorefrontBaseUrl);
@@ -241,9 +247,51 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         return (variant.Id, variant.Sku, variant.SizeValue, variant.Price.Value);
     }
 
+    public async Task<Guid> SeedAccountOrderAsync(E2ETestData data)
+    {
+        await using var db = CreateDbContext();
+        var order = new Order
+        {
+            UserId = data.UserId,
+            Reference = $"UI-{data.SimpleProductSlug}",
+            Currency = "EUR",
+            OrderStatus = OrderStatus.Confirmed,
+            PaymentStatus = OrderPaymentStatus.Paid,
+            FulfillmentStatus = FulfillmentStatus.Shipped,
+            SubtotalAmount = data.VariantPrice * 2,
+            TotalAmount = data.VariantPrice * 2,
+            Lines = [new OrderLine
+            {
+                ProductId = data.VariantProductId,
+                ProductVariantId = data.VariantId,
+                ProductNameSnapshot = data.VariantProductName,
+                SkuSnapshot = data.VariantSku,
+                SizeScaleSnapshot = "ShoesUS",
+                SizeValueSnapshot = data.VariantSize,
+                ColorSnapshot = "Blue",
+                Quantity = 2,
+                UnitPrice = data.VariantPrice,
+                LineTotal = data.VariantPrice * 2,
+            }],
+        };
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+        return order.Id;
+    }
+
+    public async Task GrantScenarioAdminAsync(E2ETestData data)
+    {
+        await using var db = CreateDbContext();
+        var role = await db.Roles.SingleAsync(candidate => candidate.Name == "Admin");
+        db.UserRoles.Add(new IdentityUserRole<string> { UserId = data.UserId, RoleId = role.Id });
+        await db.SaveChangesAsync();
+    }
+
     public async Task RemoveScenarioAsync(E2ETestData data)
     {
         await using var dbContext = CreateDbContext();
+        var orders = await dbContext.Orders.Where(order => order.UserId == data.UserId).ToListAsync();
+        dbContext.Orders.RemoveRange(orders);
         var user = await dbContext.Users.SingleOrDefaultAsync(candidate => candidate.Id == data.UserId);
         if (user is not null)
         {

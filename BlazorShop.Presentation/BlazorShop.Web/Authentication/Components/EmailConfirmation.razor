@@ -1,30 +1,22 @@
-﻿@page "/confirm-email"
+@page "/confirm-email"
+@layout AccessLayout
 
-<section class="min-h-[70vh] grid place-items-center px-4 py-10">
-  <div class="w-full max-w-md">
-    <div class="rounded-2xl shadow-[0_12px_30px_rgba(0,0,0,.08)] border border-black/5 overflow-hidden bg-white/80">
-      <div class="px-6 py-4 text-center">
-        <h2 class="text-xl font-extrabold">Email Confirmation</h2>
-      </div>
-      <div class="px-6 py-6 text-center">
-        @if (_isLoading)
+<PageTitle>Email confirmation | BlazorShop</PageTitle>
+<section class="v2-auth-card v2-confirmation" aria-labelledby="confirmation-title" aria-busy="@_isLoading">
+    <p class="v2-eyebrow">Account verification</p>
+    <div class="v2-confirmation-icon" aria-hidden="true">@(_isLoading ? "…" : _isSuccess ? "✓" : "!")</div>
+    <h1 id="confirmation-title">Email confirmation</h1>
+    @if (_isLoading)
+    {
+        <p class="v2-muted" role="status">Processing your request...</p>
+    }
+    else if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="v2-notice @(_isSuccess ? "v2-notice-success" : "v2-notice-error")" role="status">@_message</div>
+        <a href="/authentication/login/account" class="bs-button bs-button-primary v2-full">Go to Login</a>
+        @if (!_isSuccess)
         {
-          <div class="flex flex-col items-center">
-            <div class="h-10 w-10 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900"></div>
-            <p class="mt-3">Processing your request...</p>
-          </div>
+            <p class="v2-muted v2-small">Use the complete confirmation link from your email. If you still need help, return to sign in.</p>
         }
-        else if (!string.IsNullOrEmpty(_message))
-        {
-          <div class="mb-3 rounded-md px-4 py-3 text-sm font-medium @(_isSuccess ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")">
-            <p>@_message</p>
-          </div>
-          @if (_isSuccess)
-          {
-            <a href="/authentication/login/account" class="inline-flex items-center rounded bg-neutral-900 text-white px-4 py-2 font-semibold hover:bg-neutral-800">Go to Login</a>
-          }
-        }
-      </div>
-    </div>
-  </div>
+    }
 </section>

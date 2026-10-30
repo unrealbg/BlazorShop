@@ -1,0 +1,14 @@
+@inherits LayoutComponentBase
+@inject IPublicStorefrontUrlResolver StorefrontUrlResolver
+
+<div class="v2-workspace v2-access">
+    <Toast />
+    <a class="v2-skip" href="#access-content">Skip to content</a>
+    <header class="v2-workspace-header">
+        <div class="v2-workspace-container">
+            <a class="v2-brand" href="/">Blazor<span>Shop</span></a>
+            <a class="v2-store-link" href="@StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver)">← Back to store</a>
+        </div>
+    </header>
+    <main id="access-content" class="v2-access-main" tabindex="-1">@Body</main>
+</div>

@@ -121,9 +121,18 @@ namespace BlazorShop.Tests.Presentation.Storefront
         {
             var markup = ReadRepositoryFile(relativePath);
 
-            Assert.Contains("WorkspaceHeader", markup);
-            Assert.Contains("Back to shop", markup);
-            Assert.Contains("ShopHref", markup);
+            if (relativePath.EndsWith("/AccountLayout.razor", StringComparison.Ordinal))
+            {
+                Assert.Contains("StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver)", markup);
+                Assert.Contains(">Storefront</a>", markup);
+                Assert.Contains("aria-label=\"Account navigation\"", markup);
+            }
+            else
+            {
+                Assert.Contains("WorkspaceHeader", markup);
+                Assert.Contains("Back to shop", markup);
+                Assert.Contains("ShopHref", markup);
+            }
         }
 
         private static string ReadRepositoryFile(string relativePath)
