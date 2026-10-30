@@ -114,6 +114,8 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
             await Page.GetByRole(AriaRole.Button, new() { Name = "Update password", Exact = true }).ClickAsync();
             await Expect(Page.Locator(".validation-message")).ToContainTextAsync(["Passwords do not match."]);
             await Page.GetByLabel("Confirm new password", new() { Exact = true }).FillAsync(password);
+            await Page.GetByLabel("Confirm new password", new() { Exact = true }).PressAsync("Tab");
+            await Expect(Page.Locator(".validation-message")).ToHaveCountAsync(0);
             var changed = await Page.RunAndWaitForResponseAsync(
                 () => Page.GetByRole(AriaRole.Button, new() { Name = "Update password", Exact = true }).ClickAsync(),
                 response => response.Url.EndsWith("/api/authentication/change-password", StringComparison.Ordinal) && response.Request.Method == "POST");
