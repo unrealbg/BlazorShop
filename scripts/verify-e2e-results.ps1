@@ -16,7 +16,8 @@ $expectedTests = @(
     'BlazorShop.E2E.CustomerAccountTests.AccessForms_ResponsiveValidationRegistrationAndConfirmation',
     'BlazorShop.E2E.CustomerAccountTests.CustomerAccount_ResponsiveOrdersProfilePasswordAndNotifications',
     'BlazorShop.E2E.CustomerAccountTests.CustomerOrders_LoadingEmptyErrorAndRetry',
-    'BlazorShop.E2E.CustomerAccountTests.AdminAndDemo_LoginRefreshLogoutAndSessionIsolation'
+    'BlazorShop.E2E.CustomerAccountTests.AdminAndDemo_LoginRefreshLogoutAndSessionIsolation',
+    'BlazorShop.E2E.AdminOperationsTests.AdminScreens_ResponsiveNavigationAndData'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
