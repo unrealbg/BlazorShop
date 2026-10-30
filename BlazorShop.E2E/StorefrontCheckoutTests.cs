@@ -343,6 +343,7 @@ public sealed class StorefrontCheckoutTests(E2EApplicationFixture application) :
             await simple.GetByRole(AriaRole.Spinbutton).FillAsync("4");
             await simple.GetByRole(AriaRole.Spinbutton).PressAsync("Tab");
             await Expect(simple.GetByRole(AriaRole.Spinbutton)).ToHaveValueAsync("4");
+            await Expect(simple).ToContainTextAsync($"€ {Money(data.SimpleProductPrice * 4)}");
             await AssertCartCookieLineAsync(data.VariantProductId, data.VariantId, 3);
             await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "my-cart").ToString());
             await AssertCartTotalsAsync(7, data.SimpleProductPrice * 4 + data.VariantPrice * 3);
