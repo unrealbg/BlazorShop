@@ -112,7 +112,7 @@ public sealed partial class AdminOperationsTests(E2EApplicationFixture applicati
         foreach (var width in new[] { 320, 390, 768, 1440 })
         {
             await Page.SetViewportSizeAsync(width, 1000);
-            await Dialog.EvaluateAllAsync("dialogs => dialogs.forEach(dialog => dialog.scrollTop = 0)");
+            await Dialog.EvaluateAllAsync<bool>("dialogs => { dialogs.forEach(dialog => dialog.scrollTop = 0); return true; }");
             await AssertFitsAsync();
             await CaptureAsync(state, width);
         }
