@@ -6,6 +6,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
     using BlazorShop.Storefront.Services;
     using BlazorShop.Storefront.Services.Contracts;
     using BlazorShop.Web.Shared.Models.Payment;
+    using BlazorShop.Web.Shared.Models.Product;
 
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +34,7 @@ namespace BlazorShop.Tests.Presentation.Storefront
             {
                 ProductId = MetroRunnerId,
                 Quantity = 2,
-                UnitPrice = 129.95m,
+                UnitPrice = 0.01m,
             }));
 
             using var response = await client.SendAsync(request);
@@ -53,6 +54,157 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Contains("href=\"/checkout\"", content, StringComparison.Ordinal);
             Assert.Contains("data-storefront-cart-remove", content, StringComparison.Ordinal);
             Assert.Contains("data-storefront-cart-quantity", content, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task CartRoute_EmptyCartRetainsPrivacyAndOnlyOffersShoppingNavigation()
+        {
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory);
+            using var response = await client.GetAsync(StorefrontRoutes.Cart);
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("no-store, no-cache, max-age=0", response.Headers.CacheControl?.ToString());
+            Assert.Contains("noindex,nofollow", html, StringComparison.Ordinal);
+            Assert.Contains("Your cart is empty", html, StringComparison.Ordinal);
+            Assert.Contains("0 items in cart", html, StringComparison.Ordinal);
+            Assert.Contains("EUR 0.00", html, StringComparison.Ordinal);
+            Assert.Contains("href=\"/new-releases\"", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Continue to Checkout", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("data-storefront-cart-clear", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("rel=\"canonical\"", html, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task CartRoute_TwoVariantsKeepSeparateControlsMetadataAndCurrentPrices()
+        {
+            var product = new StorefrontSeoAuditScenario().Product;
+            var firstId = Guid.NewGuid();
+            var secondId = Guid.NewGuid();
+            product.Image = null;
+            product.Variants =
+            [
+                new GetProductVariant { Id = firstId, ProductId = product.Id, Sku = "RUN-10-BLUE", SizeValue = "10", Color = "Blue", Price = 10.25m, Stock = 10 },
+                new GetProductVariant { Id = secondId, ProductId = product.Id, Sku = "RUN-11-GREEN", SizeValue = "11", Color = "Green", Price = 12.50m, Stock = 10 },
+            ];
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory, new StorefrontSeoAuditScenario { Product = product });
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", CreateCartCookieHeader(
+                new ProcessCart { ProductId = product.Id, VariantId = firstId, Quantity = 2, UnitPrice = 999m, SizeValue = "stale" },
+                new ProcessCart { ProductId = product.Id, VariantId = secondId, Quantity = 3, UnitPrice = 999m, SizeValue = "stale" }));
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(2, html.Split("data-storefront-cart-quantity", StringSplitOptions.None).Length - 1);
+            Assert.Equal(2, html.Split("data-storefront-cart-remove", StringSplitOptions.None).Length - 1);
+            Assert.Contains($"data-variant-id=\"{firstId}\"", html, StringComparison.Ordinal);
+            Assert.Contains($"data-variant-id=\"{secondId}\"", html, StringComparison.Ordinal);
+            Assert.Contains("SKU RUN-10-BLUE", html, StringComparison.Ordinal);
+            Assert.Contains("SKU RUN-11-GREEN", html, StringComparison.Ordinal);
+            Assert.Contains("Size 10", html, StringComparison.Ordinal);
+            Assert.Contains("Size 11", html, StringComparison.Ordinal);
+            Assert.Contains("Blue", html, StringComparison.Ordinal);
+            Assert.Contains("Green", html, StringComparison.Ordinal);
+            Assert.Contains("EUR 20.50", html, StringComparison.Ordinal);
+            Assert.Contains("EUR 37.50", html, StringComparison.Ordinal);
+            Assert.Contains("EUR 58.00", html, StringComparison.Ordinal);
+            Assert.Contains("5 items in cart", html, StringComparison.Ordinal);
+            Assert.Contains("No image available", html, StringComparison.Ordinal);
+            Assert.Contains("for=\"cart-quantity-0\"", html, StringComparison.Ordinal);
+            Assert.Contains("for=\"cart-quantity-1\"", html, StringComparison.Ordinal);
+            Assert.Contains("data-size-value=\"10\"", html, StringComparison.Ordinal);
+            Assert.Contains("href=\"/checkout\"", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("999.00", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("stale", html, StringComparison.Ordinal);
+        }
+
+        [Theory]
+        [InlineData("missing-product")]
+        [InlineData("missing-variant")]
+        [InlineData("zero-stock")]
+        [InlineData("api-unavailable")]
+        public async Task CartRoute_UnavailableStatesRetainRowsWarningsAndCheckoutPolicy(string state)
+        {
+            var product = new StorefrontSeoAuditScenario().Product;
+            product.Quantity = state == "zero-stock" ? 0 : 5;
+            var productId = state == "missing-product" ? Guid.NewGuid() : product.Id;
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory, new StorefrontSeoAuditScenario
+            {
+                Product = product,
+                CartProductsStatusCode = state == "api-unavailable" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK,
+            });
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", CreateCartCookieHeader(new ProcessCart
+            {
+                ProductId = productId,
+                VariantId = state == "missing-variant" ? Guid.NewGuid() : null,
+                Quantity = 2,
+                UnitPrice = 999m,
+            }));
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("role=\"alert\"", html, StringComparison.Ordinal);
+            Assert.Contains("One cart item could not be refreshed", html, StringComparison.Ordinal);
+            Assert.Contains("This item is unavailable or could not be refreshed", html, StringComparison.Ordinal);
+            Assert.Contains("data-storefront-cart-remove", html, StringComparison.Ordinal);
+            Assert.Contains("data-storefront-cart-quantity", html, StringComparison.Ordinal);
+            Assert.Contains("Continue to Checkout", html, StringComparison.Ordinal);
+            Assert.Contains("2 items in cart", html, StringComparison.Ordinal);
+            Assert.Contains("no-store", response.Headers.CacheControl?.ToString(), StringComparison.Ordinal);
+            if (state is "missing-product" or "api-unavailable")
+            {
+                Assert.Contains("Unavailable item", html, StringComparison.Ordinal);
+                Assert.Contains("EUR 0.00", html, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.Contains("EUR 259.90", html, StringComparison.Ordinal);
+            }
+        }
+
+        [Fact]
+        public async Task CartRoute_PartialCatalogFailurePreservesAvailableAndUnavailableLines()
+        {
+            var product = new StorefrontSeoAuditScenario().Product;
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory, new StorefrontSeoAuditScenario
+            {
+                CartProducts = new Dictionary<Guid, GetProduct> { [product.Id] = product },
+            });
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", CreateCartCookieHeader(
+                new ProcessCart { ProductId = product.Id, Quantity = 1 },
+                new ProcessCart { ProductId = Guid.NewGuid(), Quantity = 1 }));
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("Metro Runner", html, StringComparison.Ordinal);
+            Assert.Contains("Unavailable item", html, StringComparison.Ordinal);
+            Assert.Contains("EUR 129.95", html, StringComparison.Ordinal);
+            Assert.Contains("EUR 0.00", html, StringComparison.Ordinal);
+            Assert.Equal(2, html.Split("data-storefront-cart-remove", StringSplitOptions.None).Length - 1);
+            Assert.Contains("One cart item could not be refreshed", html, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task CartRoute_MalformedCookieShowsRecoveryWithoutCheckoutOrCookieRewrite()
+        {
+            using var client = StorefrontSeoAuditClientFactory.CreateClient(_factory);
+            using var request = new HttpRequestMessage(HttpMethod.Get, StorefrontRoutes.Cart);
+            request.Headers.Add("Cookie", "my-cart=%7Bbroken-json");
+            using var response = await client.SendAsync(request);
+            var html = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("We couldn&#x27;t read the saved cart cookie", html, StringComparison.Ordinal);
+            Assert.Contains("bs-v2-cart-error", html, StringComparison.Ordinal);
+            Assert.Contains("role=\"alert\"", html, StringComparison.Ordinal);
+            Assert.Contains("Your cart is empty", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("Continue to Checkout", html, StringComparison.Ordinal);
+            Assert.False(response.Headers.Contains("Set-Cookie"));
         }
 
         [Fact]

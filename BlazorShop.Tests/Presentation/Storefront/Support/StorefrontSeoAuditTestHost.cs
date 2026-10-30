@@ -51,6 +51,10 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
         public GetProduct Product { get; init; } = CreateProduct();
 
+        public IReadOnlyDictionary<Guid, GetProduct>? CartProducts { get; init; }
+
+        public HttpStatusCode CartProductsStatusCode { get; init; } = HttpStatusCode.OK;
+
         public GetPublicCatalogSitemap Sitemap { get; init; } = CreateSitemap();
 
         public IReadOnlyDictionary<string, SeoRedirectResolutionDto> Redirects { get; init; } = CreateRedirects();
@@ -315,6 +319,18 @@ namespace BlazorShop.Tests.Presentation.Storefront
 
                 if (TryGetGuidId(path, "/product/single/", out var productId))
                 {
+                    if (_scenario.CartProductsStatusCode != HttpStatusCode.OK)
+                    {
+                        return CreateStatusResponseAsync(_scenario.CartProductsStatusCode, request);
+                    }
+
+                    if (_scenario.CartProducts is { } products)
+                    {
+                        return products.TryGetValue(productId, out var product)
+                            ? CreateResponseAsync(HttpStatusCode.OK, product, request)
+                            : CreateStatusResponseAsync(HttpStatusCode.NotFound, request);
+                    }
+
                     return productId == _scenario.Product.Id
                         ? CreateResponseAsync(HttpStatusCode.OK, _scenario.Product, request)
                         : CreateStatusResponseAsync(HttpStatusCode.NotFound, request);

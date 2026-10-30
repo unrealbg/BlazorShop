@@ -10,7 +10,8 @@ $expectedTests = @(
     'BlazorShop.E2E.StorefrontCheckoutTests.Cart_AddsProductAndVariantAndPersistsQuantityAfterReload',
     'BlazorShop.E2E.StorefrontCheckoutTests.CheckoutStart_AnonymousLoginThenAuthenticatedCheckoutPreservesCart',
     'BlazorShop.E2E.StorefrontVisualTests.StorefrontFoundation_ResponsiveNavigationAndCommerce',
-    'BlazorShop.E2E.StorefrontListingTests.ListingPages_ResponsiveImagesNavigationAndVariantCommerce'
+    'BlazorShop.E2E.StorefrontListingTests.ListingPages_ResponsiveImagesNavigationAndVariantCommerce',
+    'BlazorShop.E2E.StorefrontCheckoutTests.Cart_ResponsiveVariantsRemovalClearAndInvalidStates'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

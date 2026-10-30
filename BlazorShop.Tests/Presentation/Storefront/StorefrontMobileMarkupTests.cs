@@ -51,8 +51,9 @@ namespace BlazorShop.Tests.Presentation.Storefront
             Assert.Contains("bs-v2-detail-field", productPage);
             Assert.Contains("bs-v2-category-intro", categoryPage);
             Assert.Contains("bs-v2-category-toolbar", categoryPage);
-            Assert.Contains("p-5 shadow-lg sm:p-8", cartPage);
-            Assert.Contains("min-h-11 w-full", cartPage);
+            Assert.Contains("bs-v2-cart-layout", cartPage);
+            Assert.Contains("bs-v2-cart-quantity", cartPage);
+            Assert.Contains("bs-v2-button bs-v2-button-primary", cartPage);
         }
 
         [Fact]
