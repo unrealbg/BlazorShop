@@ -194,5 +194,19 @@
     "name": "integral-number",
     "json": "[{\"ProductId\":\"$product\",\"Quantity\":2.0}]",
     "quantity": 2
+  },
+  {
+    "items": 0,
+    "quantity": 0,
+    "json": "[{\"ProductId\":\" $product \",\"Quantity\":2}]",
+    "invalid": true,
+    "name": "guid-whitespace"
+  },
+  {
+    "items": 0,
+    "quantity": 0,
+    "json": "[{\"ProductId\":\"\\uFEFF$product\",\"Quantity\":2}]",
+    "invalid": true,
+    "name": "guid-bom"
   }
 ]

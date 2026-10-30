@@ -130,8 +130,9 @@ namespace BlazorShop.Web.Shared.CookieStorage
         private static bool TryGuid(JsonElement element, out Guid id)
         {
             id = Guid.Empty;
-            return element.ValueKind == JsonValueKind.String
-                && Guid.TryParseExact(element.GetString(), "D", out id) && id != Guid.Empty;
+            var text = element.ValueKind == JsonValueKind.String ? element.GetString() : null;
+            return text is { Length: 36 }
+                && Guid.TryParseExact(text, "D", out id) && id != Guid.Empty;
         }
     }
 

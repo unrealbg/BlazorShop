@@ -86,9 +86,9 @@
       const items = new Map();
       const rejected = new Set();
       const property = (item, name) => item[name] ?? item[name[0].toLowerCase() + name.slice(1)];
-      const guid = (value) => typeof value === "string"
-        && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())
-        && value.trim() !== "00000000-0000-0000-0000-000000000000" ? value.trim().toLowerCase() : null;
+      const guid = (value) => typeof value === "string" && value.length === 36
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+        && value !== "00000000-0000-0000-0000-000000000000" ? value.toLowerCase() : null;
       for (const item of parsed) {
         if (!item || typeof item !== "object" || Array.isArray(item)) continue;
         const productId = guid(property(item, "ProductId"));
