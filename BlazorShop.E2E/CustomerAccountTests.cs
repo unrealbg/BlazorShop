@@ -29,6 +29,12 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
                 }
             }
 
+            await GoAsync("authentication/login");
+            await Page.GetByLabel("Email Address", new() { Exact = true }).FillAsync(data.UserEmail);
+            await Page.GetByLabel("Password", new() { Exact = true }).FillAsync("SyntheticWrongPassword!123");
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Login", Exact = true }).ClickAsync();
+            await Expect(Page.Locator(".v2-notice-error[role='alert']")).ToBeVisibleAsync();
+
             await GoAsync("authentication/register");
             await Page.GetByRole(AriaRole.Button, new() { Name = "Register", Exact = true }).ClickAsync();
             await Expect(Page.Locator(".validation-message").First).ToBeVisibleAsync();
@@ -122,6 +128,7 @@ public sealed class CustomerAccountTests(E2EApplicationFixture application) : Pa
             Assert.Equal(200, changed.Status);
             using var result = JsonDocument.Parse(await changed.TextAsync());
             Assert.True(result.RootElement.GetProperty("success").GetBoolean(), "Password change must succeed through the real API.");
+            await Expect(Page.GetByText("Password changed successfully.", new() { Exact = true })).ToBeVisibleAsync();
             await Page.Locator(".v2-account-nav a[href='/account/notifications']").ClickAsync();
             await Expect(Page.Locator("#account-content")).ToContainTextAsync("Password updated");
             await CaptureAsync("notifications-event", 390);
