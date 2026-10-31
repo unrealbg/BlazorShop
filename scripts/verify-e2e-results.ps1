@@ -26,7 +26,8 @@ $expectedTests = @(
     'BlazorShop.E2E.AdminOperationsTests.AdminAuthorization_CustomerDeniedAndDemoSessionBound',
     'BlazorShop.E2E.AdminOperationsTests.AdminSeo_MetadataAndRedirectCrud',
     'BlazorShop.E2E.AdminOperationsTests.AdminSettings_StoreOrdersNotificationsAndReadOnlySystem',
-    'BlazorShop.E2E.AdminOperationsTests.AdminFeedback_LoadingEmptyFailureAndRetry'
+    'BlazorShop.E2E.AdminOperationsTests.AdminFeedback_LoadingEmptyFailureAndRetry',
+    'BlazorShop.E2E.CheckoutPaymentTests.CheckoutAndPublicPages_ResponsivePresentation'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
