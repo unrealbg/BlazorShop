@@ -19,7 +19,7 @@ public sealed class AuthenticationSessionRefresher(
     private string? lastRejectedToken;
     private string? lastIssuedToken;
 
-    public Task<LoginResponse?> TryRefreshAsync(bool clearTokenOnFailure = true, string? rejectedToken = null, bool onlyIfNeeded = false)
+    public Task<LoginResponse?> TryRefreshAsync(string? rejectedToken = null, bool onlyIfNeeded = false)
     {
         lock (gate)
         {

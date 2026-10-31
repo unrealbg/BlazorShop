@@ -6,6 +6,6 @@ public sealed class AuthenticationSessionBootstrapper(IAuthenticationSessionRefr
     {
         // The coordinator checks both the tab's JWT and the shared login/logout epoch.
         // A surviving sessionStorage JWT alone must not override a newer logout.
-        await sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false, onlyIfNeeded: true);
+        await sessionRefresher.TryRefreshAsync(onlyIfNeeded: true);
     }
 }

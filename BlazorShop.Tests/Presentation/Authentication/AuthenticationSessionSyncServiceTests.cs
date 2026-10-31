@@ -18,7 +18,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
         {
             var refresher = new Mock<IAuthenticationSessionRefresher>();
             refresher
-                .Setup(service => service.TryRefreshAsync(false, null, true))
+                .Setup(service => service.TryRefreshAsync(null, true))
                 .ReturnsAsync((LoginResponse?)null);
 
             var tokenService = new Mock<ITokenService>();
@@ -30,7 +30,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
             await service.HandleAuthSessionEventAsync("signed-in");
 
-            refresher.Verify(sync => sync.TryRefreshAsync(false, null, true), Times.Once);
+            refresher.Verify(sync => sync.TryRefreshAsync(null, true), Times.Once);
             tokenService.Verify(sync => sync.RemoveJwtTokenAsync(It.IsAny<string>()), Times.Never);
         }
 
@@ -51,12 +51,13 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
             var service = new AuthenticationSessionSyncService(refresher.Object, tokenService.Object, cleaner.Object, notifier.Object, jsRuntime.Object);
 
+            tokenService.Setup(token => token.GetJwtTokenAsync(Constant.TokenStorage.Key)).ReturnsAsync("synthetic");
             await service.HandleAuthSessionEventAsync("signed-out");
 
             tokenService.Verify(sync => sync.RemoveJwtTokenAsync(Constant.TokenStorage.Key), Times.Once);
             cleaner.Verify(sync => sync.ClearAsync(), Times.Once);
             notifier.Verify(sync => sync.NotifyAuthenticationState(), Times.Once);
-            refresher.Verify(sync => sync.TryRefreshAsync(It.IsAny<bool>()), Times.Never);
+            refresher.Verify(sync => sync.TryRefreshAsync(It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
         }
     }
 }

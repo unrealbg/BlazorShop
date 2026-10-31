@@ -51,13 +51,14 @@ namespace BlazorShop.Web.Authentication.Providers
             {
                 case "signed-in":
                 case "session-refreshed":
-                    await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false, onlyIfNeeded: true);
+                    await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: true);
                     break;
                 case "session-changing":
                 case "signed-out":
+                    var hadToken = !string.IsNullOrWhiteSpace(await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key));
                     await _tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
                     await _clientStateCleaner.ClearAsync();
-                    _authenticationStateNotifier.NotifyAuthenticationState();
+                    if (hadToken) _authenticationStateNotifier.NotifyAuthenticationState();
                     break;
             }
         }

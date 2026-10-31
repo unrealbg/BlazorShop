@@ -12,6 +12,6 @@ public sealed class AuthenticationSessionBootstrapperTests
         var refresher = new Mock<IAuthenticationSessionRefresher>();
         var bootstrapper = new AuthenticationSessionBootstrapper(refresher.Object);
         await bootstrapper.RestoreAsync();
-        refresher.Verify(service => service.TryRefreshAsync(false, null, true), Times.Once);
+        refresher.Verify(service => service.TryRefreshAsync(null, true), Times.Once);
     }
 }

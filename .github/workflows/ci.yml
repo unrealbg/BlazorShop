@@ -101,6 +101,10 @@ jobs:
       - name: Test
         run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=postgres17-and-unit.trx" --results-directory artifacts/security-tests --verbosity normal
 
+      - name: Verify mandatory PostgreSQL 17 refresh security scenarios
+        shell: pwsh
+        run: ./scripts/verify-refresh-security-results.ps1 -Path artifacts/security-tests/postgres17-and-unit.trx
+
       - name: Upload unit and PostgreSQL 17 security evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -180,7 +184,7 @@ jobs:
   browser-e2e:
     if: github.event_name != 'pull_request' || github.base_ref == 'master'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -349,6 +353,10 @@ jobs:
           --results-directory artifacts/postgres16
           --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests|FullyQualifiedName~RefreshRotationHttpTests"
           --verbosity normal
+
+      - name: Verify mandatory PostgreSQL 16 refresh security scenarios
+        shell: pwsh
+        run: ./scripts/verify-refresh-security-results.ps1 -Path artifacts/postgres16/postgres16-security.trx
 
       - name: Upload PostgreSQL 16 security evidence
         if: always()

@@ -35,7 +35,7 @@ public sealed class AuthenticationSessionRefresherTests
     {
         var services = new Services();
         services.Authentication.Setup(service => service.ReviveToken()).ReturnsAsync(QueryResult<LoginResponse>.Failed("failed", status));
-        Assert.Null(await services.Refresher.TryRefreshAsync(clearTokenOnFailure: false));
+        Assert.Null(await services.Refresher.TryRefreshAsync());
         services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
         services.Tokens.Verify(service => service.RemoveJwtTokenAsync(Constant.TokenStorage.Key), Times.Once);
         services.Publisher.Verify(service => service.PublishSignedOutAsync(), Times.Once);

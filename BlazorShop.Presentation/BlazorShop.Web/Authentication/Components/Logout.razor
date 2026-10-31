@@ -17,9 +17,10 @@
         {
             await TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
             await AuthenticatedClientStateCleaner.ClearAsync();
-            AuthenticationStateNotifier.NotifyAuthenticationState();
+
         });
 
+        AuthenticationStateNotifier.NotifyAuthenticationState();
         if (response.Success)
         {
             var message = string.IsNullOrWhiteSpace(response.Message)
