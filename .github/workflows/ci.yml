@@ -321,7 +321,7 @@ jobs:
           dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj
           --configuration Release
           --no-build
-          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests"
+          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests"
           --verbosity normal
 
       - name: Report PostgreSQL 16 Compose image

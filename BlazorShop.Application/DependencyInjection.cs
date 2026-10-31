@@ -61,6 +61,7 @@
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
             services.AddScoped<IValidationService, ValidationService>();
             services.AddScoped<IAuthenticationService, AuthenticationService>();
+            services.AddScoped<ISessionObservationService, SessionObservationService>();
 
             services.AddScoped<ICheckoutOrchestrator, CheckoutOrchestrator>();
             services.AddScoped<IPaymentMethodService, PaymentMethodService>();

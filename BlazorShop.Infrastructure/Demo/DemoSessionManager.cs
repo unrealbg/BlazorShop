@@ -109,7 +109,7 @@ namespace BlazorShop.Infrastructure.Demo
             }
         }
 
-        public async ValueTask<DemoSessionLease?> AcquireAsync(string token, CancellationToken cancellationToken = default)
+        public async ValueTask<DemoSessionLease?> AcquireAsync(string token, CancellationToken cancellationToken = default, bool readOnly = false)
         {
             if (!IsEnabled || string.IsNullOrWhiteSpace(token) || !_sessions.TryGetValue(token, out var state))
             {
@@ -118,7 +118,7 @@ namespace BlazorShop.Infrastructure.Demo
 
             if (state.IsExpired)
             {
-                await EndAsync(token, cancellationToken);
+                if (!readOnly) await EndAsync(token, cancellationToken);
                 return null;
             }
 
@@ -130,12 +130,12 @@ namespace BlazorShop.Infrastructure.Demo
                 return null;
             }
 
-            state.Touch();
+            if (!readOnly) state.Touch();
             return new DemoSessionLease(
                 state.Context,
                 () =>
                 {
-                    state.Touch();
+                    if (!readOnly) state.Touch();
                     state.Gate.Release();
                 });
         }
