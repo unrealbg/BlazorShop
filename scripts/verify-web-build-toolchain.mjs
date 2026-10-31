@@ -69,6 +69,16 @@ export default config;
     const media = [];
     actual.walkRules(rule => selectors.push(rule.selector));
     actual.walkAtRules('media', rule => media.push(rule.params));
+    // Web's Dockerfile copies Web/Shared sources but not the sibling Storefront sources.
+    // Generate the exact expected stylesheet for that existing build context as well.
+    const webOnlyConfig = join(fixture, 'web-only.config.cjs');
+    writeFileSync(webOnlyConfig, `const config = require(${JSON.stringify(join(web, 'tailwind.config.js'))});
+module.exports = { ...config, content: config.content.filter(pattern => !pattern.startsWith('../BlazorShop.Storefront/')) };
+`);
+    const webOnlyPath = join(output, 'web-only.css');
+    execFileSync(process.execPath, [require.resolve('tailwindcss/lib/cli.js'), '--config', webOnlyConfig,
+        '--input', join(web, 'wwwroot', 'css', 'input.css'), '--output', webOnlyPath, '--minify'], { cwd: web, stdio: 'pipe' });
+    const webOnlyCss = readFileSync(webOnlyPath);
     const report = {
         node: process.version,
         tailwind: require('tailwindcss/package.json').version,
@@ -77,6 +87,7 @@ export default config;
         cssBytes: css.length, cssSha256: sha256(css),
         selectorCount: selectors.length, selectorsSha256: sha256(selectors.join('\n')),
         mediaCount: media.length, mediaSha256: sha256(media.join('\n')),
+        webContainerCssBytes: webOnlyCss.length, webContainerCssSha256: sha256(webOnlyCss),
     };
     copyFileSync(cssPath, join(output, 'site.css'));
     writeFileSync(join(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');

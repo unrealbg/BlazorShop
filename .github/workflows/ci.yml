@@ -71,14 +71,6 @@ jobs:
           npm run --prefix BlazorShop.Presentation/BlazorShop.Web tailwind:build
           node scripts/verify-web-build-toolchain.mjs
 
-      - name: Upload Tailwind CSS and compatibility evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-build-toolchain-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/web-build-toolchain
-          if-no-files-found: error
-
       - name: Restore
         run: dotnet restore BlazorShop.sln -warnaserror
 
@@ -146,6 +138,7 @@ jobs:
           grep -q 'bs-v2-shell' /tmp/storefront-v2.css
           curl --fail --max-time 5 'http://127.0.0.1:18080/css/site.css?v=smoke' --output /tmp/storefront-site.css
           test -s /tmp/storefront-site.css
+          cp /tmp/storefront-site.css artifacts/web-build-toolchain/published-storefront.css
           cmp /tmp/storefront-site.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/site.css
 
       - name: Build Web container image
@@ -157,7 +150,16 @@ jobs:
           trap 'docker rm --force web-assets' EXIT
           docker cp web-assets:/usr/share/nginx/html/css/site.css /tmp/web-site.css
           test -s /tmp/web-site.css
-          cmp /tmp/web-site.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/site.css
+          cp /tmp/web-site.css artifacts/web-build-toolchain/published-web.css
+          cmp /tmp/web-site.css artifacts/web-build-toolchain/web-only.css
+
+      - name: Upload Tailwind CSS and compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-toolchain-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/web-build-toolchain
+          if-no-files-found: error
 
   browser-e2e:
     if: github.event_name != 'pull_request' || github.base_ref == 'master'
