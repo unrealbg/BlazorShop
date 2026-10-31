@@ -17,9 +17,6 @@
 
         private string _message = string.Empty;
 
-        [Inject]
-        private IAuthenticationSessionEventPublisher SessionEventPublisher { get; set; } = default!;
-
         [Parameter]
         public string Route { get; set; } = null!;
 
@@ -90,16 +87,9 @@
                 return;
             }
 
-            await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
-
-            if (!await SessionCoordinator.IsCurrentAsync())
-            {
-                await this.TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
-                return;
-            }
-            await SessionCoordinator.MarkCurrentEpochAsync();
+            if (!await SessionCoordinator.CommitTokenAsync(result.Token)) return;
+            if (!await SessionCoordinator.PublishSignedInAsync()) return;
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
-            await this.SessionEventPublisher.PublishSignedInAsync();
 
             var authState = await this.AuthStateProvider.GetAuthenticationStateAsync();
             var targetRoute = ResolveTargetRoute(authState.User);
@@ -107,7 +97,7 @@
             var successMessage = string.IsNullOrWhiteSpace(result.Message) ? "You have signed in successfully." : result.Message;
 
             this.NotificationService.NotifySuccess(successMessage, "Signed in", NotificationKind.Authentication, link: inboxLink);
-            this.NavigationManager.NavigateTo(targetRoute);
+            if (await SessionCoordinator.IsCurrentAsync()) this.NavigationManager.NavigateTo(targetRoute);
         }
 
         private async Task ResetStatusAsync()

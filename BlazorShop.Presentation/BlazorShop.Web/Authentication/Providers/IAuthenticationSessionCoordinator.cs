@@ -5,5 +5,9 @@ public interface IAuthenticationSessionCoordinator
     Task<bool> RunAsync(string operation, Func<Task> action, Func<Task>? onIntent = null);
     Task<bool> IsCurrentAsync();
     Task<bool> HasCurrentEpochAsync();
-    Task MarkCurrentEpochAsync();
+    Task<string> GetEpochAsync();
+    Task<bool> BeginRefreshAsync();
+    Task<bool> CommitTokenAsync(string token);
+    Task<bool> InvalidateCurrentAsync();
+    Task<bool> PublishSignedInAsync();
 }

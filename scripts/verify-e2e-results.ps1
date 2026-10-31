@@ -43,6 +43,8 @@ $coordinationTests = @(
     'BlazorShop.E2E.RefreshCoordinationTests.LogoutDuringCommittedRefresh_DiscardsLateResponseAndSurvivesReload',
     'BlazorShop.E2E.RefreshCoordinationTests.LoginDuringRefresh_AccountSwitchWinsOverLateResponse',
     'BlazorShop.E2E.RefreshCoordinationTests.LostHttpResponse_RequiresLoginAndDoesNotRetryAfterReload',
+    'BlazorShop.E2E.RefreshCoordinationTests.TabClosesWithUncertainRefresh_AnotherTabRequiresLoginWithoutPost',
+    'BlazorShop.E2E.RefreshCoordinationTests.RefreshRedirect_IsRejectedWithoutRepostingCookie',
     'BlazorShop.E2E.RefreshCoordinationTests.UnavailableWebLocks_FailsClosedWithoutCredentialPost',
     'BlazorShop.E2E.RefreshCoordinationTests.LockTimeoutAndTabInterruption_ReleaseWithoutExecutingStaleCallback'
 )

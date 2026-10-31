@@ -13,11 +13,37 @@ export function currentEpoch() { return state().epoch; }
 export function canRefresh() { return !["signed-out", "authenticating"].includes(state().status); }
 export function isCurrent(epoch) { return state().epoch === epoch; }
 export function hasCurrentEpoch() { return sessionStorage.getItem(epochKey) === currentEpoch(); }
-export function markCurrentEpoch() { sessionStorage.setItem(epochKey, currentEpoch()); }
+export function beginRefresh(epoch) {
+    const current = state();
+    if (!isCurrent(epoch) || !canRefresh() || current.pending) return false;
+    localStorage.setItem(stateKey, JSON.stringify({ ...current, pending: true }));
+    return true;
+}
+export function commitToken(epoch, token) {
+    const current = state();
+    if (!isCurrent(epoch) || current.status === "signed-out" || !token) return false;
+    // One JS turn: the epoch check and existing sessionStorage writes are atomic
+    // with respect to newer browser intents. The JWT never enters localStorage.
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem(epochKey, epoch);
+    localStorage.setItem(stateKey, JSON.stringify({ epoch, status: current.status }));
+    return true;
+}
+export function invalidateCurrent(epoch) {
+    if (!isCurrent(epoch)) return false;
+    publish('signed-out');
+    return true;
+}
+export function publishSignedIn(epoch) {
+    if (!isCurrent(epoch) || state().status === 'signed-out') return false;
+    publish('signed-in');
+    return true;
+}
 
 export function beginIntent(operation) {
     if (operation === "refresh") return currentEpoch();
     const next = { epoch: crypto.randomUUID(), status: operation === "logout" ? "signed-out" : "authenticating" };
+    sessionStorage.removeItem('token');
     localStorage.setItem(stateKey, JSON.stringify(next));
     notify(operation === "logout" ? "signed-out" : "session-changing", next.epoch);
     return next.epoch;
@@ -35,6 +61,12 @@ export async function runExclusive(dotnet, operationId, operation, intentEpoch, 
         return await navigator.locks.request(lockName, { mode: "exclusive", signal: controller.signal }, async () => {
             clearTimeout(timer);
             if (operation !== "refresh" && !isCurrent(intentEpoch)) return "superseded";
+            if (operation === "refresh" && state().pending) {
+                // A prior document died while a credential POST was unresolved. Its
+                // cookie may already be consumed: never attempt automatic recovery.
+                publish('signed-out');
+                return 'superseded';
+            }
             if (operation === "refresh" && !canRefresh()) return "superseded";
             acquiredEpoch = currentEpoch();
             await dotnet.invokeMethodAsync("ExecuteUnderLockAsync", operationId, acquiredEpoch);

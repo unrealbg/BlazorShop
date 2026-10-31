@@ -7,10 +7,57 @@ using BlazorShop.Web.Shared.Helper.Contracts;
 using BlazorShop.Web.Shared.Models;
 using BlazorShop.Web.Shared.Services.Contracts;
 using Moq;
+using Microsoft.Extensions.DependencyInjection;
+using System.IdentityModel.Tokens.Jwt;
 using Xunit;
 
 public sealed class AuthenticationSessionRefresherTests
 {
+    [Fact]
+    public async Task BootstrapAndFactoryHandlerScope_ShareTheSameFlight()
+    {
+        var pending = new TaskCompletionSource<QueryResult<LoginResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new Services();
+        services.Authentication.Setup(service => service.ReviveToken()).Returns(pending.Task);
+        var registrations = new ServiceCollection();
+        registrations.AddSingleton(Mock.Of<Microsoft.JSInterop.IJSRuntime>());
+        registrations.AddBrowserSessionCoordination();
+        registrations.AddSingleton<IAuthenticationSessionCoordinator>(services.Coordinator);
+        registrations.AddSingleton(services.Tokens.Object);
+        registrations.AddSingleton(services.Authentication.Object);
+        registrations.AddSingleton(Mock.Of<IAuthenticationStateNotifier>());
+        registrations.AddSingleton(Mock.Of<IAuthenticatedClientStateCleaner>());
+        registrations.AddSingleton(services.Publisher.Object);
+        registrations.AddTransient<RefreshTokenHandler>();
+        registrations.AddHttpClient("private").AddHttpMessageHandler<RefreshTokenHandler>()
+            .ConfigurePrimaryHttpMessageHandler(() => new UnauthorizedThenOk());
+        await using var provider = registrations.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        var root = provider.GetRequiredService<IAuthenticationSessionRefresher>();
+        using var explicitScope = provider.CreateScope();
+        Assert.Same(root, explicitScope.ServiceProvider.GetRequiredService<IAuthenticationSessionRefresher>());
+        var bootstrap = root.TryRefreshAsync(onlyIfNeeded: true);
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("private");
+        var privateRequest = client.GetAsync("https://example.test/orders");
+        pending.SetResult(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "ok", "synthetic-access")));
+        Assert.NotNull(await bootstrap);
+        using var response = await privateRequest;
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Late401WithIdenticalJwtSerialization_DoesNotRotateAgain()
+    {
+        var services = new Services();
+        var jwt = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(expires: DateTime.UtcNow.AddHours(1)));
+        services.Tokens.Setup(service => service.GetJwtTokenAsync(Constant.TokenStorage.Key)).ReturnsAsync(jwt);
+        services.Authentication.Setup(service => service.ReviveToken())
+            .ReturnsAsync(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "ok", jwt)));
+        Assert.NotNull(await services.Refresher.TryRefreshAsync(rejectedToken: jwt));
+        Assert.NotNull(await services.Refresher.TryRefreshAsync(rejectedToken: jwt));
+        services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
+    }
+
     [Fact]
     public async Task ConcurrentCallers_ShareOneInFlightHttpResult()
     {
@@ -24,7 +71,7 @@ public sealed class AuthenticationSessionRefresherTests
         Assert.NotNull(await first);
         Assert.NotNull(await second);
         services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
-        services.Tokens.Verify(service => service.StoreJwtTokenAsync(Constant.TokenStorage.Key, "synthetic-access"), Times.Once);
+        Assert.Single(services.Coordinator.CommittedTokens);
     }
 
     [Theory]
@@ -38,7 +85,7 @@ public sealed class AuthenticationSessionRefresherTests
         Assert.Null(await services.Refresher.TryRefreshAsync());
         services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
         services.Tokens.Verify(service => service.RemoveJwtTokenAsync(Constant.TokenStorage.Key), Times.Once);
-        services.Publisher.Verify(service => service.PublishSignedOutAsync(), Times.Once);
+        Assert.Equal(1, services.Coordinator.SignOuts);
     }
 
     [Fact]
@@ -52,7 +99,7 @@ public sealed class AuthenticationSessionRefresherTests
         pending.SetResult(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "ok", "synthetic-access")));
         Assert.Null(await refresh);
         services.Tokens.Verify(service => service.StoreJwtTokenAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-        services.Publisher.Verify(service => service.PublishSignedOutAsync(), Times.Never);
+        Assert.Equal(0, services.Coordinator.SignOuts);
     }
 
     [Fact]
@@ -72,7 +119,7 @@ public sealed class AuthenticationSessionRefresherTests
         public Mock<IAuthenticationSessionEventPublisher> Publisher { get; } = new();
         public Coordinator Coordinator { get; } = new();
         public AuthenticationSessionRefresher Refresher => refresher ??= new(Tokens.Object, Authentication.Object,
-            Mock.Of<IAuthenticationStateNotifier>(), Mock.Of<IAuthenticatedClientStateCleaner>(), Publisher.Object, Coordinator);
+            Mock.Of<IAuthenticationStateNotifier>(), Mock.Of<IAuthenticatedClientStateCleaner>(), Coordinator);
         private AuthenticationSessionRefresher? refresher;
     }
     private sealed class Coordinator : IAuthenticationSessionCoordinator
@@ -83,6 +130,19 @@ public sealed class AuthenticationSessionRefresherTests
         { if (Available) await action(); return Available; }
         public Task<bool> IsCurrentAsync() => Task.FromResult(Current);
         public Task<bool> HasCurrentEpochAsync() => Task.FromResult(true);
-        public Task MarkCurrentEpochAsync() => Task.CompletedTask;
+        public List<string> CommittedTokens { get; } = [];
+        public int SignOuts { get; private set; }
+        public Task<string> GetEpochAsync() => Task.FromResult("synthetic-epoch");
+        public Task<bool> BeginRefreshAsync() => Task.FromResult(Current);
+        public Task<bool> CommitTokenAsync(string token) { if (Current) CommittedTokens.Add(token); return Task.FromResult(Current); }
+        public Task<bool> InvalidateCurrentAsync() { if (Current) SignOuts++; return Task.FromResult(Current); }
+        public Task<bool> PublishSignedInAsync() => Task.FromResult(Current);
+    }
+
+    private sealed class UnauthorizedThenOk : HttpMessageHandler
+    {
+        private int calls;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(Interlocked.Increment(ref calls) == 1 ? HttpStatusCode.Unauthorized : HttpStatusCode.OK));
     }
 }

@@ -120,7 +120,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             await NavigateAsync(Page, $"/account/orders/{Guid.NewGuid():D}");
             await both.Task.WaitAsync(TimeSpan.FromSeconds(30));
             release.TrySetResult();
-            await Expect(Page.GetByText("Order not found", new() { Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "No orders yet", Exact = true })).ToBeVisibleAsync();
             Assert.Equal(1, refreshCount);
             await Page.EvaluateAsync("""
                 async () => {
@@ -248,6 +248,75 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             await Page.ReloadAsync();
             await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
             Assert.Equal(1, refreshes);
+        }
+        finally { await application.RemoveScenarioAsync(data); }
+    }
+
+    [Fact]
+    public async Task TabClosesWithUncertainRefresh_AnotherTabRequiresLoginWithoutPost()
+    {
+        var data = await application.SeedScenarioAsync();
+        var release = Signal();
+        try
+        {
+            await LoginAsync(Page, data);
+            var other = await Context.NewPageAsync();
+            await GoAsync(other, "account");
+            await Expect(other.Locator("#account-content h1")).ToBeVisibleAsync();
+            var committed = Signal();
+            await Page.RouteAsync(RefreshPath, async route =>
+            {
+                var response = await route.FetchAsync();
+                Assert.Equal(200, response.Status);
+                committed.TrySetResult();
+                await release.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                try { await route.FulfillAsync(new() { Response = response }); }
+                catch (PlaywrightException) when (Page.IsClosed) { }
+                await response.DisposeAsync();
+            });
+            await ForceOrders401Async(Page);
+            await NavigateAsync(Page, "/account/orders");
+            await committed.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await other.WaitForFunctionAsync("JSON.parse(localStorage.getItem('blazorshop.auth-session-state')).pending === true");
+            await Page.CloseAsync();
+            release.TrySetResult();
+            var attempted = 0;
+            await other.RouteAsync(RefreshPath, async route => { Interlocked.Increment(ref attempted); await route.ContinueAsync(); });
+            await other.ReloadAsync();
+            await Expect(other.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
+            Assert.Equal(0, attempted);
+            await AssertMetadataOnlyAsync(other);
+        }
+        finally { release.TrySetResult(); await application.RemoveScenarioAsync(data); }
+    }
+
+    [Fact]
+    public async Task RefreshRedirect_IsRejectedWithoutRepostingCookie()
+    {
+        var data = await application.SeedScenarioAsync();
+        try
+        {
+            await LoginAsync(Page, data);
+            var repeated = 0;
+            await Page.RouteAsync("**/api/authentication/refresh-token?*", async route =>
+            {
+                Interlocked.Increment(ref repeated);
+                await route.FulfillAsync(new() { Status = 400, ContentType = "application/json", Body = "{}" });
+            });
+            await Page.RouteAsync(RefreshPath, route => route.FulfillAsync(new()
+            {
+                Status = 307, Headers = new Dictionary<string, string>
+                {
+                    ["Location"] = new Uri(application.ApiBaseUrl, "api/authentication/refresh-token?retry=1").ToString(),
+                    ["Access-Control-Allow-Origin"] = application.WebBaseUrl.GetLeftPart(UriPartial.Authority),
+                    ["Access-Control-Allow-Credentials"] = "true",
+                },
+            }));
+            await ForceOrders401Async(Page);
+            await NavigateAsync(Page, "/account/orders");
+            await Page.WaitForFunctionAsync("JSON.parse(localStorage.getItem('blazorshop.auth-session-state')).status === 'signed-out'");
+            Assert.Equal(0, repeated);
+            Assert.True(await Page.EvaluateAsync<bool>("sessionStorage.getItem('token') === null"));
         }
         finally { await application.RemoveScenarioAsync(data); }
     }

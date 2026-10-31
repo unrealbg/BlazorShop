@@ -67,7 +67,9 @@ sequenceDiagram
     L-->>B: acquire; re-evaluate current state/cookie
 ```
 
-Within a tab, concurrent callers share one in-flight task. Queued 401 responses reuse a newer JWT where possible; identical JWT serialization within the same issuance second also does not cause a second rotation for the same rejected JWT. Each tab retains its own JWT in sessionStorage. Two tabs that both need JWTs can rotate sequentially with the browser's latest HttpOnly cookie; JWTs are not copied between tabs.
+A non-secret `pending` marker is written under the lock immediately before sending a refresh POST and removed only when its successful response can be accepted. If a document disappears while the outcome is unresolved, the next lock owner detects that marker and requires sign-in without submitting the old cookie. Login/logout intents supersede the marker using a new epoch. Token storage and epoch validation occur in the same JavaScript turn, so a late response cannot transiently write a JWT after a newer logout.
+
+Within a tab, concurrent callers share one in-flight task. The coordinator and refresher have WebAssembly-host singleton lifetimes so that HttpClientFactory handler scopes share the same instance as bootstrap/profile/UI callers. This registration is client-only and must not be used for shared server-side authentication state. Queued 401 responses reuse a newer JWT where possible; identical JWT serialization within the same issuance second also does not cause a second rotation for the same rejected JWT. Each tab retains its own JWT in sessionStorage. Two tabs that both need JWTs can rotate sequentially with the browser's latest HttpOnly cookie; JWTs are not copied between tabs.
 
 Login, demo provisioning plus login, and logout use the same origin-scoped Web Lock as refresh. Login/logout announce a new non-secret intent epoch before waiting. The refresh response may update client state only while its epoch is current. Logout clears local state immediately and then, under the lock, revokes/deletes the latest browser cookie. Bootstrap always consults the coordinator, including when sessionStorage still contains a JWT from before a missed logout notification.
 
@@ -75,7 +77,7 @@ localStorage contains only intent metadata (`epoch`, `status`) and notifications
 
 Web Locks are required for credential-changing browser operations. There is deliberately no localStorage spin-lock fallback. A missing/rejected API or a queued acquisition timeout sends no credential POST and clears local authentication state. The sign-in UI reports coordination unavailability; the user must restore Web Locks availability/use a supported secure browser before explicit sign-in. A timeout only cancels lock acquisition. It never releases an acquired lock while its HTTP request remains in flight. Closing/navigating away from the owning document releases its Web Lock; an interrupted refresh may require fresh sign-in.
 
-The public WebAssembly HttpClient has only the existing credentials handler, with no resilience/retry handler. Refresh never uses the private 401 handler recursively. Private GET retry after a successful refresh remains limited to the existing policy; the refresh POST itself is never automatically retried.
+The public WebAssembly HttpClient has only the existing credentials handler, with no resilience/retry handler. Refresh never uses the private 401 handler recursively. Its browser Fetch redirect mode is explicitly `error`, preventing implicit 307/308 reposting. Private GET retry after a successful refresh remains limited to the existing policy; the refresh POST itself is never automatically retried.
 
 ## Failure matrix
 
@@ -97,7 +99,7 @@ The public WebAssembly HttpClient has only the existing credentials handler, wit
 
 The HTTP/PostgreSQL suite covers exactly-one rotation/no fork, rollback, ambiguous commit acknowledgement, real request cancellation before/after commit, lost delivery and attempted replay, invalid/expired/revoked/missing credentials, logout concurrency and independent families, plus normal/demo context separation. Existing C01 ordering, confirmation, authorization and C02 observation tests remain in the full gate and PostgreSQL 16 regression filter.
 
-Eight mandatory Playwright scenarios cover concurrent bootstraps, two-tab 401s, one-tab 401 bursts and duplicate/stale events, logout during a committed delayed response, login during refresh, lost HTTP response/reload, missing/rejected Web Locks, and acquisition timeout/tab interruption. Chromium executes these alongside all original 27 scenarios twice. Firefox and WebKit run the targeted coordination suite. Strict TRX verification requires every expected scenario to pass.
+Ten mandatory Playwright scenarios cover concurrent bootstraps, two-tab 401s, one-tab 401 bursts and duplicate/stale events, logout during a committed delayed response, login during refresh, lost HTTP response/reload, missing/rejected Web Locks, acquisition timeout/tab interruption, a tab closing with an unresolved committed refresh, and rejecting a 307 without reposting the cookie. Chromium executes these alongside all original 27 scenarios twice. Firefox and WebKit run the targeted coordination suite. Strict TRX verification requires every expected scenario to pass.
 
 CI publishes security TRX results for PostgreSQL 16 and 17, full/runtime npm and transitive NuGet audit JSON, container/published-asset checks, and browser results/screenshots. The final PR validation summary identifies the exact tested head SHA and corresponding CI and Code Analysis runs. A green run on an earlier implementation commit is not final-head evidence.
 

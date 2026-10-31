@@ -31,9 +31,10 @@ namespace BlazorShop.Web
             builder.Services.AddSingleton<IBrowserCookieStorageService, BrowserCookieStorageService>();
             builder.Services.AddSingleton<IBrowserSessionStorageService, BrowserSessionStorageService>();
             builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
-            builder.Services.AddScoped<ITokenService, TokenService>();
-            builder.Services.AddScoped<IHttpClientHelper, HttpClientHelper>();
-            builder.Services.AddScoped<IApiCallHelper, ApiCallHelper>();
+            // Authentication state is owned by this WASM tab, including factory handler scopes.
+            builder.Services.AddSingleton<ITokenService, TokenService>();
+            builder.Services.AddSingleton<IHttpClientHelper, HttpClientHelper>();
+            builder.Services.AddSingleton<IApiCallHelper, ApiCallHelper>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IProductSeoService, ProductSeoService>();
@@ -45,12 +46,11 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
             builder.Services.AddScoped<IAdminInventoryService, AdminInventoryService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
-            builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-            builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
-            builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
-            builder.Services.AddScoped<IAuthenticatedClientStateCleaner, AuthenticatedClientStateCleaner>();
-            builder.Services.AddScoped<IAuthenticationSessionCoordinator, AuthenticationSessionCoordinator>();
-            builder.Services.AddScoped<IAuthenticationSessionRefresher, AuthenticationSessionRefresher>();
+            builder.Services.AddSingleton<IAuthenticationService, AuthenticationService>();
+            builder.Services.AddSingleton<AuthenticationStateProvider, CustomAuthStateProvider>();
+            builder.Services.AddSingleton<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
+            builder.Services.AddSingleton<IAuthenticatedClientStateCleaner, AuthenticatedClientStateCleaner>();
+            builder.Services.AddBrowserSessionCoordination();
             builder.Services.AddScoped<IAuthenticationSessionBootstrapper, AuthenticationSessionBootstrapper>();
             builder.Services.AddScoped<IAuthenticationSessionEventPublisher, AuthenticationSessionEventPublisher>();
             builder.Services.AddScoped<IAuthenticationSessionSyncService, AuthenticationSessionSyncService>();
