@@ -49,12 +49,16 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         var storefrontResource = builder.Resources
             .OfType<ProjectResource>()
             .Single(resource => resource.Name == "storefront");
+        var observationKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         builder.CreateResourceBuilder(apiResource)
             .WithEnvironment("Jwt__Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)))
             .WithEnvironment("Runtime__Security__EnableHttpsRedirection", "false")
             .WithEnvironment("Demo__Enabled", "true")
             .WithEnvironment("EmailSettings__Enabled", "false")
+            .WithEnvironment("SessionObservation__Enabled", "true")
+            .WithEnvironment("SessionObservation__ServiceKey", observationKey)
+            .WithEnvironment("SessionObservation__AllowInsecureDevelopmentTransport", "true")
             .WithEnvironment("EmailSettings__From", "browser@example.test")
             .WithEnvironment("EmailSettings__SmtpServer", "smtp.example.test")
             .WithEnvironment("EmailSettings__DisplayName", "Synthetic browser store")
@@ -64,6 +68,9 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             .WithEnvironment("BankTransfer__AdditionalInfo", "Synthetic transfer instructions; no real payment")
             .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
+            .WithEnvironment("SessionObservation__Enabled", "true")
+            .WithEnvironment("SessionObservation__ServiceKey", observationKey)
+            .WithEnvironment("SessionObservation__AllowInsecureDevelopmentTransport", "true")
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
 
         application = await builder.BuildAsync();

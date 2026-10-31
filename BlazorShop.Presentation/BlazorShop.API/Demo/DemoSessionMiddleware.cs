@@ -5,6 +5,7 @@ namespace BlazorShop.API.Demo
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Contracts.Demo;
     using BlazorShop.Infrastructure.Demo;
+    using BlazorShop.API.SessionObservation;
 
     using Microsoft.Extensions.Options;
     using Microsoft.AspNetCore.Mvc;
@@ -66,10 +67,11 @@ namespace BlazorShop.API.Demo
                 return;
             }
 
-            var lease = await sessionManager.AcquireAsync(token, httpContext.RequestAborted);
+            var observation = httpContext.GetEndpoint()?.Metadata.GetMetadata<SessionObservationEndpointAttribute>() is not null;
+            var lease = await sessionManager.AcquireAsync(token, httpContext.RequestAborted, readOnly: observation);
             if (lease is null)
             {
-                DemoSessionCookie.Delete(httpContext.Response, options);
+                if (!observation) DemoSessionCookie.Delete(httpContext.Response, options);
 
                 if (CanRecoverWithoutSession(httpContext.Request))
                 {

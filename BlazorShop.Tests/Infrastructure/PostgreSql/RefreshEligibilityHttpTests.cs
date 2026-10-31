@@ -10,6 +10,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using BlazorShop.API.Controllers;
     using BlazorShop.API.Demo;
     using BlazorShop.API.Options;
+    using BlazorShop.API.SessionObservation;
     using BlazorShop.Application;
     using BlazorShop.Application.DTOs;
     using BlazorShop.Application.DTOs.Admin.Users;
@@ -321,17 +322,18 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 && cookie.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase));
         }
 
-        private sealed record TestUser(string Id, string Email);
-        private sealed record Session(string AccessToken, string Cookie);
+        internal sealed record TestUser(string Id, string Email);
+        internal sealed record Session(string AccessToken, string Cookie);
 
         // Real application services, Identity stores, bearer validation and controllers.
         // TestServer replaces the socket; PostgreSQL is a disposable Testcontainers database.
-        private sealed class IdentityHttpHost(WebApplication app, HttpClient client) : IAsyncDisposable
+        internal sealed class IdentityHttpHost(WebApplication app, HttpClient client) : IAsyncDisposable
         {
             public const string Password = "Isolated-test-password-123!";
+            public IServiceProvider Services => app.Services;
 
             public static async Task<IdentityHttpHost> CreateAsync(string connectionString, DbCommandInterceptor? interceptor = null,
-                bool requireAccount = true, bool requireEmail = true)
+                bool requireAccount = true, bool requireEmail = true, string? observationKey = null, bool demoEnabled = false)
             {
                 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
                 {
@@ -351,11 +353,16 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     ["Identity:RequireConfirmedAccount"] = requireAccount.ToString(),
                     ["Identity:RequireConfirmedEmail"] = requireEmail.ToString(),
                     ["EmailSettings:Enabled"] = "false",
-                    ["Demo:Enabled"] = "false",
+                    ["Demo:Enabled"] = demoEnabled.ToString(),
+                    ["Demo:Password"] = Password,
+                    ["SessionObservation:Enabled"] = (observationKey is not null).ToString(),
+                    ["SessionObservation:ServiceKey"] = observationKey,
                     ["Stripe:Enabled"] = "false",
                 });
                 builder.Services.AddApplication(builder.Configuration);
                 builder.Services.AddInfrastructure(builder.Configuration);
+                builder.Services.AddOptions<SessionObservationOptions>()
+                    .Bind(builder.Configuration.GetSection(SessionObservationOptions.SectionName));
                 if (interceptor is not null) builder.Services.AddDbContext<AppDbContext>(options => options.AddInterceptors(interceptor));
                 builder.Services.AddOptions<IdentityConfirmationOptions>()
                     .Bind(builder.Configuration.GetSection(IdentityConfirmationOptions.SectionName));
@@ -370,6 +377,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 builder.Services.AddRateLimiter(options => options.AddPolicy("AuthApi",
                     _ => RateLimitPartition.GetNoLimiter("isolated-test")));
                 var app = builder.Build();
+                app.UseMiddleware<SessionObservationGate>();
                 app.UseMiddleware<DemoSessionMiddleware>();
                 app.UseAuthentication();
                 app.UseAuthorization();
@@ -400,9 +408,14 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 return new TestUser(user.Id, email);
             }
 
-            public async Task<Session> LoginAsync(TestUser user)
+            public async Task<Session> LoginAsync(TestUser user, string? demoCredential = null)
             {
-                using var response = await client.PostAsJsonAsync("/api/authentication/login", new LoginUser { Email = user.Email, Password = Password });
+                using var request = new HttpRequestMessage(HttpMethod.Post, "/api/authentication/login")
+                {
+                    Content = JsonContent.Create(new LoginUser { Email = user.Email, Password = Password }),
+                };
+                if (demoCredential is not null) request.Headers.Add("X-BlazorShop-Demo-Session", demoCredential);
+                using var response = await client.SendAsync(request);
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 return await ReadSessionAsync(response);
             }
@@ -474,6 +487,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 if (body is not null) request.Content = JsonContent.Create(body);
                 return await client.SendAsync(request);
             }
+
+            public Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request) => client.SendAsync(request);
 
             public async ValueTask DisposeAsync()
             {

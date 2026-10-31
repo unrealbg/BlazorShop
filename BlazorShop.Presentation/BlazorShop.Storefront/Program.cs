@@ -12,15 +12,23 @@ using BlazorShop.Storefront.Services.Contracts;
 
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Http.Resilience;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddServiceDefaults();
+// Configure the two credential-bearing clients explicitly; API defaults stay unchanged.
+builder.AddServiceDefaults(configureHttpResilience: false);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 builder.Services.Configure<DemoOptions>(builder.Configuration.GetSection(DemoOptions.SectionName));
+builder.Services.AddOptions<SessionObservationOptions>()
+    .Bind(builder.Configuration.GetSection(SessionObservationOptions.SectionName))
+    .Validate(options => !options.Enabled || options.HasValidKey(), "SessionObservation requires a 32-byte base64 service key when enabled.")
+    .Validate(options => !options.AllowInsecureDevelopmentTransport || builder.Environment.IsDevelopment(), "Insecure observation transport is Development-only.")
+    .ValidateOnStart();
 builder.Services.AddTransient<StorefrontDemoSessionHandler>();
+builder.Services.AddTransient<SessionObservationCredentialHandler>();
 builder.Services.AddSingleton<IValidateOptions<StorefrontApiOptions>, StorefrontApiOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<ClientAppOptions>, StorefrontClientAppOptionsValidator>();
 builder.Services.AddSingleton<IValidateOptions<StorefrontPublicUrlOptions>, StorefrontPublicUrlOptionsValidator>();
@@ -46,18 +54,39 @@ builder.Services.AddHttpClient<IStorefrontSessionResolver, StorefrontSessionReso
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
     client.BaseAddress = ResolveApiBaseAddress(configuration);
-}).AddHttpMessageHandler<StorefrontDemoSessionHandler>();
+    client.Timeout = TimeSpan.FromSeconds(2);
+}).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
+  .RedactLoggedHeaders(_ => true)
+  .AddHttpMessageHandler<StorefrontDemoSessionHandler>()
+  .AddHttpMessageHandler<SessionObservationCredentialHandler>();
 builder.Services.AddHttpClient<StorefrontApiClient>((serviceProvider, client) =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
     client.BaseAddress = ResolveApiBaseAddress(configuration);
-}).AddHttpMessageHandler<StorefrontDemoSessionHandler>();
+}).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
+  .RedactLoggedHeaders(_ => true)
+  .AddHttpMessageHandler<StorefrontDemoSessionHandler>()
+  .AddStandardResilienceHandler(options => options.Retry.DisableForUnsafeHttpMethods());
 
 var app = builder.Build();
 
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = CreateStaticFileProvider(app.Environment),
+});
+app.Use(async (context, next) =>
+{
+    var refreshName = app.Configuration["Api:RefreshTokenCookieName"] ?? "__Host-blazorshop-refresh";
+    var demoName = app.Services.GetRequiredService<IOptions<DemoOptions>>().Value.CookieName;
+    if (context.Request.Cookies.ContainsKey(refreshName) || context.Request.Cookies.ContainsKey(demoName))
+    {
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers.CacheControl = "private, no-store, no-cache, max-age=0";
+            return Task.CompletedTask;
+        });
+    }
+    await next();
 });
 app.UseMiddleware<StorefrontPublicRedirectMiddleware>();
 app.Use(async (context, next) =>

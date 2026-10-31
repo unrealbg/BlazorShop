@@ -9,6 +9,7 @@ namespace BlazorShop.API
     using BlazorShop.API.HealthChecks;
     using BlazorShop.API.Demo;
     using BlazorShop.API.Options;
+    using BlazorShop.API.SessionObservation;
     using BlazorShop.Application;
     using BlazorShop.Application.Options;
     using BlazorShop.Infrastructure;
@@ -106,6 +107,11 @@ namespace BlazorShop.API
 
             builder.Services.AddInfrastructure(builder.Configuration);
             builder.Services.AddApplication(builder.Configuration);
+            builder.Services.AddOptions<SessionObservationOptions>()
+                .Bind(builder.Configuration.GetSection(SessionObservationOptions.SectionName))
+                .Validate(options => !options.Enabled || options.HasValidKey(), "SessionObservation requires a 32-byte base64 service key when enabled.")
+                .Validate(options => !options.AllowInsecureDevelopmentTransport || builder.Environment.IsDevelopment(), "Insecure observation transport is Development-only.")
+                .ValidateOnStart();
             builder.Services.AddOptions<IdentityConfirmationOptions>()
                 .Bind(identitySection)
                 .ValidateOnStart();
@@ -232,6 +238,7 @@ namespace BlazorShop.API
 
                 app.UseInfrastructure();
 
+                app.UseMiddleware<SessionObservationGate>();
                 app.UseMiddleware<DemoSessionMiddleware>();
 
                 app.UseAuthentication();
