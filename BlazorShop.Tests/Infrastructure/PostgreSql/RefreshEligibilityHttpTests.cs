@@ -85,6 +85,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                     ["JWT:Issuer"] = "isolated-identity-tests",
                     ["JWT:Audience"] = "isolated-identity-tests",
                     ["ClientApp:BaseUrl"] = "https://localhost",
+                    ["Commerce:Currency"] = "EUR",
                     ["Identity:RequireConfirmedAccount"] = "true",
                     ["Identity:RequireConfirmedEmail"] = "true",
                     ["EmailSettings:Enabled"] = "false",
