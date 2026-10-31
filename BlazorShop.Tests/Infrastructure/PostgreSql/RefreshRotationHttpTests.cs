@@ -34,6 +34,7 @@ public sealed class RefreshRotationHttpTests(PostgreSqlFixture database)
             Assert.Contains(tokens, child => parent.ReplacedByTokenHash == child.TokenHash);
             // Strict replay revokes the committed successor; there is deliberately no grace window.
             Assert.All(tokens, token => Assert.NotNull(token.RevokedAtUtc));
+            Assert.All(tokens, token => Assert.True(token.RevokedAtUtc >= token.CreatedAtUtc));
         }
         finally { foreach (var response in responses) response.Dispose(); }
     }

@@ -37,6 +37,7 @@ $expectedTests = @(
 )
 
 $coordinationTests = @(
+    'BlazorShop.E2E.RefreshCoordinationTests.ProfileNotification_UpdatesPeerClaimsAndDeduplicatesTheSameEvent',
     'BlazorShop.E2E.RefreshCoordinationTests.TwoTabs_ConcurrentBootstrapSerializesCookieRotation',
     'BlazorShop.E2E.RefreshCoordinationTests.TwoTabs_Concurrent401UsesLatestCookieWithoutReplay',
     'BlazorShop.E2E.RefreshCoordinationTests.OneTab_401BurstSharesOneRefreshAndIgnoresDuplicateEvents',

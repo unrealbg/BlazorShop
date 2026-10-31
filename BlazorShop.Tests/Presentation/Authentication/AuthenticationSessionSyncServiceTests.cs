@@ -20,7 +20,8 @@ namespace BlazorShop.Tests.Presentation.Authentication
         public async Task SupersededFlight_ReevaluatesOnlyTheStillSignedInAnnouncedEpoch(string eventType, bool stillSignedIn)
         {
             var refresher = new Mock<IAuthenticationSessionRefresher>();
-            refresher.Setup(service => service.TryRefreshAsync(null, true)).ReturnsAsync((BlazorShop.Web.Shared.Models.LoginResponse?)null);
+            var onlyIfNeeded = eventType == "signed-in";
+            refresher.Setup(service => service.TryRefreshAsync(null, onlyIfNeeded)).ReturnsAsync((BlazorShop.Web.Shared.Models.LoginResponse?)null);
             var coordinator = new Mock<IAuthenticationSessionCoordinator>();
             coordinator.Setup(service => service.GetEpochAsync()).ReturnsAsync("announced");
             coordinator.Setup(service => service.IsSignedInAsync("announced")).ReturnsAsync(stillSignedIn);
@@ -28,7 +29,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
                 Mock.Of<IAuthenticatedClientStateCleaner>(), Mock.Of<IAuthenticationStateNotifier>(),
                 Mock.Of<IJSRuntime>(), coordinator.Object);
             await service.HandleAuthSessionEventAsync(eventType);
-            refresher.Verify(instance => instance.TryRefreshAsync(null, true), Times.Exactly(stillSignedIn ? 2 : 1));
+            refresher.Verify(instance => instance.TryRefreshAsync(null, onlyIfNeeded), Times.Exactly(stillSignedIn ? 2 : 1));
         }
 
         [Fact]

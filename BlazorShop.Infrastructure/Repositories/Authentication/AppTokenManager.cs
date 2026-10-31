@@ -247,8 +247,9 @@
                 var replacement = CreateRefreshToken(user.Id, rawReplacement, ipAddress, userAgent);
                 _context.RefreshTokens.Add(replacement);
                 await _context.SaveChangesAsync(cancellationToken);
+                var revokedAtUtc = DateTime.UtcNow;
                 await _context.RefreshTokens.Where(current => current.Id == token.Id).ExecuteUpdateAsync(update => update
-                    .SetProperty(current => current.RevokedAtUtc, DateTime.UtcNow)
+                    .SetProperty(current => current.RevokedAtUtc, revokedAtUtc)
                     .SetProperty(current => current.RevokedByIp, ipAddress)
                     .SetProperty(current => current.ReplacedByTokenHash, replacement.TokenHash), cancellationToken);
                 return new RefreshRotationResult(rawReplacement, claims);
@@ -319,10 +320,13 @@
         {
             var token = root;
             var visited = new HashSet<string>(StringComparer.Ordinal);
+            // Capture after acquiring the account lock. PostgreSQL now() is fixed
+            // at transaction start, potentially before a waited-for successor existed.
+            var revokedAtUtc = DateTime.UtcNow;
             while (visited.Add(token.TokenHash))
             {
                 await _context.RefreshTokens.Where(current => current.Id == token.Id && current.RevokedAtUtc == null)
-                    .ExecuteUpdateAsync(update => update.SetProperty(current => current.RevokedAtUtc, DateTime.UtcNow)
+                    .ExecuteUpdateAsync(update => update.SetProperty(current => current.RevokedAtUtc, revokedAtUtc)
                         .SetProperty(current => current.RevokedByIp, ipAddress), cancellationToken);
                 if (string.IsNullOrWhiteSpace(token.ReplacedByTokenHash)) break;
                 token = await _context.RefreshTokens.AsNoTracking().SingleOrDefaultAsync(current =>

@@ -4,6 +4,7 @@ const epochKey = "blazorshop.auth-session-epoch";
 export const lockName = "blazorshop.authentication";
 let reference;
 let storageHandler;
+let lastHandledNonce;
 
 function state() {
     const value = localStorage.getItem(stateKey);
@@ -104,7 +105,9 @@ export function subscribe(dotnet) {
         if (event.key !== eventKey || !event.newValue || event.newValue !== localStorage.getItem(eventKey)) return;
         try {
             const payload = JSON.parse(event.newValue);
-            if (!payload || payload.epoch !== currentEpoch()) return;
+            if (!payload || payload.epoch !== currentEpoch() || typeof payload.nonce !== 'string'
+                || payload.nonce === lastHandledNonce) return;
+            lastHandledNonce = payload.nonce;
             await reference?.invokeMethodAsync("HandleAuthSessionEventAsync", payload.type);
         } catch { /* Ignore malformed notifications and disposed tabs. */ }
     };
@@ -112,5 +115,5 @@ export function subscribe(dotnet) {
 }
 export function unsubscribe() {
     if (storageHandler) window.removeEventListener("storage", storageHandler);
-    reference = storageHandler = null;
+    reference = storageHandler = lastHandledNonce = null;
 }

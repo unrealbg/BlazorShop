@@ -54,14 +54,15 @@ namespace BlazorShop.Web.Authentication.Providers
             {
                 case "signed-in":
                 case "session-refreshed":
+                    var onlyIfNeeded = eventType == "signed-in";
                     var epoch = await _coordinator.GetEpochAsync();
-                    var refreshed = await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: true);
+                    var refreshed = await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: onlyIfNeeded);
                     // A newer credential login can supersede a flight already in this
                     // tab. Re-evaluate that announced session after the old flight ends.
                     // Failed/uncertain refresh changes the epoch to signed-out, so this
                     // cannot retry a credential with an unknown outcome.
                     if (refreshed is null && await _coordinator.IsSignedInAsync(epoch))
-                        await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: true);
+                        await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: onlyIfNeeded);
                     break;
                 case "session-changing":
                 case "signed-out":

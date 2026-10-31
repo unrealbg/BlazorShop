@@ -125,9 +125,9 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             await Page.EvaluateAsync("""
                 async () => {
                     const module = await import('/js/authSessionSync.js');
+                    module.publish('signed-in');
+                    const value = localStorage.getItem('blazorshop.auth-session-event');
                     for (let i = 0; i < 3; i++) {
-                        module.publish('session-refreshed');
-                        const value = localStorage.getItem('blazorshop.auth-session-event');
                         dispatchEvent(new StorageEvent('storage', { key: 'blazorshop.auth-session-event', newValue: value }));
                     }
                     dispatchEvent(new StorageEvent('storage', { key: 'blazorshop.auth-session-event', newValue: JSON.stringify({type:'signed-out',epoch:'obsolete'}) }));
@@ -138,6 +138,41 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             Assert.True(await Page.EvaluateAsync<bool>("!!sessionStorage.getItem('token')"));
         }
         finally { release.TrySetResult(); await application.RemoveScenarioAsync(data); }
+    }
+
+    [Fact]
+    public async Task ProfileNotification_UpdatesPeerClaimsAndDeduplicatesTheSameEvent()
+    {
+        var data = await application.SeedScenarioAsync();
+        try
+        {
+            await LoginAsync(Page, data);
+            var other = await Context.NewPageAsync();
+            await GoAsync(other, "account/profile");
+            await Expect(other.GetByLabel("Full Name", new() { Exact = true })).ToBeVisibleAsync();
+            await NavigateAsync(Page, "/account/profile");
+            await Expect(Page.GetByLabel("Full Name", new() { Exact = true })).ToBeVisibleAsync();
+            var refreshes = 0;
+            await Context.RouteAsync(RefreshPath, async route => { Interlocked.Increment(ref refreshes); await route.ContinueAsync(); });
+            const string updatedName = "Cross-tab Updated Customer";
+            await Page.GetByLabel("Full Name", new() { Exact = true }).FillAsync(updatedName);
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+            await other.WaitForFunctionAsync("name => { try { return Object.values(JSON.parse(atob(sessionStorage.getItem('token').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))).includes(name); } catch { return false; } }", updatedName);
+            Assert.Equal(2, refreshes);
+            await other.EvaluateAsync("""
+                async () => {
+                    const m = await import('/js/authSessionSync.js');
+                    const value = localStorage.getItem('blazorshop.auth-session-event');
+                    for (let i=0;i<3;i++) dispatchEvent(new StorageEvent('storage', {key:'blazorshop.auth-session-event',newValue:value}));
+                    await navigator.locks.request(m.lockName, () => {});
+                }
+                """);
+            Assert.Equal(2, refreshes);
+            await NavigateAsync(other, "/account");
+            await NavigateAsync(other, "/account/profile");
+            await Expect(other.GetByLabel("Full Name", new() { Exact = true })).ToHaveValueAsync(updatedName);
+        }
+        finally { await application.RemoveScenarioAsync(data); }
     }
 
     [Fact]
