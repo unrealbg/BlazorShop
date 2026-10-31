@@ -13,6 +13,12 @@ public sealed partial class AdminOperationsTests
         await application.GrantScenarioAdminAsync(data);
         string? uploadName = null;
         var name = $"Admin product {data.CategorySlug}";
+        var productUpdates = 0;
+        void TrackProductUpdate(object? sender, IRequest request)
+        {
+            if (request.Method == "PUT" && request.Url.EndsWith("/api/product/update", StringComparison.OrdinalIgnoreCase)) Interlocked.Increment(ref productUpdates);
+        }
+        Page.Request += TrackProductUpdate;
         try
         {
             await LoginAsync(data);
@@ -53,8 +59,10 @@ public sealed partial class AdminOperationsTests
             await Dialog.GetByLabel("Color (optional)").FillAsync("Blue");
             await Button(Dialog, "Update Variant").ClickAsync();
             await Expect(variantRow).ToContainTextAsync("Blue");
+            Assert.Equal(0, Volatile.Read(ref productUpdates));
             await Button(Dialog, "Update").ClickAsync();
             await Expect(Dialog).ToHaveCountAsync(0);
+            Assert.Equal(1, Volatile.Read(ref productUpdates));
             await Row(name + " edited").GetByTitle("Edit", new() { Exact = true }).ClickAsync();
             await Button(Dialog, "SEO").ClickAsync();
             await Dialog.GetByLabel("Slug", new() { Exact = true }).FillAsync($"admin-product-{data.CategorySlug}");
@@ -68,6 +76,7 @@ public sealed partial class AdminOperationsTests
             await Button(Dialog, "Catalog").ClickAsync();
             await Button(Dialog.GetByRole(AriaRole.Row).Filter(new() { HasText = $"UI-{data.CategorySlug}" }), "Delete").ClickAsync();
             await Expect(Dialog.GetByRole(AriaRole.Row).Filter(new() { HasText = $"UI-{data.CategorySlug}" })).ToHaveCountAsync(0);
+            Assert.Equal(1, Volatile.Read(ref productUpdates));
             await Button(Dialog, "Cancel").Last.ClickAsync();
             await Row(name + " edited").GetByTitle("Delete", new() { Exact = true }).ClickAsync();
             await CaptureWidthsAsync("product-delete-confirmation");
@@ -76,6 +85,7 @@ public sealed partial class AdminOperationsTests
         }
         finally
         {
+            Page.Request -= TrackProductUpdate;
             await application.RemoveScenarioAsync(data);
             if (uploadName is not null && Guid.TryParseExact(Path.GetFileNameWithoutExtension(uploadName), "N", out _))
             {

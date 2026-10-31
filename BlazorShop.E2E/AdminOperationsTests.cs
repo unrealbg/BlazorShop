@@ -44,8 +44,10 @@ public sealed partial class AdminOperationsTests(E2EApplicationFixture applicati
                 await add.ClickAsync();
                 await Expect(Dialog.GetByLabel("Category Name")).ToBeFocusedAsync();
                 await Dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-                await Expect(Dialog.Locator(".validation-message")).ToBeVisibleAsync();
-                Assert.False(string.IsNullOrWhiteSpace(await Dialog.GetByLabel("Category Name").GetAttributeAsync("aria-describedby")));
+                var errorId = await Dialog.GetByLabel("Category Name").GetAttributeAsync("aria-describedby");
+                Assert.False(string.IsNullOrWhiteSpace(errorId));
+                await Expect(Dialog.Locator($"#{errorId} .validation-message")).ToHaveTextAsync("The Category Name field is required.");
+                await Expect(Dialog.GetByRole(AriaRole.Alert)).ToContainTextAsync("The Category Name field is required.");
                 for (var tab = 0; tab < 7; tab++)
                 {
                     await Page.Keyboard.PressAsync("Tab");

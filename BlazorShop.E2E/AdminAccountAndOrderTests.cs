@@ -45,6 +45,7 @@ public sealed partial class AdminOperationsTests
             await CaptureWidthsAsync("order-edit-tracking");
             await Button(Dialog, "Save").ClickAsync();
             await Expect(Dialog).ToHaveCountAsync(0);
+            await Button(Page.Locator("main"), "Expand All").ClickAsync();
             await Expect(Page.Locator("main")).ToContainTextAsync("InTransit");
             await application.WithAdminDatabaseAsync(async db =>
             {
@@ -152,6 +153,7 @@ public sealed partial class AdminOperationsTests
             }
             await GoAsync("authentication/logout");
             await Expect(Page).ToHaveURLAsync(new Regex("/authentication/login/account$"));
+            await GoAsync("authentication/login");
             await Page.GetByText("Explore a demo workspace", new() { Exact = true }).ClickAsync();
             await Button(Page.Locator("main"), "Administrator demo").ClickAsync();
             await Expect(Page).ToHaveURLAsync(new Regex("/admin$"));

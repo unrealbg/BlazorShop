@@ -115,6 +115,7 @@ public sealed partial class AdminOperationsTests
         var data = await application.SeedScenarioAsync();
         await application.GrantScenarioAdminAsync(data);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var intercepted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var usersQuery = new Regex(@"/api/admin/users\?");
         try
         {
@@ -123,8 +124,17 @@ public sealed partial class AdminOperationsTests
             await FilterInventoryAsync($"no-product-{Guid.NewGuid():N}");
             await Expect(Page.GetByText("No inventory items found.", new() { Exact = true })).ToBeVisibleAsync();
             await CaptureWidthsAsync("inventory-empty");
-            await Page.RouteAsync(usersQuery, async route => { await release.Task.WaitAsync(TimeSpan.FromSeconds(60)); await route.AbortAsync(); });
             await GoAsync("admin/users");
+            await Expect(Page.Locator("tbody tr").First).ToBeVisibleAsync();
+            await Page.RouteAsync(usersQuery, async route =>
+            {
+                if (route.Request.Method != "GET") { await route.ContinueAsync(); return; }
+                intercepted.TrySetResult();
+                await release.Task.WaitAsync(TimeSpan.FromSeconds(60));
+                await route.AbortAsync();
+            });
+            await Button(Page.Locator("main"), "Apply").ClickAsync();
+            await intercepted.Task.WaitAsync(TimeSpan.FromSeconds(10));
             await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Loading users..." })).ToBeVisibleAsync();
             await CaptureWidthsAsync("users-loading");
             release.TrySetResult();

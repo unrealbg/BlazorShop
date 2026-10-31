@@ -31,6 +31,8 @@ Existing operation feedback is also announced and displayed inside an active dia
 
 `AdminProductImage` preserves existing public image paths and absolute URLs, resolves API-relative upload paths against the already configured API origin, and displays a missing-image state on empty/failed images. Upload, product and variant handlers are unchanged. The browser workflow uploads an existing product photograph and checks that the rendered preview actually decodes.
 
+Variant row Edit/Delete controls explicitly use `type="button"`. They invoke their existing variant handlers without implicitly submitting the surrounding product form; product submission remains the explicit Update action.
+
 Labels and validation descriptions are connected in admin forms and the existing admin SEO field editor. Loading and request failures expose status/alert regions. The stylesheet is scoped to the admin root and uniquely named admin components.
 
 Unsupported prototype search/theme tools, invented KPI trends, imports, bulk actions, hierarchy and new configuration controls are omitted. Existing metrics and operations take priority over illustrative prototype content.
