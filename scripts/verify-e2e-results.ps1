@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Path
+    [string]$Path,
+    [switch]$CoordinationOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +35,18 @@ $expectedTests = @(
     'BlazorShop.E2E.CheckoutPaymentTests.PublicInformation_StaticSsrSeoAndKeyboardWithoutJavaScript',
     'BlazorShop.E2E.CheckoutPaymentTests.CheckoutStripe_SyntheticRedirectRetainsPendingPresentation'
 )
+
+$coordinationTests = @(
+    'BlazorShop.E2E.RefreshCoordinationTests.TwoTabs_ConcurrentBootstrapSerializesCookieRotation',
+    'BlazorShop.E2E.RefreshCoordinationTests.TwoTabs_Concurrent401UsesLatestCookieWithoutReplay',
+    'BlazorShop.E2E.RefreshCoordinationTests.OneTab_401BurstSharesOneRefreshAndIgnoresDuplicateEvents',
+    'BlazorShop.E2E.RefreshCoordinationTests.LogoutDuringCommittedRefresh_DiscardsLateResponseAndSurvivesReload',
+    'BlazorShop.E2E.RefreshCoordinationTests.LoginDuringRefresh_AccountSwitchWinsOverLateResponse',
+    'BlazorShop.E2E.RefreshCoordinationTests.LostHttpResponse_RequiresLoginAndDoesNotRetryAfterReload',
+    'BlazorShop.E2E.RefreshCoordinationTests.UnavailableWebLocks_FailsClosedWithoutCredentialPost',
+    'BlazorShop.E2E.RefreshCoordinationTests.LockTimeoutAndTabInterruption_ReleaseWithoutExecutingStaleCallback'
+)
+if ($CoordinationOnly) { $expectedTests = $coordinationTests } else { $expectedTests += $coordinationTests }
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
     throw "E2E TRX report was not created: $Path"

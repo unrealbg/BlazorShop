@@ -28,6 +28,7 @@ export function beginIntent(operation) {
 // already-running credential POST. No localStorage/BroadcastChannel mutex fallback.
 export async function runExclusive(dotnet, operationId, operation, intentEpoch, timeoutMs = 15000) {
     if (!navigator.locks?.request) return "unavailable";
+    let acquiredEpoch;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -35,10 +36,14 @@ export async function runExclusive(dotnet, operationId, operation, intentEpoch, 
             clearTimeout(timer);
             if (operation !== "refresh" && !isCurrent(intentEpoch)) return "superseded";
             if (operation === "refresh" && !canRefresh()) return "superseded";
-            await dotnet.invokeMethodAsync("ExecuteUnderLockAsync", operationId, currentEpoch());
+            acquiredEpoch = currentEpoch();
+            await dotnet.invokeMethodAsync("ExecuteUnderLockAsync", operationId, acquiredEpoch);
             return "completed";
         });
-    } catch { return "unavailable"; }
+    } catch {
+        if (operation === "refresh" && acquiredEpoch && isCurrent(acquiredEpoch)) publish("signed-out");
+        return "unavailable";
+    }
     finally { clearTimeout(timer); }
 }
 

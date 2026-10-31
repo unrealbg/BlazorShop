@@ -92,6 +92,11 @@
 
             await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
 
+            if (!await SessionCoordinator.IsCurrentAsync())
+            {
+                await this.TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
+                return;
+            }
             await SessionCoordinator.MarkCurrentEpochAsync();
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
             await this.SessionEventPublisher.PublishSignedInAsync();

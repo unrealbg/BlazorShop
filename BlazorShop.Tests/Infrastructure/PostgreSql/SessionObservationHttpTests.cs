@@ -274,7 +274,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             return SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { tokens, user })));
         }
 
-        private static async Task<(string Credential, TestUser User)> StartDemoAsync(IdentityHttpHost host, string role)
+        internal static async Task<(string Credential, TestUser User)> StartDemoAsync(IdentityHttpHost host, string role)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, "/api/demo/sessions") { Content = JsonContent.Create(new StartDemoSessionRequest { Role = role }) };
             using var response = await host.SendRawAsync(request);

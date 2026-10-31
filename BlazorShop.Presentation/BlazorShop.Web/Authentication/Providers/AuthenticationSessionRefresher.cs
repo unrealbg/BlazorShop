@@ -16,6 +16,8 @@ public sealed class AuthenticationSessionRefresher(
 {
     private readonly object gate = new();
     private Task<LoginResponse?>? inFlight;
+    private string? lastRejectedToken;
+    private string? lastIssuedToken;
 
     public Task<LoginResponse?> TryRefreshAsync(bool clearTokenOnFailure = true, string? rejectedToken = null, bool onlyIfNeeded = false)
     {
@@ -40,12 +42,22 @@ public sealed class AuthenticationSessionRefresher(
                 // reuse this tab's newer JWT instead of rotating the cookie again.
                 var token = await tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key);
                 if (await coordinator.HasCurrentEpochAsync() && IsCurrentToken(token)
-                    && (onlyIfNeeded || (rejectedToken is not null && token != rejectedToken)))
+                    && (onlyIfNeeded || (rejectedToken is not null && (token != rejectedToken || (token == lastIssuedToken && rejectedToken == lastRejectedToken)))))
                 {
                     result = new LoginResponse(true, "Session available.", token);
                     return;
                 }
-                var response = await authenticationService.ReviveToken();
+                QueryResult<LoginResponse> response;
+                try { response = await authenticationService.ReviveToken(); }
+                catch
+                {
+                    if (await coordinator.IsCurrentAsync())
+                    {
+                        await ClearAsync();
+                        await publisher.PublishSignedOutAsync();
+                    }
+                    return;
+                }
                 if (!await coordinator.IsCurrentAsync()) return;
                 if (response.Success && !string.IsNullOrWhiteSpace(response.Data?.Token))
                 {
@@ -55,6 +67,8 @@ public sealed class AuthenticationSessionRefresher(
                         await tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
                         return;
                     }
+                    lastRejectedToken = rejectedToken;
+                    lastIssuedToken = response.Data.Token;
                     await coordinator.MarkCurrentEpochAsync();
                     notifier.NotifyAuthenticationState();
                     result = response.Data;

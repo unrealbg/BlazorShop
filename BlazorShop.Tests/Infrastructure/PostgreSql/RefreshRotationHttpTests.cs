@@ -129,6 +129,111 @@ public sealed class RefreshRotationHttpTests(PostgreSqlFixture database)
         await host.RotateAsync(independent);
     }
 
+    [Fact]
+    public async Task ConcurrentLogoutAndRefresh_SerializesAndLeavesNoRenewableDescendant()
+    {
+        var barrier = new InitialReadBarrier();
+        await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString, barrier);
+        var user = await host.CreateUserAsync("User");
+        var session = await host.LoginAsync(user);
+        barrier.Arm();
+        var refreshing = host.RefreshAsync(session);
+        var loggingOut = host.SendAsync(HttpMethod.Post, "/api/authentication/logout", session, useCookie: true);
+        using var refreshed = await refreshing;
+        using var logout = await loggingOut;
+        Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+        Assert.Contains(refreshed.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.BadRequest });
+        Assert.InRange(await host.TokenCountAsync(user), 1, 2);
+        await host.AssertAllRevokedAsync(user);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HttpCancellation_BeforeOrAfterCommitDoesNotDeliverCredentials(bool afterCommit)
+    {
+        var barrier = new CommitCancellation(afterCommit);
+        await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString, barrier);
+        var user = await host.CreateUserAsync("User");
+        var session = await host.LoginAsync(user);
+        barrier.Arm();
+        using var cancellation = new CancellationTokenSource();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/authentication/refresh-token");
+        request.Headers.Add("Cookie", session.Cookie);
+        var refreshing = host.SendRawAsync(request, cancellation.Token);
+        await barrier.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await refreshing);
+        await barrier.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        // Wait for disposal/rollback using a real follow-up transaction, not a sleep.
+        await using var scope = host.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var tx = await context.Database.BeginTransactionAsync();
+            await context.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM \"AspNetUsers\" WHERE \"Id\" = {user.Id} FOR UPDATE");
+            Assert.Equal(afterCommit ? 2 : 1, await host.TokenCountAsync(user));
+        });
+    }
+
+    private sealed class CommitCancellation(bool afterCommit) : DbTransactionInterceptor
+    {
+        private int armed;
+        public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Arm() => Volatile.Write(ref armed, 1);
+        public override async ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
+            TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+        {
+            if (!afterCommit && Interlocked.Exchange(ref armed, 0) == 1) await AwaitCancellationAsync(cancellationToken);
+            return result;
+        }
+        public override async Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (afterCommit && Interlocked.Exchange(ref armed, 0) == 1) await AwaitCancellationAsync(cancellationToken);
+        }
+        private async Task AwaitCancellationAsync(CancellationToken cancellationToken)
+        {
+            Reached.TrySetResult();
+            try { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).WaitAsync(TimeSpan.FromSeconds(30)); }
+            catch (OperationCanceledException) { Cancelled.TrySetResult(); throw; }
+        }
+    }
+
+    [Theory]
+    [InlineData("User")]
+    [InlineData("Admin")]
+    public async Task DemoRotation_UsesLeasedStoreAndRejectsMissingOrReboundContext(string role)
+    {
+        await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString, demoEnabled: true);
+        var normalUser = await host.CreateUserAsync(role);
+        var normal = await host.LoginAsync(normalUser);
+        var (credential, demoUser) = await SessionObservationHttpTests.StartDemoAsync(host, role);
+        var original = await host.LoginAsync(demoUser, credential);
+        async Task<HttpResponseMessage> RefreshDemoAsync(Session session, string? context)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/authentication/refresh-token");
+            request.Headers.Add("Cookie", session.Cookie);
+            if (context is not null) request.Headers.Add("X-BlazorShop-Demo-Session", context);
+            return await host.SendRawAsync(request);
+        }
+        using var missing = await RefreshDemoAsync(original, null);
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        using var rebound = await RefreshDemoAsync(normal, credential);
+        Assert.Equal(HttpStatusCode.BadRequest, rebound.StatusCode);
+        using var rotated = await RefreshDemoAsync(original, credential);
+        Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
+        var successor = await IdentityHttpHost.ReadSessionAsync(rotated);
+        using var replay = await RefreshDemoAsync(original, credential);
+        Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        using var revoked = await RefreshDemoAsync(successor, credential);
+        Assert.Equal(HttpStatusCode.BadRequest, revoked.StatusCode);
+        // Demo requests never mutate the ordinary account's session family.
+        Assert.Equal(1, await host.TokenCountAsync(normalUser));
+        await host.RotateAsync(normal);
+    }
+
     private sealed class CommitFault(bool afterCommit) : DbTransactionInterceptor
     {
         private int armed;

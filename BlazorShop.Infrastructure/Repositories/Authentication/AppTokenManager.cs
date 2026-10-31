@@ -141,6 +141,20 @@
 
         public async Task<int> RevokeUserRefreshTokensAsync(string userId)
         {
+            if (!_context.Database.IsNpgsql()) return await RevokeUserTokensCoreAsync(userId);
+            return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                await _context.Users.FromSqlInterpolated(
+                    $"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {userId} FOR UPDATE").AsNoTracking().SingleOrDefaultAsync();
+                var count = await RevokeUserTokensCoreAsync(userId);
+                await transaction.CommitAsync();
+                return count;
+            });
+        }
+
+        private async Task<int> RevokeUserTokensCoreAsync(string userId)
+        {
             var now = DateTime.UtcNow;
             var activeTokens = _context.RefreshTokens.Where(token => token.UserId == userId && token.RevokedAtUtc == null);
             if (_context.Database.IsRelational())
@@ -258,7 +272,8 @@
         {
             // The production and demo stores are PostgreSQL. No unsafe non-transactional
             // fallback for providers that cannot uphold this contract.
-            if (!_context.Database.IsNpgsql() || string.IsNullOrWhiteSpace(refreshToken)) return missing;
+            if (!_context.Database.IsNpgsql()) return failure;
+            if (string.IsNullOrWhiteSpace(refreshToken)) return missing;
             var hash = HashRefreshToken(refreshToken);
             var attempted = false;
             try

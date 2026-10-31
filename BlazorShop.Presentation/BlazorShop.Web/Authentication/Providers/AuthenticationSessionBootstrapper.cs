@@ -1,28 +1,11 @@
-namespace BlazorShop.Web.Authentication.Providers
+namespace BlazorShop.Web.Authentication.Providers;
+
+public sealed class AuthenticationSessionBootstrapper(IAuthenticationSessionRefresher sessionRefresher) : IAuthenticationSessionBootstrapper
 {
-    using BlazorShop.Web.Shared;
-    using BlazorShop.Web.Shared.Helper.Contracts;
-
-    public sealed class AuthenticationSessionBootstrapper : IAuthenticationSessionBootstrapper
+    public async Task RestoreAsync()
     {
-        private readonly ITokenService _tokenService;
-        private readonly IAuthenticationSessionRefresher _sessionRefresher;
-
-        public AuthenticationSessionBootstrapper(ITokenService tokenService, IAuthenticationSessionRefresher sessionRefresher)
-        {
-            _tokenService = tokenService;
-            _sessionRefresher = sessionRefresher;
-        }
-
-        public async Task RestoreAsync()
-        {
-            var token = await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key);
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                return;
-            }
-
-            await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false, onlyIfNeeded: true);
-        }
+        // The coordinator checks both the tab's JWT and the shared login/logout epoch.
+        // A surviving sessionStorage JWT alone must not override a newer logout.
+        await sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false, onlyIfNeeded: true);
     }
 }
