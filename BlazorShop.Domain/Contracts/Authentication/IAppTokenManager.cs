@@ -24,6 +24,8 @@
 
         Task<int> RevokeRefreshTokenFamilyAsync(string refreshToken, string? revokedByIp = null);
 
+        Task<int> RevokeUserRefreshTokensAsync(string userId);
+
         string GenerateAccessToken(List<Claim> claims);
     }
 }

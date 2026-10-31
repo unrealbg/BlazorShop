@@ -7,6 +7,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
     using BlazorShop.Application.DTOs.Admin.Users;
     using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Domain.Contracts;
+    using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Infrastructure.Data;
 
@@ -21,17 +22,20 @@ namespace BlazorShop.Infrastructure.Services.Admin
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly AppDbContext _db;
         private readonly IAdminAuditService _auditService;
+        private readonly IAppTokenManager _tokenManager;
 
         public AdminUserService(
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
             AppDbContext db,
-            IAdminAuditService auditService)
+            IAdminAuditService auditService,
+            IAppTokenManager tokenManager)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _db = db;
             _auditService = auditService;
+            _tokenManager = tokenManager;
         }
 
         public async Task<PagedResult<AdminUserListItemDto>> GetUsersAsync(AdminUserQueryDto query)
@@ -201,6 +205,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure(IdentityErrors(result), ServiceResponseType.Failure);
             }
 
+            await _tokenManager.RevokeUserRefreshTokensAsync(user.Id);
             await LogAsync("AdminUser.Locked", user.Id, $"User {DisplayName(user)} locked.", new { lockoutEnd, request.Reason });
             return Success(await MapDetailsAsync(user), "User locked successfully.");
         }
@@ -293,6 +298,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
                 return Failure(IdentityErrors(result), ServiceResponseType.Failure);
             }
 
+            await _tokenManager.RevokeUserRefreshTokensAsync(user.Id);
             await LogAsync("AdminUser.Deactivated", user.Id, $"User {DisplayName(user)} deactivated.", null);
             return Success(await MapDetailsAsync(user), "User deactivated successfully.");
         }
