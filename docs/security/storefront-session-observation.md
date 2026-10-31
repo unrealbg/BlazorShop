@@ -51,10 +51,12 @@ loads data. Refresh credentials are read from that context, so missing, mismatch
 or ended demo sessions cannot fall back to normal account data. Demo markers with
 no active context return anonymous or the existing middleware denial.
 
-Existing demo expiry cleanup may delete the demo cookie in the API response.
-Storefront does not forward observation `Set-Cookie` headers, including cleanup
-headers; it never deletes or overwrites a newer browser refresh cookie. Existing
-explicit demo reset/logout flows remain responsible for browser lifecycle changes.
+Observation acquires the same isolation lease in a read-only mode: it neither
+touches the demo expiry deadline nor performs expired-session cleanup or cookie
+deletion. Default lease behavior on existing endpoints is unchanged, including
+ordinary catalog activity, refresh and explicit reset/logout. The background
+cleanup service also retains its existing behavior. Storefront never forwards
+observation Set-Cookie headers or overwrites a newer browser refresh cookie.
 
 ## HTTP and cache isolation
 
@@ -71,6 +73,11 @@ SSR responses carrying a refresh or demo cookie receive
 `Cache-Control: private, no-store, no-cache, max-age=0`, including failures and
 redirects. This privacy rule does not set `noindex` on public SEO pages. Existing
 cart/checkout noindex rules, canonical URLs and discovery endpoints remain intact.
+
+## Complete response deadline
+
+The two-second observation deadline covers both response headers and body, so a
+stalled JSON body also degrades safely without keeping SSR rendering waiting.
 
 ## Regression evidence and limits
 

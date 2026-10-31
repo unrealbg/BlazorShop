@@ -25,11 +25,13 @@ namespace BlazorShop.Storefront.Services
 
             using var request = new HttpRequestMessage(HttpMethod.Get, "internal/storefront/session");
             request.Headers.TryAddWithoutValidation("Cookie", $"{cookieName}={Uri.EscapeDataString(credential)}");
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(2));
             try
             {
-                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
                 if (!response.IsSuccessStatusCode) return StorefrontSessionInfo.Anonymous;
-                var state = await response.Content.ReadFromJsonAsync<SessionObservation>(cancellationToken);
+                var state = await response.Content.ReadFromJsonAsync<SessionObservation>(deadline.Token);
                 return state is { IsAuthenticated: true }
                     ? new StorefrontSessionInfo(true, state.IsAdmin, state.DisplayName, state.Email)
                     : StorefrontSessionInfo.Anonymous;

@@ -6,7 +6,7 @@ namespace BlazorShop.Infrastructure.Demo
 
         Task<DemoSessionStartResult> CreateAsync(CancellationToken cancellationToken = default);
 
-        ValueTask<DemoSessionLease?> AcquireAsync(string token, CancellationToken cancellationToken = default);
+        ValueTask<DemoSessionLease?> AcquireAsync(string token, CancellationToken cancellationToken = default, bool readOnly = false);
 
         Task EndAsync(string token, CancellationToken cancellationToken = default);
 

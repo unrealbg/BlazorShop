@@ -66,6 +66,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         [InlineData("expired")]
         [InlineData("revoked")]
         [InlineData("unconfirmed")]
+        [InlineData("locked")]
         public async Task UnavailableCredentials_AreAnonymousWithoutChangingTokensOrCookies(string state)
         {
             var key = NewKey();
@@ -79,6 +80,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 if (state == "expired") token.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1);
                 if (state == "revoked") token.RevokedAtUtc = DateTime.UtcNow;
                 await db.SaveChangesAsync();
+                if (state == "locked")
+                {
+                    var users = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<BlazorShop.Domain.Entities.Identity.AppUser>>();
+                    var account = await users.FindByIdAsync(user.Id);
+                    Assert.NotNull(account);
+                    Assert.True((await users.SetLockoutEndDateAsync(account, DateTimeOffset.UtcNow.AddHours(1))).Succeeded);
+                }
             }
             if (state == "unconfirmed") await api.SetConfirmationAsync(user, false);
             var before = await SnapshotAsync(api, user.Id);
@@ -140,6 +148,16 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         }
 
         [Fact]
+        public async Task WrongWellFormedServiceKey_CannotObserveKnownSession()
+        {
+            await using var api = await IdentityHttpHost.CreateAsync(database.ConnectionString, observationKey: NewKey());
+            var session = await api.LoginAsync(await api.CreateUserAsync("User"));
+            using var response = await ObserveAsync(api, session, NewKey());
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.False(response.Headers.Contains("Set-Cookie"));
+        }
+
+        [Fact]
         public async Task ServiceCredential_DoesNotAuthorizeBusinessEndpoints_AndDisabledFeatureIsClosed()
         {
             var key = NewKey();
@@ -165,12 +183,19 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             var normalSession = await api.LoginAsync(normal);
             var (demoCredential, demoUser) = await StartDemoAsync(api, role);
             var demoSession = await api.LoginAsync(demoUser, demoCredential);
+            var deadline = await DemoDeadlineAsync(api, demoCredential);
             using var active = await ObserveAsync(api, demoSession, key, demoCredential);
             var activeState = await active.Content.ReadFromJsonAsync<SessionObservation>();
             Assert.NotNull(activeState);
             Assert.True(activeState.IsAuthenticated);
             Assert.Equal(role == "Admin", activeState.IsAdmin);
             Assert.False(active.Headers.Contains("Set-Cookie"));
+            Assert.Equal(deadline, await DemoDeadlineAsync(api, demoCredential));
+            await using (var ordinary = await api.Services.GetRequiredService<IDemoSessionManager>().AcquireAsync(demoCredential))
+            {
+                Assert.NotNull(ordinary);
+                Assert.True(ordinary.Context.ExpiresAtUtc > deadline);
+            }
             using var missing = await ObserveAsync(api, demoSession, key);
             Assert.Equal(SessionObservation.Anonymous, await missing.Content.ReadFromJsonAsync<SessionObservation>());
             using var rebound = await ObserveAsync(api, normalSession, key, demoCredential);
@@ -181,7 +206,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await api.Services.GetRequiredService<IDemoSessionManager>().EndAsync(demoCredential);
             using var ended = await ObserveAsync(api, demoSession, key, demoCredential);
             Assert.Equal(HttpStatusCode.Gone, ended.StatusCode);
-            Assert.DoesNotContain(ended.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith("__Host-blazorshop-refresh=", StringComparison.Ordinal));
+            Assert.False(ended.Headers.Contains("Set-Cookie"));
         }
 
         [Fact]
@@ -259,6 +284,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.True(model.Success);
             var cookie = response.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("blazorshop-demo-session=", StringComparison.Ordinal)).Split(';')[0];
             return (Uri.UnescapeDataString(cookie[(cookie.IndexOf('=') + 1)..]), new TestUser("unused", model.Email));
+        }
+
+        private static async Task<DateTime> DemoDeadlineAsync(IdentityHttpHost host, string credential)
+        {
+            await using var lease = await host.Services.GetRequiredService<IDemoSessionManager>().AcquireAsync(credential, readOnly: true);
+            Assert.NotNull(lease);
+            return lease.Context.ExpiresAtUtc;
         }
 
         private static WebApplicationFactory<global::Program> CreateStorefront(IdentityHttpHost api, string key, BridgeCounters counters) =>

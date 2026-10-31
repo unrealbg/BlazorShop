@@ -103,14 +103,17 @@ namespace BlazorShop.Tests.Presentation.Authentication
         [InlineData("server-error")]
         [InlineData("redirect")]
         [InlineData("timeout")]
+        [InlineData("stalled-body")]
         public async Task ObservationFailure_IsAnonymousWithNoCookieForwardingOrSensitiveResponse(string failure)
         {
+            var slow = new StalledContent();
             var destination = new ResponseHandler(() => failure switch
             {
                 "network" => throw new HttpRequestException("sensitive upstream diagnostic"),
                 "timeout" => throw new TaskCanceledException("sensitive upstream diagnostic"),
                 "invalid-json" => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("sensitive upstream diagnostic") },
                 "redirect" => new HttpResponseMessage(HttpStatusCode.Redirect),
+                "stalled-body" => new HttpResponseMessage(HttpStatusCode.OK) { Content = slow },
                 _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             });
             var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -133,6 +136,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
             Assert.Equal(StorefrontSessionInfo.Anonymous, state);
             Assert.False(context.Response.Headers.ContainsKey("Set-Cookie"));
             Assert.Equal(1, destination.Calls);
+            if (failure == "stalled-body") Assert.True(slow.CancellationObserved);
         }
 
         [Fact]
@@ -155,6 +159,39 @@ namespace BlazorShop.Tests.Presentation.Authentication
         }
 
         [Fact]
+        public async Task CredentialIsAttachedOnlyAfterHttpsServiceDiscoveryResolution()
+        {
+            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            var destination = new ResponseHandler(() => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new SessionObservation(true, false, "User", "user@example.test")),
+            });
+            await using var app = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Production");
+                builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Api:BaseUrl"] = null,
+                    ["Services:apiservice:https:0"] = "https://api.example.test/",
+                    ["ClientApp:BaseUrl"] = "https://account.example.test/",
+                    ["PublicUrl:BaseUrl"] = "https://shop.example.test/",
+                    ["SessionObservation:Enabled"] = "true",
+                    ["SessionObservation:ServiceKey"] = key,
+                }));
+                builder.ConfigureTestServices(services => services.AddHttpClient<IStorefrontSessionResolver, StorefrontSessionResolver>()
+                    .ConfigurePrimaryHttpMessageHandler(() => destination));
+            });
+            var context = new DefaultHttpContext();
+            context.Request.Headers.Cookie = "__Host-blazorshop-refresh=isolated-test-credential";
+            app.Services.GetRequiredService<IHttpContextAccessor>().HttpContext = context;
+            await using var scope = app.Services.CreateAsyncScope();
+            var state = await scope.ServiceProvider.GetRequiredService<IStorefrontSessionResolver>().GetCurrentUserAsync();
+            Assert.True(state.IsAuthenticated);
+            Assert.Equal("https", destination.LastScheme);
+            Assert.True(destination.HadObservationCredential);
+        }
+
+        [Fact]
         public async Task CatalogClient_DoesNotRetryCredentialBearingUnsafeMethods()
         {
             var destination = new ResponseHandler(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
@@ -173,12 +210,29 @@ namespace BlazorShop.Tests.Presentation.Authentication
             Assert.Equal(1, destination.Calls);
         }
 
+        private sealed class StalledContent : HttpContent
+        {
+            public bool CancellationObserved { get; private set; }
+            protected override bool TryComputeLength(out long length) { length = 0; return false; }
+            protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => Task.CompletedTask;
+            protected override async Task<Stream> CreateContentReadStreamAsync(CancellationToken cancellationToken)
+            {
+                try { await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken); }
+                catch (OperationCanceledException) { CancellationObserved = true; throw; }
+                return Stream.Null;
+            }
+        }
+
         private sealed class ResponseHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
         {
             public int Calls { get; private set; }
+            public string? LastScheme { get; private set; }
+            public bool HadObservationCredential { get; private set; }
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 Calls++;
+                LastScheme = request.RequestUri?.Scheme;
+                HadObservationCredential = request.Headers.Contains(SessionObservationOptions.CredentialHeader);
                 return Task.FromResult(respond());
             }
         }

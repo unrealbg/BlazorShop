@@ -309,7 +309,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
             public bool IsEnabled => enabled;
             public int ReleaseCalls { get; private set; }
             public Task<DemoSessionStartResult> CreateAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public ValueTask<DemoSessionLease?> AcquireAsync(string token, CancellationToken cancellationToken = default)
+            public ValueTask<DemoSessionLease?> AcquireAsync(string token, CancellationToken cancellationToken = default, bool readOnly = false)
             {
                 if (token is not ("active-a" or "active-b" or "expired")) return ValueTask.FromResult<DemoSessionLease?>(null);
                 var sessionId = token == "active-b" ? "session-b" : "session-a";
