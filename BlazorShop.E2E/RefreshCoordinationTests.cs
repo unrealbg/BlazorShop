@@ -329,7 +329,9 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         {
             await LoginAsync(Page, data);
             var requests = 0;
+            var loginRequests = 0;
             await Context.RouteAsync(RefreshPath, async route => { Interlocked.Increment(ref requests); await route.ContinueAsync(); });
+            await Context.RouteAsync("**/api/authentication/login", async route => { Interlocked.Increment(ref loginRequests); await route.ContinueAsync(); });
             foreach (var mode in new[] { "missing", "rejected" })
             {
                 await Page.EvaluateAsync("mode => Object.defineProperty(navigator, 'locks', { configurable:true, value: mode === 'missing' ? undefined : {request: () => Promise.reject(new Error('unavailable'))} })", mode);
@@ -341,6 +343,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
                 Assert.True(await Page.EvaluateAsync<bool>("sessionStorage.getItem('token') === null"));
             }
             Assert.Equal(0, requests);
+            Assert.Equal(0, loginRequests);
         }
         finally { await application.RemoveScenarioAsync(data); }
     }

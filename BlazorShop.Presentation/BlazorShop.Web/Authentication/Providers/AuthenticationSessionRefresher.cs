@@ -64,7 +64,7 @@ public sealed class AuthenticationSessionRefresher(
                     lastRejectedToken = rejectedToken;
                     lastIssuedToken = response.Data.Token;
                     lastIssuedEpoch = epoch;
-                    notifier.NotifyAuthenticationState();
+                    if (!SameAuthentication(token, response.Data.Token)) notifier.NotifyAuthenticationState();
                     result = response.Data;
                     return;
                 }
@@ -100,6 +100,22 @@ public sealed class AuthenticationSessionRefresher(
             var handler = new JwtSecurityTokenHandler();
             return !string.IsNullOrWhiteSpace(value) && handler.CanReadToken(value)
                 && handler.ReadJwtToken(value).ValidTo > DateTime.UtcNow;
+        }
+        catch (ArgumentException) { return false; }
+    }
+
+    private static bool SameAuthentication(string? previous, string current)
+    {
+        if (!IsCurrentToken(previous)) return false;
+        try
+        {
+            static IEnumerable<(string Type, string Value)> IdentityClaims(string value) =>
+                new JwtSecurityTokenHandler().ReadJwtToken(value).Claims
+                    .Where(claim => claim.Type is not (JwtRegisteredClaimNames.Exp or JwtRegisteredClaimNames.Iat
+                        or JwtRegisteredClaimNames.Nbf or JwtRegisteredClaimNames.Jti))
+                    .Select(claim => (claim.Type, claim.Value)).OrderBy(claim => claim.Type, StringComparer.Ordinal)
+                    .ThenBy(claim => claim.Value, StringComparer.Ordinal);
+            return IdentityClaims(previous!).SequenceEqual(IdentityClaims(current));
         }
         catch (ArgumentException) { return false; }
     }

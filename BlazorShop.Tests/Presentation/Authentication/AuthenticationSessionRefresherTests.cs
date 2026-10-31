@@ -13,6 +13,23 @@ using Xunit;
 
 public sealed class AuthenticationSessionRefresherTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RefreshNotifiesOnlyAnActualAuthenticationChange(bool changedIdentity)
+    {
+        var services = new Services();
+        var handler = new JwtSecurityTokenHandler();
+        var previous = handler.WriteToken(new JwtSecurityToken(claims: [new("name", "Original")], expires: DateTime.UtcNow.AddMinutes(5)));
+        var current = handler.WriteToken(new JwtSecurityToken(claims: [new("name", changedIdentity ? "Updated" : "Original")], expires: DateTime.UtcNow.AddHours(2)));
+        services.Tokens.Setup(service => service.GetJwtTokenAsync(Constant.TokenStorage.Key)).ReturnsAsync(previous);
+        services.Authentication.Setup(service => service.ReviveToken())
+            .ReturnsAsync(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "ok", current)));
+        Assert.NotNull(await services.Refresher.TryRefreshAsync());
+        services.Notifier.Verify(notifier => notifier.NotifyAuthenticationState(), Times.Exactly(changedIdentity ? 1 : 0));
+        Assert.Single(services.Coordinator.CommittedTokens);
+    }
+
     [Fact]
     public async Task BootstrapAndFactoryHandlerScope_ShareTheSameFlight()
     {
@@ -117,9 +134,10 @@ public sealed class AuthenticationSessionRefresherTests
         public Mock<ITokenService> Tokens { get; } = new();
         public Mock<IAuthenticationService> Authentication { get; } = new();
         public Mock<IAuthenticationSessionEventPublisher> Publisher { get; } = new();
+        public Mock<IAuthenticationStateNotifier> Notifier { get; } = new();
         public Coordinator Coordinator { get; } = new();
         public AuthenticationSessionRefresher Refresher => refresher ??= new(Tokens.Object, Authentication.Object,
-            Mock.Of<IAuthenticationStateNotifier>(), Mock.Of<IAuthenticatedClientStateCleaner>(), Coordinator);
+            Notifier.Object, Mock.Of<IAuthenticatedClientStateCleaner>(), Coordinator);
         private AuthenticationSessionRefresher? refresher;
     }
     private sealed class Coordinator : IAuthenticationSessionCoordinator
