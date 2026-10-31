@@ -53,6 +53,32 @@ jobs:
           path: artifacts/npm-audit/*.json
           if-no-files-found: error
 
+      - name: Require zero npm audit findings at every severity
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($report in @('artifacts/npm-audit/runtime.json', 'artifacts/npm-audit/full.json')) {
+            $audit = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+            if ($audit.error -or $audit.auditReportVersion -ne 2 -or $null -eq $audit.metadata.vulnerabilities.total) {
+              throw "Invalid npm audit report: $report"
+            }
+            if ($audit.metadata.vulnerabilities.total -ne 0) { throw "npm audit findings remain in $report" }
+          }
+          Write-Host 'Full and runtime npm audits: zero findings at every severity.'
+
+      - name: Compile and verify Web build toolchain
+        run: |
+          npm run --prefix BlazorShop.Presentation/BlazorShop.Web tailwind:build
+          node scripts/verify-web-build-toolchain.mjs
+
+      - name: Upload Tailwind CSS and compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-toolchain-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/web-build-toolchain
+          if-no-files-found: error
+
       - name: Restore
         run: dotnet restore BlazorShop.sln -warnaserror
 
@@ -120,9 +146,18 @@ jobs:
           grep -q 'bs-v2-shell' /tmp/storefront-v2.css
           curl --fail --max-time 5 'http://127.0.0.1:18080/css/site.css?v=smoke' --output /tmp/storefront-site.css
           test -s /tmp/storefront-site.css
+          cmp /tmp/storefront-site.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/site.css
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
+
+      - name: Verify published Web utility CSS
+        run: |
+          docker create --name web-assets blazorshop-web:ci
+          trap 'docker rm --force web-assets' EXIT
+          docker cp web-assets:/usr/share/nginx/html/css/site.css /tmp/web-site.css
+          test -s /tmp/web-site.css
+          cmp /tmp/web-site.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/site.css
 
   browser-e2e:
     if: github.event_name != 'pull_request' || github.base_ref == 'master'
