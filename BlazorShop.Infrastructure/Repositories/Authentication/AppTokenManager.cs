@@ -214,6 +214,108 @@
             return revokedCount > 0 ? await _context.SaveChangesAsync() : 0;
         }
 
+        public Task<RefreshRotationResult?> RotateRefreshTokenAsync(string refreshToken, string? ipAddress = null,
+            string? userAgent = null, CancellationToken cancellationToken = default)
+        {
+            return WithRefreshSessionLockAsync<RefreshRotationResult?>(refreshToken, null, async token =>
+            {
+                var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Id == token.UserId, cancellationToken);
+                if (!IsRefreshTokenActive(token) || user is null || string.IsNullOrWhiteSpace(user.Email)
+                    || !await _userManager.CanRefreshSignInAsync(user))
+                {
+                    await RevokeLockedChainAsync(token, ipAddress, cancellationToken);
+                    return null;
+                }
+
+                var claims = await _userManager.GetUserClaimsAsync(user.Email);
+                cancellationToken.ThrowIfCancellationRequested();
+                var rawReplacement = GetReFreshToken();
+                var replacement = CreateRefreshToken(user.Id, rawReplacement, ipAddress, userAgent);
+                _context.RefreshTokens.Add(replacement);
+                await _context.SaveChangesAsync(cancellationToken);
+                await _context.RefreshTokens.Where(current => current.Id == token.Id).ExecuteUpdateAsync(update => update
+                    .SetProperty(current => current.RevokedAtUtc, DateTime.UtcNow)
+                    .SetProperty(current => current.RevokedByIp, ipAddress)
+                    .SetProperty(current => current.ReplacedByTokenHash, replacement.TokenHash), cancellationToken);
+                return new RefreshRotationResult(rawReplacement, claims);
+            }, cancellationToken);
+        }
+
+        public Task<bool> RevokeRefreshSessionAsync(string refreshToken, string? ipAddress = null,
+            CancellationToken cancellationToken = default)
+        {
+            return WithRefreshSessionLockAsync(refreshToken, true, async token =>
+            {
+                // Logout of a credential racing rotation also revokes its successor, but
+                // never touches another independently established browser session.
+                await RevokeLockedChainAsync(token, ipAddress, cancellationToken);
+                return true;
+            }, cancellationToken, failure: false);
+        }
+
+        private async Task<T> WithRefreshSessionLockAsync<T>(string refreshToken, T missing,
+            Func<RefreshToken, Task<T>> action, CancellationToken cancellationToken, T failure = default!)
+        {
+            // The production and demo stores are PostgreSQL. No unsafe non-transactional
+            // fallback for providers that cannot uphold this contract.
+            if (!_context.Database.IsNpgsql() || string.IsNullOrWhiteSpace(refreshToken)) return missing;
+            var hash = HashRefreshToken(refreshToken);
+            var attempted = false;
+            try
+            {
+                return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+                {
+                    // EF's configured strategy permits an explicit transaction here. It
+                    // must NEVER replay this credential operation, even after an ambiguous
+                    // commit/disposal failure. A second invocation performs no database IO.
+                    if (attempted) return failure;
+                    attempted = true;
+                    var userId = await _context.RefreshTokens.AsNoTracking().Where(token => token.TokenHash == hash)
+                        .Select(token => token.UserId).SingleOrDefaultAsync(cancellationToken);
+                    if (userId is null) return missing;
+                    await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                    // All session operations lock account FIRST, matching Identity's admin
+                    // UPDATE. READ COMMITTED then sees the latest committed token state.
+                    var user = await _context.Users.FromSqlInterpolated(
+                        $"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {userId} FOR UPDATE")
+                        .AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+                    if (user is null) return missing;
+                    var token = await _context.RefreshTokens.FromSqlInterpolated(
+                        $"SELECT * FROM \"RefreshTokens\" WHERE \"TokenHash\" = {hash} FOR UPDATE")
+                        .AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+                    if (token is null) return missing;
+                    var result = await action(token);
+                    await transaction.CommitAsync(cancellationToken);
+                    // No credential escapes unless commit completed and the caller still
+                    // accepts the response. A lost response requires a fresh login.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return result;
+                });
+            }
+            catch (Exception exception) when (exception is System.Data.Common.DbException
+                or DbUpdateException or TimeoutException or OperationCanceledException)
+            {
+                // Do not return credentials or retry after an unknown commit outcome.
+                return failure;
+            }
+        }
+
+        private async Task RevokeLockedChainAsync(RefreshToken root, string? ipAddress, CancellationToken cancellationToken)
+        {
+            var token = root;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (visited.Add(token.TokenHash))
+            {
+                await _context.RefreshTokens.Where(current => current.Id == token.Id && current.RevokedAtUtc == null)
+                    .ExecuteUpdateAsync(update => update.SetProperty(current => current.RevokedAtUtc, DateTime.UtcNow)
+                        .SetProperty(current => current.RevokedByIp, ipAddress), cancellationToken);
+                if (string.IsNullOrWhiteSpace(token.ReplacedByTokenHash)) break;
+                token = await _context.RefreshTokens.AsNoTracking().SingleOrDefaultAsync(current =>
+                    current.UserId == root.UserId && current.TokenHash == token.ReplacedByTokenHash, cancellationToken);
+                if (token is null) break;
+            }
+        }
+
         public string GenerateAccessToken(List<Claim> claims)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:Key"]!));

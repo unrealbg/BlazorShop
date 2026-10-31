@@ -187,75 +187,22 @@
 
         }
 
-        public async Task<LoginResponse> ReviveToken(string refreshToken, string? ipAddress = null, string? userAgent = null)
+        public async Task<LoginResponse> ReviveToken(string refreshToken, string? ipAddress = null, string? userAgent = null,
+            CancellationToken cancellationToken = default)
         {
-            var storedRefreshToken = await _tokenManager.GetRefreshTokenAsync(refreshToken);
-
-            if (storedRefreshToken is null)
-            {
-                return new LoginResponse { Message = "Invalid token." };
-            }
-
-            if (!_tokenManager.IsRefreshTokenActive(storedRefreshToken))
-            {
-                if (storedRefreshToken.RevokedAtUtc is null && storedRefreshToken.ExpiresAtUtc <= DateTime.UtcNow)
-                {
-                    await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress);
-                }
-
-                if (storedRefreshToken.RevokedAtUtc is not null && !string.IsNullOrWhiteSpace(storedRefreshToken.ReplacedByTokenHash))
-                {
-                    await _tokenManager.RevokeRefreshTokenFamilyAsync(refreshToken, ipAddress);
-                }
-
-                return new LoginResponse { Message = "Invalid token." };
-            }
-
-            var currentUser = await _userManager.GetUserByIdAsync(storedRefreshToken.UserId);
-            if (currentUser == null || string.IsNullOrWhiteSpace(currentUser.Email))
-            {
-                return new LoginResponse { Message = "Invalid token." };
-            }
-
-            if (!await _userManager.CanRefreshSignInAsync(currentUser))
-            {
-                await _tokenManager.RevokeRefreshTokenFamilyAsync(refreshToken, ipAddress);
-                await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress);
-                return new LoginResponse { Message = "Invalid token." };
-            }
-
-            var claims = await _userManager.GetUserClaimsAsync(currentUser.Email);
-            var newAccessToken = _tokenManager.GenerateAccessToken(claims);
-            var newRefreshToken = _tokenManager.GetReFreshToken();
-
-            var newRefreshTokenEntry = _tokenManager.CreateRefreshToken(currentUser.Id, newRefreshToken, ipAddress, userAgent);
-            var saveTokenResult = await _tokenManager.AddRefreshTokenAsync(newRefreshTokenEntry);
-
-            if (saveTokenResult <= 0)
-            {
-                return new LoginResponse { Message = "Error occurred in login." };
-            }
-
-            var revokeTokenResult = await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress, newRefreshToken);
-
-            if (revokeTokenResult <= 0)
-            {
-                await _tokenManager.RevokeRefreshTokenAsync(newRefreshToken, ipAddress);
-                return new LoginResponse { Message = "Error occurred in login." };
-            }
-
-            return new LoginResponse { Success = true, Message = "Token revived successfully.", Token = newAccessToken, RefreshToken = newRefreshToken };
+            var rotation = await _tokenManager.RotateRefreshTokenAsync(refreshToken, ipAddress, userAgent, cancellationToken);
+            return rotation is null || cancellationToken.IsCancellationRequested
+                ? new LoginResponse { Message = "Invalid token." }
+                : new LoginResponse { Success = true, Message = "Token revived successfully.",
+                    Token = _tokenManager.GenerateAccessToken(rotation.Claims), RefreshToken = rotation.RefreshToken };
         }
 
         public async Task<ServiceResponse> Logout(string refreshToken, string? ipAddress = null)
         {
-            if (string.IsNullOrWhiteSpace(refreshToken))
-            {
-                return new ServiceResponse(true, "Logged out successfully.");
-            }
-
-            await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress);
-            return new ServiceResponse(true, "Logged out successfully.");
+            if (string.IsNullOrWhiteSpace(refreshToken)) return new ServiceResponse(true, "Logged out successfully.");
+            var revoked = await _tokenManager.RevokeRefreshSessionAsync(refreshToken, ipAddress);
+            return revoked ? new ServiceResponse(true, "Logged out successfully.")
+                : new ServiceResponse(false, "Unable to confirm logout.");
         }
 
         public async Task<ServiceResponse> ChangePassword(ChangePassword changePasswordDto, string userId)

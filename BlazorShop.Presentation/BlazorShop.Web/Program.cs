@@ -49,6 +49,7 @@ namespace BlazorShop.Web
             builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
             builder.Services.AddScoped<IAuthenticationStateNotifier, AuthenticationStateNotifier>();
             builder.Services.AddScoped<IAuthenticatedClientStateCleaner, AuthenticatedClientStateCleaner>();
+            builder.Services.AddScoped<IAuthenticationSessionCoordinator, AuthenticationSessionCoordinator>();
             builder.Services.AddScoped<IAuthenticationSessionRefresher, AuthenticationSessionRefresher>();
             builder.Services.AddScoped<IAuthenticationSessionBootstrapper, AuthenticationSessionBootstrapper>();
             builder.Services.AddScoped<IAuthenticationSessionEventPublisher, AuthenticationSessionEventPublisher>();

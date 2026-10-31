@@ -310,7 +310,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             }
         }
 
-        private static async Task AssertRejectedAsync(HttpResponseMessage response)
+        internal static async Task AssertRejectedAsync(HttpResponseMessage response)
         {
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             Assert.NotNull(result);
@@ -332,7 +332,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             public const string Password = "Isolated-test-password-123!";
             public IServiceProvider Services => app.Services;
 
-            public static async Task<IdentityHttpHost> CreateAsync(string connectionString, DbCommandInterceptor? interceptor = null,
+            public static async Task<IdentityHttpHost> CreateAsync(string connectionString, IInterceptor? interceptor = null,
                 bool requireAccount = true, bool requireEmail = true, string? observationKey = null, bool demoEnabled = false)
             {
                 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -488,7 +488,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 return await client.SendAsync(request);
             }
 
-            public Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request) => client.SendAsync(request);
+            public Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request, CancellationToken cancellationToken = default) => client.SendAsync(request, cancellationToken);
 
             public async ValueTask DisposeAsync()
             {

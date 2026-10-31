@@ -4,6 +4,6 @@ namespace BlazorShop.Web.Authentication.Providers
 
     public interface IAuthenticationSessionRefresher
     {
-        Task<LoginResponse?> TryRefreshAsync(bool clearTokenOnFailure = true);
+        Task<LoginResponse?> TryRefreshAsync(bool clearTokenOnFailure = true, string? rejectedToken = null, bool onlyIfNeeded = false);
     }
 }

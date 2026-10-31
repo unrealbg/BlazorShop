@@ -51,8 +51,9 @@ namespace BlazorShop.Web.Authentication.Providers
             {
                 case "signed-in":
                 case "session-refreshed":
-                    await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false);
+                    await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false, onlyIfNeeded: true);
                     break;
+                case "session-changing":
                 case "signed-out":
                     await _tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
                     await _clientStateCleaner.ClearAsync();

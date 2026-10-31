@@ -1,123 +1,88 @@
-namespace BlazorShop.Tests.Presentation.Authentication
+namespace BlazorShop.Tests.Presentation.Authentication;
+
+using System.Net;
+using BlazorShop.Web.Authentication.Providers;
+using BlazorShop.Web.Shared;
+using BlazorShop.Web.Shared.Helper.Contracts;
+using BlazorShop.Web.Shared.Models;
+using BlazorShop.Web.Shared.Services.Contracts;
+using Moq;
+using Xunit;
+
+public sealed class AuthenticationSessionRefresherTests
 {
-    using System.Net;
-
-    using BlazorShop.Web.Authentication.Providers;
-    using BlazorShop.Web.Shared;
-    using BlazorShop.Web.Shared.Helper.Contracts;
-    using BlazorShop.Web.Shared.Models;
-    using BlazorShop.Web.Shared.Services.Contracts;
-
-    using Moq;
-
-    using Xunit;
-
-    public class AuthenticationSessionRefresherTests
+    [Fact]
+    public async Task ConcurrentCallers_ShareOneInFlightHttpResult()
     {
-        [Fact]
-        public async Task TryRefreshAsync_WhenRefreshSucceeds_StoresToken_AndNotifiesAuthState()
-        {
-            const string refreshedToken = "refreshed-token";
+        var pending = new TaskCompletionSource<QueryResult<LoginResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new Services();
+        services.Authentication.Setup(service => service.ReviveToken()).Returns(pending.Task);
+        var first = services.Refresher.TryRefreshAsync();
+        var second = services.Refresher.TryRefreshAsync();
+        Assert.Same(first, second);
+        pending.SetResult(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "ok", "synthetic-access")));
+        Assert.NotNull(await first);
+        Assert.NotNull(await second);
+        services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
+        services.Tokens.Verify(service => service.StoreJwtTokenAsync(Constant.TokenStorage.Key, "synthetic-access"), Times.Once);
+    }
 
-            var tokenService = new Mock<ITokenService>();
-            tokenService
-                .Setup(service => service.StoreJwtTokenAsync(Constant.TokenStorage.Key, refreshedToken))
-                .Returns(Task.CompletedTask);
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.RequestTimeout)]
+    public async Task FailedOrUncertainResponse_ClearsStateWithoutRetry(HttpStatusCode status)
+    {
+        var services = new Services();
+        services.Authentication.Setup(service => service.ReviveToken()).ReturnsAsync(QueryResult<LoginResponse>.Failed("failed", status));
+        Assert.Null(await services.Refresher.TryRefreshAsync(clearTokenOnFailure: false));
+        services.Authentication.Verify(service => service.ReviveToken(), Times.Once);
+        services.Tokens.Verify(service => service.RemoveJwtTokenAsync(Constant.TokenStorage.Key), Times.Once);
+        services.Publisher.Verify(service => service.PublishSignedOutAsync(), Times.Once);
+    }
 
-            var authenticationService = new Mock<IAuthenticationService>();
-            authenticationService
-                .Setup(service => service.ReviveToken())
-                .ReturnsAsync(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "Token revived successfully.", refreshedToken)));
+    [Fact]
+    public async Task LogoutIntentDuringRefresh_DiscardsLateJwt()
+    {
+        var pending = new TaskCompletionSource<QueryResult<LoginResponse>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new Services();
+        services.Authentication.Setup(service => service.ReviveToken()).Returns(pending.Task);
+        var refresh = services.Refresher.TryRefreshAsync();
+        services.Coordinator.Current = false;
+        pending.SetResult(QueryResult<LoginResponse>.Succeeded(new LoginResponse(true, "ok", "synthetic-access")));
+        Assert.Null(await refresh);
+        services.Tokens.Verify(service => service.StoreJwtTokenAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        services.Publisher.Verify(service => service.PublishSignedOutAsync(), Times.Never);
+    }
 
-            var authStateNotifier = new Mock<IAuthenticationStateNotifier>();
-            var cleaner = new Mock<IAuthenticatedClientStateCleaner>();
-            var publisher = new Mock<IAuthenticationSessionEventPublisher>();
-            var refresher = new AuthenticationSessionRefresher(tokenService.Object, authenticationService.Object, authStateNotifier.Object, cleaner.Object, publisher.Object);
+    [Fact]
+    public async Task LockUnavailable_SendsNoCredentialPost()
+    {
+        var services = new Services();
+        services.Coordinator.Available = false;
+        Assert.Null(await services.Refresher.TryRefreshAsync());
+        services.Authentication.Verify(service => service.ReviveToken(), Times.Never);
+        services.Tokens.Verify(service => service.RemoveJwtTokenAsync(Constant.TokenStorage.Key), Times.Once);
+    }
 
-            var result = await refresher.TryRefreshAsync();
-
-            Assert.NotNull(result);
-            Assert.Equal(refreshedToken, result!.Token);
-            tokenService.Verify(service => service.StoreJwtTokenAsync(Constant.TokenStorage.Key, refreshedToken), Times.Once);
-            tokenService.Verify(service => service.RemoveJwtTokenAsync(It.IsAny<string>()), Times.Never);
-            cleaner.Verify(service => service.ClearAsync(), Times.Never);
-            authStateNotifier.Verify(notifier => notifier.NotifyAuthenticationState(), Times.Once);
-        }
-
-        [Fact]
-        public async Task TryRefreshAsync_WhenRefreshReturnsInvalidSession_RemovesToken_AndNotifiesAuthState()
-        {
-            var tokenService = new Mock<ITokenService>();
-            tokenService
-                .Setup(service => service.RemoveJwtTokenAsync(Constant.TokenStorage.Key))
-                .Returns(Task.CompletedTask);
-
-            var authenticationService = new Mock<IAuthenticationService>();
-            authenticationService
-                .Setup(service => service.ReviveToken())
-                .ReturnsAsync(QueryResult<LoginResponse>.Failed("Invalid token.", HttpStatusCode.BadRequest));
-
-            var authStateNotifier = new Mock<IAuthenticationStateNotifier>();
-            var cleaner = new Mock<IAuthenticatedClientStateCleaner>();
-            cleaner.Setup(service => service.ClearAsync()).Returns(Task.CompletedTask);
-            var publisher = new Mock<IAuthenticationSessionEventPublisher>();
-            publisher.Setup(service => service.PublishSignedOutAsync()).Returns(Task.CompletedTask);
-            var refresher = new AuthenticationSessionRefresher(tokenService.Object, authenticationService.Object, authStateNotifier.Object, cleaner.Object, publisher.Object);
-
-            var result = await refresher.TryRefreshAsync();
-
-            Assert.Null(result);
-            tokenService.Verify(service => service.StoreJwtTokenAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-            tokenService.Verify(service => service.RemoveJwtTokenAsync(Constant.TokenStorage.Key), Times.Once);
-            cleaner.Verify(service => service.ClearAsync(), Times.Once);
-            authStateNotifier.Verify(notifier => notifier.NotifyAuthenticationState(), Times.Once);
-            publisher.Verify(service => service.PublishSignedOutAsync(), Times.Once);
-        }
-
-        [Fact]
-        public async Task TryRefreshAsync_WhenRefreshFailsWithoutClearing_LeavesTokenUntouched()
-        {
-            var tokenService = new Mock<ITokenService>();
-            var authenticationService = new Mock<IAuthenticationService>();
-            authenticationService
-                .Setup(service => service.ReviveToken())
-                .ReturnsAsync(QueryResult<LoginResponse>.Failed("Invalid token.", HttpStatusCode.BadRequest));
-
-            var authStateNotifier = new Mock<IAuthenticationStateNotifier>();
-            var cleaner = new Mock<IAuthenticatedClientStateCleaner>();
-            var publisher = new Mock<IAuthenticationSessionEventPublisher>();
-            var refresher = new AuthenticationSessionRefresher(tokenService.Object, authenticationService.Object, authStateNotifier.Object, cleaner.Object, publisher.Object);
-
-            var result = await refresher.TryRefreshAsync(clearTokenOnFailure: false);
-
-            Assert.Null(result);
-            tokenService.Verify(service => service.StoreJwtTokenAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-            tokenService.Verify(service => service.RemoveJwtTokenAsync(It.IsAny<string>()), Times.Never);
-            cleaner.Verify(service => service.ClearAsync(), Times.Never);
-            authStateNotifier.Verify(notifier => notifier.NotifyAuthenticationState(), Times.Never);
-        }
-
-        [Fact]
-        public async Task TryRefreshAsync_WhenRefreshFailsDueToServerOutage_DoesNotClearToken()
-        {
-            var tokenService = new Mock<ITokenService>();
-            var authenticationService = new Mock<IAuthenticationService>();
-            authenticationService
-                .Setup(service => service.ReviveToken())
-                .ReturnsAsync(QueryResult<LoginResponse>.Failed("Connection error", HttpStatusCode.ServiceUnavailable));
-
-            var authStateNotifier = new Mock<IAuthenticationStateNotifier>();
-            var cleaner = new Mock<IAuthenticatedClientStateCleaner>();
-            var publisher = new Mock<IAuthenticationSessionEventPublisher>();
-            var refresher = new AuthenticationSessionRefresher(tokenService.Object, authenticationService.Object, authStateNotifier.Object, cleaner.Object, publisher.Object);
-
-            var result = await refresher.TryRefreshAsync();
-
-            Assert.Null(result);
-            tokenService.Verify(service => service.RemoveJwtTokenAsync(It.IsAny<string>()), Times.Never);
-            cleaner.Verify(service => service.ClearAsync(), Times.Never);
-            authStateNotifier.Verify(notifier => notifier.NotifyAuthenticationState(), Times.Never);
-            publisher.Verify(service => service.PublishSignedOutAsync(), Times.Never);
-        }
+    private sealed class Services
+    {
+        public Mock<ITokenService> Tokens { get; } = new();
+        public Mock<IAuthenticationService> Authentication { get; } = new();
+        public Mock<IAuthenticationSessionEventPublisher> Publisher { get; } = new();
+        public Coordinator Coordinator { get; } = new();
+        public AuthenticationSessionRefresher Refresher => refresher ??= new(Tokens.Object, Authentication.Object,
+            Mock.Of<IAuthenticationStateNotifier>(), Mock.Of<IAuthenticatedClientStateCleaner>(), Publisher.Object, Coordinator);
+        private AuthenticationSessionRefresher? refresher;
+    }
+    private sealed class Coordinator : IAuthenticationSessionCoordinator
+    {
+        public bool Current { get; set; } = true;
+        public bool Available { get; set; } = true;
+        public async Task<bool> RunAsync(string operation, Func<Task> action, Func<Task>? onIntent = null)
+        { if (Available) await action(); return Available; }
+        public Task<bool> IsCurrentAsync() => Task.FromResult(Current);
+        public Task<bool> HasCurrentEpochAsync() => Task.FromResult(true);
+        public Task MarkCurrentEpochAsync() => Task.CompletedTask;
     }
 }

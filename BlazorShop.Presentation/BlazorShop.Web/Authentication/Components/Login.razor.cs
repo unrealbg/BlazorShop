@@ -25,6 +25,8 @@
 
         public LoginUser User { get; set; } = new();
 
+        [Inject] private BlazorShop.Web.Authentication.Providers.IAuthenticationSessionCoordinator SessionCoordinator { get; set; } = default!;
+
         private bool IsSubmitting => _loginGate.IsRunning;
 
         protected override async Task OnParametersSetAsync()
@@ -44,7 +46,8 @@
             await _loginGate.RunAsync(async () =>
             {
                 await ResetStatusAsync();
-                await CompleteLoginAsync();
+                var completed = await SessionCoordinator.RunAsync("login", CompleteLoginAsync);
+                if (!completed) { _message = "Session coordination is unavailable. Please sign in using a browser with Web Locks support."; _alertType = "danger"; }
             });
         }
 
@@ -54,6 +57,8 @@
             {
                 await ResetStatusAsync();
 
+                var completed = await SessionCoordinator.RunAsync("login", async () =>
+                {
                 var demoSession = await this.AuthenticationService.StartDemoSession(role);
                 if (!demoSession.Success)
                 {
@@ -67,12 +72,16 @@
                 User.Email = demoSession.Email;
                 User.Password = demoSession.Password;
                 await CompleteLoginAsync();
+                });
+                if (!completed) { _message = "Session coordination is unavailable. Please try signing in again."; _alertType = "danger"; }
             });
         }
 
         private async Task CompleteLoginAsync()
         {
             var result = await this.AuthenticationService.LoginUser(this.User);
+
+            if (!await SessionCoordinator.IsCurrentAsync()) return;
 
             if (!result.Success)
             {
@@ -83,6 +92,7 @@
 
             await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
 
+            await SessionCoordinator.MarkCurrentEpochAsync();
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
             await this.SessionEventPublisher.PublishSignedInAsync();
 

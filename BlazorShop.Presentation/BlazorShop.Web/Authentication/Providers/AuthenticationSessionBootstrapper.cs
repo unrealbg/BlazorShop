@@ -22,7 +22,7 @@ namespace BlazorShop.Web.Authentication.Providers
                 return;
             }
 
-            await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false);
+            await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false, onlyIfNeeded: true);
         }
     }
 }

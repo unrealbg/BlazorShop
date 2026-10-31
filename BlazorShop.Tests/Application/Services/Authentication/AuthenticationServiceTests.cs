@@ -559,167 +559,52 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task ReviveToken_ShouldReturnSuccess_WhenTokenIsValid()
+        public async Task ReviveToken_DoesNotGenerateJwtBeforeConfirmedRotation()
         {
-            // Arrange
-            var refreshToken = "refreshToken";
-            var userId = "userId";
-            var storedRefreshToken = new RefreshToken
-            {
-                UserId = userId,
-                TokenHash = "stale-hash",
-                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
-                ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
-            };
-            var appUser = new AppUser { Id = userId, Email = "test@example.com" };
-            var claims = new List<Claim>();
-            var newAccessToken = "newAccessToken";
-            var newRefreshToken = "newRefreshToken";
-            var replacementRefreshToken = new RefreshToken { UserId = userId, TokenHash = "replacement-hash" };
-
-            _tokenManagerMock.Setup(t => t.GetRefreshTokenAsync(refreshToken)).ReturnsAsync(storedRefreshToken);
-            _tokenManagerMock.Setup(t => t.IsRefreshTokenActive(storedRefreshToken)).Returns(true);
-            _userManagerMock.Setup(u => u.GetUserByIdAsync(userId)).ReturnsAsync(appUser);
-            _userManagerMock.Setup(u => u.CanRefreshSignInAsync(appUser)).ReturnsAsync(true);
-            _userManagerMock.Setup(u => u.GetUserClaimsAsync(appUser.Email)).ReturnsAsync(claims);
-            _tokenManagerMock.Setup(t => t.GenerateAccessToken(claims)).Returns(newAccessToken);
-            _tokenManagerMock.Setup(t => t.GetReFreshToken()).Returns(newRefreshToken);
-            _tokenManagerMock.Setup(t => t.CreateRefreshToken(userId, newRefreshToken, null, null)).Returns(replacementRefreshToken);
-            _tokenManagerMock.Setup(t => t.AddRefreshTokenAsync(replacementRefreshToken)).ReturnsAsync(1);
-            _tokenManagerMock.Setup(t => t.RevokeRefreshTokenAsync(refreshToken, null, newRefreshToken)).ReturnsAsync(1);
-
-            // Act
-            var result = await _authenticationService.ReviveToken(refreshToken);
-
-            // Assert
+            var pending = new TaskCompletionSource<RefreshRotationResult?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _tokenManagerMock.Setup(manager => manager.RotateRefreshTokenAsync("presented", null, null, default)).Returns(pending.Task);
+            var request = _authenticationService.ReviveToken("presented");
+            _tokenManagerMock.Verify(manager => manager.GenerateAccessToken(It.IsAny<List<Claim>>()), Times.Never);
+            var claims = new List<Claim> { new(ClaimTypes.Role, "User") };
+            _tokenManagerMock.Setup(manager => manager.GenerateAccessToken(claims)).Returns("synthetic-access");
+            pending.SetResult(new RefreshRotationResult("synthetic-replacement", claims));
+            var result = await request;
             Assert.True(result.Success);
-            Assert.Equal("Token revived successfully.", result.Message);
-            Assert.Equal(newAccessToken, result.Token);
-            Assert.Equal(newRefreshToken, result.RefreshToken);
-            _tokenManagerMock.Verify(t => t.RevokeRefreshTokenAsync(refreshToken, null, newRefreshToken), Times.Once);
+            Assert.Equal("synthetic-access", result.Token);
+            Assert.Equal("synthetic-replacement", result.RefreshToken);
         }
 
         [Fact]
-        public async Task ReviveToken_ReturnsError_WhenTokenIsInvalid()
+        public async Task ReviveToken_FailedAtomicRotationNeverGeneratesJwt()
         {
-            // Arrange
-            var invalidToken = "invalid_refresh_token";
-
-            _tokenManagerMock
-                .Setup(t => t.GetRefreshTokenAsync(invalidToken))
-                .ReturnsAsync((RefreshToken?)null);
-
-            // Act
-            var result = await _authenticationService.ReviveToken(invalidToken);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.False(result.Success);
-            Assert.Equal("Invalid token.", result.Message);
-        }
-
-        [Fact]
-        public async Task ReviveToken_IneligibleUserRevokesPresentedFamilyBeforeGeneratingAnyToken()
-        {
-            var stored = new RefreshToken { UserId = "restricted-user", ExpiresAtUtc = DateTime.UtcNow.AddDays(1) };
-            var user = new AppUser { Id = stored.UserId, Email = "restricted@example.test" };
-            _tokenManagerMock.Setup(manager => manager.GetRefreshTokenAsync("presented")).ReturnsAsync(stored);
-            _tokenManagerMock.Setup(manager => manager.IsRefreshTokenActive(stored)).Returns(true);
-            _userManagerMock.Setup(manager => manager.GetUserByIdAsync(stored.UserId)).ReturnsAsync(user);
-            _userManagerMock.Setup(manager => manager.CanRefreshSignInAsync(user)).ReturnsAsync(false);
-
+            _tokenManagerMock.Setup(manager => manager.RotateRefreshTokenAsync("presented", null, null, default))
+                .ReturnsAsync((RefreshRotationResult?)null);
             var result = await _authenticationService.ReviveToken("presented");
-
             Assert.False(result.Success);
             Assert.True(string.IsNullOrEmpty(result.Token));
             Assert.True(string.IsNullOrEmpty(result.RefreshToken));
-            _tokenManagerMock.Verify(manager => manager.RevokeRefreshTokenFamilyAsync("presented", null), Times.Once);
-            _tokenManagerMock.Verify(manager => manager.RevokeRefreshTokenAsync("presented", null, null), Times.Once);
             _tokenManagerMock.Verify(manager => manager.GenerateAccessToken(It.IsAny<List<Claim>>()), Times.Never);
-            _tokenManagerMock.Verify(manager => manager.GetReFreshToken(), Times.Never);
-            _tokenManagerMock.Verify(manager => manager.AddRefreshTokenAsync(It.IsAny<RefreshToken>()), Times.Never);
-            _userManagerMock.Verify(manager => manager.GetUserClaimsAsync(It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
-        public async Task ReviveToken_ReturnsError_WhenTokenIsExpired()
+        public async Task ReviveToken_CancelledAfterRotationDoesNotGenerateJwt()
         {
-            // Arrange
-            var refreshToken = "expired_refresh_token";
-            var storedRefreshToken = new RefreshToken
-            {
-                UserId = "userId",
-                TokenHash = "expired-hash",
-                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-1)
-            };
-
-            _tokenManagerMock
-                .Setup(t => t.GetRefreshTokenAsync(refreshToken))
-                .ReturnsAsync(storedRefreshToken);
-            _tokenManagerMock
-                .Setup(t => t.IsRefreshTokenActive(storedRefreshToken))
-                .Returns(false);
-            _tokenManagerMock
-                .Setup(t => t.RevokeRefreshTokenAsync(refreshToken, null, null))
-                .ReturnsAsync(1);
-
-            // Act
-            var result = await _authenticationService.ReviveToken(refreshToken);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.False(result.Success);
-            Assert.Equal("Invalid token.", result.Message);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            _tokenManagerMock.Setup(manager => manager.RotateRefreshTokenAsync("presented", null, null, cancellation.Token))
+                .ReturnsAsync(new RefreshRotationResult("synthetic", []));
+            Assert.False((await _authenticationService.ReviveToken("presented", cancellationToken: cancellation.Token)).Success);
+            _tokenManagerMock.Verify(manager => manager.GenerateAccessToken(It.IsAny<List<Claim>>()), Times.Never);
         }
 
-        [Fact]
-        public async Task ReviveToken_ReturnsError_WhenTokenHasAlreadyBeenRotated()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task Logout_ReportsOnlyConfirmedSessionRevocation(bool committed)
         {
-            // Arrange
-            var refreshToken = "rotated_refresh_token";
-            var storedRefreshToken = new RefreshToken
-            {
-                UserId = "userId",
-                TokenHash = "rotated-hash",
-                ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-                RevokedAtUtc = DateTime.UtcNow.AddMinutes(-1),
-                ReplacedByTokenHash = "replacement-hash"
-            };
-
-            _tokenManagerMock
-                .Setup(t => t.GetRefreshTokenAsync(refreshToken))
-                .ReturnsAsync(storedRefreshToken);
-            _tokenManagerMock
-                .Setup(t => t.IsRefreshTokenActive(storedRefreshToken))
-                .Returns(false);
-            _tokenManagerMock
-                .Setup(t => t.RevokeRefreshTokenFamilyAsync(refreshToken, null))
-                .ReturnsAsync(1);
-
-            // Act
-            var result = await _authenticationService.ReviveToken(refreshToken);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.False(result.Success);
-            Assert.Equal("Invalid token.", result.Message);
-            _tokenManagerMock.Verify(t => t.RevokeRefreshTokenFamilyAsync(refreshToken, null), Times.Once);
-        }
-
-        [Fact]
-        public async Task Logout_RevokesRefreshToken_WhenTokenIsPresent()
-        {
-            var refreshToken = "refresh-token";
-
-            _tokenManagerMock
-                .Setup(tokenManager => tokenManager.RevokeRefreshTokenAsync(refreshToken, null, null))
-                .ReturnsAsync(1);
-
-            var result = await _authenticationService.Logout(refreshToken);
-
-            Assert.True(result.Success);
-            Assert.Equal("Logged out successfully.", result.Message);
-            _tokenManagerMock.Verify(tokenManager => tokenManager.RevokeRefreshTokenAsync(refreshToken, null, null), Times.Once);
+            _tokenManagerMock.Setup(manager => manager.RevokeRefreshSessionAsync("presented", null, default)).ReturnsAsync(committed);
+            Assert.Equal(committed, (await _authenticationService.Logout("presented")).Success);
+            _tokenManagerMock.Verify(manager => manager.RevokeRefreshSessionAsync("presented", null, default), Times.Once);
         }
 
         [Fact]

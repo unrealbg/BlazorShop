@@ -18,7 +18,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
         {
             var refresher = new Mock<IAuthenticationSessionRefresher>();
             refresher
-                .Setup(service => service.TryRefreshAsync(false))
+                .Setup(service => service.TryRefreshAsync(false, null, true))
                 .ReturnsAsync((LoginResponse?)null);
 
             var tokenService = new Mock<ITokenService>();
@@ -30,7 +30,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
             await service.HandleAuthSessionEventAsync("signed-in");
 
-            refresher.Verify(sync => sync.TryRefreshAsync(false), Times.Once);
+            refresher.Verify(sync => sync.TryRefreshAsync(false, null, true), Times.Once);
             tokenService.Verify(sync => sync.RemoveJwtTokenAsync(It.IsAny<string>()), Times.Never);
         }
 

@@ -9,7 +9,7 @@
 
         Task<LoginResponse> LoginUser(LoginUser user, string? ipAddress = null, string? userAgent = null);
 
-        Task<LoginResponse> ReviveToken(string refreshToken, string? ipAddress = null, string? userAgent = null);
+        Task<LoginResponse> ReviveToken(string refreshToken, string? ipAddress = null, string? userAgent = null, CancellationToken cancellationToken = default);
 
         Task<ServiceResponse> Logout(string refreshToken, string? ipAddress = null);
 

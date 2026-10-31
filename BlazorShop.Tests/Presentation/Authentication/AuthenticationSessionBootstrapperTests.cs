@@ -37,14 +37,14 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
             var refresher = new Mock<IAuthenticationSessionRefresher>();
             refresher
-                .Setup(service => service.TryRefreshAsync(false))
+                .Setup(service => service.TryRefreshAsync(false, null, true))
                 .ReturnsAsync((LoginResponse?)null);
 
             var bootstrapper = new AuthenticationSessionBootstrapper(tokenService.Object, refresher.Object);
 
             await bootstrapper.RestoreAsync();
 
-            refresher.Verify(service => service.TryRefreshAsync(false), Times.Once);
+            refresher.Verify(service => service.TryRefreshAsync(false, null, true), Times.Once);
         }
     }
 }
