@@ -55,8 +55,9 @@
 .v2-admin table { width: 100%; min-width: 0 !important; border-collapse: collapse; background: white; }
 .v2-admin :is(.bs-table-wide, .bs-table-compact) { min-width: 0 !important; }
 .v2-admin :is(th, td) { padding: 12px; font-size: .8rem; text-align: left; vertical-align: top; }
-.v2-admin th { background: #f8fafc; color: #64748b; font-weight: 650; }
+.v2-admin th { background: #f8fafc; color: #64748b; font-weight: 650; white-space: nowrap; }
 .v2-admin td { border-top: 1px solid var(--admin-line); }
+.v2-admin td:is([data-label="Price"], [data-label="Quantity"], [data-label="Qty"], [data-label="Stock"], [data-label="Unit"], [data-label="Total"], [data-label="Amount (€)"]) { white-space: nowrap; }
 .v2-admin td img { max-width: 70px; max-height: 70px; object-fit: contain; }
 .v2-admin-image-fallback { display: inline-flex; align-items: center; justify-content: center; width: 64px; min-height: 48px; border: 1px dashed #cbd5e1; border-radius: 7px; color: #64748b; background: #f8fafc; font-size: .7rem; }
 .v2-admin canvas { max-width: 100%; }
@@ -72,6 +73,8 @@
 .v2-admin-dialog::backdrop { background: #0b12209c; }
 .v2-admin-dialog-header { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #dfe5ec; background: white; }
 .v2-admin-dialog-header h5 { font-size: 1.15rem; font-weight: 650; }
+.v2-admin-dialog-header > div { flex: 1; min-width: 0; }
+.v2-admin-dialog-header > div > .flex { flex-wrap: wrap; gap: 4px 12px; }
 .v2-admin-close { min-width: 44px; min-height: 44px; border: 1px solid #dfe5ec; border-radius: 7px; background: white; font-size: 1.6rem; color: #475569; }
 .v2-admin-dialog-body { padding: 22px; }
 .v2-admin-dialog-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid #dfe5ec; background: #f8fafc; }

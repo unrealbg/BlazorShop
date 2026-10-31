@@ -89,7 +89,7 @@ public sealed partial class AdminOperationsTests(E2EApplicationFixture applicati
         await Page.EvaluateAsync("document.fonts.ready");
         var directory = Path.Combine(application.ArtifactDirectory, "ui-v2-admin");
         Directory.CreateDirectory(directory);
-        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{state}-{width}.png"), FullPage = true, Mask = [Page.Locator("input[type='password']"), Page.Locator("dialog[open] pre"), Page.Locator("dialog[open] div:has(> dt:text-is('IP')) dd, dialog[open] div:has(> dt:text-is('User agent')) dd"), Page.Locator("#admin-settings-9, #admin-settings-10")] });
+        await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{state}-{width}.png"), FullPage = await Dialog.CountAsync() == 0, Mask = [Page.Locator("input[type='password']"), Page.Locator("dialog[open] pre"), Page.Locator("dialog[open] div:has(> dt:text-is('IP')) dd, dialog[open] div:has(> dt:text-is('User agent')) dd"), Page.Locator("#admin-settings-9, #admin-settings-10")] });
     }
 
     private ILocator Dialog => Page.Locator("dialog[open]");
