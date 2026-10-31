@@ -13,6 +13,24 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
     public class AuthenticationSessionSyncServiceTests
     {
+        [Theory]
+        [InlineData("signed-in", true)]
+        [InlineData("session-refreshed", true)]
+        [InlineData("signed-in", false)]
+        public async Task SupersededFlight_ReevaluatesOnlyTheStillSignedInAnnouncedEpoch(string eventType, bool stillSignedIn)
+        {
+            var refresher = new Mock<IAuthenticationSessionRefresher>();
+            refresher.Setup(service => service.TryRefreshAsync(null, true)).ReturnsAsync((BlazorShop.Web.Shared.Models.LoginResponse?)null);
+            var coordinator = new Mock<IAuthenticationSessionCoordinator>();
+            coordinator.Setup(service => service.GetEpochAsync()).ReturnsAsync("announced");
+            coordinator.Setup(service => service.IsSignedInAsync("announced")).ReturnsAsync(stillSignedIn);
+            var service = new AuthenticationSessionSyncService(refresher.Object, Mock.Of<ITokenService>(),
+                Mock.Of<IAuthenticatedClientStateCleaner>(), Mock.Of<IAuthenticationStateNotifier>(),
+                Mock.Of<IJSRuntime>(), coordinator.Object);
+            await service.HandleAuthSessionEventAsync(eventType);
+            refresher.Verify(instance => instance.TryRefreshAsync(null, true), Times.Exactly(stillSignedIn ? 2 : 1));
+        }
+
         [Fact]
         public async Task HandleAuthSessionEventAsync_WhenSignedIn_RefreshesWithoutClearing()
         {
@@ -26,7 +44,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
             var notifier = new Mock<IAuthenticationStateNotifier>();
             var jsRuntime = new Mock<IJSRuntime>();
 
-            var service = new AuthenticationSessionSyncService(refresher.Object, tokenService.Object, cleaner.Object, notifier.Object, jsRuntime.Object);
+            var service = new AuthenticationSessionSyncService(refresher.Object, tokenService.Object, cleaner.Object, notifier.Object, jsRuntime.Object, Mock.Of<IAuthenticationSessionCoordinator>());
 
             await service.HandleAuthSessionEventAsync("signed-in");
 
@@ -49,7 +67,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
             var notifier = new Mock<IAuthenticationStateNotifier>();
             var jsRuntime = new Mock<IJSRuntime>();
 
-            var service = new AuthenticationSessionSyncService(refresher.Object, tokenService.Object, cleaner.Object, notifier.Object, jsRuntime.Object);
+            var service = new AuthenticationSessionSyncService(refresher.Object, tokenService.Object, cleaner.Object, notifier.Object, jsRuntime.Object, Mock.Of<IAuthenticationSessionCoordinator>());
 
             tokenService.Setup(token => token.GetJwtTokenAsync(Constant.TokenStorage.Key)).ReturnsAsync("synthetic");
             await service.HandleAuthSessionEventAsync("signed-out");

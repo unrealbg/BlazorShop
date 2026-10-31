@@ -132,6 +132,7 @@ public sealed class AuthenticationSessionRefresherTests
         public Task<bool> HasCurrentEpochAsync() => Task.FromResult(true);
         public List<string> CommittedTokens { get; } = [];
         public int SignOuts { get; private set; }
+        public Task<bool> IsSignedInAsync(string epoch) => Task.FromResult(Current);
         public Task<string> GetEpochAsync() => Task.FromResult("synthetic-epoch");
         public Task<bool> BeginRefreshAsync() => Task.FromResult(Current);
         public Task<bool> CommitTokenAsync(string token) { if (Current) CommittedTokens.Add(token); return Task.FromResult(Current); }

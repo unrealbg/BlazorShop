@@ -41,6 +41,7 @@ public sealed class AuthenticationSessionCoordinator(IJSRuntime js) : IAuthentic
     public async Task<bool> IsCurrentAsync() => executingEpoch is not null
         && await (await ModuleAsync()).InvokeAsync<bool>("isCurrent", executingEpoch);
     public async Task<bool> HasCurrentEpochAsync() => await (await ModuleAsync()).InvokeAsync<bool>("hasCurrentEpoch");
+    public async Task<bool> IsSignedInAsync(string epoch) => await (await ModuleAsync()).InvokeAsync<bool>("isSignedIn", epoch);
     public async Task<string> GetEpochAsync() => await (await ModuleAsync()).InvokeAsync<string>("currentEpoch");
     public async Task<bool> BeginRefreshAsync() => await (await ModuleAsync()).InvokeAsync<bool>("beginRefresh", executingEpoch);
     public async Task<bool> CommitTokenAsync(string token) => await (await ModuleAsync()).InvokeAsync<bool>("commitToken", executingEpoch, token);

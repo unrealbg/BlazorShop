@@ -12,6 +12,7 @@ function state() {
 export function currentEpoch() { return state().epoch; }
 export function canRefresh() { return !["signed-out", "authenticating"].includes(state().status); }
 export function isCurrent(epoch) { return state().epoch === epoch; }
+export function isSignedIn(epoch) { return isCurrent(epoch) && state().status === "signed-in"; }
 export function hasCurrentEpoch() { return sessionStorage.getItem(epochKey) === currentEpoch(); }
 export function beginRefresh(epoch) {
     const current = state();
