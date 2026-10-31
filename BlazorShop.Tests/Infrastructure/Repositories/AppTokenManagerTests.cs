@@ -1,6 +1,7 @@
 namespace BlazorShop.Tests.Infrastructure.Repositories
 {
     using BlazorShop.Domain.Entities.Identity;
+    using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Infrastructure.Data;
     using BlazorShop.Infrastructure.Repositories.Authentication;
 
@@ -8,6 +9,7 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
     using Microsoft.Extensions.Configuration;
 
     using Xunit;
+    using Moq;
 
     public class AppTokenManagerTests
     {
@@ -98,7 +100,9 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
                 })
                 .Build();
 
-            return new AppTokenManager(context, configuration);
+            var users = new Mock<IAppUserManager>();
+            users.Setup(manager => manager.CanRefreshSignInAsync(It.IsAny<AppUser>())).ReturnsAsync(true);
+            return new AppTokenManager(context, configuration, users.Object);
         }
 
         private static async Task SeedUserAsync(AppDbContext context, string userId)

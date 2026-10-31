@@ -5,6 +5,7 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
     using BlazorShop.Application.DTOs.Admin.Users;
     using BlazorShop.Application.Services.Contracts.Admin;
     using BlazorShop.Domain.Entities.Identity;
+    using BlazorShop.Domain.Contracts.Authentication;
     using BlazorShop.Infrastructure.Data;
     using BlazorShop.Infrastructure.Services.Admin;
 
@@ -129,7 +130,8 @@ namespace BlazorShop.Tests.Infrastructure.Services.Admin
                     provider.GetRequiredService<UserManager<AppUser>>(),
                     roleManager,
                     context,
-                    audit.Object);
+                    audit.Object,
+                    Mock.Of<IAppTokenManager>());
 
                 return new IdentityFixture(provider, service, provider.GetRequiredService<UserManager<AppUser>>());
             }

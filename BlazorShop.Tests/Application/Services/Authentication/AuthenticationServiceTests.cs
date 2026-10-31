@@ -580,6 +580,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _tokenManagerMock.Setup(t => t.GetRefreshTokenAsync(refreshToken)).ReturnsAsync(storedRefreshToken);
             _tokenManagerMock.Setup(t => t.IsRefreshTokenActive(storedRefreshToken)).Returns(true);
             _userManagerMock.Setup(u => u.GetUserByIdAsync(userId)).ReturnsAsync(appUser);
+            _userManagerMock.Setup(u => u.CanRefreshSignInAsync(appUser)).ReturnsAsync(true);
             _userManagerMock.Setup(u => u.GetUserClaimsAsync(appUser.Email)).ReturnsAsync(claims);
             _tokenManagerMock.Setup(t => t.GenerateAccessToken(claims)).Returns(newAccessToken);
             _tokenManagerMock.Setup(t => t.GetReFreshToken()).Returns(newRefreshToken);
@@ -615,6 +616,29 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             Assert.NotNull(result);
             Assert.False(result.Success);
             Assert.Equal("Invalid token.", result.Message);
+        }
+
+        [Fact]
+        public async Task ReviveToken_IneligibleUserRevokesPresentedFamilyBeforeGeneratingAnyToken()
+        {
+            var stored = new RefreshToken { UserId = "restricted-user", ExpiresAtUtc = DateTime.UtcNow.AddDays(1) };
+            var user = new AppUser { Id = stored.UserId, Email = "restricted@example.test" };
+            _tokenManagerMock.Setup(manager => manager.GetRefreshTokenAsync("presented")).ReturnsAsync(stored);
+            _tokenManagerMock.Setup(manager => manager.IsRefreshTokenActive(stored)).Returns(true);
+            _userManagerMock.Setup(manager => manager.GetUserByIdAsync(stored.UserId)).ReturnsAsync(user);
+            _userManagerMock.Setup(manager => manager.CanRefreshSignInAsync(user)).ReturnsAsync(false);
+
+            var result = await _authenticationService.ReviveToken("presented");
+
+            Assert.False(result.Success);
+            Assert.True(string.IsNullOrEmpty(result.Token));
+            Assert.True(string.IsNullOrEmpty(result.RefreshToken));
+            _tokenManagerMock.Verify(manager => manager.RevokeRefreshTokenFamilyAsync("presented", null), Times.Once);
+            _tokenManagerMock.Verify(manager => manager.RevokeRefreshTokenAsync("presented", null, null), Times.Once);
+            _tokenManagerMock.Verify(manager => manager.GenerateAccessToken(It.IsAny<List<Claim>>()), Times.Never);
+            _tokenManagerMock.Verify(manager => manager.GetReFreshToken(), Times.Never);
+            _tokenManagerMock.Verify(manager => manager.AddRefreshTokenAsync(It.IsAny<RefreshToken>()), Times.Never);
+            _userManagerMock.Verify(manager => manager.GetUserClaimsAsync(It.IsAny<string>()), Times.Never);
         }
 
         [Fact]

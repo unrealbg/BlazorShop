@@ -10,6 +10,8 @@
 
         Task<UserLoginResult> LoginUserAsync(AppUser user);
 
+        Task<bool> CanRefreshSignInAsync(AppUser user);
+
         Task<AppUser?> GetUserByEmailAsync(string email);
 
         Task<AppUser?> GetUserByIdAsync(string id);

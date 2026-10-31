@@ -217,6 +217,13 @@
                 return new LoginResponse { Message = "Invalid token." };
             }
 
+            if (!await _userManager.CanRefreshSignInAsync(currentUser))
+            {
+                await _tokenManager.RevokeRefreshTokenFamilyAsync(refreshToken, ipAddress);
+                await _tokenManager.RevokeRefreshTokenAsync(refreshToken, ipAddress);
+                return new LoginResponse { Message = "Invalid token." };
+            }
+
             var claims = await _userManager.GetUserClaimsAsync(currentUser.Email);
             var newAccessToken = _tokenManager.GenerateAccessToken(claims);
             var newRefreshToken = _tokenManager.GetReFreshToken();

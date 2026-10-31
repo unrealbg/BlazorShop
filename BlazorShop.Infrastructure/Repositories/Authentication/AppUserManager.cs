@@ -71,6 +71,12 @@
             return await _userManager.FindByEmailAsync(email);
         }
 
+        public async Task<bool> CanRefreshSignInAsync(AppUser user)
+        {
+            return await _signInManager.CanSignInAsync(user)
+                && !await _userManager.IsLockedOutAsync(user);
+        }
+
         public async Task<AppUser?> GetUserByIdAsync(string id)
         {
             var user = await _userManager.FindByIdAsync(id);

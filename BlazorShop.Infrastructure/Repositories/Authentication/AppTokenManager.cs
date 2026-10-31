@@ -20,11 +20,13 @@
 
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
+        private readonly IAppUserManager _userManager;
 
-        public AppTokenManager(AppDbContext context, IConfiguration config)
+        public AppTokenManager(AppDbContext context, IConfiguration config, IAppUserManager userManager)
         {
             _context = context;
             _config = config;
+            _userManager = userManager;
         }
 
         public string GetReFreshToken()
@@ -87,8 +89,66 @@
 
         public async Task<int> AddRefreshTokenAsync(RefreshToken refreshToken)
         {
+            if (!_context.Database.IsNpgsql())
+            {
+                var user = await _context.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Id == refreshToken.UserId);
+                return user is not null && await _userManager.CanRefreshSignInAsync(user)
+                    ? await SaveRefreshTokenAsync(refreshToken)
+                    : 0;
+            }
+
+            return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                // Serialize issuance with Identity's account update. A request that read the
+                // user before an admin lock must not insert a replacement after that lock.
+                var user = await _context.Users.FromSqlInterpolated(
+                    $"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {refreshToken.UserId} FOR UPDATE")
+                    .AsNoTracking().SingleOrDefaultAsync();
+                if (user is null || !await _userManager.CanRefreshSignInAsync(user))
+                {
+                    return 0;
+                }
+
+                // The client-generated ID makes a retry after an uncertain commit safe.
+                var existing = await _context.RefreshTokens.AsNoTracking()
+                    .SingleOrDefaultAsync(token => token.Id == refreshToken.Id);
+                if (existing is not null)
+                {
+                    return IsRefreshTokenActive(existing) ? 1 : 0;
+                }
+
+                try
+                {
+                    var saved = await SaveRefreshTokenAsync(refreshToken);
+                    await transaction.CommitAsync();
+                    return saved;
+                }
+                catch
+                {
+                    _context.Entry(refreshToken).State = EntityState.Detached;
+                    throw;
+                }
+            });
+        }
+
+        private async Task<int> SaveRefreshTokenAsync(RefreshToken refreshToken)
+        {
             _context.RefreshTokens.Add(refreshToken);
 
+            return await _context.SaveChangesAsync();
+        }
+
+        public async Task<int> RevokeUserRefreshTokensAsync(string userId)
+        {
+            var now = DateTime.UtcNow;
+            var activeTokens = _context.RefreshTokens.Where(token => token.UserId == userId && token.RevokedAtUtc == null);
+            if (_context.Database.IsRelational())
+            {
+                return await activeTokens.ExecuteUpdateAsync(update => update.SetProperty(token => token.RevokedAtUtc, now));
+            }
+
+            foreach (var token in await activeTokens.ToListAsync()) token.RevokedAtUtc = now;
             return await _context.SaveChangesAsync();
         }
 

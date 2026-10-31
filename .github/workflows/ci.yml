@@ -316,12 +316,12 @@ jobs:
       - name: Build archive tests
         run: dotnet build BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-restore
 
-      - name: Test archive migration on PostgreSQL 16
+      - name: Test archive migration and refresh eligibility on PostgreSQL 16
         run: >-
           dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj
           --configuration Release
           --no-build
-          --filter "FullyQualifiedName~LegacyCheckoutArchive"
+          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests"
           --verbosity normal
 
       - name: Report PostgreSQL 16 Compose image

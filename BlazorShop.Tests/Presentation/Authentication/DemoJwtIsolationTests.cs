@@ -275,7 +275,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
                 claims.AddRange((demoIds ?? []).Select(id => new Claim(DemoSessionConstants.ClaimType, id)));
                 if (fault is null)
                 {
-                    return new AppTokenManager(null!, _configuration).GenerateAccessToken(claims);
+                    return new AppTokenManager(null!, _configuration, null!).GenerateAccessToken(claims);
                 }
 
                 var key = fault == "signature" ? RandomNumberGenerator.GetBytes(48) : Encoding.UTF8.GetBytes(_configuration["JWT:Key"]!);
