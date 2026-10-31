@@ -140,6 +140,8 @@ jobs:
           test -s /tmp/storefront-site.css
           cp /tmp/storefront-site.css artifacts/web-build-toolchain/published-storefront.css
           cmp /tmp/storefront-site.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/site.css
+          curl --fail --max-time 5 'http://127.0.0.1:18080/css/ui-v2-storefront.css' --output /tmp/storefront-ui-v2.css
+          cmp /tmp/storefront-ui-v2.css BlazorShop.Presentation/BlazorShop.Storefront/wwwroot/css/ui-v2-storefront.css
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
@@ -152,6 +154,12 @@ jobs:
           test -s /tmp/web-site.css
           cp /tmp/web-site.css artifacts/web-build-toolchain/published-web.css
           cmp /tmp/web-site.css artifacts/web-build-toolchain/web-only.css
+          docker cp web-assets:/usr/share/nginx/html/css/ui-v2-checkout.css /tmp/web-checkout.css
+          docker cp web-assets:/usr/share/nginx/html/js/checkoutUi.js /tmp/web-checkout.js
+          docker cp web-assets:/usr/share/nginx/html/index.html /tmp/web-index.html
+          cmp /tmp/web-checkout.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/ui-v2-checkout.css
+          cmp /tmp/web-checkout.js BlazorShop.Presentation/BlazorShop.Web/wwwroot/js/checkoutUi.js
+          grep -F 'css/ui-v2-checkout.css' /tmp/web-index.html
 
       - name: Upload Tailwind CSS and compatibility evidence
         if: always()

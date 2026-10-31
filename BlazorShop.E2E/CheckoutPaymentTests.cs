@@ -4,7 +4,7 @@ using Microsoft.Playwright;
 using Microsoft.Playwright.Xunit;
 
 [Collection(E2ECollection.Name)]
-public sealed class CheckoutPaymentTests(E2EApplicationFixture application) : PageTest
+public sealed partial class CheckoutPaymentTests(E2EApplicationFixture application) : PageTest
 {
     public override BrowserNewContextOptions ContextOptions() => new() { IgnoreHTTPSErrors = true, Locale = "en-US" };
 
@@ -62,6 +62,8 @@ public sealed class CheckoutPaymentTests(E2EApplicationFixture application) : Pa
         {
             await Page.SetViewportSizeAsync(width, 1000);
             await Page.EvaluateAsync("document.fonts.ready");
+            Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"), $"Page overflow: {name} at {width}px");
+            Assert.True(await Page.Locator(".v2-checkout-panel, .v2-checkout-lines, .bs-v2-info-panel, dialog[open]").EvaluateAllAsync<bool>("elements => elements.every(e => { const r = e.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1 && e.scrollWidth <= e.clientWidth + 1; })"), $"Clipped content: {name} at {width}px");
             await Page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{name}-{width}.png"), FullPage = true });
         }
     }

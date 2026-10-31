@@ -1,21 +1,23 @@
 @page "/payment-cancel"
+@layout CheckoutLayout
 
-<div class="container m-5 p-5">
-    <div class="row">
-        <div class="col-lg-6 offset-3">
-            <div class="alert alert-warning text-center" role="status">
-                <h4>Payment not completed</h4>
-                <p>Visiting this page does not change your order or inventory.</p>
-                @if (OrderId.HasValue)
-                {
-                    <p>Order ID: @OrderId.Value</p>
-                }
-                <p>The server will use trusted payment events to determine the final order status.</p>
-                <a href="/account/orders">View orders</a>
-            </div>
-        </div>
+<PageTitle>Payment not completed | BlazorShop</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="v2-checkout-result v2-checkout-panel v2-checkout-cancel">
+    <span class="v2-checkout-result-icon" aria-hidden="true">×</span>
+    <p class="v2-eyebrow">Payment return</p>
+    <h1>Payment not completed</h1>
+    <p class="v2-muted">You returned from the payment process without a browser confirmation.</p>
+    <div role="status" class="v2-checkout-notice v2-checkout-warning">
+        <p>Visiting this page does not change your order or inventory.</p>
+        <p>The server will use trusted payment events to determine the final order status. Check your orders before taking further action.</p>
     </div>
-</div>
+    @if (OrderId.HasValue)
+    {
+        <dl class="v2-checkout-bank"><div><dt>Order ID</dt><dd>@OrderId.Value</dd></div></dl>
+    }
+    <a href="/account/orders" class="bs-button bs-button-primary">View orders</a>
+</section>
 
 @code {
     [Parameter]

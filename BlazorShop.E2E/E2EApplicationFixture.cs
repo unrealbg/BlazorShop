@@ -58,6 +58,10 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             .WithEnvironment("EmailSettings__From", "browser@example.test")
             .WithEnvironment("EmailSettings__SmtpServer", "smtp.example.test")
             .WithEnvironment("EmailSettings__DisplayName", "Synthetic browser store")
+            .WithEnvironment("BankTransfer__Iban", "BG00SYNTHETIC00000000")
+            .WithEnvironment("BankTransfer__Beneficiary", "Synthetic browser merchant")
+            .WithEnvironment("BankTransfer__BankName", "Synthetic browser bank")
+            .WithEnvironment("BankTransfer__AdditionalInfo", "Synthetic transfer instructions; no real payment")
             .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
