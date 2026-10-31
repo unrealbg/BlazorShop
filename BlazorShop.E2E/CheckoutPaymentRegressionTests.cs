@@ -80,6 +80,7 @@ public sealed partial class CheckoutPaymentTests
                     await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Cash on delivery", Exact = true })).ToBeVisibleAsync();
                     await Expect(Page.Locator("main")).ToContainTextAsync("not a paid status");
                 }
+                await CaptureAllAsync(method == "Bank Transfer" ? "bank-order-received" : "cod-order-received");
                 await Page.UnrouteAsync("**/api/cart/checkout");
                 Assert.Equal(1, submissions);
                 Assert.DoesNotContain(await Context.CookiesAsync(application.WebBaseUrl.ToString()), cookie => cookie.Name == "my-cart");
@@ -118,6 +119,7 @@ public sealed partial class CheckoutPaymentTests
             await CaptureAllAsync("methods-error");
             await Page.UnrouteAsync("**/api/payment/methods");
             await Page.GetByRole(AriaRole.Button, new() { Name = "Retry payment methods", Exact = true }).ClickAsync();
+            await Page.SetViewportSizeAsync(320, 1000);
             await OpenPaymentAsync();
             await AssertDialogKeyboardAsync();
             await Page.Keyboard.PressAsync("Escape");
@@ -172,6 +174,7 @@ public sealed partial class CheckoutPaymentTests
                 $"payment-success?pm=card&order_id={orderId}&reference=SYNTHETIC&session_id=spoofed&paid=true",
                 $"payment-success?pm=stripe&order_id={orderId}&session_id=spoofed",
                 $"payment-success/1?order_id={orderId}",
+                $"payment-success?bt=1&order_id={orderId}",
                 $"payment-success?pm=unknown&order_id={orderId}",
                 $"payment-cancel?order_id={orderId}&session_id=spoofed",
             })
@@ -182,7 +185,7 @@ public sealed partial class CheckoutPaymentTests
                 Assert.DoesNotContain("Payment completed", await Page.Locator("main").InnerTextAsync(), StringComparison.OrdinalIgnoreCase);
                 if (path.Contains("pm=card", StringComparison.Ordinal) || path.Contains("pm=stripe", StringComparison.Ordinal))
                     await Expect(Page.Locator("main")).ToContainTextAsync("awaiting server confirmation");
-                if (path.StartsWith("payment-success/1", StringComparison.Ordinal))
+                if (path.StartsWith("payment-success/1", StringComparison.Ordinal) || path.Contains("bt=1", StringComparison.Ordinal))
                     await Expect(Page.Locator("main")).ToContainTextAsync("payment expected");
                 await Page.ReloadAsync();
             }
@@ -232,6 +235,15 @@ public sealed partial class CheckoutPaymentTests
                 var directory = Path.Combine(application.ArtifactDirectory, "ui-v2-checkout-public", "no-js");
                 Directory.CreateDirectory(directory);
                 await page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"{path}-{width}.png"), FullPage = true });
+                if (path == "faq")
+                {
+                    var summary = page.Locator("summary").Filter(new() { HasText = "What payment methods" });
+                    await summary.FocusAsync();
+                    await summary.PressAsync("Space");
+                    await Expect(page.Locator("details[open]").Filter(new() { HasText = "What payment methods" })).ToBeVisibleAsync();
+                    await page.ScreenshotAsync(new() { Path = Path.Combine(directory, $"faq-expanded-{width}.png"), FullPage = true });
+                    await summary.PressAsync("Space");
+                }
             }
         }
     }
@@ -243,6 +255,12 @@ public sealed partial class CheckoutPaymentTests
         try
         {
             await LoginCheckoutAsync(data);
+            // The real API correctly hides unconfigured Stripe. Supply a test-only option for this UI boundary.
+            await Page.RouteAsync("**/api/payment/methods", route => route.FulfillAsync(new()
+            {
+                Status = 200, ContentType = "application/json",
+                Body = JsonSerializer.Serialize(new[] { new { id = PaymentMethodIds.CreditCard, name = "Synthetic Stripe card" } }),
+            }));
             await SetCartAsync(data);
             var before = await DatabaseSnapshotAsync(data);
             var orderId = Guid.NewGuid();
@@ -258,7 +276,7 @@ public sealed partial class CheckoutPaymentTests
                 }),
             }));
             await OpenPaymentAsync();
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Select Credit Card", Exact = true }).ClickAsync();
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Select Synthetic Stripe card", Exact = true }).ClickAsync();
             await Expect(Page).ToHaveURLAsync(redirect);
             await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Card payment: awaiting server confirmation", Exact = true })).ToBeVisibleAsync();
             await CaptureAllAsync("stripe-redirect-pending");

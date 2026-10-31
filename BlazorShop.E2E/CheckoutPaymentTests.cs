@@ -30,6 +30,10 @@ public sealed partial class CheckoutPaymentTests(E2EApplicationFixture applicati
             }]);
             await Page.ReloadAsync();
             await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = data.VariantProductName })).ToBeVisibleAsync();
+            var image = Page.Locator(".v2-checkout-thumb img").First;
+            await Expect(image).ToBeVisibleAsync();
+            await image.EvaluateAsync("image => image.decode()");
+            Assert.True(await image.EvaluateAsync<bool>("image => image.complete && image.naturalWidth > 0"));
             await CaptureAllAsync("checkout");
             await Page.GetByRole(AriaRole.Button, new() { Name = "Checkout", Exact = true }).ClickAsync();
             await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Select Payment Method", Exact = true })).ToBeVisibleAsync();

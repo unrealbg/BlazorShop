@@ -15,7 +15,7 @@
             <h2>Card payment: awaiting server confirmation</h2>
             <p>Stripe payment status is confirmed through trusted server notifications. Returning to this page does not confirm payment.</p>
         }
-        else if (NormalizedPaymentMethod == "bank" || Bt.GetValueOrDefault() == 1)
+        else if (NormalizedPaymentMethod == "bank" || Bt.GetValueOrDefault() == 1 || BankTransferQuery.GetValueOrDefault() == 1)
         {
             <h2>Bank transfer: payment expected</h2>
             <p>Use the bank transfer instructions provided at checkout. Visiting this page does not confirm receipt of a transfer.</p>
@@ -50,8 +50,11 @@
 
 @code {
     [Parameter]
-    [SupplyParameterFromQuery(Name = "bt")]
     public int? Bt { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "bt")]
+    public int? BankTransferQuery { get; set; }
 
     [Parameter]
     [SupplyParameterFromQuery(Name = "pm")]

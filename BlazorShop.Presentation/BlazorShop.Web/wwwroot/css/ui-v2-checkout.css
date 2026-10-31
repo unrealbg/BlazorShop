@@ -20,7 +20,7 @@
 .v2-checkout-thumb { flex: 0 0 64px; width: 64px; height: 76px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; display: grid; place-items: center; overflow: hidden; }
 .v2-checkout-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .v2-checkout-thumb span { padding: 4px; font-size: .7rem; color: #64748b; text-align: center; }
-.v2-checkout .v2-checkout-lines input { width: 74px; padding: 8px; min-height: 44px; }
+.v2-checkout .v2-checkout-lines input[type="number"] { width: 74px; max-width: 100%; padding: 8px; min-height: 44px; }
 .v2-checkout-remove { color: #b91c1c; min-height: 44px; font-weight: 600; background: transparent; border: 0; cursor: pointer; }
 .v2-checkout-unavailable { color: #92400e; font-weight: 600; }
 .v2-checkout-notice { padding: 16px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1e40af; margin-block: 16px; font-size: .85rem; overflow-wrap: anywhere; }
