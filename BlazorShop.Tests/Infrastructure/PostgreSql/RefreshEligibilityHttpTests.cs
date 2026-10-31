@@ -494,6 +494,12 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
 
             public Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request, CancellationToken cancellationToken = default) => client.SendAsync(request, cancellationToken);
 
+            public HttpClient CreateTransportClient(DelegatingHandler transport)
+            {
+                transport.InnerHandler = app.GetTestServer().CreateHandler();
+                return new HttpClient(transport) { BaseAddress = new Uri("https://localhost") };
+            }
+
             public async ValueTask DisposeAsync()
             {
                 client.Dispose();

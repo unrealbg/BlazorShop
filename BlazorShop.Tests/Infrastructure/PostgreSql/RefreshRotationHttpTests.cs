@@ -115,6 +115,38 @@ public sealed class RefreshRotationHttpTests(PostgreSqlFixture database)
     }
 
     [Fact]
+    public async Task TransportTimeoutAfterCommittedHttpResponse_IsNotRetriedAndKeepsOneLinkedSuccessor()
+    {
+        await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
+        var user = await host.CreateUserAsync("User");
+        var original = await host.LoginAsync(user);
+        var transport = new ResponseTimeout();
+        using var client = host.CreateTransportClient(transport);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/authentication/refresh-token");
+        request.Headers.Add("Cookie", original.Cookie);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SendAsync(request));
+        Assert.Equal(1, transport.Attempts);
+        Assert.Equal(2, await host.TokenCountAsync(user));
+        using var replay = await host.RefreshAsync(original);
+        Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        await host.AssertAllRevokedAsync(user);
+    }
+
+    private sealed class ResponseTimeout : DelegatingHandler
+    {
+        public int Attempts { get; private set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Attempts++;
+            using var committed = await base.SendAsync(request, cancellationToken);
+            Assert.Equal(HttpStatusCode.OK, committed.StatusCode);
+            // Deterministic transport boundary: the real HTTP action has committed,
+            // but no response headers/body/cookie are delivered to the client.
+            throw new TaskCanceledException("Injected transport timeout after server completion.");
+        }
+    }
+
+    [Fact]
     public async Task LogoutOfOldCredential_RevokesItsCurrentDescendantOnly()
     {
         await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
