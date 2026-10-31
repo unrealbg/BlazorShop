@@ -23,8 +23,9 @@ export function beginRefresh(epoch) {
 export function commitToken(epoch, token) {
     const current = state();
     if (!isCurrent(epoch) || current.status === "signed-out" || !token) return false;
-    // One JS turn: the epoch check and existing sessionStorage writes are atomic
-    // with respect to newer browser intents. The JWT never enters localStorage.
+    // Avoid same-document async gaps between the epoch check and token storage.
+    // Completed cross-tab credential operations are serialized by the Web Lock;
+    // intent notifications are advisory and never business authorization.
     sessionStorage.setItem('token', token);
     sessionStorage.setItem(epochKey, epoch);
     localStorage.setItem(stateKey, JSON.stringify({ epoch, status: current.status }));
