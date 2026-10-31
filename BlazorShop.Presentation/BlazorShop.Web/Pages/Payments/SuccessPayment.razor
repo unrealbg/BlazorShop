@@ -1,55 +1,60 @@
 @page "/payment-success"
 @page "/payment-success/{bt:int?}"
+@layout CheckoutLayout
 
-<section class="success-payment">
-    <div class="card shadow-sm success-payment-card">
-        <div class="card-header text-center">
-            <h4 class="mb-0">Order received</h4>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-success text-center" role="status">
-                <h4 class="alert-heading">Thank you for your order!</h4>
-                @if (NormalizedPaymentMethod == "card")
-                {
-                    <p>Your order already exists. Its payment status will be updated from Stripe's trusted server notification.</p>
-                }
-                else if (NormalizedPaymentMethod == "bank" || Bt.GetValueOrDefault() == 1)
-                {
-                    <p>Your order is awaiting the bank transfer described in your checkout instructions.</p>
-                }
-                else
-                {
-                    <p>Your order was placed successfully and is awaiting fulfillment.</p>
-                }
-
-                @if (OrderId.HasValue || !string.IsNullOrWhiteSpace(OrderReference))
-                {
-                    <hr>
-                    <dl class="mb-0">
-                        @if (!string.IsNullOrWhiteSpace(OrderReference))
-                        {
-                            <dt>Order reference</dt>
-                            <dd>@OrderReference</dd>
-                        }
-                        @if (OrderId.HasValue)
-                        {
-                            <dt>Order ID</dt>
-                            <dd>@OrderId.Value</dd>
-                        }
-                    </dl>
-                }
-
-                <hr>
-                <p class="mb-0">View the current server-known status on the <a href="/account/orders">Orders</a> page.</p>
-            </div>
-        </div>
+<PageTitle>Order received | BlazorShop</PageTitle>
+<HeadContent><meta name="robots" content="noindex,nofollow" /></HeadContent>
+<section class="v2-checkout-result v2-checkout-panel">
+    <header class="v2-checkout-result-heading">
+        <span class="v2-checkout-result-icon" aria-hidden="true">↗</span>
+        <div><p class="v2-eyebrow">Checkout result</p><h1>Order received</h1><p class="v2-muted">Check your orders for the current payment and fulfillment status.</p></div>
+    </header>
+    <div class="v2-checkout-notice" role="status">
+        @if (NormalizedPaymentMethod is "card" or "stripe")
+        {
+            <h2>Card payment: awaiting server confirmation</h2>
+            <p>Stripe payment status is confirmed through trusted server notifications. Returning to this page does not confirm payment.</p>
+        }
+        else if (NormalizedPaymentMethod == "bank" || Bt.GetValueOrDefault() == 1 || BankTransferQuery.GetValueOrDefault() == 1)
+        {
+            <h2>Bank transfer: payment expected</h2>
+            <p>Use the bank transfer instructions provided at checkout. Visiting this page does not confirm receipt of a transfer.</p>
+        }
+        else if (NormalizedPaymentMethod == "cod")
+        {
+            <h2>Cash on delivery</h2>
+            <p>Payment is collected on delivery. An order confirmation is not a paid status.</p>
+        }
+        else
+        {
+            <h2>Check your order status</h2>
+            <p>The payment method and current status are available in your orders.</p>
+        }
     </div>
+    @if (OrderId.HasValue || !string.IsNullOrWhiteSpace(OrderReference))
+    {
+        <dl class="v2-checkout-bank">
+            @if (!string.IsNullOrWhiteSpace(OrderReference))
+            {
+                <div><dt>Order reference</dt><dd>@OrderReference</dd></div>
+            }
+            @if (OrderId.HasValue)
+            {
+                <div><dt>Order ID</dt><dd>@OrderId.Value</dd></div>
+            }
+        </dl>
+    }
+    <p class="v2-muted v2-small">Details in this address are navigation references only. The Orders page shows your server-recorded order, payment and fulfillment status.</p>
+    <a href="/account/orders" class="bs-button bs-button-primary">View orders</a>
 </section>
 
 @code {
     [Parameter]
-    [SupplyParameterFromQuery(Name = "bt")]
     public int? Bt { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "bt")]
+    public int? BankTransferQuery { get; set; }
 
     [Parameter]
     [SupplyParameterFromQuery(Name = "pm")]

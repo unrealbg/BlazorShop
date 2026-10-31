@@ -4,30 +4,14 @@
 
 <SeoHead Metadata="_metadata" StructuredData="_structuredData" />
 
-<section class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-    <div class="rounded-2xl bg-white/80 p-6 shadow sm:p-8">
-        <header class="text-center">
-            <h1 class="text-3xl font-extrabold tracking-tight text-neutral-900">About BlazorShop</h1>
-            <p class="mt-4 text-base leading-7 text-neutral-700">
-                BlazorShop is a layered .NET commerce application. This storefront surface focuses on server-rendered product and category pages so public catalog content is available on stable, SEO-capable routes.
-            </p>
-        </header>
-
-        <div class="mt-8 grid gap-6 md:grid-cols-2">
-            <div class="rounded-2xl border border-neutral-200 bg-white/70 p-6">
-                <h2 class="text-lg font-bold text-neutral-900">What changed</h2>
-                <p class="mt-3 text-sm leading-6 text-neutral-700">
-                    Public category and product discovery now lives on route-based pages backed by published-only slug lookups. Admin and legacy interactive flows still remain available in the existing client app.
-                </p>
-            </div>
-            <div class="rounded-2xl border border-neutral-200 bg-white/70 p-6">
-                <h2 class="text-lg font-bold text-neutral-900">Why it matters</h2>
-                <p class="mt-3 text-sm leading-6 text-neutral-700">
-                    Search engines and social crawlers can now read real HTML responses for the main storefront pages instead of relying on modal-only product details and client-side head updates.
-                </p>
-            </div>
-        </div>
+<section class="bs-v2-info">
+    <header class="bs-v2-info-heading"><p class="bs-v2-info-eyebrow">About BlazorShop</p><h1>A practical .NET commerce starter</h1>
+        <p>A layered commerce application with a public storefront and a separate customer and admin workspace.</p></header>
+    <div class="bs-v2-info-grid">
+        <section class="bs-v2-info-panel"><p class="bs-v2-info-eyebrow">Storefront</p><h2>Discoverable by design</h2><p>Published products and categories have dedicated pages, with real catalog content, metadata and structured data.</p></section>
+        <section class="bs-v2-info-panel"><p class="bs-v2-info-eyebrow">Your account</p><h2>Keep your orders together</h2><p>Sign in to view your order history, manage your profile and access account notifications.</p><a href="@StorefrontRoutes.SignIn" class="bs-v2-info-link">Open your account →</a></section>
     </div>
+    <section class="bs-v2-info-panel"><p class="bs-v2-info-eyebrow">The application</p><h2>Built around real commerce</h2><p>The storefront and workspace use the same catalog and commerce services. Order, payment and fulfillment statuses remain separate so each stage can be checked in your order history.</p><div class="bs-v2-info-tags"><span>.NET 10</span><span>Blazor</span><span>PostgreSQL</span><span>Stripe</span></div></section>
 </section>
 
 @code {
@@ -39,11 +23,11 @@
         var metadataTask = SeoComposer.ComposeStaticPageAsync(
             "About Us",
             StorefrontRoutes.About,
-            "Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience.");
+            "Learn about the BlazorShop storefront, catalog and customer account experience.");
         var structuredDataTask = StructuredDataComposer.ComposeWebPageAsync(
             "About Us",
             StorefrontRoutes.About,
-            "Learn about the BlazorShop storefront, the production SEO migration, and the team behind the catalog experience.");
+            "Learn about the BlazorShop storefront, catalog and customer account experience.");
 
         await Task.WhenAll(metadataTask, structuredDataTask);
 

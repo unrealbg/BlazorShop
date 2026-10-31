@@ -137,6 +137,10 @@ public sealed class StorefrontCheckoutTests(E2EApplicationFixture application) :
                 .ToHaveAttributeAsync("href", new Uri(application.WebBaseUrl, "account").ToString());
             await Expect(footer.GetByRole(AriaRole.Link, new() { Name = "Sign in", Exact = true })).ToHaveCountAsync(0);
             await Expect(footer.GetByRole(AriaRole.Link, new() { Name = "Register", Exact = true })).ToHaveCountAsync(0);
+            await Page.GotoAsync(new Uri(application.StorefrontBaseUrl, "checkout").ToString());
+            await Expect(Page).ToHaveURLAsync(new Uri(application.WebBaseUrl, "account/checkout").ToString());
+            await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = data.VariantProductName }).GetByRole(AriaRole.Spinbutton)).ToHaveValueAsync("2");
+            await AssertCartCookieLineAsync(data.VariantProductId, data.VariantId, 2);
         });
     }
 

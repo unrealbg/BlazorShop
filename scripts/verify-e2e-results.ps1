@@ -26,7 +26,13 @@ $expectedTests = @(
     'BlazorShop.E2E.AdminOperationsTests.AdminAuthorization_CustomerDeniedAndDemoSessionBound',
     'BlazorShop.E2E.AdminOperationsTests.AdminSeo_MetadataAndRedirectCrud',
     'BlazorShop.E2E.AdminOperationsTests.AdminSettings_StoreOrdersNotificationsAndReadOnlySystem',
-    'BlazorShop.E2E.AdminOperationsTests.AdminFeedback_LoadingEmptyFailureAndRetry'
+    'BlazorShop.E2E.AdminOperationsTests.AdminFeedback_LoadingEmptyFailureAndRetry',
+    'BlazorShop.E2E.CheckoutPaymentTests.CheckoutAndPublicPages_ResponsivePresentation',
+    'BlazorShop.E2E.CheckoutPaymentTests.CheckoutMethods_RealCodBankTransferAndDoubleSubmitGuard',
+    'BlazorShop.E2E.CheckoutPaymentTests.CheckoutFeedback_LoadingUnavailableInvalidCartAndApiRecovery',
+    'BlazorShop.E2E.CheckoutPaymentTests.PaymentReturns_QueryParametersCannotMutateOrdersOrInventory',
+    'BlazorShop.E2E.CheckoutPaymentTests.PublicInformation_StaticSsrSeoAndKeyboardWithoutJavaScript',
+    'BlazorShop.E2E.CheckoutPaymentTests.CheckoutStripe_SyntheticRedirectRetainsPendingPresentation'
 )
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {

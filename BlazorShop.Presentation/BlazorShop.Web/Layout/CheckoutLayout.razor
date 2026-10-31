@@ -1,0 +1,24 @@
+@inherits LayoutComponentBase
+@inject IPublicStorefrontUrlResolver StorefrontUrlResolver
+
+<div class="v2-workspace v2-checkout">
+    <Toast />
+    <a class="v2-skip" href="@(NavigationManager.Uri.Split('#')[0] + "#checkout-content")" @onclick="FocusContentAsync" @onclick:preventDefault>Skip to content</a>
+    <header class="v2-workspace-header">
+        <div class="v2-workspace-container">
+            <a class="v2-brand" href="@StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver)">Blazor<span>Shop</span></a>
+            <nav aria-label="Checkout navigation" class="v2-header-actions">
+                <a href="@CartHref" class="v2-store-link">← Back to store</a>
+                <a href="/account/orders" class="bs-button bs-button-secondary">My orders</a>
+            </nav>
+        </div>
+    </header>
+    <main id="checkout-content" class="v2-workspace-container v2-checkout-main" tabindex="-1" @ref="_content">@Body</main>
+</div>
+
+@code {
+    private ElementReference _content;
+    private string CartHref => StorefrontNavigationHref.ResolveShopHref(StorefrontUrlResolver);
+    private async Task FocusContentAsync() => await _content.FocusAsync();
+}
+
