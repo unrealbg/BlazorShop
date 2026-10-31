@@ -22,7 +22,11 @@ public sealed class AuthenticationSessionCoordinator(IJSRuntime js) : IAuthentic
             if (onIntent is not null) await onIntent();
             reference ??= DotNetObjectReference.Create(this);
             actions.Add(id, action);
-            return await current.InvokeAsync<string>("runExclusive", reference, id, operation, epoch) == "completed";
+            // Acquisition has its own abortable JS deadline. Once acquired, the
+            // HTTP client's timeout owns cancellation: an interop timer must not
+            // abandon this callback while its credential POST is still in flight.
+            return await current.InvokeAsync<string>("runExclusive", CancellationToken.None,
+                reference, id, operation, epoch) == "completed";
         }
         catch (JSException) { return false; }
         catch (TaskCanceledException) { return false; }
