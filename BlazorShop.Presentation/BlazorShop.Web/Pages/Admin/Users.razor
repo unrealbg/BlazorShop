@@ -3,7 +3,7 @@
 
 <PageTitle>Admin Users</PageTitle>
 
-<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<section class="v2-admin-page">
     <header class="bs-panel bs-page-hero p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -11,15 +11,15 @@
                 <h1 class="mt-2 text-2xl font-bold text-slate-950">Users</h1>
             </div>
             <div class="bs-toolbar-cluster">
-                <input placeholder="Search email or name" @bind="_query.SearchTerm" @bind:event="oninput" />
-                <select class="min-w-44" @bind="_query.Role">
+                <input aria-label="Search email or name" placeholder="Search email or name" @bind="_query.SearchTerm" @bind:event="oninput" />
+                <select aria-label="Role" class="min-w-44" @bind="_query.Role">
                     <option value="">All roles</option>
                     @foreach (var role in _roles)
                     {
                         <option value="@role">@role</option>
                     }
                 </select>
-                <select class="min-w-44" @bind="_lockedFilter">
+                <select aria-label="Lock status" class="min-w-44" @bind="_lockedFilter">
                     <option value="">All statuses</option>
                     <option value="locked">Locked</option>
                     <option value="active">Unlocked</option>
@@ -32,11 +32,11 @@
 
     @if (_isLoading)
     {
-        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading users...</div>
+        <div role="status" class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading users...</div>
     }
     else if (!string.IsNullOrWhiteSpace(_loadError))
     {
-        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+        <div role="alert" class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
             <div>@_loadError</div>
             <button class="bs-button bs-button-primary mt-4" @onclick="LoadUsersAsync">Retry</button>
         </div>
@@ -48,26 +48,26 @@
     else
     {
         <div class="bs-table-shell mt-6 overflow-x-auto">
-            <table class="bs-table-wide min-w-full text-sm">
+            <table role="table" class="bs-table-wide min-w-full text-sm">
                 <thead>
                     <tr class="text-left">
-                        <th class="px-3 py-2">User</th>
-                        <th class="px-3 py-2">Roles</th>
-                        <th class="px-3 py-2">Email</th>
-                        <th class="px-3 py-2">Status</th>
-                        <th class="px-3 py-2">Created</th>
-                        <th class="px-3 py-2 text-right">Actions</th>
+                        <th scope="col" class="px-3 py-2">User</th>
+                        <th scope="col" class="px-3 py-2">Roles</th>
+                        <th scope="col" class="px-3 py-2">Email</th>
+                        <th scope="col" class="px-3 py-2">Status</th>
+                        <th scope="col" class="px-3 py-2">Created</th>
+                        <th scope="col" class="px-3 py-2 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200">
                     @foreach (var user in _page!.Items)
                     {
                         <tr>
-                            <td class="px-3 py-3 align-top">
+                            <td data-label="User" class="px-3 py-3 align-top">
                                 <div class="font-semibold text-slate-950">@DisplayName(user)</div>
                                 <div class="text-xs text-slate-500 break-all">@user.Id</div>
                             </td>
-                            <td class="px-3 py-3 align-top">
+                            <td data-label="Roles" class="px-3 py-3 align-top">
                                 <div class="flex flex-wrap gap-1">
                                     @foreach (var role in user.Roles)
                                     {
@@ -75,12 +75,12 @@
                                     }
                                 </div>
                             </td>
-                            <td class="px-3 py-3 align-top">
+                            <td data-label="Email" class="px-3 py-3 align-top">
                                 <span class="rounded-full px-2 py-1 text-xs font-semibold @(user.EmailConfirmed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800")">
                                     @(user.EmailConfirmed ? "Confirmed" : "Unconfirmed")
                                 </span>
                             </td>
-                            <td class="px-3 py-3 align-top">
+                            <td data-label="Status" class="px-3 py-3 align-top">
                                 <div class="flex flex-wrap gap-1">
                                     <span class="rounded-full px-2 py-1 text-xs font-semibold @(user.IsLocked ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")">
                                         @(user.IsLocked ? "Locked" : "Unlocked")
@@ -91,8 +91,8 @@
                                     }
                                 </div>
                             </td>
-                            <td class="px-3 py-3 align-top">@user.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd")</td>
-                            <td class="px-3 py-3 align-top">
+                            <td data-label="Created" class="px-3 py-3 align-top">@user.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                            <td data-label="Actions" class="px-3 py-3 align-top">
                                 <div class="flex flex-wrap justify-end gap-2">
                                     <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenDetailsAsync(user.Id)" disabled="@IsBusy">Details</button>
                                     <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenRoles(user)" disabled="@IsBusy">Roles</button>
@@ -127,7 +127,7 @@
     }
 </section>
 
-<ModalDialog @bind-IsVisible="_showDetails">
+<AdminDialog @bind-IsVisible="_showDetails">
     <Header>
         <h5 class="text-lg font-semibold">User Details</h5>
     </Header>
@@ -147,9 +147,9 @@
     <Footer>
         <button class="bs-button bs-button-ghost" @onclick="() => _showDetails = false">Close</button>
     </Footer>
-</ModalDialog>
+</AdminDialog>
 
-<ModalDialog @bind-IsVisible="_showRoles">
+<AdminDialog @bind-IsVisible="_showRoles">
     <Header>
         <h5 class="text-lg font-semibold">Edit Roles</h5>
     </Header>
@@ -169,7 +169,7 @@
         <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="SaveRolesAsync" disabled="@IsBusy">@(_isMutating ? "Saving..." : "Save")</button>
         <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="() => _showRoles = false" disabled="@IsBusy">Cancel</button>
     </Footer>
-</ModalDialog>
+</AdminDialog>
 
 @code {
     private AdminUserQuery _query = new();

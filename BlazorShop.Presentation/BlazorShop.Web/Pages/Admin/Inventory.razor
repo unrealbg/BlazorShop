@@ -3,7 +3,7 @@
 
 <PageTitle>Admin Inventory</PageTitle>
 
-<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<section class="v2-admin-page">
     <header class="bs-panel bs-page-hero p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -11,10 +11,10 @@
                 <h1 class="mt-2 text-2xl font-bold text-slate-950">Inventory</h1>
             </div>
             <div class="bs-toolbar-cluster">
-                <input placeholder="Search product or SKU" @bind="_query.SearchTerm" @bind:event="oninput" />
+                <input aria-label="Search product or SKU" placeholder="Search product or SKU" @bind="_query.SearchTerm" @bind:event="oninput" />
                 <label class="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" class="h-4 w-4" @bind="_query.LowStockOnly" /> Low</label>
                 <label class="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" class="h-4 w-4" @bind="_query.OutOfStockOnly" /> Out</label>
-                <input type="number" class="w-28" min="0" @bind="_query.LowStockThreshold" />
+                <input aria-label="Low Stock Threshold" type="number" class="w-28" min="0" @bind="_query.LowStockThreshold" />
                 <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply</button>
                 <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="ClearFiltersAsync" disabled="@_isLoading">Clear</button>
             </div>
@@ -23,11 +23,11 @@
 
     @if (_isLoading)
     {
-        <div class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading inventory...</div>
+        <div role="status" class="bs-panel-soft mt-6 px-6 py-5 text-sm text-slate-600">Loading inventory...</div>
     }
     else if (!string.IsNullOrWhiteSpace(_loadError))
     {
-        <div class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+        <div role="alert" class="mt-6 rounded border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
             <div>@_loadError</div>
             <button class="bs-button bs-button-primary mt-4" @onclick="LoadAsync">Retry</button>
         </div>
@@ -58,27 +58,27 @@
                     @if (item.Variants.Any())
                     {
                         <div class="overflow-x-auto">
-                            <table class="bs-table-wide min-w-full text-sm">
+                            <table role="table" class="bs-table-wide min-w-full text-sm">
                                 <thead>
                                     <tr class="text-left">
-                                        <th class="px-3 py-2">SKU</th>
-                                        <th class="px-3 py-2">Size</th>
-                                        <th class="px-3 py-2">Color</th>
-                                        <th class="px-3 py-2">Stock</th>
-                                        <th class="px-3 py-2">Status</th>
-                                        <th class="px-3 py-2 text-right">Actions</th>
+                                        <th scope="col" class="px-3 py-2">SKU</th>
+                                        <th scope="col" class="px-3 py-2">Size</th>
+                                        <th scope="col" class="px-3 py-2">Color</th>
+                                        <th scope="col" class="px-3 py-2">Stock</th>
+                                        <th scope="col" class="px-3 py-2">Status</th>
+                                        <th scope="col" class="px-3 py-2 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200">
                                     @foreach (var variant in item.Variants)
                                     {
                                         <tr>
-                                            <td class="px-3 py-2">@(!string.IsNullOrWhiteSpace(variant.Sku) ? variant.Sku : "-")</td>
-                                            <td class="px-3 py-2">@variant.SizeScale @variant.SizeValue</td>
-                                            <td class="px-3 py-2">@(!string.IsNullOrWhiteSpace(variant.Color) ? variant.Color : "-")</td>
-                                            <td class="px-3 py-2">@variant.Stock</td>
-                                            <td class="px-3 py-2">@StockBadge(variant.IsOutOfStock, variant.IsLowStock)</td>
-                                            <td class="px-3 py-2 text-right">
+                                            <td data-label="SKU" class="px-3 py-2">@(!string.IsNullOrWhiteSpace(variant.Sku) ? variant.Sku : "-")</td>
+                                            <td data-label="Size" class="px-3 py-2">@variant.SizeScale @variant.SizeValue</td>
+                                            <td data-label="Color" class="px-3 py-2">@(!string.IsNullOrWhiteSpace(variant.Color) ? variant.Color : "-")</td>
+                                            <td data-label="Stock" class="px-3 py-2">@variant.Stock</td>
+                                            <td data-label="Status" class="px-3 py-2">@StockBadge(variant.IsOutOfStock, variant.IsLowStock)</td>
+                                            <td data-label="Actions" class="px-3 py-2 text-right">
                                                 <button class="bs-subtle-action-link disabled:opacity-60" @onclick="() => OpenVariantStock(variant)" disabled="@_isSaving">Edit</button>
                                             </td>
                                         </tr>
@@ -101,33 +101,33 @@
     }
 </section>
 
-<ModalDialog @bind-IsVisible="_showProductStock">
+<AdminDialog @bind-IsVisible="_showProductStock">
     <Header><h5 class="text-lg font-semibold">Product Stock</h5></Header>
     <Body>
         <div class="space-y-3">
             <div class="font-semibold text-slate-900">@_editingProductName</div>
-            <input type="number" min="0" @bind="_productQuantity" />
+            <input aria-label="Product quantity" type="number" min="0" @bind="_productQuantity" />
         </div>
     </Body>
     <Footer>
         <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="SaveProductStockAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save")</button>
         <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="() => _showProductStock = false" disabled="@_isSaving">Cancel</button>
     </Footer>
-</ModalDialog>
+</AdminDialog>
 
-<ModalDialog @bind-IsVisible="_showVariantStock">
+<AdminDialog @bind-IsVisible="_showVariantStock">
     <Header><h5 class="text-lg font-semibold">Variant Stock</h5></Header>
     <Body>
         <div class="space-y-3">
             <div class="font-semibold text-slate-900">@_editingVariantLabel</div>
-            <input type="number" min="0" @bind="_variantStock" />
+            <input aria-label="Variant stock" type="number" min="0" @bind="_variantStock" />
         </div>
     </Body>
     <Footer>
         <button class="bs-button bs-button-primary disabled:opacity-60" @onclick="SaveVariantStockAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save")</button>
         <button class="bs-button bs-button-ghost disabled:opacity-60" @onclick="() => _showVariantStock = false" disabled="@_isSaving">Cancel</button>
     </Footer>
-</ModalDialog>
+</AdminDialog>
 
 @code {
     private AdminInventoryQuery _query = new();

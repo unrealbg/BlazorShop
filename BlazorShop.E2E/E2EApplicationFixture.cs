@@ -55,6 +55,9 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
             .WithEnvironment("Runtime__Security__EnableHttpsRedirection", "false")
             .WithEnvironment("Demo__Enabled", "true")
             .WithEnvironment("EmailSettings__Enabled", "false")
+            .WithEnvironment("EmailSettings__From", "browser@example.test")
+            .WithEnvironment("EmailSettings__SmtpServer", "smtp.example.test")
+            .WithEnvironment("EmailSettings__DisplayName", "Synthetic browser store")
             .WithEndpoint("https", endpoint => endpoint.Port = 7094);
         builder.CreateResourceBuilder(storefrontResource)
             .WithEnvironment("Api__BaseUrl", "http://apiservice/api/");
@@ -250,11 +253,14 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
     public async Task<Guid> SeedAccountOrderAsync(E2ETestData data)
     {
         await using var db = CreateDbContext();
+        var user = await db.Users.SingleAsync(candidate => candidate.Id == data.UserId);
         var order = new Order
         {
             UserId = data.UserId,
             Reference = $"UI-{data.SimpleProductSlug}",
             Currency = "EUR",
+            CustomerNameSnapshot = user.FullName,
+            CustomerEmailSnapshot = user.Email,
             OrderStatus = OrderStatus.Confirmed,
             PaymentStatus = OrderPaymentStatus.Paid,
             FulfillmentStatus = FulfillmentStatus.Shipped,
@@ -289,9 +295,16 @@ public sealed class E2EApplicationFixture : IAsyncLifetime
         await db.SaveChangesAsync();
     }
 
+    public async Task WithAdminDatabaseAsync(Func<AppDbContext, Task> action)
+    {
+        await using var db = CreateDbContext();
+        await action(db);
+    }
+
     public async Task RemoveScenarioAsync(E2ETestData data)
     {
         await using var dbContext = CreateDbContext();
+        dbContext.AdminAuditLogs.RemoveRange(await dbContext.AdminAuditLogs.Where(entry => entry.ActorUserId == data.UserId).ToListAsync());
         var orders = await dbContext.Orders.Where(order => order.UserId == data.UserId).ToListAsync();
         dbContext.Orders.RemoveRange(orders);
         var user = await dbContext.Users.SingleOrDefaultAsync(candidate => candidate.Id == data.UserId);

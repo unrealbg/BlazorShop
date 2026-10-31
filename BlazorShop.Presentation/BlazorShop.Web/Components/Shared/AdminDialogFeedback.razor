@@ -1,0 +1,34 @@
+@using BlazorShop.Web.Shared.Toast
+@implements IDisposable
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="v2-admin-dialog-feedback @(_isError ? "v2-admin-dialog-feedback-error" : string.Empty)" role="@(_isError ? "alert" : "status")">
+        <strong>@_heading</strong>
+        <p>@_message</p>
+    </div>
+}
+
+@code {
+    private string? _heading;
+    private string? _message;
+    private bool _isError;
+    private bool _disposed;
+
+    protected override void OnInitialized() => ToastService.OnShow += OnFeedback;
+
+    private void OnFeedback(object? sender, ToastEventArgs feedback)
+    {
+        if (_disposed) return;
+        _heading = feedback.Heading;
+        _message = feedback.Message;
+        _isError = feedback.Level is ToastLevel.Error or ToastLevel.Warning;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ToastService.OnShow -= OnFeedback;
+    }
+}

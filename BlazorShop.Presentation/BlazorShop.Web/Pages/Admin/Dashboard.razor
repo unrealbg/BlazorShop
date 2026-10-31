@@ -2,7 +2,7 @@
 
 <PageTitle>Admin Dashboard</PageTitle>
 
-<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-12 sm:mb-16">
+<section class="v2-admin-page">
   <div class="bs-panel p-6 admin-panel">
     <header class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div>
@@ -20,14 +20,14 @@
 
     @if (!string.IsNullOrWhiteSpace(_ordersError))
     {
-      <div class="mt-6 rounded border border-red-200 bg-red-50 px-5 py-5 text-sm text-red-700">
+      <div role="alert" class="mt-6 rounded border border-red-200 bg-red-50 px-5 py-5 text-sm text-red-700">
         <div>@_ordersError</div>
         <button type="button" class="bs-button bs-button-primary mt-4" @onclick="RetryLoadOrdersAsync">Retry orders</button>
       </div>
     }
     else if (_ordersLoading)
     {
-      <div class="mt-6 rounded border border-slate-200 bg-slate-50 px-5 py-5 text-sm text-slate-600">Loading admin orders...</div>
+      <div role="status" class="mt-6 rounded border border-slate-200 bg-slate-50 px-5 py-5 text-sm text-slate-600">Loading admin orders...</div>
     }
 
     <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -92,10 +92,10 @@
               <button class="bs-tab-button@(active ? " bs-tab-button-active" : string.Empty)" disabled="@_metricsLoading" @onclick="async () => await ApplyQuickRangeAsync(range)">@range d</button>
             }
           </div>
-          <input type="date" value="@_metricsFrom.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, true)" disabled="@_metricsLoading" />
+          <input aria-label="Metrics from date" type="date" value="@_metricsFrom.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, true)" disabled="@_metricsLoading" />
           <span>→</span>
-          <input type="date" value="@_metricsTo.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, false)" disabled="@_metricsLoading" />
-          <select value="@_metricsGranularity" @onchange="async e => await OnGranularityChangedAsync(e)" disabled="@_metricsLoading">
+          <input aria-label="Metrics to date" type="date" value="@_metricsTo.ToLocalTime().ToString("yyyy-MM-dd")" @onchange="async e => await OnMetricsDateChangedAsync(e, false)" disabled="@_metricsLoading" />
+          <select aria-label="Metrics granularity" value="@_metricsGranularity" @onchange="async e => await OnGranularityChangedAsync(e)" disabled="@_metricsLoading">
             <option value="day">Daily</option>
             <option value="week">Weekly</option>
             <option value="month">Monthly</option>
@@ -105,11 +105,11 @@
       <div class="p-4">
         @if (_metricsLoading)
         {
-          <div class="text-sm text-neutral-500">Loading metrics…</div>
+          <div role="status" class="text-sm text-neutral-500">Loading metrics…</div>
         }
         else if (!string.IsNullOrWhiteSpace(_metricsError))
         {
-          <div class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+          <div role="alert" class="rounded border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
             <div>@_metricsError</div>
             <button type="button" class="bs-button bs-button-primary mt-3" @onclick="RetryLoadMetricsAsync">Retry analytics</button>
           </div>
@@ -195,8 +195,8 @@
 
     <div class="bs-panel-soft mt-6 grid grid-cols-1 items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
       <div>
-        <label class="block text-xs text-neutral-600">Fulfillment</label>
-        <select value="@_statusFilter" @onchange="e => { _statusFilter = e.Value?.ToString() ?? string.Empty; ApplyFilters(); }">
+        <label class="block text-xs text-neutral-600" for="admin-dashboard-1">Fulfillment</label>
+        <select id="admin-dashboard-1" value="@_statusFilter" @onchange="e => { _statusFilter = e.Value?.ToString() ?? string.Empty; ApplyFilters(); }">
           <option value="">All</option>
           <option value="NotStarted">NotStarted</option>
           <option value="Shipped">Shipped</option>
@@ -207,16 +207,16 @@
         </select>
       </div>
       <div class="lg:col-span-2">
-        <label class="block text-xs text-neutral-600">Reference</label>
-        <input placeholder="Search..." @bind="_refQuery" @oninput="_ => ApplyFilters()" />
+        <label class="block text-xs text-neutral-600" for="admin-dashboard-2">Reference</label>
+        <input id="admin-dashboard-2" placeholder="Search..." @bind="_refQuery" @oninput="_ => ApplyFilters()" />
       </div>
       <div>
-        <label class="block text-xs text-neutral-600">From</label>
-        <input type="date" value="@(_fromDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _fromDate = d; else _fromDate = null; ApplyFilters(); }" />
+        <label class="block text-xs text-neutral-600" for="admin-dashboard-3">From</label>
+        <input id="admin-dashboard-3" type="date" value="@(_fromDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _fromDate = d; else _fromDate = null; ApplyFilters(); }" />
       </div>
       <div>
-        <label class="block text-xs text-neutral-600">To</label>
-        <input type="date" value="@(_toDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _toDate = d; else _toDate = null; ApplyFilters(); }" />
+        <label class="block text-xs text-neutral-600" for="admin-dashboard-4">To</label>
+        <input id="admin-dashboard-4" type="date" value="@(_toDate?.ToString("yyyy-MM-dd"))" @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _toDate = d; else _toDate = null; ApplyFilters(); }" />
       </div>
     </div>
 
@@ -231,17 +231,17 @@
         </div>
       </div>
       <div class="p-4 overflow-x-auto">
-        <table class="bs-table-wide min-w-full text-sm">
+        <table role="table" class="bs-table-wide min-w-full text-sm">
           <thead>
             <tr class="bg-neutral-50 text-left">
-              <th class="px-3 py-2">Created</th>
-              <th class="px-3 py-2">Reference</th>
-              <th class="px-3 py-2">Order</th>
-              <th class="px-3 py-2">Payment</th>
-              <th class="px-3 py-2">Fulfillment</th>
-              <th class="px-3 py-2">Total</th>
-              <th class="px-3 py-2">Tracking</th>
-              <th class="px-3 py-2">Actions</th>
+              <th scope="col" class="px-3 py-2">Created</th>
+              <th scope="col" class="px-3 py-2">Reference</th>
+              <th scope="col" class="px-3 py-2">Order</th>
+              <th scope="col" class="px-3 py-2">Payment</th>
+              <th scope="col" class="px-3 py-2">Fulfillment</th>
+              <th scope="col" class="px-3 py-2">Total</th>
+              <th scope="col" class="px-3 py-2">Tracking</th>
+              <th scope="col" class="px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-200">
@@ -250,13 +250,13 @@
               @foreach (var o in _displayOrders)
               {
                 <tr>
-                  <td class="px-3 py-2">@o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
-                  <td class="px-3 py-2">@o.Reference</td>
-                  <td class="px-3 py-2">@o.OrderStatus</td>
-                  <td class="px-3 py-2">@o.PaymentStatus</td>
-                  <td class="px-3 py-2">@o.FulfillmentStatus</td>
-                  <td class="px-3 py-2">@o.Currency @o.TotalAmount.ToString("F2")</td>
-                  <td class="px-3 py-2">
+                  <td data-label="Created" class="px-3 py-2">@o.CreatedOn.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                  <td data-label="Reference" class="px-3 py-2">@o.Reference</td>
+                  <td data-label="Order" class="px-3 py-2">@o.OrderStatus</td>
+                  <td data-label="Payment" class="px-3 py-2">@o.PaymentStatus</td>
+                  <td data-label="Fulfillment" class="px-3 py-2">@o.FulfillmentStatus</td>
+                  <td data-label="Total" class="px-3 py-2">@o.Currency @o.TotalAmount.ToString("F2")</td>
+                  <td data-label="Tracking" class="px-3 py-2">
                     @if (!string.IsNullOrWhiteSpace(o.TrackingUrl))
                     {
                       <a class="text-blue-700 hover:underline" href="@o.TrackingUrl" target="_blank" rel="noopener">Track</a>
@@ -270,7 +270,7 @@
                       <span class="text-neutral-500">—</span>
                     }
                   </td>
-                  <td class="px-3 py-2">
+                  <td data-label="Actions" class="px-3 py-2">
                     <button class="text-blue-700 hover:underline" @onclick="() => OpenEdit(o)">Edit</button>
                   </td>
                 </tr>
@@ -279,7 +279,7 @@
             else
             {
               <tr>
-                <td class="px-3 py-6 text-center text-neutral-500" colspan="6">No orders</td>
+                <td data-label="Created" class="px-3 py-6 text-center text-neutral-500" colspan="6">No orders</td>
               </tr>
             }
           </tbody>
@@ -304,25 +304,25 @@
             @g.Key.ToShortDateString() - Total: € @daily.ToString("F2")
           </div>
           <div class="p-4 overflow-x-auto">
-            <table class="bs-table-wide min-w-full text-sm">
+            <table role="table" class="bs-table-wide min-w-full text-sm">
               <thead>
                 <tr class="bg-neutral-50 text-left">
-                  <th class="px-3 py-2">Name</th>
-                  <th class="px-3 py-2">Email</th>
-                  <th class="px-3 py-2">Product</th>
-                  <th class="px-3 py-2">Quantity</th>
-                  <th class="px-3 py-2">Amount (€)</th>
+                  <th scope="col" class="px-3 py-2">Name</th>
+                  <th scope="col" class="px-3 py-2">Email</th>
+                  <th scope="col" class="px-3 py-2">Product</th>
+                  <th scope="col" class="px-3 py-2">Quantity</th>
+                  <th scope="col" class="px-3 py-2">Amount (€)</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-neutral-200">
                 @foreach (var r in rows)
                 {
                   <tr>
-                    <td class="px-3 py-2">@r.CustomerName</td>
-                    <td class="px-3 py-2">@r.CustomerEmail</td>
-                    <td class="px-3 py-2">@r.ProductName</td>
-                    <td class="px-3 py-2">@r.Quantity</td>
-                    <td class="px-3 py-2">@r.Amount.ToString("F2")</td>
+                    <td data-label="Name" class="px-3 py-2">@r.CustomerName</td>
+                    <td data-label="Email" class="px-3 py-2">@r.CustomerEmail</td>
+                    <td data-label="Product" class="px-3 py-2">@r.ProductName</td>
+                    <td data-label="Quantity" class="px-3 py-2">@r.Quantity</td>
+                    <td data-label="Amount (€)" class="px-3 py-2">@r.Amount.ToString("F2")</td>
                   </tr>
                 }
               </tbody>
@@ -343,17 +343,17 @@
   </div>
 </section>
 
-<ModalDialog @bind-IsVisible="_showEdit">
+<AdminDialog @bind-IsVisible="_showEdit">
   <Header>
     <h5 class="text-lg font-semibold">Edit Tracking</h5>
   </Header>
   <Body>
     <div class="space-y-2">
       <div class="text-xs text-neutral-600">Order: @_editOrder?.Reference</div>
-      <input class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
-      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
-      <input class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
-      <select class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
+      <input aria-label="Carrier" class="border rounded w-full px-2 py-1" placeholder="Carrier" @bind="_carrier" />
+      <input aria-label="Tracking Number" class="border rounded w-full px-2 py-1" placeholder="Tracking Number" @bind="_trackingNumber" />
+      <input aria-label="Tracking Url" class="border rounded w-full px-2 py-1" placeholder="Tracking Url" @bind="_trackingUrl" />
+      <select aria-label="Shipping status" class="border rounded w-full px-2 py-1" @bind="_shippingStatus">
         @foreach (var status in GetAllowedFulfillmentStatuses(_editOrder))
         {
           <option value="@status">@status</option>
@@ -365,4 +365,4 @@
     <button class="bs-button bs-button-primary" @onclick="SaveEditAsync">Save</button>
     <button class="bs-button bs-button-ghost ml-2" @onclick="() => _showEdit = false">Close</button>
   </Footer>
-</ModalDialog>
+</AdminDialog>

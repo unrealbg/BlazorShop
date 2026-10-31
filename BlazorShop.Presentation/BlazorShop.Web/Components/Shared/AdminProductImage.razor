@@ -1,0 +1,31 @@
+@if (!string.IsNullOrWhiteSpace(Source) && !_failed)
+{
+    <img src="@ImageSource" alt="@Alt" class="@Class" @onerror="() => _failed = true" />
+}
+else
+{
+    <span class="v2-admin-image-fallback" role="img" aria-label="No product image">No image</span>
+}
+
+@code {
+    [Parameter] public string? Source { get; set; }
+    [Parameter] public string Alt { get; set; } = "Product image";
+    [Parameter] public string? Class { get; set; }
+
+    private string? _previousSource;
+    private bool _failed;
+    private string? ImageSource;
+
+    protected override void OnParametersSet()
+    {
+        if (_previousSource == Source) return;
+        _failed = false;
+        _previousSource = Source;
+        ImageSource = Source;
+        if (Source?.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            using var client = HttpClientHelper.GetPublicClient();
+            if (client.BaseAddress is { } api) ImageSource = new Uri(api, Source).AbsoluteUri;
+        }
+    }
+}
