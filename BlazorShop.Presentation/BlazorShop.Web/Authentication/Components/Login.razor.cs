@@ -17,13 +17,12 @@
 
         private string _message = string.Empty;
 
-        [Inject]
-        private IAuthenticationSessionEventPublisher SessionEventPublisher { get; set; } = default!;
-
         [Parameter]
         public string Route { get; set; } = null!;
 
         public LoginUser User { get; set; } = new();
+
+        [Inject] private BlazorShop.Web.Authentication.Providers.IAuthenticationSessionCoordinator SessionCoordinator { get; set; } = default!;
 
         private bool IsSubmitting => _loginGate.IsRunning;
 
@@ -44,7 +43,8 @@
             await _loginGate.RunAsync(async () =>
             {
                 await ResetStatusAsync();
-                await CompleteLoginAsync();
+                var completed = await SessionCoordinator.RunAsync("login", CompleteLoginAsync);
+                if (!completed) { _message = "Session coordination is unavailable. Please sign in using a browser with Web Locks support."; _alertType = "danger"; }
             });
         }
 
@@ -54,6 +54,8 @@
             {
                 await ResetStatusAsync();
 
+                var completed = await SessionCoordinator.RunAsync("login", async () =>
+                {
                 var demoSession = await this.AuthenticationService.StartDemoSession(role);
                 if (!demoSession.Success)
                 {
@@ -67,12 +69,16 @@
                 User.Email = demoSession.Email;
                 User.Password = demoSession.Password;
                 await CompleteLoginAsync();
+                });
+                if (!completed) { _message = "Session coordination is unavailable. Please try signing in again."; _alertType = "danger"; }
             });
         }
 
         private async Task CompleteLoginAsync()
         {
             var result = await this.AuthenticationService.LoginUser(this.User);
+
+            if (!await SessionCoordinator.IsCurrentAsync()) return;
 
             if (!result.Success)
             {
@@ -81,10 +87,9 @@
                 return;
             }
 
-            await this.TokenService.StoreJwtTokenAsync(Constant.TokenStorage.Key, result.Token);
-
+            if (!await SessionCoordinator.CommitTokenAsync(result.Token)) return;
+            if (!await SessionCoordinator.PublishSignedInAsync()) return;
             (this.AuthStateProvider as CustomAuthStateProvider)!.NotifyAuthenticationState();
-            await this.SessionEventPublisher.PublishSignedInAsync();
 
             var authState = await this.AuthStateProvider.GetAuthenticationStateAsync();
             var targetRoute = ResolveTargetRoute(authState.User);
@@ -92,7 +97,7 @@
             var successMessage = string.IsNullOrWhiteSpace(result.Message) ? "You have signed in successfully." : result.Message;
 
             this.NotificationService.NotifySuccess(successMessage, "Signed in", NotificationKind.Authentication, link: inboxLink);
-            this.NavigationManager.NavigateTo(targetRoute);
+            if (await SessionCoordinator.IsCurrentAsync()) this.NavigationManager.NavigateTo(targetRoute);
         }
 
         private async Task ResetStatusAsync()

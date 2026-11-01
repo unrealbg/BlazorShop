@@ -111,7 +111,7 @@
             var response = await AuthenticationService.UpdateProfile(_updateProfile);
             if (response.Success)
             {
-                var refreshResult = await AuthenticationSessionRefresher.TryRefreshAsync(clearTokenOnFailure: false);
+                var refreshResult = await AuthenticationSessionRefresher.TryRefreshAsync();
                 if (refreshResult is not null)
                 {
                     await SessionEventPublisher.PublishSessionRefreshedAsync();

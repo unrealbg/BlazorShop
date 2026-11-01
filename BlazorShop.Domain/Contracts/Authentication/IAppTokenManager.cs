@@ -20,6 +20,12 @@
 
         Task<int> AddRefreshTokenAsync(RefreshToken refreshToken);
 
+        Task<RefreshRotationResult?> RotateRefreshTokenAsync(string refreshToken, string? ipAddress = null,
+            string? userAgent = null, CancellationToken cancellationToken = default);
+
+        Task<bool> RevokeRefreshSessionAsync(string refreshToken, string? ipAddress = null,
+            CancellationToken cancellationToken = default);
+
         Task<int> RevokeRefreshTokenAsync(string refreshToken, string? revokedByIp = null, string? replacedByRefreshToken = null);
 
         Task<int> RevokeRefreshTokenFamilyAsync(string refreshToken, string? revokedByIp = null);

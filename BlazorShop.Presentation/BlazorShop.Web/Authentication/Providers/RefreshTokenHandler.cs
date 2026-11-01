@@ -29,7 +29,7 @@
 
             if (!request.Options.TryGetValue(RetriedKey, out var retried) || !retried)
             {
-                var loginResponse = await _sessionRefresher.TryRefreshAsync();
+                var loginResponse = await _sessionRefresher.TryRefreshAsync(rejectedToken: request.Headers.Authorization?.Parameter);
                 if (loginResponse is not null)
                 {
                     if (request.Method == HttpMethod.Get || request.Content is null)

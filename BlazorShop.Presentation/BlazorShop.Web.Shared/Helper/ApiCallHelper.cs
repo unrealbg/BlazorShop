@@ -44,10 +44,10 @@
                 HttpResponseMessage response = callType switch
                 {
                     "post" => apiCall.Model is HttpContent content
-                        ? await client.PostAsync(route, content)
+                        ? await client.PostAsync(route, content, apiCall.CancellationToken)
                         : apiCall.Model is null
-                            ? await client.PostAsync(route, content: null)
-                        : await client.PostAsJsonAsync(route, (TModel)apiCall.Model!),
+                            ? await client.PostAsync(route, content: null, apiCall.CancellationToken)
+                        : await client.PostAsJsonAsync(route, (TModel)apiCall.Model!, apiCall.CancellationToken),
                     "update" => await client.PutAsJsonAsync(route, (TModel)apiCall.Model!),
                     "delete" => await client.DeleteAsync($"{route}/{apiCall.Id}"),
                     "get" => await client.GetAsync($"{route}{(apiCall.Id != null ? $"/{apiCall.Id}" : string.Empty)}"),

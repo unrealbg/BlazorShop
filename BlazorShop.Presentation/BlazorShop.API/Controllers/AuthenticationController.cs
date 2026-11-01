@@ -80,7 +80,7 @@
                 return this.BadRequest(new LoginResponse { Message = "Invalid token." });
             }
 
-            var result = await _authenticationService.ReviveToken(refreshToken, GetClientIpAddress(), GetUserAgent());
+            var result = await _authenticationService.ReviveToken(refreshToken, GetClientIpAddress(), GetUserAgent(), HttpContext.RequestAborted);
 
             if (!result.Success)
             {

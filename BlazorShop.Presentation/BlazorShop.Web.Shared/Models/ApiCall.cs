@@ -12,6 +12,8 @@
 
         public string? Id { get; set; }
 
+        public CancellationToken CancellationToken { get; set; }
+
         public void ToString(Guid id) => this.Id = id.ToString();
     }
 }

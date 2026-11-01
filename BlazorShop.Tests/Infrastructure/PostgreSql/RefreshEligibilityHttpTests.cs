@@ -244,8 +244,10 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             await host.AssertAllRevokedAsync(user);
         }
 
-        [Fact]
-        public async Task IssuanceAlreadyHoldingUserLock_CompletesBeforeAdminRevokesItsReplacement()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task IssuanceAlreadyHoldingUserLock_CompletesBeforeAdminRevokesItsReplacement(bool deactivate)
         {
             var barrier = new IssuanceBarrier(pauseAfterLock: true);
             await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString, barrier);
@@ -258,7 +260,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             try
             {
                 await barrier.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
-                locking = host.AdminAsync(admin, user.Id, "lock", new UserLockRequestDto());
+                locking = deactivate
+                    ? host.SendAsync(HttpMethod.Delete, $"/api/admin/users/{user.Id}", admin)
+                    : host.AdminAsync(admin, user.Id, "lock", new UserLockRequestDto());
                 await barrier.AccountWriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(30));
             }
             finally { barrier.Release.TrySetResult(); }
@@ -310,7 +314,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             }
         }
 
-        private static async Task AssertRejectedAsync(HttpResponseMessage response)
+        internal static async Task AssertRejectedAsync(HttpResponseMessage response)
         {
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             Assert.NotNull(result);
@@ -332,7 +336,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             public const string Password = "Isolated-test-password-123!";
             public IServiceProvider Services => app.Services;
 
-            public static async Task<IdentityHttpHost> CreateAsync(string connectionString, DbCommandInterceptor? interceptor = null,
+            public static async Task<IdentityHttpHost> CreateAsync(string connectionString, IInterceptor? interceptor = null,
                 bool requireAccount = true, bool requireEmail = true, string? observationKey = null, bool demoEnabled = false)
             {
                 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -427,7 +431,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 return await ReadSessionAsync(response);
             }
 
-            private static async Task<Session> ReadSessionAsync(HttpResponseMessage response)
+            internal static async Task<Session> ReadSessionAsync(HttpResponseMessage response)
             {
                 var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
                 Assert.NotNull(result);
@@ -488,7 +492,13 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 return await client.SendAsync(request);
             }
 
-            public Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request) => client.SendAsync(request);
+            public Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request, CancellationToken cancellationToken = default) => client.SendAsync(request, cancellationToken);
+
+            public HttpClient CreateTransportClient(DelegatingHandler transport)
+            {
+                transport.InnerHandler = app.GetTestServer().CreateHandler();
+                return new HttpClient(transport) { BaseAddress = new Uri("https://localhost") };
+            }
 
             public async ValueTask DisposeAsync()
             {

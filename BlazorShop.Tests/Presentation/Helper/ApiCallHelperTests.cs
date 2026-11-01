@@ -11,6 +11,44 @@ namespace BlazorShop.Tests.Presentation.Helper
 
     public class ApiCallHelperTests
     {
+        [Theory]
+        [InlineData("empty")]
+        [InlineData("content")]
+        [InlineData("json")]
+        public async Task PostCancellation_StopsOneAttemptWithoutRetry(string body)
+        {
+            var handler = new CancellablePost();
+            using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/api/") };
+            using var cancellation = new CancellationTokenSource();
+            using var content = new StringContent("synthetic");
+            var call = new ApiCall
+            {
+                Client = client, Route = "authentication/refresh-token", Type = Constant.ApiCallType.Post,
+                CancellationToken = cancellation.Token,
+                Model = body == "empty" ? null : body == "content" ? content : new Dictionary<string, string> { ["value"] = "synthetic" },
+            };
+            var pending = new ApiCallHelper().ApiCallTypeCall<Dictionary<string, string>>(call);
+            await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cancellation.Cancel();
+            using var response = await pending;
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+            Assert.Equal(1, handler.Attempts);
+        }
+
+        private sealed class CancellablePost : HttpMessageHandler
+        {
+            public int Attempts { get; private set; }
+            public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Attempts++;
+                var pending = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var registration = cancellationToken.Register(() => pending.TrySetCanceled(cancellationToken));
+                Started.TrySetResult();
+                return await pending.Task;
+            }
+        }
+
         [Fact]
         public async Task ApiCallTypeCall_ReturnsServiceUnavailableResponse_WhenGetRequestFails()
         {

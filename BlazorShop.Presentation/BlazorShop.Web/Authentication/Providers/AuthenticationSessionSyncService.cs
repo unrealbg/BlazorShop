@@ -14,6 +14,7 @@ namespace BlazorShop.Web.Authentication.Providers
         private readonly IAuthenticatedClientStateCleaner _clientStateCleaner;
         private readonly IAuthenticationStateNotifier _authenticationStateNotifier;
         private readonly IJSRuntime _jsRuntime;
+        private readonly IAuthenticationSessionCoordinator _coordinator;
 
         private IJSObjectReference? _module;
         private DotNetObjectReference<AuthenticationSessionSyncService>? _selfReference;
@@ -23,13 +24,15 @@ namespace BlazorShop.Web.Authentication.Providers
             ITokenService tokenService,
             IAuthenticatedClientStateCleaner clientStateCleaner,
             IAuthenticationStateNotifier authenticationStateNotifier,
-            IJSRuntime jsRuntime)
+            IJSRuntime jsRuntime,
+            IAuthenticationSessionCoordinator coordinator)
         {
             _sessionRefresher = sessionRefresher;
             _tokenService = tokenService;
             _clientStateCleaner = clientStateCleaner;
             _authenticationStateNotifier = authenticationStateNotifier;
             _jsRuntime = jsRuntime;
+            _coordinator = coordinator;
         }
 
         public async Task InitializeAsync()
@@ -51,12 +54,22 @@ namespace BlazorShop.Web.Authentication.Providers
             {
                 case "signed-in":
                 case "session-refreshed":
-                    await _sessionRefresher.TryRefreshAsync(clearTokenOnFailure: false);
+                    var onlyIfNeeded = eventType == "signed-in";
+                    var epoch = await _coordinator.GetEpochAsync();
+                    var refreshed = await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: onlyIfNeeded);
+                    // A newer credential login can supersede a flight already in this
+                    // tab. Re-evaluate that announced session after the old flight ends.
+                    // Failed/uncertain refresh changes the epoch to signed-out, so this
+                    // cannot retry a credential with an unknown outcome.
+                    if (refreshed is null && await _coordinator.IsSignedInAsync(epoch))
+                        await _sessionRefresher.TryRefreshAsync(onlyIfNeeded: onlyIfNeeded);
                     break;
+                case "session-changing":
                 case "signed-out":
+                    var hadToken = !string.IsNullOrWhiteSpace(await _tokenService.GetJwtTokenAsync(Constant.TokenStorage.Key));
                     await _tokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
                     await _clientStateCleaner.ClearAsync();
-                    _authenticationStateNotifier.NotifyAuthenticationState();
+                    if (hadToken) _authenticationStateNotifier.NotifyAuthenticationState();
                     break;
             }
         }

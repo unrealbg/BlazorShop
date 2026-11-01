@@ -3,16 +3,22 @@
 @inject BlazorShop.Web.Authentication.Providers.IAuthenticationStateNotifier AuthenticationStateNotifier
 @inject BlazorShop.Web.Authentication.Providers.IAuthenticationSessionEventPublisher SessionEventPublisher
 
+@inject BlazorShop.Web.Authentication.Providers.IAuthenticationSessionCoordinator SessionCoordinator
+
 @code {
 
     protected override async Task OnInitializedAsync()
     {
-        var response = await AuthenticationService.Logout();
+        // Local cleanup must also succeed when coordination cannot initialize.
         await TokenService.RemoveJwtTokenAsync(Constant.TokenStorage.Key);
         await AuthenticatedClientStateCleaner.ClearAsync();
-        AuthenticationStateNotifier.NotifyAuthenticationState();
-        await SessionEventPublisher.PublishSignedOutAsync();
+        BlazorShop.Web.Shared.Models.ServiceResponse response = new(false, "Unable to confirm logout.");
+        await SessionCoordinator.RunAsync("logout", async () =>
+        {
+            response = await AuthenticationService.Logout();
+        });
 
+        AuthenticationStateNotifier.NotifyAuthenticationState();
         if (response.Success)
         {
             var message = string.IsNullOrWhiteSpace(response.Message)

@@ -110,11 +110,13 @@
         public async Task<QueryResult<LoginResponse>> ReviveToken()
         {
             var client = _httpClientHelper.GetPublicClient();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
             var currentApiCall = new ApiCall
             {
                 Route = Constant.Authentication.ReviveToke,
                 Type = Constant.ApiCallType.Post,
                 Client = client,
+                CancellationToken = deadline.Token,
             };
 
             var result = await _apiCallHelper.ApiCallTypeCall<Unit>(currentApiCall);

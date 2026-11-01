@@ -20,7 +20,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
             var sessionRefresher = new Mock<IAuthenticationSessionRefresher>();
             sessionRefresher
-                .Setup(service => service.TryRefreshAsync(true))
+                .Setup(service => service.TryRefreshAsync(It.IsAny<string?>(), false))
                 .ReturnsAsync(new LoginResponse(true, "Token revived successfully.", refreshedToken));
             var innerHandler = new RecordingHandler(HttpStatusCode.Unauthorized, HttpStatusCode.OK);
 
@@ -35,7 +35,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
             Assert.Equal(2, innerHandler.CallCount);
             Assert.Equal("Bearer expired-token", innerHandler.AuthorizationHeaders[0]);
             Assert.Equal($"Bearer {refreshedToken}", innerHandler.AuthorizationHeaders[1]);
-            sessionRefresher.Verify(service => service.TryRefreshAsync(true), Times.Once);
+            sessionRefresher.Verify(service => service.TryRefreshAsync(It.IsAny<string?>(), false), Times.Once);
         }
 
         [Fact]
@@ -43,7 +43,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
         {
             var sessionRefresher = new Mock<IAuthenticationSessionRefresher>();
             sessionRefresher
-                .Setup(service => service.TryRefreshAsync(true))
+                .Setup(service => service.TryRefreshAsync(It.IsAny<string?>(), false))
                 .ReturnsAsync((LoginResponse?)null);
             var innerHandler = new RecordingHandler(HttpStatusCode.Unauthorized);
 
@@ -56,7 +56,7 @@ namespace BlazorShop.Tests.Presentation.Authentication
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
             Assert.Equal(1, innerHandler.CallCount);
-            sessionRefresher.Verify(service => service.TryRefreshAsync(true), Times.Once);
+            sessionRefresher.Verify(service => service.TryRefreshAsync(It.IsAny<string?>(), false), Times.Once);
         }
 
         private static HttpClient CreateClient(

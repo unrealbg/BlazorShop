@@ -99,7 +99,19 @@ jobs:
         run: dotnet build BlazorShop.sln --configuration Release --no-restore -warnaserror
 
       - name: Test
-        run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=postgres17-and-unit.trx" --results-directory artifacts/security-tests --verbosity normal
+
+      - name: Verify mandatory PostgreSQL 17 refresh security scenarios
+        shell: pwsh
+        run: ./scripts/verify-refresh-security-results.ps1 -Path artifacts/security-tests/postgres17-and-unit.trx
+
+      - name: Upload unit and PostgreSQL 17 security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-postgres17-${{ github.run_id }}
+          path: artifacts/security-tests
+          if-no-files-found: error
 
       - name: Report PostgreSQL 17 regression image
         run: docker image inspect postgres:17-alpine --format 'tag=postgres:17-alpine digests={{json .RepoDigests}}'
@@ -172,7 +184,7 @@ jobs:
   browser-e2e:
     if: github.event_name != 'pull_request' || github.base_ref == 'master'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -282,6 +294,22 @@ jobs:
           ./scripts/verify-e2e-results.ps1
           -Path artifacts/e2e/test-results/run-2/e2e-run-2.trx
 
+      - name: Install Firefox and WebKit for targeted session regressions
+        run: pwsh BlazorShop.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps firefox webkit
+
+      - name: Targeted Firefox and WebKit session regressions
+        shell: pwsh
+        run: |
+          foreach ($browser in @("firefox", "webkit")) {
+            $env:BLAZORSHOP_E2E_ARTIFACTS_DIR = "${{ github.workspace }}/artifacts/e2e/$browser"
+            & dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj --configuration Release --no-build --no-restore `
+              --filter "FullyQualifiedName~RefreshCoordinationTests" `
+              --logger "trx;LogFileName=$browser.trx" --results-directory "artifacts/e2e/test-results/$browser" `
+              --verbosity normal -- "Playwright.BrowserName=$browser"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            ./scripts/verify-e2e-results.ps1 -Path "artifacts/e2e/test-results/$browser/$browser.trx" -CoordinationOnly
+          }
+
       - name: Report E2E PostgreSQL image
         run: >-
           docker image inspect postgres:16.13-alpine3.23
@@ -321,8 +349,22 @@ jobs:
           dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj
           --configuration Release
           --no-build
-          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests"
+          --logger "trx;LogFileName=postgres16-security.trx"
+          --results-directory artifacts/postgres16
+          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests|FullyQualifiedName~RefreshRotationHttpTests"
           --verbosity normal
+
+      - name: Verify mandatory PostgreSQL 16 refresh security scenarios
+        shell: pwsh
+        run: ./scripts/verify-refresh-security-results.ps1 -Path artifacts/postgres16/postgres16-security.trx
+
+      - name: Upload PostgreSQL 16 security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-postgres16-${{ github.run_id }}
+          path: artifacts/postgres16
+          if-no-files-found: error
 
       - name: Report PostgreSQL 16 Compose image
         run: >-
