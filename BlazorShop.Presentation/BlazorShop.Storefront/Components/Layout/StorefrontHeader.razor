@@ -3,7 +3,11 @@
     <div class="bs-v2-header-main bs-v2-container">
         <a href="@StorefrontRoutes.Home" class="bs-v2-brand" aria-label="BlazorShop public shop home">Blazor<span>Shop</span></a>
 
-        <div class="bs-v2-header-message">Discover great products, all in one place.</div>
+        <form class="bs-v2-header-search" method="get" action="@StorefrontRoutes.Catalog" role="search" aria-label="Shop search">
+            <label class="bs-v2-visually-hidden" for="shop-search">Search the shop</label>
+            <input id="shop-search" name="q" type="search" maxlength="@StorefrontCatalogQuery.MaxSearchLength" placeholder="Search products…" />
+            <button type="submit" class="bs-v2-button bs-v2-button-primary">Search</button>
+        </form>
 
         <div class="bs-v2-header-actions" aria-label="Shop actions">
             <a href="@StorefrontRoutes.Cart" class="bs-v2-cart-action" aria-label="Open cart" title="Open cart">
@@ -22,6 +26,7 @@
     <div class="bs-v2-navline">
         <nav class="bs-v2-container bs-v2-desktop-nav" aria-label="Primary shop navigation">
             <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" ActiveClass="is-active">Home</NavLink>
+            <NavLink href="@StorefrontRoutes.Catalog" ActiveClass="is-active">Catalog</NavLink>
             <NavLink href="@StorefrontRoutes.NewReleases" ActiveClass="is-active">New Releases</NavLink>
             <NavLink href="@StorefrontRoutes.TodaysDeals" ActiveClass="is-active">Today's Deals</NavLink>
             <NavLink href="@StorefrontRoutes.About" ActiveClass="is-active">About</NavLink>
@@ -33,6 +38,7 @@
         <summary>Browse shop <span aria-hidden="true">☰</span></summary>
         <nav aria-label="Mobile shop navigation">
             <NavLink href="@StorefrontRoutes.Home" Match="NavLinkMatch.All" ActiveClass="is-active">Home</NavLink>
+            <NavLink href="@StorefrontRoutes.Catalog" ActiveClass="is-active">Catalog</NavLink>
             <NavLink href="@StorefrontRoutes.NewReleases" ActiveClass="is-active">New Releases</NavLink>
             <NavLink href="@StorefrontRoutes.TodaysDeals" ActiveClass="is-active">Today's Deals</NavLink>
             <NavLink href="@StorefrontRoutes.About" ActiveClass="is-active">About</NavLink>

@@ -6,6 +6,7 @@ $namespace = [System.Xml.XmlNamespaceManager]::new($trx.NameTable)
 $namespace.AddNamespace('trx', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
 $results = @($trx.SelectNodes('//trx:UnitTestResult', $namespace))
 $required = @{
+    'PublicCatalogHttpTests' = 6
     'RefreshRotationHttpTests' = 15
     'RefreshEligibilityHttpTests' = 17
     'SessionObservationHttpTests' = 18

@@ -25,7 +25,10 @@
 .bs-v2-header-main { min-height: 76px; display: grid; grid-template-columns: 180px minmax(0,1fr) auto; align-items: center; gap: 28px; }
 .bs-v2-brand { font-size: 1.3rem; font-weight: 760; color: var(--bs-v2-ink); letter-spacing: -.035em; white-space: nowrap; text-decoration: none; }
 .bs-v2-brand span { color: var(--bs-v2-blue); }
-.bs-v2-header-message { color: var(--bs-v2-muted); font-size: .91rem; text-align: center; }
+.bs-v2-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.bs-v2-header-search { display: flex; min-width: 0; gap: 8px; }
+.bs-v2-header-search input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; color: var(--bs-v2-ink); font: inherit; }
+.bs-v2-header-search input:focus-visible { outline: 3px solid var(--bs-v2-blue); outline-offset: 3px; }
 .bs-v2-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 22px; }
 .bs-v2-cart-action { display: flex; align-items: center; gap: 9px; position: relative; min-height: 44px; min-width: 44px; font-size: .9rem; font-weight: 520; text-decoration: none; }
 .bs-v2-cart-action svg { width: 25px; height: 25px; }
@@ -117,7 +120,8 @@
 }
 @media (max-width: 980px) {
     .bs-v2-header-main { grid-template-columns: 1fr auto; min-height: 64px; gap: 12px; }
-    .bs-v2-header-message,.bs-v2-navline { display: none; }
+    .bs-v2-navline { display: none; }
+    .bs-v2-header-search { grid-column: 1 / -1; grid-row: 2; padding-bottom: 12px; }
     .bs-v2-header-actions { gap: 12px; }
     .bs-v2-mobile-nav { display: block; border-top: 1px solid #f1f5f9; }
     .bs-v2-mobile-nav > summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 9px 16px; font-size: .86rem; font-weight: 650; cursor: pointer; list-style: none; }
@@ -364,3 +368,44 @@
 .bs-v2-info .bs-v2-info-code { font-size: 5rem; line-height: 1.1; font-weight: 750; letter-spacing: -.05em; color: #bfdbfe; margin: 0 0 22px; }
 .bs-v2-info-not-found .bs-v2-button { margin-top: 16px; }
 @media (max-width: 767px) { .bs-v2-info { padding-block: 30px 44px; } .bs-v2-info-grid { grid-template-columns: minmax(0,1fr); } .bs-v2-info-panel { padding: 20px; } }
+/* Public catalog/search: native GET controls, shared product cards and no prototype-only filters. */
+.bs-v2-catalog { padding-block: 24px 48px; }
+.bs-v2-catalog-breadcrumbs { display: flex; align-items: center; gap: 12px; color: var(--bs-v2-muted); font-size: .85rem; }
+.bs-v2-catalog-breadcrumbs a { display: inline-flex; align-items: center; min-height: 44px; color: var(--bs-v2-blue-strong); }
+.bs-v2-catalog-intro { margin: 18px 0 30px; }
+.bs-v2-catalog-intro h1 { margin: 8px 0 10px; font-size: clamp(1.9rem,4vw,2.65rem); line-height: 1.15; font-weight: 750; letter-spacing: -.035em; }
+.bs-v2-catalog-intro p:not(.bs-v2-eyebrow) { margin: 0; color: #475569; overflow-wrap: anywhere; }
+.bs-v2-catalog-layout { display: grid; grid-template-columns: 240px minmax(0,1fr); align-items: start; gap: 28px; }
+.bs-v2-catalog-filters { display: grid; gap: 20px; min-width: 0; padding: 22px; border: 1px solid var(--bs-v2-line); border-radius: 12px; background: #fff; }
+.bs-v2-catalog-filters h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.bs-v2-catalog-field { min-width: 0; }
+.bs-v2-catalog-field label { display: block; margin-bottom: 8px; color: #334155; font-size: .85rem; font-weight: 650; }
+.bs-v2-catalog-field :is(input,select) { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: var(--bs-v2-ink); font: inherit; font-size: .85rem; }
+.bs-v2-catalog-field :is(input,select):focus-visible { outline: 3px solid var(--bs-v2-blue); outline-offset: 3px; }
+.bs-v2-catalog-filter-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.bs-v2-catalog-filter-actions .bs-v2-button { flex: 1 1 100%; }
+.bs-v2-catalog-results { min-width: 0; }
+.bs-v2-catalog-results .bs-v2-listing-toolbar { margin-bottom: 4px; }
+.bs-v2-catalog-results .bs-v2-product-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.bs-v2-catalog-range { margin: 0 0 20px; color: #475569; font-size: .85rem; }
+.bs-v2-catalog-pagination { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin-top: 28px; }
+.bs-v2-catalog-pagination :is(a,span) { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--bs-v2-line); border-radius: 6px; font-size: .85rem; }
+.bs-v2-catalog-pagination a:hover { background: #eff6ff; color: #1d4ed8; }
+.bs-v2-catalog-pagination .is-current { border-color: var(--bs-v2-blue); background: var(--bs-v2-blue); color: #fff; font-weight: 700; }
+.bs-v2-catalog-notice { padding: 12px 16px; margin-bottom: 20px; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e40af; background: #eff6ff; }
+.bs-v2-catalog-search .bs-v2-catalog-layout { grid-template-columns: minmax(0,1fr); }
+.bs-v2-catalog-search .bs-v2-catalog-filters { grid-template-columns: minmax(0,2fr) repeat(2,minmax(0,1fr)) auto; align-items: end; }
+.bs-v2-catalog-search .bs-v2-catalog-filters h2 { grid-column: 1 / -1; }
+.bs-v2-catalog-search .bs-v2-catalog-filter-actions .bs-v2-button { flex-basis: auto; }
+.bs-v2-catalog-search .bs-v2-catalog-results .bs-v2-product-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+@media (max-width: 1000px) {
+    .bs-v2-catalog-results .bs-v2-product-grid,.bs-v2-catalog-search .bs-v2-catalog-results .bs-v2-product-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .bs-v2-catalog-search .bs-v2-catalog-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 767px) {
+    .bs-v2-catalog { padding-block: 16px 32px; }
+    .bs-v2-catalog-intro { margin-block: 12px 24px; }
+    .bs-v2-catalog-layout { grid-template-columns: minmax(0,1fr); gap: 24px; }
+    .bs-v2-catalog-filters,.bs-v2-catalog-search .bs-v2-catalog-filters { grid-template-columns: minmax(0,1fr); padding: 18px; gap: 16px; }
+    .bs-v2-catalog-filter-actions .bs-v2-button,.bs-v2-catalog-search .bs-v2-catalog-filter-actions .bs-v2-button { flex: 1 1 120px; }
+}

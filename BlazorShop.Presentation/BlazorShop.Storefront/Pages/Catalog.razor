@@ -1,0 +1,186 @@
+@page "/catalog"
+@inject StorefrontApiClient ApiClient
+@inject IStorefrontSeoComposer SeoComposer
+
+<SeoHead Metadata="_metadata" />
+
+<div class="bs-v2-container bs-v2-catalog @(_query.SearchTerm is null ? null : "bs-v2-catalog-search")">
+    @if (_unavailable)
+    {
+        <ServiceUnavailableState Title="Catalog is temporarily unavailable" Message="We couldn't load the catalog. Please try again shortly." />
+        <a class="bs-v2-button bs-v2-button-secondary" href="@_query.Url()">Try again</a>
+    }
+    else if (_notFound)
+    {
+        <NotFoundState Title="Catalog page not found" Message="This category, search or page isn't available. Start again with the catalog." />
+        <a class="bs-v2-button bs-v2-button-primary" href="@StorefrontRoutes.Catalog">Browse catalog</a>
+    }
+    else
+    {
+        <nav class="bs-v2-catalog-breadcrumbs" aria-label="Breadcrumb">
+            <a href="@StorefrontRoutes.Home">Home</a><span aria-hidden="true">/</span><span aria-current="page">Catalog</span>
+        </nav>
+        <header class="bs-v2-catalog-intro">
+            <p class="bs-v2-eyebrow">Browse &amp; discover</p>
+            <h1>@(_query.SearchTerm is null ? "Shop all products" : "Search results")</h1>
+            @if (_query.SearchTerm is not null)
+            {
+                <p>Results for <strong>“@_query.SearchTerm”</strong></p>
+            }
+            else
+            {
+                <p>Explore the catalog and find your next favorite.</p>
+            }
+        </header>
+        @if (_query.DefaultsApplied)
+        {
+            <p class="bs-v2-catalog-notice" role="status">An unsupported sort or page was reset to its default.</p>
+        }
+        <div class="bs-v2-catalog-layout">
+            <form class="bs-v2-catalog-filters" method="get" action="@StorefrontRoutes.Catalog" aria-label="Catalog filters">
+                <h2>Find products</h2>
+                <div class="bs-v2-catalog-field">
+                    <label for="catalog-query">Search products</label>
+                    <input id="catalog-query" name="q" type="search" value="@_query.SearchTerm" maxlength="@StorefrontCatalogQuery.MaxSearchLength" placeholder="Search by name or description" />
+                </div>
+                <div class="bs-v2-catalog-field">
+                    <label for="catalog-category">Category</label>
+                    <select id="catalog-category" name="category">
+                        <option value="" selected="@(!_query.CategoryId.HasValue)">All categories</option>
+                        @foreach (var category in _categories.OrderBy(category => category.Name))
+                        {
+                            <option value="@category.Id" selected="@(_query.CategoryId == category.Id)">@category.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="bs-v2-catalog-field">
+                    <label for="catalog-sort">Sort products</label>
+                    <select id="catalog-sort" name="sort">
+                        @foreach (var option in StorefrontCatalogQuery.SortOptions)
+                        {
+                            <option value="@option.Value" selected="@(_query.Sort == option.Value)">@option.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="bs-v2-catalog-filter-actions">
+                    <button type="submit" class="bs-v2-button bs-v2-button-primary">Apply filters</button>
+                    <a href="@StorefrontRoutes.Catalog" class="bs-v2-button bs-v2-button-secondary">Reset filters</a>
+                </div>
+            </form>
+            <section class="bs-v2-catalog-results" aria-labelledby="catalog-results-heading">
+                <div class="bs-v2-listing-toolbar">
+                    <h2 id="catalog-results-heading">@(_query.SearchTerm is null ? "Products" : "Matching products")</h2>
+                    <p class="bs-v2-count" role="status">@_page.TotalCount @(_page.TotalCount == 1 ? "product" : "products")</p>
+                </div>
+                @if (_page.TotalCount > 0)
+                {
+                    <p class="bs-v2-catalog-range">Showing @(((_query.PageNumber - 1) * StorefrontCatalogQuery.PageSize) + 1)–@(((_query.PageNumber - 1) * StorefrontCatalogQuery.PageSize) + _page.Items.Count) of @_page.TotalCount</p>
+                }
+                <ProductGrid Products="_page.Items" EmptyMessage="No products match your search or filters. Try a different term or reset the filters." />
+                @if (_page.TotalPages > 1)
+                {
+                    <nav class="bs-v2-catalog-pagination" aria-label="Catalog pagination">
+                        @if (_query.PageNumber > 1)
+                        {
+                            <a href="@_query.Url(_query.PageNumber - 1)" rel="prev" aria-label="Previous page">Previous</a>
+                        }
+                        @{ var previousPage = 0; }
+                        @foreach (var page in _query.PaginationPages(_page.TotalPages))
+                        {
+                            @if (previousPage > 0 && page - previousPage > 1)
+                            {
+                                <span aria-hidden="true">…</span>
+                            }
+                            @if (page == _query.PageNumber)
+                            {
+                                <span class="is-current" aria-current="page" aria-label="Page @(page)">@(page)</span>
+                            }
+                            else
+                            {
+                                <a href="@_query.Url(page)" aria-label="Page @(page)">@(page)</a>
+                            }
+                            previousPage = page;
+                        }
+                        @if (_query.PageNumber < _page.TotalPages)
+                        {
+                            <a href="@_query.Url(_query.PageNumber + 1)" rel="next" aria-label="Next page">Next</a>
+                        }
+                    </nav>
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private StorefrontCatalogQuery _query = new();
+    private IReadOnlyList<GetCategory> _categories = [];
+    private PagedResult<GetCatalogProduct> _page = new();
+    private SeoMetadataDto _metadata = new();
+    private bool _unavailable;
+    private bool _notFound;
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "category")] public string? Category { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public string? Page { get; set; }
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _query = StorefrontCatalogQuery.Parse(Search, Category, Sort, Page);
+        _unavailable = false;
+        _notFound = _query.IsInvalid;
+        if (!_notFound)
+        {
+            var categories = await ApiClient.GetPublishedCategoriesAsync();
+            _unavailable = !categories.IsSuccess;
+            _categories = categories.Value ?? [];
+            _notFound = !_unavailable && _query.CategoryId.HasValue && !_categories.Any(category => category.Id == _query.CategoryId);
+            if (!_unavailable && !_notFound)
+            {
+                var result = await ApiClient.GetPublishedCatalogPageAsync(_query.ToApiQuery());
+                _page = result.Value ?? new();
+                _unavailable = !result.IsSuccess || _page.PageNumber != _query.PageNumber
+                    || _page.PageSize != StorefrontCatalogQuery.PageSize || _page.TotalCount < 0
+                    || _page.Items is null || _page.Items.Count > StorefrontCatalogQuery.PageSize;
+                if (!_unavailable)
+                {
+                    var expectedCount = Math.Min(StorefrontCatalogQuery.PageSize, Math.Max(0L, (long)_page.TotalCount - (((long)_query.PageNumber - 1) * StorefrontCatalogQuery.PageSize)));
+                    _unavailable = _page.Items!.Count != expectedCount;
+                }
+
+                _notFound = !_unavailable && _query.PageNumber > Math.Max(1, _page.TotalPages);
+            }
+        }
+
+        if (_unavailable)
+        {
+            StorefrontResponseHeaders.ApplyServiceUnavailable(HttpContext);
+            _metadata = await SeoComposer.ComposeServiceUnavailablePageAsync("Catalog unavailable", StorefrontRoutes.Catalog, "Please try the catalog again shortly.");
+        }
+        else if (_notFound)
+        {
+            StorefrontResponseHeaders.ApplyNotFound(HttpContext);
+            _metadata = await SeoComposer.ComposeNotFoundPageAsync("Catalog page not found", StorefrontRoutes.Catalog, "This catalog page isn't available.");
+        }
+        else
+        {
+            // The initial indexing policy is deliberately conservative, pending review.
+            // Search terms are never interpolated into metadata or structured data.
+            _metadata = await SeoComposer.ComposeStaticPageAsync(_query.SearchTerm is null ? "Catalog" : "Search results", _query.Url(), "Browse and search the published BlazorShop catalog.");
+            if (Uri.TryCreate(_metadata.CanonicalUrl, UriKind.Absolute, out var canonical))
+            {
+                _metadata.CanonicalUrl = canonical.AbsoluteUri;
+            }
+
+            _metadata.RobotsIndex = false;
+            _metadata.RobotsFollow = true;
+            if (HttpContext is not null)
+            {
+                HttpContext.Response.Headers["X-Robots-Tag"] = "noindex, follow";
+                HttpContext.Response.Headers["Cache-Control"] = "private, no-store";
+            }
+        }
+    }
+}
