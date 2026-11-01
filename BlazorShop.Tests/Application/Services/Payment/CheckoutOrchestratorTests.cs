@@ -11,6 +11,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
     using BlazorShop.Domain.Entities;
     using BlazorShop.Domain.Entities.Identity;
     using BlazorShop.Domain.Entities.Payment;
+    using BlazorShop.Testing;
 
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -32,6 +33,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
         private readonly Mock<IOrderRepository> _orders = new();
         private readonly Mock<IEmailService> _email = new();
         private readonly CheckoutOrchestrator _orchestrator;
+        private readonly BankTransferSettings _bankSettings = SyntheticBankTransfer.CreateSettings();
 
         public CheckoutOrchestratorTests()
         {
@@ -129,7 +131,10 @@ namespace BlazorShop.Tests.Application.Services.Payment
                     StripePaymentStateTransitionOutcome.Applied,
                     PaymentTransactionStatus.Failed));
 
-            _orchestrator = new CheckoutOrchestrator(
+            _orchestrator = CreateOrchestrator(_bankSettings);
+        }
+
+        private CheckoutOrchestrator CreateOrchestrator(BankTransferSettings settings) => new(
                 _products.Object,
                 _paymentMethods.Object,
                 _payment.Object,
@@ -140,17 +145,37 @@ namespace BlazorShop.Tests.Application.Services.Payment
                 _stripeTransitions.Object,
                 _orders.Object,
                 _email.Object,
-                Options.Create(new BankTransferSettings
-                {
-                    Iban = "BG00TEST",
-                    Beneficiary = "Blazor Shop",
-                    BankName = "Test Bank",
-                    AdditionalInfo = "Use the order reference.",
-                }),
+                Options.Create(settings),
                 Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
                 Options.Create(new CheckoutIdempotencyOptions()),
                 Options.Create(new CommerceOptions { Currency = "EUR" }),
                 Mock.Of<ILogger<CheckoutOrchestrator>>());
+
+        [Fact]
+        public async Task InvalidBankSettings_RejectAdvertisedMethodBeforePendingOutcomeOrCommerceCalls()
+        {
+            var product = ConfigureProduct(price: 10m, quantity: 5);
+            ConfigurePaymentMethod(PaymentMethodIds.BankTransfer, "Bank Transfer");
+            var orchestrator = CreateOrchestrator(new BankTransferSettings());
+
+            var result = await orchestrator.CheckoutAsync(new Checkout
+            {
+                PaymentMethodId = PaymentMethodIds.BankTransfer,
+                Carts = [new CartLineRequest(product.Id, null, 1)],
+            }, "customer-1", Guid.NewGuid());
+
+            Assert.Equal(CheckoutExecutionStatus.BadRequest, result.Status);
+            Assert.False(result.Success);
+            Assert.Null(result.Payload);
+            _idempotency.Verify(store => store.SetPendingOutcomeAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.IsAny<PersistedCheckoutOutcome>(), It.IsAny<CancellationToken>()), Times.Never);
+            _idempotency.Verify(store => store.CompleteAsync(It.IsAny<Guid>(), It.IsAny<Guid>(),
+                It.Is<PersistedCheckoutOutcome>(outcome => !outcome.Response.Success && outcome.Response.Payload == null),
+                CheckoutIdempotencyState.Failed, It.IsAny<CancellationToken>()), Times.Once);
+            _inventory.VerifyNoOtherCalls();
+            _payment.VerifyNoOtherCalls();
+            _email.VerifyNoOtherCalls();
+            _paymentTransactions.VerifyNoOtherCalls();
         }
 
         [Fact]
@@ -291,7 +316,7 @@ namespace BlazorShop.Tests.Application.Services.Payment
             Assert.NotNull(result.Payload.BankTransfer);
             Assert.Equal(createdOrder.Reference, result.Payload.BankTransfer!.Reference);
             Assert.Equal(39m, result.Payload.BankTransfer.Amount);
-            Assert.Equal("BG00TEST", result.Payload.BankTransfer.Iban);
+            Assert.Equal(_bankSettings.Iban, result.Payload.BankTransfer.Iban);
             _inventory.Verify(service => service.CreateOrderWithInventoryAsync(
                 createdOrder,
                 InventoryReservationStatus.Reserved,

@@ -29,7 +29,7 @@ namespace BlazorShop.Application.Services.Payment
         private readonly IStripePaymentStateTransitionService _stripePaymentStateTransitionService;
         private readonly IOrderRepository _orderRepository;
         private readonly IEmailService _emailService;
-        private readonly BankTransferSettings _bankTransferSettings;
+        private readonly BankTransferSettings? _bankTransferSettings;
         private readonly ClientAppOptions _clientAppOptions;
         private readonly CheckoutIdempotencyOptions _idempotencyOptions;
         private readonly CommerceOptions _commerceOptions;
@@ -62,7 +62,7 @@ namespace BlazorShop.Application.Services.Payment
             _stripePaymentStateTransitionService = stripePaymentStateTransitionService;
             _orderRepository = orderRepository;
             _emailService = emailService;
-            _bankTransferSettings = bankTransferOptions.Value;
+            _bankTransferSettings = BankTransferConfiguration.ValidatedSnapshot(bankTransferOptions.Value);
             _clientAppOptions = clientAppOptions.Value;
             _idempotencyOptions = idempotencyOptions.Value;
             _commerceOptions = commerceOptions.Value;
@@ -140,13 +140,15 @@ namespace BlazorShop.Application.Services.Payment
             CheckoutIdempotencyClaim claim,
             CancellationToken cancellationToken)
         {
-            var paymentKind = await ResolvePaymentKindAsync(checkout.PaymentMethodId);
+            var existingOrder = await _orderRepository.GetByIdAsync(claim.Record.OrderId);
+            var paymentKind = await ResolvePaymentKindAsync(
+                checkout.PaymentMethodId,
+                recoverCommittedBankOrder: existingOrder?.PaymentMethod == OrderPaymentMethod.BankTransfer);
             if (!paymentKind.HasValue)
             {
                 return await FinishFailureAsync(claim, "Invalid payment method", cancellationToken);
             }
 
-            var existingOrder = await _orderRepository.GetByIdAsync(claim.Record.OrderId);
             if (existingOrder is not null)
             {
                 if (!string.Equals(existingOrder.UserId, userId, StringComparison.Ordinal)
@@ -164,6 +166,14 @@ namespace BlazorShop.Application.Services.Payment
                     customer,
                     claim,
                     cancellationToken);
+            }
+
+            // Independent execution guard: discovery can be stale or bypassed. Preserve
+            // durable replay/committed-order recovery above; block before any new success
+            // snapshot, order, inventory reservation, provider call or bank email.
+            if (paymentKind == CheckoutPaymentKind.BankTransfer && _bankTransferSettings is null)
+            {
+                return await FinishFailureAsync(claim, "Bank Transfer is currently unavailable.", cancellationToken);
             }
 
             var resolution = await ResolveCartLinesAsync(checkout.Carts);
@@ -258,7 +268,16 @@ namespace BlazorShop.Application.Services.Payment
                 return await InitializeStripeAsync(order, claim, cancellationToken);
             }
 
-            var outcome = _idempotencyStore.ReadOutcome(claim.Record)
+            var persistedOutcome = _idempotencyStore.ReadOutcome(claim.Record);
+            if (paymentKind == CheckoutPaymentKind.BankTransfer && persistedOutcome is null && _bankTransferSettings is null)
+            {
+                // Never invent instructions for a committed order whose durable snapshot
+                // is missing. Keep its state and stock intact for explicit recovery.
+                await _idempotencyStore.ReleaseLeaseAsync(claim.Record.Id, claim.LeaseOwnerId, cancellationToken);
+                return CheckoutExecutionResult.InProgress("Bank transfer instructions for this order are unavailable. Contact the store before making a payment.");
+            }
+
+            var outcome = persistedOutcome
                 ?? (paymentKind == CheckoutPaymentKind.CashOnDelivery
                     ? CreateSuccessOutcome(
                         order,
@@ -919,8 +938,15 @@ namespace BlazorShop.Application.Services.Payment
                 : CheckoutExecutionResult.InProgress();
         }
 
-        private async Task<CheckoutPaymentKind?> ResolvePaymentKindAsync(Guid paymentMethodId)
+        private async Task<CheckoutPaymentKind?> ResolvePaymentKindAsync(Guid paymentMethodId, bool recoverCommittedBankOrder)
         {
+            // Discovery governs new orders. Removing current bank configuration must not
+            // invalidate an already committed bank order with a persisted valid outcome.
+            if (recoverCommittedBankOrder && paymentMethodId == PaymentMethodIds.BankTransfer)
+            {
+                return CheckoutPaymentKind.BankTransfer;
+            }
+
             var availableMethods = await _paymentMethodService.GetPaymentMethodsAsync();
             if (!availableMethods.Any(method => method.Id == paymentMethodId))
             {
@@ -1137,18 +1163,21 @@ namespace BlazorShop.Application.Services.Payment
         private string BuildClientUrl(string path) =>
             $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{path.TrimStart('/')}";
 
-        private BankTransferInfo BuildBankTransferInfo(Order order) => new()
+        private BankTransferInfo BuildBankTransferInfo(Order order)
         {
-            Iban = string.IsNullOrWhiteSpace(_bankTransferSettings.Iban)
-                ? "BG00UNCR70001512345678"
-                : _bankTransferSettings.Iban,
-            Beneficiary = _bankTransferSettings.Beneficiary,
-            BankName = _bankTransferSettings.BankName,
-            Reference = order.Reference,
-            Amount = order.TotalAmount,
-            Currency = order.Currency,
-            AdditionalInfo = _bankTransferSettings.AdditionalInfo,
-        };
+            var settings = _bankTransferSettings
+                ?? throw new InvalidOperationException("Bank Transfer is currently unavailable.");
+            return new BankTransferInfo
+            {
+                Iban = settings.Iban,
+                Beneficiary = settings.Beneficiary,
+                BankName = settings.BankName,
+                Reference = order.Reference,
+                Amount = order.TotalAmount,
+                Currency = order.Currency,
+                AdditionalInfo = settings.AdditionalInfo,
+            };
+        }
 
         private async Task TrySendBankTransferEmailAsync(AppUser customer, BankTransferInfo info)
         {

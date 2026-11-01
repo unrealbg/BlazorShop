@@ -1596,9 +1596,9 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 email ?? Mock.Of<IEmailService>(),
                 Options.Create(new BankTransferSettings
                 {
-                    Iban = "BG00TEST",
+                    Iban = BlazorShop.Testing.SyntheticBankTransfer.CreateIban(),
                     Beneficiary = "Blazor Shop",
-                    BankName = "Test Bank",
+                    BankName = "Synthetic regression institution",
                 }),
                 Options.Create(new ClientAppOptions { BaseUrl = "https://shop.test" }),
                 Options.Create(new CheckoutIdempotencyOptions
