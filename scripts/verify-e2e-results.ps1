@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $expectedTests = @(
+    'BlazorShop.E2E.StorefrontCatalogTests.CatalogSearch_NativeGetResponsiveImagesKeyboardAndSeoWithoutJavaScript',
+    'BlazorShop.E2E.StorefrontCatalogTests.CatalogSearch_PaginationLegacySearchAndCommerceHandoffs',
     'BlazorShop.E2E.StorefrontCheckoutTests.HomeCategoryAndProductNavigation_ShowsSeededCatalogContent',
     'BlazorShop.E2E.StorefrontCheckoutTests.Cart_AddsProductAndVariantAndPersistsQuantityAfterReload',
     'BlazorShop.E2E.StorefrontCheckoutTests.CheckoutStart_AnonymousLoginThenAuthenticatedCheckoutPreservesCart',

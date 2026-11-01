@@ -154,6 +154,12 @@ jobs:
           cmp /tmp/storefront-site.css BlazorShop.Presentation/BlazorShop.Web/wwwroot/css/site.css
           curl --fail --max-time 5 'http://127.0.0.1:18080/css/ui-v2-storefront.css' --output /tmp/storefront-ui-v2.css
           cmp /tmp/storefront-ui-v2.css BlazorShop.Presentation/BlazorShop.Storefront/wwwroot/css/ui-v2-storefront.css
+          grep -q 'bs-v2-catalog-layout' /tmp/storefront-ui-v2.css
+          status=$(curl --silent --show-error --max-time 20 --dump-header /tmp/catalog-unavailable.headers --output /tmp/catalog-unavailable.html --write-out '%{http_code}' http://127.0.0.1:18080/catalog)
+          test "$status" = '503'
+          grep -qi 'Cache-Control:.*no-store' /tmp/catalog-unavailable.headers
+          grep -qi 'X-Robots-Tag:.*noindex' /tmp/catalog-unavailable.headers
+          grep -q 'Catalog is temporarily unavailable' /tmp/catalog-unavailable.html
 
       - name: Build Web container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Web/Dockerfile -t blazorshop-web:ci .
@@ -351,7 +357,7 @@ jobs:
           --no-build
           --logger "trx;LogFileName=postgres16-security.trx"
           --results-directory artifacts/postgres16
-          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests|FullyQualifiedName~RefreshRotationHttpTests"
+          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests|FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~PublicCatalogHttpTests"
           --verbosity normal
 
       - name: Verify mandatory PostgreSQL 16 refresh security scenarios
