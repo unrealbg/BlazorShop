@@ -33,17 +33,11 @@ The repository includes catalog management, product variants, cart and checkout,
 - Developers exploring ASP.NET Core, Blazor Web App, Blazor WebAssembly, EF Core, PostgreSQL, Aspire, and layered application architecture in a non-trivial project.
 
 ## Project Status
-BlazorShop is functional and deployed as a live demo. The project is currently undergoing a focused commerce-core and production-hardening pass before treating the current architecture as a stronger reusable production starter.
+The UI v2 integration through PR #127 is merged, including public static SSR catalog/search. Commerce/security issues #87–#95 are closed: explicit administrator bootstrap, variant-preserving checkout, immutable order snapshots, atomic inventory reservations, authoritative order-first checkout, idempotency, Stripe reconciliation, lifecycle separation and the legacy archive are implemented and covered by automated regressions.
 
-Current high-priority work:
-- #87 — secure administrator bootstrap
-- #88 — preserve product variants through checkout and orders
-- #89 — immutable order-line snapshots
-- #90 — atomic inventory reservation and stock management
-- #91 — authoritative server-side, order-first checkout
-- #92 — checkout idempotency
-- #93 — Stripe reconciliation and webhook idempotency
-- #94 — separate order/payment/fulfillment lifecycle states
+Release readiness is tracked separately in #128. The [2026-11-01 RC audit](docs/rc-readiness/2026-11-01/README.md) records the exact audited commit, functional evidence, defects, unverified operational gates and an **RC NO-GO** decision. A live demo or green PR checks do not establish production readiness.
+
+Current priorities include fail-closed bank configuration, transactional email reliability (#52), hosting/CSP hardening (#26), measured accessibility/performance work (#31/#42), and a current-target routing/provider/recovery rehearsal. Each fix requires its own reviewed scope; optional features remain in the issue backlog.
 
 Additional production/UX work remains tracked in GitHub Issues. The issue tracker is treated as the current implementation backlog; README features describe what exists on `master`, not planned functionality.
 
@@ -60,6 +54,7 @@ Additional production/UX work remains tracked in GitHub Issues. The issue tracke
   - Admin inventory overview with low/out-of-stock filtering and product/variant stock updates
 - Public SEO Storefront
   - Server-rendered product and category routes (`/product/{slug}` and `/category/{slug}`)
+  - Public `/catalog` with native GET search, six supported sorts, category filtering and pagination; legacy WebAssembly search remains available
   - Published-only public catalog exposure and route-based metadata rendering
   - `/sitemap.xml` and `/robots.txt` for the published route surface
 - Cart & Checkout
@@ -91,10 +86,12 @@ Additional production/UX work remains tracked in GitHub Issues. The issue tracke
 ## Current Limitations
 These are known areas being actively hardened; see the linked issues for the source-of-truth acceptance criteria.
 
-- **Variant/order integrity (#88, #89):** the commerce contracts and historical order snapshots are being strengthened so the exact purchased variant/SKU is authoritative throughout checkout and order history.
-- **Inventory concurrency (#90):** atomic reservation/decrement behavior is still being implemented to prevent overselling under concurrent checkout.
-- **Checkout lifecycle (#91, #92):** checkout is being moved to a fully authoritative server-side, order-first and idempotent flow.
-- **Stripe reconciliation (#93):** signed Checkout Session events are durably deduplicated and reconciled against immutable local order, payment, provider-identity, amount, and currency state.
+- **Release gates (#128):** implemented commerce contracts and passing isolated regressions do not replace a verified production-like installation, recovery rehearsal, external provider lifecycle and owner approval. See the [audit findings and evidence](docs/rc-readiness/2026-11-01/README.md).
+- **Bank configuration and email delivery:** the audit reproduces unsafe fallback bank instructions under missing settings and SMTP-dependent registration rollback. Durable email recovery remains open in #52; these findings have not been fixed by documentation changes.
+- **Security/session policy:** refresh eligibility, atomic rotation and demo/session isolation are implemented. Already issued ordinary access JWTs retain their existing two-hour validity; immediate revocation needs a separate decision. Final proxy trust, unified routing and production observation provisioning remain separate work.
+- **Public catalog indexing:** new catalog/search URLs initially use `noindex,follow` and stay out of the sitemap. Product/category SEO remains available; enabling unfiltered catalog indexing needs a separate reviewed policy.
+- **Accessibility/performance:** sampled responsive/keyboard checks pass, but measured contrast/list-semantics defects and unverified production budgets remain. No full accessibility or cross-browser layout certification is claimed.
+- **Merchant/provider suitability:** merchant identity, bank ownership, legal content, delivery/fulfillment scope and real provider configuration require owner verification. Current presentation assumes EUR; this is not a complete multi-currency or shipping-address implementation.
 - **Legacy checkout archive (#95):** old checkout-history rows are retained losslessly as an operational archive that is deliberately outside runtime order history; see [the archive policy and cutover procedure](docs/legacy-checkout-archive.md).
 
 ## Technologies Used
