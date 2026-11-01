@@ -28,7 +28,7 @@
         private readonly IValidator<ChangePassword> _changePasswordValidator;
         private readonly IValidationService _validationService;
         private readonly IEmailService _emailService;
-        private readonly ClientAppOptions _clientAppOptions;
+        private readonly IRegistrationConfirmationStore _confirmationStore;
         private readonly IdentityConfirmationOptions _identityConfirmationOptions;
 
         public AuthenticationService(
@@ -42,7 +42,7 @@
             IValidationService validationService,
             IValidator<ChangePassword> changePasswordValidator,
             IEmailService emailService,
-            IOptions<ClientAppOptions> clientAppOptions,
+            IRegistrationConfirmationStore confirmationStore,
             IOptions<IdentityConfirmationOptions> identityConfirmationOptions)
         {
             _tokenManager = tokenManager;
@@ -55,7 +55,7 @@
             _validationService = validationService;
             _changePasswordValidator = changePasswordValidator;
             _emailService = emailService;
-            _clientAppOptions = clientAppOptions.Value;
+            _confirmationStore = confirmationStore;
             _identityConfirmationOptions = identityConfirmationOptions.Value;
         }
 
@@ -76,6 +76,18 @@
             var mappedUser = _mapper.Map<AppUser>(user);
             mappedUser.UserName = user.Email;
             mappedUser.PasswordHash = user.Password;
+
+            if (RequiresConfirmedEmail())
+            {
+                var committed = await _confirmationStore.RegisterCustomerAsync(mappedUser);
+                return committed switch
+                {
+                    RegistrationCommitResult.Created => new ServiceResponse(true, "User created successfully."),
+                    RegistrationCommitResult.Duplicate => new ServiceResponse(false, "User already exists."),
+                    RegistrationCommitResult.DemoNotSupported => new ServiceResponse(false, "Strict registration is unavailable in an isolated demo workspace."),
+                    _ => new ServiceResponse(false, "Registration could not be confirmed. Try signing in or retrying later."),
+                };
+            }
 
             var result = await _userManager.CreateUserAsync(mappedUser);
 
@@ -100,28 +112,7 @@
                 return new ServiceResponse { Message = "Error occurred in creating account." };
             }
 
-            if (RequiresConfirmedEmail())
-            {
-                try
-                {
-                    var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
-                    var confirmationLink = this.BuildClientUrl($"confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}");
-
-                    await this.SendConfirmationEmail(user.Email,
-                        $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Failed to send email confirmation link to {user.Email}");
-                    await RollbackCreatedUserAsync(currentUser.Email,
-                        $"User with Email {currentUser.Email} failed to be removed after confirmation email dispatch failed.");
-                    return new ServiceResponse { Message = "Failed to send confirmation email." };
-                }
-            }
-            else
-            {
-                await TryConfirmUserForNonStrictRegistrationAsync(currentUser);
-            }
+            await TryConfirmUserForNonStrictRegistrationAsync(currentUser);
 
             return new ServiceResponse { Success = true, Message = "User created successfully." };
         }
@@ -155,7 +146,7 @@
 
                 if (loginResult.IsNotAllowed && RequiresConfirmedSignIn() && !currentUser.EmailConfirmed)
                 {
-                    return await CreateConfirmationRequiredResponseAsync(currentUser);
+                    return await CreateConfirmationRequiredResponseAsync(currentUser, user.Password);
                 }
 
                 return new LoginResponse { Message = "Invalid credentials." };
@@ -163,7 +154,7 @@
 
             if (RequiresConfirmedSignIn() && !currentUser.EmailConfirmed)
             {
-                return await CreateConfirmationRequiredResponseAsync(currentUser);
+                return await CreateConfirmationRequiredResponseAsync(currentUser, user.Password);
             }
 
 
@@ -277,11 +268,6 @@
                 : new ServiceResponse(false, "Failed to update profile.");
         }
 
-        private string BuildClientUrl(string pathAndQuery)
-        {
-            return $"{_clientAppOptions.BaseUrl.TrimEnd('/')}/{pathAndQuery.TrimStart('/')}";
-        }
-
         private bool RequiresConfirmedSignIn()
         {
             return _identityConfirmationOptions.RequireConfirmedAccount || _identityConfirmationOptions.RequireConfirmedEmail;
@@ -292,24 +278,17 @@
             return _identityConfirmationOptions.RequireConfirmedEmail;
         }
 
-        private async Task<LoginResponse> CreateConfirmationRequiredResponseAsync(AppUser currentUser)
+        private async Task<LoginResponse> CreateConfirmationRequiredResponseAsync(AppUser currentUser, string password)
         {
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(currentUser);
-            var confirmationLink = this.BuildClientUrl($"confirm-email?userId={currentUser.Id}&token={Uri.EscapeDataString(token)}");
-
-            var pendingEmail = currentUser.Email;
-            if (!string.IsNullOrWhiteSpace(pendingEmail))
-            {
-                await this.SendConfirmationEmail(pendingEmail,
-                    $"Please confirm your email by clicking <a href=\"{confirmationLink}\">here</a>.");
-            }
-
-            _logger.LogWarning($"User with unconfirmed email tried to log in. Email: {currentUser.Email}, UserId: {currentUser.Id}");
+            await _confirmationStore.RequestDeliveryAsync(currentUser.Id, password);
+            _logger.LogWarning($"Unconfirmed sign-in was refused for account {currentUser.Id}.");
 
             return new LoginResponse
                        {
                            Success = false,
-                           Message = "Email not confirmed. A new confirmation link has been sent to your email."
+                           // Same public response for eligibility, coalescing, rate limiting
+                           // and storage failure; do not expose a password/resend oracle.
+                           Message = "Email not confirmed. If eligible, confirmation delivery has been queued; requests are subject to delivery limits."
                        };
         }
 

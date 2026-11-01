@@ -144,6 +144,10 @@ Core values commonly required:
 - `BankTransfer:Iban`, `BankTransfer:Beneficiary`, `BankTransfer:BankName`, `BankTransfer:AdditionalInfo`
 - `EmailSettings:From`, `DisplayName`, `SmtpServer`, `Port`, `UseSsl`, `Username`, `Password`
 
+Strict registration confirmation uses a transactional outbox and bounded background delivery.
+SMTP failure does not delete a committed account. See [confirmation delivery and recovery](docs/registration-confirmation-outbox.md)
+for Identity token expiry, resend limits, disabled-email behavior and migration/rollback precautions.
+
 Bank Transfer is optional and disabled by default. The API advertises it only when IBAN,
 beneficiary and bank name pass the shared server validation; direct fresh checkouts are
 also rejected when configuration is invalid. `AdditionalInfo` is optional. IBAN validation
