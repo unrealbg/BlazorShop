@@ -337,7 +337,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             public IServiceProvider Services => app.Services;
 
             public static async Task<IdentityHttpHost> CreateAsync(string connectionString, IInterceptor? interceptor = null,
-                bool requireAccount = true, bool requireEmail = true, string? observationKey = null, bool demoEnabled = false)
+                bool requireAccount = true, bool requireEmail = true, string? observationKey = null, bool demoEnabled = false,
+                Action<IServiceCollection>? configureServices = null)
             {
                 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
                 {
@@ -380,6 +381,7 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 builder.Services.AddControllers().AddApplicationPart(typeof(AuthenticationController).Assembly);
                 builder.Services.AddRateLimiter(options => options.AddPolicy("AuthApi",
                     _ => RateLimitPartition.GetNoLimiter("isolated-test")));
+                configureServices?.Invoke(builder.Services);
                 var app = builder.Build();
                 app.UseMiddleware<SessionObservationGate>();
                 app.UseMiddleware<DemoSessionMiddleware>();

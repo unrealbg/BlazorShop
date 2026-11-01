@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\BlazorShop.Tests\TestUtilities\SyntheticBankTransfer.cs" Link="Fixtures\SyntheticBankTransfer.cs" />
     <ProjectReference Include="..\BlazorShop.AppHost\BlazorShop.AppHost.csproj" />
     <ProjectReference Include="..\BlazorShop.Infrastructure\BlazorShop.Infrastructure.csproj" />
   </ItemGroup>

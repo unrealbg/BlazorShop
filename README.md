@@ -145,6 +145,13 @@ Core values commonly required:
 - `Stripe:Enabled`, `Stripe:SecretKey`, `Stripe:WebhookSecret`
 - `Commerce:Currency` (required store currency; currently supports `EUR`, `GBP`, and `USD`)
 - `BankTransfer:Iban`, `BankTransfer:Beneficiary`, `BankTransfer:BankName`, `BankTransfer:AdditionalInfo`
+
+Bank Transfer is optional and disabled by default. The API advertises it only when IBAN,
+beneficiary and bank name pass the shared server validation; direct fresh checkouts are
+also rejected when configuration is invalid. `AdditionalInfo` is optional. IBAN validation
+checks generic structure and MOD-97, not bank existence or merchant ownership. Merchant
+details require independent owner verification. See [the configuration guard review](docs/bank-transfer-configuration-guard.md)
+for normalization, placeholder rejection and durable replay/recovery behavior.
 - `EmailSettings:From`, `DisplayName`, `SmtpServer`, `Port`, `UseSsl`, `Username`, `Password`
 
 Production configuration also includes Identity confirmation requirements and runtime settings for CORS, forwarded headers, health endpoints, HSTS/HTTPS behavior, refresh-token cookies, and rate limiting. Use the production example/runbook rather than copying local-development defaults into production.

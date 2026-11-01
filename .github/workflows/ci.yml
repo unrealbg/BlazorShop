@@ -357,7 +357,7 @@ jobs:
           --no-build
           --logger "trx;LogFileName=postgres16-security.trx"
           --results-directory artifacts/postgres16
-          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests|FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~PublicCatalogHttpTests"
+          --filter "FullyQualifiedName~LegacyCheckoutArchive|FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~SessionObservationHttpTests|FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~PublicCatalogHttpTests|FullyQualifiedName~BankTransferConfigurationHttpTests|FullyQualifiedName~CheckoutIdempotencyPostgreSqlTests"
           --verbosity normal
 
       - name: Verify mandatory PostgreSQL 16 refresh security scenarios
