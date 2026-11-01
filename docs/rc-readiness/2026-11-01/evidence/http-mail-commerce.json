@@ -1,0 +1,69 @@
+[
+  {
+    "mode": "catalog-page-overflow",
+    "httpStatus": 500
+  },
+  {
+    "mode": "hidden-category-checkout",
+    "httpStatus": 200,
+    "success": true,
+    "publicLookupStatus": 404
+  },
+  {
+    "mode": "empty-bank-config",
+    "httpStatus": 200,
+    "success": true,
+    "fallbackIbanSupplied": true,
+    "missingBeneficiary": true,
+    "missingBankName": true
+  },
+  {
+    "mode": "healthy",
+    "httpStatus": 200,
+    "userRetained": true,
+    "acceptedMessages": 2,
+    "confirmationStatus": 200,
+    "loginStatus": 200,
+    "accessIssued": true,
+    "cookieSecure": true,
+    "cookieHttpOnly": true,
+    "cookieLax": true
+  },
+  {
+    "mode": "bank-order-smtp-down",
+    "statuses": [
+      200,
+      200
+    ],
+    "replays": [
+      false,
+      true
+    ],
+    "orderCount": 1,
+    "requirePasswordChangeFlagLoginStatus": 200
+  },
+  {
+    "mode": "closed-port",
+    "httpStatus": 400,
+    "userRetained": false,
+    "acceptedMessages": 0,
+    "confirmationStatus": null,
+    "loginStatus": null,
+    "accessIssued": false,
+    "cookieSecure": false,
+    "cookieHttpOnly": false,
+    "cookieLax": false
+  },
+  {
+    "mode": "accepted-data-lost-ack",
+    "httpStatus": 400,
+    "userRetained": false,
+    "acceptedMessages": 1,
+    "confirmationStatus": 400,
+    "loginStatus": null,
+    "accessIssued": false,
+    "cookieSecure": false,
+    "cookieHttpOnly": false,
+    "cookieLax": false
+  }
+]

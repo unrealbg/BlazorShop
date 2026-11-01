@@ -1,0 +1,52 @@
+[
+  {
+    "Route": "/plain.txt",
+    "Status": 200,
+    "FrameOptions": "DENY",
+    "ContentTypeOptions": "nosniff",
+    "ReferrerPolicy": "strict-origin-when-cross-origin",
+    "PermissionsPolicy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+    "Csp": "",
+    "Cache": ""
+  },
+  {
+    "Route": "/",
+    "Status": 200,
+    "FrameOptions": "",
+    "ContentTypeOptions": "",
+    "ReferrerPolicy": "",
+    "PermissionsPolicy": "",
+    "Csp": "",
+    "Cache": "no-cache"
+  },
+  {
+    "Route": "/index.html",
+    "Status": 200,
+    "FrameOptions": "",
+    "ContentTypeOptions": "",
+    "ReferrerPolicy": "",
+    "PermissionsPolicy": "",
+    "Csp": "",
+    "Cache": "no-cache"
+  },
+  {
+    "Route": "/account/profile",
+    "Status": 200,
+    "FrameOptions": "",
+    "ContentTypeOptions": "",
+    "ReferrerPolicy": "",
+    "PermissionsPolicy": "",
+    "Csp": "",
+    "Cache": "no-cache"
+  },
+  {
+    "Route": "/audit.css",
+    "Status": 200,
+    "FrameOptions": "",
+    "ContentTypeOptions": "",
+    "ReferrerPolicy": "",
+    "PermissionsPolicy": "",
+    "Csp": "",
+    "Cache": "no-cache"
+  }
+]

@@ -1,0 +1,829 @@
+{
+  "auditSha": "9abba4d642798aa1fabfe98fca72990022fb0d4a",
+  "axeVersion": "4.14.0",
+  "measurementMode": "Release binaries, Development Aspire hosting, warm loopback, no throttling",
+  "limitations": [
+    "One observation per navigation; warm loopback, no network or CPU throttling.",
+    "Development Aspire hosting of Release binaries, not published container performance.",
+    "Performance window ends shortly after heading visibility; not field Core Web Vitals.",
+    "Invalid-login snapshot reuses login navigation timings.",
+    "Encoded body sizes are resource-timing totals, not cold wire bytes; cross-origin opaque resources can be missing."
+  ],
+  "scans": [
+    {
+      "surface": "home",
+      "width": 320,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 57.5,
+        "domContentLoadedMs": 173.20000000298023,
+        "lcpMs": 180,
+        "cls": 0,
+        "resourceCount": 9,
+        "encodedBodyBytes": 309646,
+        "transferBytes": 312346,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 248,
+            "cssWidth": 380
+          },
+          {
+            "$id": "3",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 143
+          },
+          {
+            "$id": "4",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 143
+          },
+          {
+            "$id": "5",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 143
+          },
+          {
+            "$id": "6",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 143
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "catalog",
+      "width": 320,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 58.100000001490116,
+        "domContentLoadedMs": 63,
+        "lcpMs": 76,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 143
+          }
+        ]
+      },
+      "headers": {
+        "cache-control": "private, no-store",
+        "x-robots-tag": "noindex, follow"
+      },
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "product",
+      "width": 320,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 109.5,
+        "domContentLoadedMs": 114.19999999925494,
+        "lcpMs": 148,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 298
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "cart-empty",
+      "width": 320,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 13.199999999254942,
+        "domContentLoadedMs": 17.100000001490116,
+        "lcpMs": 24,
+        "cls": 0,
+        "resourceCount": 4,
+        "encodedBodyBytes": 117312,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store, no-cache, max-age=0",
+        "x-robots-tag": "noindex, nofollow"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "home",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 8.300000000745058,
+        "domContentLoadedMs": 13.400000002235174,
+        "lcpMs": 24,
+        "cls": 0,
+        "resourceCount": 9,
+        "encodedBodyBytes": 309646,
+        "transferBytes": 132610,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 248,
+            "cssWidth": 380
+          },
+          {
+            "$id": "3",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 178
+          },
+          {
+            "$id": "4",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 178
+          },
+          {
+            "$id": "5",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 178
+          },
+          {
+            "$id": "6",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 178
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "catalog",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 11.699999999254942,
+        "domContentLoadedMs": 18.5,
+        "lcpMs": 20,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 178
+          }
+        ]
+      },
+      "headers": {
+        "cache-control": "private, no-store",
+        "x-robots-tag": "noindex, follow"
+      },
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "product",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 12.5,
+        "domContentLoadedMs": 17.099999997764826,
+        "lcpMs": 28,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 368
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "cart-empty",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 4.599999997764826,
+        "domContentLoadedMs": 8.699999999254942,
+        "lcpMs": 20,
+        "cls": 0,
+        "resourceCount": 4,
+        "encodedBodyBytes": 117312,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store, no-cache, max-age=0",
+        "x-robots-tag": "noindex, nofollow"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "home",
+      "width": 768,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 6.399999998509884,
+        "domContentLoadedMs": 11.100000001490116,
+        "lcpMs": 28,
+        "cls": 0,
+        "resourceCount": 9,
+        "encodedBodyBytes": 309646,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 248,
+            "cssWidth": 734
+          },
+          {
+            "$id": "3",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 357
+          },
+          {
+            "$id": "4",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 357
+          },
+          {
+            "$id": "5",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 357
+          },
+          {
+            "$id": "6",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 357
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "catalog",
+      "width": 768,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 9.300000000745058,
+        "domContentLoadedMs": 13.600000001490116,
+        "lcpMs": 20,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 223
+          }
+        ]
+      },
+      "headers": {
+        "cache-control": "private, no-store",
+        "x-robots-tag": "noindex, follow"
+      },
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "product",
+      "width": 768,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 10.800000000745058,
+        "domContentLoadedMs": 15.300000000745058,
+        "lcpMs": 20,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 734
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "cart-empty",
+      "width": 768,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 5.199999999254942,
+        "domContentLoadedMs": 9.399999998509884,
+        "lcpMs": 28,
+        "cls": 0,
+        "resourceCount": 4,
+        "encodedBodyBytes": 117312,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store, no-cache, max-age=0",
+        "x-robots-tag": "noindex, nofollow"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "home",
+      "width": 1440,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 6.899999998509884,
+        "domContentLoadedMs": 11.699999999254942,
+        "lcpMs": 28,
+        "cls": 0,
+        "resourceCount": 9,
+        "encodedBodyBytes": 309646,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 248,
+            "cssWidth": 593.078125
+          },
+          {
+            "$id": "3",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 284.5
+          },
+          {
+            "$id": "4",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 284.5
+          },
+          {
+            "$id": "5",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 284.5
+          },
+          {
+            "$id": "6",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1254,
+            "cssWidth": 284.5
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 2
+    },
+    {
+      "surface": "catalog",
+      "width": 1440,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 9.100000001490116,
+        "domContentLoadedMs": 13.800000000745058,
+        "lcpMs": 32,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": true,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 296.671875
+          }
+        ]
+      },
+      "headers": {
+        "cache-control": "private, no-store",
+        "x-robots-tag": "noindex, follow"
+      },
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 1
+    },
+    {
+      "surface": "product",
+      "width": 1440,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 10.699999999254942,
+        "domContentLoadedMs": 15.399999998509884,
+        "lcpMs": 28,
+        "cls": 0,
+        "resourceCount": 5,
+        "encodedBodyBytes": 178236,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": [
+          {
+            "$id": "2",
+            "lazy": false,
+            "hasSrcset": false,
+            "complete": true,
+            "naturalWidth": 1200,
+            "cssWidth": 622.234375
+          }
+        ]
+      },
+      "headers": {},
+      "axeViolations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  Element has insufficient color contrast of 4.31 (foreground color: #64748b, background color: #f1f4f7, font size: 9.6pt (12.8px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ],
+      "manualReviewRuleCount": 1
+    },
+    {
+      "surface": "cart-empty",
+      "width": 1440,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 5.199999999254942,
+        "domContentLoadedMs": 9.600000001490116,
+        "lcpMs": 24,
+        "cls": 0,
+        "resourceCount": 4,
+        "encodedBodyBytes": 117312,
+        "transferBytes": 0,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store, no-cache, max-age=0",
+        "x-robots-tag": "noindex, nofollow"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 1
+    },
+    {
+      "surface": "wasm-login",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 27.300000000745058,
+        "domContentLoadedMs": 2823.900000002235,
+        "lcpMs": 3492,
+        "cls": 0,
+        "resourceCount": 242,
+        "encodedBodyBytes": 27553199,
+        "transferBytes": 27625499,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 0
+    },
+    {
+      "surface": "wasm-login-invalid",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 27.300000000745058,
+        "domContentLoadedMs": 2823.900000002235,
+        "lcpMs": 3492,
+        "cls": 0,
+        "resourceCount": 242,
+        "encodedBodyBytes": 27553199,
+        "transferBytes": 27625499,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [
+        {
+          "id": "listitem",
+          "impact": "serious",
+          "nodeCount": 2,
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/listitem?application=axeAPI",
+          "exampleFailure": "Fix any of the following:\n  List item parent element has a role that is not role=\"list\". Ensure the parent element has role=\"list\", or move the <li> inside a <ul> or <ol>."
+        }
+      ],
+      "manualReviewRuleCount": 0
+    },
+    {
+      "surface": "wasm-account",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 1.9000000022351742,
+        "domContentLoadedMs": 22.900000002235174,
+        "lcpMs": 508,
+        "cls": 0.017840102564102567,
+        "resourceCount": 242,
+        "encodedBodyBytes": 27182031,
+        "transferBytes": 27177204,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 0
+    },
+    {
+      "surface": "wasm-account-profile",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 2.099999997764826,
+        "domContentLoadedMs": 13.300000000745058,
+        "lcpMs": 556,
+        "cls": 0,
+        "resourceCount": 241,
+        "encodedBodyBytes": 27089788,
+        "transferBytes": 27084961,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 0
+    },
+    {
+      "surface": "wasm-account-settings",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 1.6000000014901161,
+        "domContentLoadedMs": 26.200000002980232,
+        "lcpMs": 560,
+        "cls": 0,
+        "resourceCount": 241,
+        "encodedBodyBytes": 27182031,
+        "transferBytes": 27177204,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 0
+    },
+    {
+      "surface": "wasm-account-orders",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 1,
+        "domContentLoadedMs": 14.399999998509884,
+        "lcpMs": 16,
+        "cls": 0,
+        "resourceCount": 241,
+        "encodedBodyBytes": 27089788,
+        "transferBytes": 27084961,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 0
+    },
+    {
+      "surface": "wasm-account-notifications",
+      "width": 390,
+      "metrics": {
+        "$id": "1",
+        "ttfbMs": 5.300000000745058,
+        "domContentLoadedMs": 15.599999997764826,
+        "lcpMs": 508,
+        "cls": 0,
+        "resourceCount": 241,
+        "encodedBodyBytes": 27089788,
+        "transferBytes": 27084961,
+        "overflow": false,
+        "images": []
+      },
+      "headers": {
+        "cache-control": "no-store"
+      },
+      "axeViolations": [],
+      "manualReviewRuleCount": 0
+    }
+  ]
+}
