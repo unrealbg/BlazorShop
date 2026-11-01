@@ -71,6 +71,10 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             var categories = await api.GetPublishedCategoriesAsync();
             Assert.True(categories.IsSuccess);
             Assert.DoesNotContain(categories.Value!, candidate => candidate.Id == hiddenCategory.Id);
+            var unfiltered = await api.GetPublishedCatalogPageAsync(new ProductCatalogQuery { SearchTerm = products[0].Description });
+            Assert.True(unfiltered.IsSuccess);
+            Assert.Equal(31, unfiltered.Value!.TotalCount);
+            Assert.DoesNotContain(unfiltered.Value.Items, product => product.Name is "Unpublished" or "Hidden parent");
             var empty = await api.GetPublishedCatalogPageAsync(new ProductCatalogQuery { SearchTerm = "no match", CategoryId = category.Id });
             Assert.True(empty.IsSuccess);
             Assert.Equal(0, empty.Value!.TotalCount);

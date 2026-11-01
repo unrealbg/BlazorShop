@@ -29,6 +29,20 @@ public sealed class StorefrontCatalogTests(E2EApplicationFixture application) : 
                 Assert.NotNull(response);
                 Assert.Equal(200, response.Status);
                 Assert.Equal("noindex, follow", response.Headers["x-robots-tag"]);
+                if (width < 981)
+                {
+                    await page.Locator(".bs-v2-mobile-nav > summary").ClickAsync();
+                    await page.Locator(".bs-v2-mobile-nav nav").GetByRole(AriaRole.Link, new() { Name = "Catalog", Exact = true }).ClickAsync();
+                }
+                else
+                {
+                    await page.GetByRole(AriaRole.Navigation, new() { Name = "Primary shop navigation" }).GetByRole(AriaRole.Link, new() { Name = "Catalog", Exact = true }).ClickAsync();
+                }
+
+                await Expect(page).ToHaveURLAsync(CatalogUrl());
+                await page.GetByRole(AriaRole.Navigation, new() { Name = "Footer shop navigation" }).GetByRole(AriaRole.Link, new() { Name = "Catalog", Exact = true }).ClickAsync();
+                await page.Locator("#catalog-category").SelectOptionAsync(data.CategoryId.ToString());
+                await page.GetByRole(AriaRole.Button, new() { Name = "Apply filters", Exact = true }).ClickAsync();
                 await Expect(page.Locator("main h1")).ToHaveTextAsync("Shop all products");
                 var filters = page.GetByRole(AriaRole.Form, new() { Name = "Catalog filters" });
                 await Expect(filters.GetByLabel("Category", new() { Exact = true })).ToHaveValueAsync(data.CategoryId.ToString());
@@ -140,8 +154,10 @@ public sealed class StorefrontCatalogTests(E2EApplicationFixture application) : 
             }
 
             await Page.Locator("#catalog-sort").SelectOptionAsync("name-descending");
+            await Page.Locator("#catalog-category").SelectOptionAsync(string.Empty);
             await Page.GetByRole(AriaRole.Button, new() { Name = "Apply filters", Exact = true }).ClickAsync();
             Assert.DoesNotContain("page=", Page.Url, StringComparison.Ordinal);
+            await Expect(Page.Locator("#catalog-category")).ToHaveValueAsync(string.Empty);
             await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Catalog 26", Exact = true })).ToBeVisibleAsync();
             var missing = await Page.GotoAsync(CatalogUrl($"?q={Uri.EscapeDataString(search)}&category={data.CategoryId}&page=3"));
             Assert.NotNull(missing);
