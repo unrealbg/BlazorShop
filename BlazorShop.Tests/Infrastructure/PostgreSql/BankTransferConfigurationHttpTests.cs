@@ -49,7 +49,10 @@ public sealed class BankTransferConfigurationHttpTests(PostgreSqlFixture databas
             case "bank-name": settings.BankName = null!; break;
             case "placeholder-iban": settings.Iban = "YOUR_IBAN"; break;
             case "format": settings.Iban = "not-a-bank-account"; break;
-            case "checksum": settings.Iban = "BG00" + settings.Iban[4..]; break;
+            case "checksum":
+                // Keep the structure/check-digit range valid so only MOD-97 can reject it.
+                settings.Iban = (settings.Iban.StartsWith("BG02", StringComparison.Ordinal) ? "BG03" : "BG02") + settings.Iban[4..];
+                break;
             case "placeholder-beneficiary": settings.Beneficiary = "<YOUR_BENEFICIARY>"; break;
             case "placeholder-bank": settings.BankName = "CHANGE_ME"; break;
         }
@@ -166,7 +169,7 @@ public sealed class BankTransferConfigurationHttpTests(PostgreSqlFixture databas
         await using (var db = database.CreateContext())
         {
             var claim = await db.CheckoutIdempotencyRecords.SingleAsync();
-            claim.State = CheckoutIdempotencyState.Processing;
+            claim.State = CheckoutIdempotencyState.LocalCommitted;
             claim.CompletedOn = null;
             claim.ExpiresOn = null;
             claim.LeaseExpiresOn = DateTime.UtcNow.AddMinutes(-1);
@@ -186,7 +189,7 @@ public sealed class BankTransferConfigurationHttpTests(PostgreSqlFixture databas
             Assert.Null(result.Payload);
             await using var db = database.CreateContext();
             var claim = await db.CheckoutIdempotencyRecords.SingleAsync();
-            Assert.Equal(CheckoutIdempotencyState.Processing, claim.State);
+            Assert.Equal(CheckoutIdempotencyState.LocalCommitted, claim.State);
             Assert.Null(claim.OutcomeJson);
             Assert.Null(claim.LeaseOwnerId);
         }
