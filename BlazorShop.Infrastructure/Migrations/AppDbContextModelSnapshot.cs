@@ -355,6 +355,90 @@ namespace BlazorShop.Infrastructure.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Identity.RegistrationConfirmationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeliveredOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Generation")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastAttemptOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastFailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("LastRequestedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LeaseExpiresOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseOwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("NextAttemptOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("RequestWindowStartedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RequestsInWindow")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SecurityStampHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.HasIndex("State", "LeaseExpiresOn");
+
+                    b.HasIndex("State", "NextAttemptOn");
+
+                    b.ToTable("RegistrationConfirmationDeliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ConfirmationDelivery_Counts", "\"AttemptCount\" >= 0 AND \"Generation\" >= 1 AND \"RequestsInWindow\" >= 1");
+
+                            t.HasCheckConstraint("CK_ConfirmationDelivery_State", "\"State\" BETWEEN 0 AND 4");
+                        });
+                });
+
             modelBuilder.Entity("BlazorShop.Domain.Entities.NewsletterSubscriber", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1287,6 +1371,15 @@ namespace BlazorShop.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("BlazorShop.Domain.Entities.Identity.RefreshToken", b =>
+                {
+                    b.HasOne("BlazorShop.Domain.Entities.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlazorShop.Domain.Entities.Identity.RegistrationConfirmationDelivery", b =>
                 {
                     b.HasOne("BlazorShop.Domain.Entities.Identity.AppUser", null)
                         .WithMany()

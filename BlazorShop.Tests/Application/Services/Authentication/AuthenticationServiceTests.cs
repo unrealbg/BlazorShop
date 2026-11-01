@@ -8,6 +8,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
     using BlazorShop.Application.DTOs.UserIdentity;
     using BlazorShop.Application.Options;
     using BlazorShop.Application.Services.Authentication;
+    using BlazorShop.Application.Services.Contracts.Authentication;
     using BlazorShop.Application.Services.Contracts.Logging;
     using BlazorShop.Application.Validations;
     using BlazorShop.Domain.Contracts;
@@ -35,6 +36,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         private readonly Mock<IValidationService> _validationServiceMock;
         private readonly AuthenticationService _authenticationService;
         private readonly Mock<IEmailService> _emailServiceMock;
+        private readonly Mock<IRegistrationConfirmationStore> _confirmationStoreMock = new();
 
         public AuthenticationServiceTests()
         {
@@ -48,6 +50,8 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _changePasswordValidatorMock = new Mock<IValidator<ChangePassword>>();
             _validationServiceMock = new Mock<IValidationService>();
             _emailServiceMock = new Mock<IEmailService>();
+            _confirmationStoreMock.Setup(store => store.RegisterCustomerAsync(It.IsAny<AppUser>())).ReturnsAsync(RegistrationCommitResult.Created);
+            _confirmationStoreMock.Setup(store => store.RequestDeliveryAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(ConfirmationRequestResult.Queued);
 
             _authenticationService = CreateAuthenticationService();
         }
@@ -65,12 +69,12 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 _validationServiceMock.Object,
                 _changePasswordValidatorMock.Object,
                 _emailServiceMock.Object,
-                Options.Create(new ClientAppOptions { BaseUrl = "https://localhost:7258" }),
+                _confirmationStoreMock.Object,
                 Options.Create(identityConfirmationOptions ?? new IdentityConfirmationOptions()));
         }
 
         [Fact]
-        public async Task CreateUser_AssignsUserRole_WhenDatabaseWasEmpty()
+        public async Task CreateUser_StrictRegistrationUsesAtomicCustomerAndIntentPortWithoutSmtp()
         {
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
@@ -93,10 +97,11 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             // Assert
             Assert.True(result.Success);
             Assert.Equal("User created successfully.", result.Message);
-            _roleManagerMock.Verify(r => r.AddUserToRoleAsync(mappedUser, "User"), Times.Once);
+            _confirmationStoreMock.Verify(store => store.RegisterCustomerAsync(mappedUser), Times.Once);
+            _roleManagerMock.Verify(r => r.AddUserToRoleAsync(mappedUser, "User"), Times.Never);
             _roleManagerMock.Verify(r => r.AddUserToRoleAsync(mappedUser, "Admin"), Times.Never);
             _userManagerMock.Verify(u => u.GetAllUsersAsync(), Times.Never);
-            _emailServiceMock.Verify(e => e.SendEmailAsync(createUser.Email, "Confirm your email", It.IsAny<string>()), Times.Once);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(createUser.Email, "Confirm your email", It.IsAny<string>()), Times.Never);
             _userManagerMock.Verify(u => u.ConfirmEmailAsync(It.IsAny<AppUser>(), It.IsAny<string>()), Times.Never);
         }
 
@@ -130,6 +135,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 .ReturnsAsync(new ServiceResponse { Success = true });
             _mapperMock.Setup(m => m.Map<AppUser>(createUser)).Returns(mappedUser);
             _userManagerMock.Setup(u => u.CreateUserAsync(mappedUser)).ReturnsAsync(false);
+            _confirmationStoreMock.Setup(store => store.RegisterCustomerAsync(mappedUser)).ReturnsAsync(RegistrationCommitResult.Duplicate);
 
             // Act
             var result = await _authenticationService.CreateUser(createUser);
@@ -140,7 +146,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         }
 
         [Fact]
-        public async Task CreateUser_ShouldReturnError_WhenEmailConfirmationFails()
+        public async Task CreateUser_UnconfirmedCommitDoesNotDeleteUserOrAttemptSmtp()
         {
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
@@ -157,20 +163,22 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _emailServiceMock.Setup(e => e.SendEmailAsync(createUser.Email, It.IsAny<string>(), It.IsAny<string>()))
                 .ThrowsAsync(new Exception("Email service error"));
             _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(1);
+            _confirmationStoreMock.Setup(store => store.RegisterCustomerAsync(mappedUser)).ReturnsAsync(RegistrationCommitResult.Unavailable);
 
             // Act
             var result = await _authenticationService.CreateUser(createUser);
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("Failed to send confirmation email.", result.Message);
-            _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
-            _userManagerMock.Verify(u => u.RemoveUserByEmail(createUser.Email), Times.Once);
+            Assert.Equal("Registration could not be confirmed. Try signing in or retrying later.", result.Message);
+            _userManagerMock.Verify(u => u.RemoveUserByEmail(It.IsAny<string>()), Times.Never);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
         public async Task CreateUser_ShouldReturnError_WhenRoleAssignmentFails()
         {
+            var nonStrict = CreateAuthenticationService(new IdentityConfirmationOptions { RequireConfirmedAccount = false, RequireConfirmedEmail = false });
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
             var mappedUser = new AppUser { Email = createUser.Email, PasswordHash = createUser.Password };
@@ -185,7 +193,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(0);
 
             // Act
-            var result = await _authenticationService.CreateUser(createUser);
+            var result = await nonStrict.CreateUser(createUser);
 
             // Assert
             Assert.False(result.Success);
@@ -286,6 +294,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
         [Fact]
         public async Task CreateUser_ReturnsError_WhenRoleAssignmentFails()
         {
+            var nonStrict = CreateAuthenticationService(new IdentityConfirmationOptions { RequireConfirmedAccount = false, RequireConfirmedEmail = false });
             // Arrange
             var createUser = new CreateUser { Email = "test@example.com", Password = "Password123", ConfirmPassword = "Password123", FullName = "Test User" };
             var mappedUser = new AppUser { Email = createUser.Email, PasswordHash = createUser.Password };
@@ -300,7 +309,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             _userManagerMock.Setup(u => u.RemoveUserByEmail(createUser.Email)).ReturnsAsync(1);
 
             // Act
-            var result = await _authenticationService.CreateUser(createUser);
+            var result = await nonStrict.CreateUser(createUser);
 
             // Assert
             Assert.NotNull(result);
@@ -483,8 +492,9 @@ namespace BlazorShop.Tests.Application.Services.Authentication
             // Assert
             Assert.NotNull(result);
             Assert.False(result.Success);
-            Assert.Equal("Email not confirmed. A new confirmation link has been sent to your email.", result.Message);
-            _emailServiceMock.Verify(e => e.SendEmailAsync(user.Email, "Confirm your email", It.IsAny<string>()), Times.Once);
+            Assert.Equal("Email not confirmed. If eligible, confirmation delivery has been queued; requests are subject to delivery limits.", result.Message);
+            _confirmationStoreMock.Verify(store => store.RequestDeliveryAsync(appUser.Id, user.Password), Times.Once);
+            _emailServiceMock.Verify(e => e.SendEmailAsync(user.Email, "Confirm your email", It.IsAny<string>()), Times.Never);
         }
 
         [Fact]

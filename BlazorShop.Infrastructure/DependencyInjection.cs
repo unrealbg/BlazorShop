@@ -35,6 +35,8 @@
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Options;
+    using Microsoft.Extensions.DependencyInjection.Extensions;
+    using Microsoft.Extensions.Logging.Abstractions;
     using Microsoft.IdentityModel.Tokens;
 
     public static class DependencyInjection
@@ -191,6 +193,26 @@
                 .ValidateOnStart();
             services.Configure<BankTransferSettings>(config.GetSection("BankTransfer"));
             services.AddTransient<IEmailService, EmailService>();
+
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddOptions<RegistrationConfirmationOptions>()
+                .Bind(config.GetSection(RegistrationConfirmationOptions.SectionName))
+                .Validate(o => o.PollSeconds is >= 1 and <= 60 && o.BatchSize is >= 1 and <= 100
+                    && o.LeaseSeconds is >= 30 and <= 300 && o.MaxAttempts is >= 1 and <= 10
+                    && o.InitialRetrySeconds is >= 1 and <= 3600 && o.MaxRetrySeconds >= o.InitialRetrySeconds
+                    && o.MaxRetrySeconds <= 86400 && o.ResendCooldownSeconds is >= 1 and <= 86400
+                    && o.RequestWindowHours is >= 1 and <= 168 && o.MaxRequestsPerWindow is >= 1 and <= 10,
+                    "Registration confirmation delivery bounds are invalid.")
+                .ValidateOnStart();
+            services.AddScoped<RegistrationConfirmationStore>();
+            services.AddScoped<BlazorShop.Application.Services.Contracts.Authentication.IRegistrationConfirmationStore>(
+                provider => provider.GetRequiredService<RegistrationConfirmationStore>());
+            // Same MailKit provider, confirmation-only payload-free logging. Other mail
+            // functionality keeps its existing IEmailService registration and behavior.
+            services.AddKeyedTransient<IEmailService>(RegistrationConfirmationDispatcher.EmailServiceKey,
+                (provider, _) => new EmailService(provider.GetRequiredService<IOptions<EmailSettings>>(), NullLogger<EmailService>.Instance));
+            services.AddScoped<RegistrationConfirmationDispatcher>();
+            services.AddHostedService<RegistrationConfirmationWorker>();
 
             return services;
         }

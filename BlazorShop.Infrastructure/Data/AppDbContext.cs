@@ -31,6 +31,8 @@
 
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
+        public DbSet<RegistrationConfirmationDelivery> RegistrationConfirmationDeliveries { get; set; }
+
         public DbSet<PaymentMethod> PaymentMethods { get; set; }
 
         public DbSet<NewsletterSubscriber> NewsletterSubscribers { get; set; }

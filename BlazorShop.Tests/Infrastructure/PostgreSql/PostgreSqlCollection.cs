@@ -84,8 +84,11 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         public async Task ResetDatabaseAsync()
         {
             await using var context = CreateContext();
+            // Migration tests may intentionally leave a historical schema behind.
+            await context.Database.MigrateAsync();
             await context.Database.ExecuteSqlRawAsync("""
                 TRUNCATE TABLE
+                    "RegistrationConfirmationDeliveries",
                     "LegacyCheckoutOrderItemsArchive",
                     "PaymentProviderEvents",
                     "PaymentTransactions",
