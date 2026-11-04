@@ -20,3 +20,4 @@ foreach ($case in $cases) {
     else { Write-Host "[ok, rejected] $($case.Name) => exit $LASTEXITCODE" }
 }
 if ($accepted) { throw "$accepted hand-off case(s) were accepted" }
+exit 0

@@ -29,3 +29,4 @@ foreach ($case in $cases) {
     else { Write-Host "[ok, rejected] $($case.Name) => exit $exitCode" }
 }
 if ($accepted) { throw "$accepted attestation case(s) were accepted" }
+exit 0
