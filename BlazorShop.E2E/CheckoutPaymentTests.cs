@@ -8,13 +8,33 @@ public sealed partial class CheckoutPaymentTests(E2EApplicationFixture applicati
 {
     public override BrowserNewContextOptions ContextOptions() => new() { IgnoreHTTPSErrors = true, Locale = "en-US" };
 
+    // Same navigation and timeout as Page.GotoAsync; only adds redacted diagnostics when the load state is
+    // not reached (two consecutive 30-second timeouts in CI run 41880179299).
+    private NavigationDiagnostics? navigationDiagnostics;
+
+    private Task GotoCheckoutLoginAsync()
+    {
+        navigationDiagnostics ??= NavigationDiagnostics.Attach(Page);
+        return navigationDiagnostics.GotoAsync(
+            Page,
+            new Uri(application.WebBaseUrl, "authentication/login/account/checkout").ToString(),
+            "checkout login",
+            application.ArtifactDirectory,
+            [
+                application.WebBaseUrl,
+                new Uri(application.ApiBaseUrl, "alive"),
+                new Uri("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"),
+                new Uri("https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"),
+            ]);
+    }
+
     [Fact]
     public async Task CheckoutAndPublicPages_ResponsivePresentation()
     {
         var data = await application.SeedScenarioAsync(includeListingSamples: true);
         try
         {
-            await Page.GotoAsync(new Uri(application.WebBaseUrl, "authentication/login/account/checkout").ToString());
+            await GotoCheckoutLoginAsync();
             await Page.GetByLabel("Email Address", new() { Exact = true }).FillAsync(data.UserEmail);
             await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(data.UserPassword);
             await Page.GetByRole(AriaRole.Button, new() { Name = "Login", Exact = true }).ClickAsync();
