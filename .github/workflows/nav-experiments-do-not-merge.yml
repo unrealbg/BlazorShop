@@ -1,0 +1,50 @@
+name: nav-experiments-do-not-merge
+
+# EXPERIMENTS ONLY (branch codex/e2e-navigation-experiments-do-not-merge, PR #140 investigation).
+# Runs the checkout login navigation experiments once on a Linux runner. Never merge.
+on:
+  push:
+    branches: [codex/e2e-navigation-experiments-do-not-merge]
+
+permissions:
+  contents: read
+
+jobs:
+  experiments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
+      - name: Install Web build dependencies from lockfile
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: npm ci --include=dev
+      - name: Build browser E2E project
+        run: |
+          dotnet restore BlazorShop.E2E/BlazorShop.E2E.csproj
+          dotnet build BlazorShop.E2E/BlazorShop.E2E.csproj --configuration Release --no-restore -warnaserror
+      - name: Create development HTTPS certificate
+        run: dotnet dev-certs https
+      - name: Install Playwright Chromium
+        run: pwsh scripts/install-playwright-chromium.ps1 -InstallerPath BlazorShop.E2E/bin/Release/net10.0/playwright.ps1
+      - name: Run checkout navigation experiments and checkout tests
+        env:
+          BLAZORSHOP_E2E_ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/nav
+        run: >-
+          dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj --configuration Release --no-build --no-restore
+          --filter "FullyQualifiedName~CheckoutPaymentTests"
+          --logger "trx;LogFileName=nav.trx" --results-directory artifacts/nav/test-results --verbosity normal
+      - name: Upload experiment diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nav-experiments-${{ github.run_id }}
+          path: artifacts/nav
+          retention-days: 7
