@@ -86,7 +86,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
             var page = await users
                 .OrderByDescending(user => user.CreatedOn)
                 .ThenBy(user => user.Email)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PageWindow.GetSkip(pageNumber, pageSize))
                 .Take(pageSize)
                 .ToListAsync();
 

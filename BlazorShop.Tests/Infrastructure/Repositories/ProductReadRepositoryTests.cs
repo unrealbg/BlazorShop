@@ -35,6 +35,23 @@ namespace BlazorShop.Tests.Infrastructure.Repositories
         }
 
         [Fact]
+        public async Task GetCatalogPageAsync_ReturnsEmptyPage_WhenPageWindowOverflows()
+        {
+            await using var context = CreateContext();
+            await SeedProductsAsync(context, Guid.NewGuid(), Guid.NewGuid());
+            var repository = new ProductReadRepository(context);
+            var query = new ProductCatalogQuery { PageNumber = int.MaxValue, PageSize = 100 };
+
+            var catalog = await repository.GetCatalogPageAsync(query);
+            var published = await repository.GetPublishedCatalogPageAsync(query);
+
+            Assert.Equal(5, catalog.TotalCount);
+            Assert.Empty(catalog.Items);
+            Assert.Equal(int.MaxValue, catalog.PageNumber);
+            Assert.Empty(published.Items);
+        }
+
+        [Fact]
         public async Task GetCatalogPageAsync_FiltersByCategory()
         {
             await using var context = CreateContext();

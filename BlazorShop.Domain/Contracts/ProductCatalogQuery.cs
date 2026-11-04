@@ -22,6 +22,11 @@ namespace BlazorShop.Domain.Contracts
 
         public int GetNormalizedPageSize() => Math.Clamp(this.PageSize, 1, MaxPageSize);
 
+        public bool HasRepresentablePageWindow() =>
+            PageWindow.IsRepresentable(this.GetNormalizedPageNumber(), this.GetNormalizedPageSize());
+
+        public int GetSkip() => PageWindow.GetSkip(this.GetNormalizedPageNumber(), this.GetNormalizedPageSize());
+
         public string? GetNormalizedSearchTerm() => string.IsNullOrWhiteSpace(this.SearchTerm)
             ? null
             : this.SearchTerm.Trim();
