@@ -15,6 +15,10 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
     // Timeouts are deliberately unchanged: diagnostics must not turn a stall into a pass.
     private readonly Dictionary<IPage, BrowserBootDiagnostics> bootRecorders = new();
 
+    // Wall-clock (Unix ms) of ReloadAsync() being called and returning, to place it on the reloaded
+    // document's timeline (probe timeOrigin) without relying on the tab-creation clock.
+    private readonly Dictionary<IPage, (long Called, long Returned)> reloadClock = new();
+
     // Cold boot of an additional tab gets the same 30-second budget that the first tab's login
     // navigation already has through Playwright's default action timeout. Firefox CI measured the
     // first rendered account UI at 5.24 s after opening the tab, past the 5-second assertion default,
@@ -321,10 +325,13 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             release.TrySetResult();
             var attempted = 0;
             await other.RouteAsync(RefreshPath, async route => { Interlocked.Increment(ref attempted); await route.ContinueAsync(); });
-            await other.ReloadAsync();
-            await Expect(other.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
-            Assert.Equal(0, attempted);
-            await AssertMetadataOnlyAsync(other);
+            await ReloadWithStartupProbeAsync(other, "secondary reload");
+            await AssertWithDiagnosticsAsync(other, "sign-in after reload", async () =>
+            {
+                await Expect(other.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
+                Assert.Equal(0, attempted);
+                await AssertMetadataOnlyAsync(other);
+            });
         }
         finally { release.TrySetResult(); await application.RemoveScenarioAsync(data); }
     }
@@ -470,20 +477,12 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await wait();
-            await AppendBootRecordAsync(directory, browser, scenario, step, recorder, budget, ready: true);
+            await AppendBootRecordAsync(page, directory, browser, scenario, step, recorder, budget, ready: true);
         }
         catch (Exception exception)
         {
-            await AppendBootRecordAsync(directory, browser, scenario, step, recorder, budget, ready: false);
-            var pages = new List<object>();
-            foreach (var (trackedPage, tracked) in bootRecorders)
-            {
-                pages.Add(new { summary = tracked.Summary(), state = await BrowserBootDiagnostics.CaptureStateAsync(trackedPage), events = tracked.Events });
-            }
-
-            var report = new { browser, scenario, step, budgetMs = (long)budget.TotalMilliseconds, failedTab = recorder.Label, pages };
-            var fileStep = new string(step.Select(character => char.IsLetterOrDigit(character) ? character : '-').ToArray());
-            await BrowserBootDiagnostics.WriteFailureAsync(Path.Combine(directory, $"boot-failure-{browser}-{scenario}-{fileStep}.json"), report);
+            await AppendBootRecordAsync(page, directory, browser, scenario, step, recorder, budget, ready: false);
+            var report = await WriteFailureReportAsync("boot-failure", page, scenario, step, (long)budget.TotalMilliseconds);
 
             // Also surface the redacted report in the test result itself, so it is readable from CI logs
             // even when artifacts are unavailable. The original failure stays the inner exception.
@@ -494,9 +493,92 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         }
     }
 
-    private static async Task AppendBootRecordAsync(string directory, string browser, string scenario, string step, BrowserBootDiagnostics recorder, TimeSpan budget, bool ready)
+    // Functional assertions keep their own timeouts; on failure the same redacted report is kept so an
+    // assertion failure after a successful boot is diagnosable too (issue #134).
+    private async Task AssertWithDiagnosticsAsync(IPage page, string step, Func<Task> assertions, [CallerMemberName] string scenario = "")
+    {
+        try
+        {
+            await assertions();
+            await AppendStartupRecordAsync(page, scenario, step, passed: true);
+        }
+        catch (Exception exception)
+        {
+            await AppendStartupRecordAsync(page, scenario, step, passed: false);
+            var report = await WriteFailureReportAsync("assertion-failure", page, scenario, step, budgetMs: null);
+            throw new ScenarioAssertionException(
+                $"Assertion step '{step}' failed for the {bootRecorders[page].Label} tab ({Browser.BrowserType.Name}). Redacted diagnostics:{Environment.NewLine}"
+                + BrowserBootDiagnostics.ToJson(report),
+                exception);
+        }
+    }
+
+    // One line per probed assertion step in refresh-coordination/startup-timeline.jsonl, so passing runs
+    // also show when the reloaded document rendered, restored its session and reached the expected UI.
+    private async Task AppendStartupRecordAsync(IPage page, string scenario, string step, bool passed)
+    {
+        var recorder = bootRecorders[page];
+        if (recorder.NavigationStartMs == 0)
+        {
+            return;
+        }
+
+        var directory = Path.Combine(application.ArtifactDirectory, "refresh-coordination");
+        Directory.CreateDirectory(directory);
+        var record = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            browser = Browser.BrowserType.Name,
+            scenario,
+            step,
+            tab = recorder.Label,
+            passed,
+            elapsedSinceNavigationMs = recorder.SinceNavigation(recorder.ElapsedMs),
+            loadMs = recorder.SinceNavigation(recorder.LoadMs),
+            frameworkRequests = recorder.FrameworkRequests,
+            reloadCalledUnixMs = reloadClock.TryGetValue(page, out var clock) ? clock.Called : (long?)null,
+            reloadReturnedUnixMs = reloadClock.TryGetValue(page, out var returned) ? returned.Returned : (long?)null,
+            startup = await BrowserBootDiagnostics.ReadStartupProbeAsync(page),
+        });
+        await File.AppendAllTextAsync(Path.Combine(directory, "startup-timeline.jsonl"), record + Environment.NewLine);
+    }
+
+    // Reloads a tab as a new measured navigation: tab metrics restart and the startup probe records the
+    // new document relative to its own navigation start, not to the creation of the tab.
+    private async Task ReloadWithStartupProbeAsync(IPage page, string description)
+    {
+        await BrowserBootDiagnostics.InstallStartupProbeAsync(page);
+        bootRecorders[page].MarkNavigation(description);
+        var called = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        await page.ReloadAsync();
+        reloadClock[page] = (called, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    }
+
+    private async Task<object> WriteFailureReportAsync(string kind, IPage failedPage, string scenario, string step, long? budgetMs)
+    {
+        var directory = Path.Combine(application.ArtifactDirectory, "refresh-coordination");
+        var browser = Browser.BrowserType.Name;
+        var pages = new List<object>();
+        foreach (var (trackedPage, tracked) in bootRecorders)
+        {
+            pages.Add(new
+            {
+                summary = tracked.Summary(),
+                state = await BrowserBootDiagnostics.CaptureStateAsync(trackedPage),
+                startup = await BrowserBootDiagnostics.ReadStartupProbeAsync(trackedPage),
+                events = tracked.Events,
+            });
+        }
+
+        var report = new { kind, browser, scenario, step, budgetMs, failedTab = bootRecorders[failedPage].Label, pages };
+        var fileStep = new string(step.Select(character => char.IsLetterOrDigit(character) ? character : '-').ToArray());
+        await BrowserBootDiagnostics.WriteFailureAsync(Path.Combine(directory, $"{kind}-{browser}-{scenario}-{fileStep}.json"), report);
+        return report;
+    }
+
+    private static async Task AppendBootRecordAsync(IPage page, string directory, string browser, string scenario, string step, BrowserBootDiagnostics recorder, TimeSpan budget, bool ready)
     {
         Directory.CreateDirectory(directory);
+        // Times are relative to the measured navigation (the tab's first navigation, or a later reload).
         var record = System.Text.Json.JsonSerializer.Serialize(new
         {
             browser,
@@ -505,12 +587,13 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             tab = recorder.Label,
             budgetMs = (long)budget.TotalMilliseconds,
             ready,
-            readyMs = ready ? recorder.ElapsedMs : (long?)null,
-            loadMs = recorder.LoadMs,
-            firstRefreshRequestMs = recorder.FirstRefreshRequestMs,
-            firstRefreshResponseMs = recorder.FirstRefreshResponseMs,
+            readyMs = ready ? recorder.SinceNavigation(recorder.ElapsedMs) : null,
+            loadMs = recorder.SinceNavigation(recorder.LoadMs),
+            firstRefreshRequestMs = recorder.SinceNavigation(recorder.FirstRefreshRequestMs),
+            firstRefreshResponseMs = recorder.SinceNavigation(recorder.FirstRefreshResponseMs),
             firstRefreshStatus = recorder.FirstRefreshStatus,
             frameworkRequests = recorder.FrameworkRequests,
+            startup = recorder.NavigationStartMs > 0 ? await BrowserBootDiagnostics.ReadStartupProbeAsync(page) : null,
         });
         await File.AppendAllTextAsync(Path.Combine(directory, "boot-timeline.jsonl"), record + Environment.NewLine);
     }
