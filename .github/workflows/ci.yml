@@ -179,6 +179,14 @@ jobs:
           cmp /tmp/web-checkout.js BlazorShop.Presentation/BlazorShop.Web/wwwroot/js/checkoutUi.js
           grep -F 'css/ui-v2-checkout.css' /tmp/web-index.html
 
+      - name: Verify Web security headers
+        run: |
+          docker run --detach --name web-headers --publish 127.0.0.1:18081:80 \
+            --add-host api:127.0.0.1 \
+            --env BLAZORSHOP_STOREFRONT_BASE_URL=https://shop.example.com/ blazorshop-web:ci
+          trap 'docker logs web-headers; docker rm --force web-headers' EXIT
+          bash scripts/verify-web-security-headers.sh http://127.0.0.1:18081
+
       - name: Upload Tailwind CSS and compatibility evidence
         if: always()
         uses: actions/upload-artifact@v4

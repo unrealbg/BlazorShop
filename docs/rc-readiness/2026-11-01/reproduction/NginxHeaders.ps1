@@ -12,6 +12,13 @@ $repository = (Resolve-Path (Join-Path $PSScriptRoot '../../../..')).Path
 $fixture = [IO.Path]::GetFullPath((Join-Path $OutputDirectory 'nginx'))
 New-Item -ItemType Directory -Force (Join-Path $fixture 'html') | Out-Null
 Copy-Item -LiteralPath (Join-Path $repository 'BlazorShop.Presentation/BlazorShop.Web/nginx.conf') -Destination (Join-Path $fixture 'default.conf.template')
+# Present since the R04 fix; the audited baseline had no shared snippet.
+$snippet = Join-Path $repository 'BlazorShop.Presentation/BlazorShop.Web/nginx-security-headers.conf'
+$snippetMount = @()
+if (Test-Path -LiteralPath $snippet) {
+    Copy-Item -LiteralPath $snippet -Destination (Join-Path $fixture 'blazorshop-security-headers.conf')
+    $snippetMount = @('--mount', "type=bind,source=$fixture/blazorshop-security-headers.conf,target=/etc/nginx/snippets/blazorshop-security-headers.conf,readonly")
+}
 Copy-Item -LiteralPath (Join-Path $repository 'BlazorShop.Presentation/BlazorShop.Web/wwwroot/index.html') -Destination (Join-Path $fixture 'html/index.html')
 Set-Content -LiteralPath (Join-Path $fixture 'html/plain.txt') -Value 'synthetic audit control'
 Set-Content -LiteralPath (Join-Path $fixture 'html/audit.css') -Value '.audit { color: black; }'
@@ -19,6 +26,7 @@ Set-Content -LiteralPath (Join-Path $fixture 'html/audit.css') -Value '.audit { 
 $container = docker run --detach --rm --publish 127.0.0.1::80 --add-host api:127.0.0.1 `
     --env BLAZORSHOP_STOREFRONT_BASE_URL=https://shop.example.test/ `
     --mount "type=bind,source=$fixture/default.conf.template,target=/etc/nginx/templates/default.conf.template,readonly" `
+    @snippetMount `
     --mount "type=bind,source=$fixture/html,target=/usr/share/nginx/html,readonly" nginx:1.27.5-alpine3.21
 if ($LASTEXITCODE -ne 0 -or $container -notmatch '^[a-f0-9]{64}$') {
     throw 'The disposable fixture failed to start.'

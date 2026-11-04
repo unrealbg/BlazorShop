@@ -28,6 +28,9 @@ internal sealed partial class BrowserBootDiagnostics
 
     public long ElapsedMs => clock.ElapsedMilliseconds;
 
+    /// <summary>Start of the navigation being measured (0 for the tab's first navigation).</summary>
+    public long NavigationStartMs { get; private set; }
+
     public long? LoadMs { get; private set; }
 
     public long? FirstRefreshRequestMs { get; private set; }
@@ -65,6 +68,52 @@ internal sealed partial class BrowserBootDiagnostics
         };
         page.Close += (_, _) => recorder.Add("close");
         return recorder;
+    }
+
+    /// <summary>
+    /// Starts measuring a new navigation of the same tab (for example a reload). Load, refresh and
+    /// framework-request metrics restart, so the next boot record is relative to this navigation.
+    /// </summary>
+    public void MarkNavigation(string description)
+    {
+        NavigationStartMs = ElapsedMs;
+        LoadMs = null;
+        FirstRefreshRequestMs = null;
+        FirstRefreshResponseMs = null;
+        FirstRefreshStatus = null;
+        Interlocked.Exchange(ref frameworkRequests, 0);
+        Add($"navigation {description}");
+    }
+
+    /// <summary>Converts a tab-clock value to milliseconds since the measured navigation started.</summary>
+    public long? SinceNavigation(long? tabMs) => tabMs - NavigationStartMs;
+
+    /// <summary>
+    /// Installs an E2E-only probe for the tab's next documents. It records, relative to each new
+    /// document's navigation start: DOMContentLoaded/load, the first Blazor render, the
+    /// "Authorizing" and sign-in UI states, auth-session status/pending transitions, and the
+    /// request/grant/release of Web Locks (session restoration). It never reads the epoch, JWT,
+    /// cookies, headers or bodies; storage writes are reduced to status and the pending flag.
+    /// </summary>
+    public static Task InstallStartupProbeAsync(IPage page) => page.AddInitScriptAsync(StartupProbeScript);
+
+    /// <summary>Reads the startup probe of the current document, or a short reason when unavailable.</summary>
+    public static async Task<object?> ReadStartupProbeAsync(IPage page)
+    {
+        if (page.IsClosed)
+        {
+            return "closed";
+        }
+
+        try
+        {
+            return await page.EvaluateAsync<JsonElement>("() => window.__bsStartupProbe ? window.__bsStartupProbe.read() : null")
+                .WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (Exception exception)
+        {
+            return $"unavailable: {exception.GetType().Name}";
+        }
     }
 
     /// <summary>
@@ -130,6 +179,7 @@ internal sealed partial class BrowserBootDiagnostics
     {
         label = Label,
         elapsedMs = ElapsedMs,
+        navigationStartMs = NavigationStartMs,
         loadMs = LoadMs,
         firstRefreshRequestMs = FirstRefreshRequestMs,
         firstRefreshResponseMs = FirstRefreshResponseMs,
@@ -197,6 +247,110 @@ internal sealed partial class BrowserBootDiagnostics
 
     [GeneratedRegex(@"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")]
     private static partial Regex JwtPattern();
+
+    // Times are performance.now() of the new document, i.e. milliseconds since its navigation started.
+    private const string StartupProbeScript = """
+        (() => {
+            if (window.__bsStartupProbe) return;
+            const stateKey = 'blazorshop.auth-session-state';
+            const lockPrefix = 'blazorshop.';
+            const events = [];
+            const add = (name, detail) => {
+                if (events.length < 200) events.push(detail === undefined
+                    ? { t: Math.round(performance.now()), name }
+                    : { t: Math.round(performance.now()), name, detail });
+            };
+            const authOf = value => {
+                try {
+                    const parsed = JSON.parse(value);
+                    return parsed ? { status: parsed.status ?? null, pending: parsed.pending === true } : null;
+                } catch { return 'unreadable'; }
+            };
+            add('document-start', { auth: authOf(localStorage.getItem(stateKey)) });
+            document.addEventListener('DOMContentLoaded', () => add('domcontentloaded'), { once: true });
+            window.addEventListener('load', () => add('load'), { once: true });
+
+            const setItem = Storage.prototype.setItem;
+            const removeItem = Storage.prototype.removeItem;
+            Storage.prototype.setItem = function (key, value) {
+                const result = setItem.apply(this, arguments);
+                if (this === localStorage && key === stateKey) add('auth-state', authOf(value));
+                if (this === sessionStorage && key === 'token') add('tab-token-stored');
+                return result;
+            };
+            Storage.prototype.removeItem = function (key) {
+                const result = removeItem.apply(this, arguments);
+                if (this === sessionStorage && key === 'token') add('tab-token-removed');
+                return result;
+            };
+
+            let unsettledLocks = 0;
+            if (typeof LockManager !== 'undefined' && LockManager.prototype.request) {
+                const request = LockManager.prototype.request;
+                LockManager.prototype.request = function (name, ...rest) {
+                    const callback = rest.pop();
+                    if (typeof name !== 'string' || !name.startsWith(lockPrefix) || typeof callback !== 'function') {
+                        return request.call(this, name, ...rest, callback);
+                    }
+                    const label = `${name}:${rest[0]?.mode ?? 'exclusive'}`;
+                    add('lock-request', label);
+                    unsettledLocks++;
+                    let outcome;
+                    try {
+                        outcome = request.call(this, name, ...rest, lock => {
+                            add('lock-granted', label);
+                            const result = callback(lock);
+                            Promise.resolve(result).then(() => add('lock-released', label), () => add('lock-released', `${label} rejected`));
+                            return result;
+                        });
+                    } catch (error) {
+                        unsettledLocks--;
+                        throw error;
+                    }
+                    outcome.then(() => add('lock-request-settled', label), error => add('lock-request-settled', `${label} ${error?.name ?? 'error'}`))
+                        .finally(() => unsettledLocks--);
+                    return outcome;
+                };
+            }
+
+            const seen = { render: false, blazor: false, authorizing: false, signInRequired: false, signIn: false };
+            const flag = (key, value, shown, hidden) => {
+                if (seen[key] !== value) { seen[key] = value; if (value || hidden) add(value ? shown : hidden); }
+            };
+            const check = () => {
+                const app = document.getElementById('app');
+                flag('render', seen.render || (!!app && !app.querySelector('.loader_main')), 'blazor-first-render');
+                flag('blazor', seen.blazor || typeof Blazor !== 'undefined', 'blazor-defined');
+                const text = document.body ? document.body.textContent : '';
+                flag('authorizing', text.includes('Authorizing, please wait...'), 'authorizing-shown', 'authorizing-hidden');
+                flag('signInRequired', text.includes('Sign-in required'), 'sign-in-required-shown', 'sign-in-required-hidden');
+                flag('signIn', Array.from(document.querySelectorAll('h1')).some(h => h.textContent.trim() === 'Sign in'), 'sign-in-heading-shown', 'sign-in-heading-hidden');
+            };
+            new MutationObserver(check).observe(document, { childList: true, subtree: true, characterData: true });
+
+            const resourcePattern = /blazor\.webassembly\.js$|\/dotnet[^/]*\.(js|wasm)$|authSessionSync\.js$|\/api\/authentication\/refresh-token$/;
+            window.__bsStartupProbe = {
+                // Requests for this app's Web Locks made by this document that are queued or held.
+                unsettledLocks: () => unsettledLocks,
+                read: () => {
+                    const navigation = performance.getEntriesByType('navigation')[0];
+                    const resources = performance.getEntriesByType('resource')
+                        .map(entry => ({ path: new URL(entry.name).pathname, start: Math.round(entry.startTime), end: Math.round(entry.responseEnd) }))
+                        .filter(entry => resourcePattern.test(entry.path));
+                    return {
+                        timeOrigin: Math.round(performance.timeOrigin),
+                        now: Math.round(performance.now()),
+                        domContentLoaded: navigation ? Math.round(navigation.domContentLoadedEventEnd) : null,
+                        load: navigation ? Math.round(navigation.loadEventEnd) : null,
+                        refreshRequests: resources.filter(entry => entry.path.endsWith('/refresh-token')).length,
+                        unsettledLocks,
+                        resources,
+                        events: events.slice(),
+                    };
+                },
+            };
+        })();
+        """;
 }
 
 /// <summary>
@@ -204,3 +358,9 @@ internal sealed partial class BrowserBootDiagnostics
 /// Playwright failure is preserved as the inner exception.
 /// </summary>
 internal sealed class BootReadinessException(string message, Exception innerException) : Exception(message, innerException);
+
+/// <summary>
+/// A functional assertion failed after its readiness stage passed. The message carries the same
+/// redacted diagnostics; the original assertion failure is preserved as the inner exception.
+/// </summary>
+internal sealed class ScenarioAssertionException(string message, Exception innerException) : Exception(message, innerException);
