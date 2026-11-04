@@ -288,7 +288,7 @@ public sealed partial class CheckoutPaymentTests
 
     private async Task LoginCheckoutAsync(E2ETestData data)
     {
-        await Page.GotoAsync(new Uri(application.WebBaseUrl, "authentication/login/account/checkout").ToString());
+        await GotoCheckoutLoginAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
         await Page.GetByLabel("Email Address", new() { Exact = true }).FillAsync(data.UserEmail);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(data.UserPassword);
