@@ -54,7 +54,7 @@ namespace BlazorShop.Infrastructure.Repositories
 
             var totalCount = await products.CountAsync();
             var items = await products
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(query.GetSkip())
                 .Take(pageSize)
                 .Select(MapCatalogProduct())
                 .ToListAsync();
@@ -86,7 +86,7 @@ namespace BlazorShop.Infrastructure.Repositories
 
             var totalCount = await products.CountAsync();
             var items = await products
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(query.GetSkip())
                 .Take(pageSize)
                 .Select(MapCatalogProduct())
                 .ToListAsync();

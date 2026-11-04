@@ -80,7 +80,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
             var total = await orders.CountAsync();
             var page = await orders
                 .OrderByDescending(order => order.CreatedOn)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PageWindow.GetSkip(pageNumber, pageSize))
                 .Take(pageSize)
                 .ToListAsync();
 

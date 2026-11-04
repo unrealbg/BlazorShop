@@ -40,6 +40,12 @@
         [HttpGet("catalog")]
         public async Task<ActionResult<PagedResult<GetCatalogProduct>>> GetCatalog([FromQuery] ProductCatalogQuery query)
         {
+            if (!query.HasRepresentablePageWindow())
+            {
+                ModelState.AddModelError(nameof(ProductCatalogQuery.PageNumber), CatalogPagingErrors.PageOutOfRange);
+                return BadRequest(new ValidationProblemDetails(ModelState));
+            }
+
             var data = await _publicCatalogService.GetPublishedCatalogPageAsync(query);
             return Ok(data);
         }

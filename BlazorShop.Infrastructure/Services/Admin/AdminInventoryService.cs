@@ -60,7 +60,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
 
             var total = mappedItems.Count();
             var items = mappedItems
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PageWindow.GetSkip(pageNumber, pageSize))
                 .Take(pageSize)
                 .ToList();
 

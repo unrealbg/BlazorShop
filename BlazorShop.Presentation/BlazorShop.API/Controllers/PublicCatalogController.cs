@@ -43,6 +43,12 @@ namespace BlazorShop.API.Controllers
         [HttpGet("products")]
         public async Task<ActionResult<PagedResult<GetCatalogProduct>>> GetProducts([FromQuery] ProductCatalogQuery query)
         {
+            if (!query.HasRepresentablePageWindow())
+            {
+                ModelState.AddModelError(nameof(ProductCatalogQuery.PageNumber), CatalogPagingErrors.PageOutOfRange);
+                return BadRequest(new ValidationProblemDetails(ModelState));
+            }
+
             var products = await _publicCatalogService.GetPublishedCatalogPageAsync(query);
             return Ok(products);
         }
