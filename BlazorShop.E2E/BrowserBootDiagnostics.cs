@@ -121,8 +121,10 @@ internal sealed partial class BrowserBootDiagnostics
     public static async Task WriteFailureAsync(string path, object report)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(report, JsonOptions));
+        await File.WriteAllTextAsync(path, ToJson(report));
     }
+
+    public static string ToJson(object report) => JsonSerializer.Serialize(report, JsonOptions);
 
     public object Summary() => new
     {
@@ -196,3 +198,9 @@ internal sealed partial class BrowserBootDiagnostics
     [GeneratedRegex(@"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")]
     private static partial Regex JwtPattern();
 }
+
+/// <summary>
+/// A boot readiness wait failed. The message carries the redacted diagnostics; the original
+/// Playwright failure is preserved as the inner exception.
+/// </summary>
+internal sealed class BootReadinessException(string message, Exception innerException) : Exception(message, innerException);

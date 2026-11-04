@@ -462,7 +462,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             await wait();
             await AppendBootRecordAsync(directory, browser, scenario, step, recorder, ready: true);
         }
-        catch
+        catch (Exception exception)
         {
             await AppendBootRecordAsync(directory, browser, scenario, step, recorder, ready: false);
             var pages = new List<object>();
@@ -471,11 +471,16 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
                 pages.Add(new { summary = tracked.Summary(), state = await BrowserBootDiagnostics.CaptureStateAsync(trackedPage), events = tracked.Events });
             }
 
+            var report = new { browser, scenario, step, failedTab = recorder.Label, pages };
             var fileStep = new string(step.Select(character => char.IsLetterOrDigit(character) ? character : '-').ToArray());
-            await BrowserBootDiagnostics.WriteFailureAsync(
-                Path.Combine(directory, $"boot-failure-{browser}-{scenario}-{fileStep}.json"),
-                new { browser, scenario, step, failedTab = recorder.Label, pages });
-            throw;
+            await BrowserBootDiagnostics.WriteFailureAsync(Path.Combine(directory, $"boot-failure-{browser}-{scenario}-{fileStep}.json"), report);
+
+            // Also surface the redacted report in the test result itself, so it is readable from CI logs
+            // even when artifacts are unavailable. The original failure stays the inner exception.
+            throw new BootReadinessException(
+                $"Boot wait '{step}' failed for the {recorder.Label} tab ({browser}). Redacted boot diagnostics:{Environment.NewLine}"
+                + BrowserBootDiagnostics.ToJson(report),
+                exception);
         }
     }
 
