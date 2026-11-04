@@ -47,3 +47,13 @@ pwsh BlazorShop.E2E/bin/Release/net10.0/playwright.ps1 show-trace path/to/scenar
 ```
 
 A missing container runtime, application startup failure, missing TRX file, zero discovered tests, non-passing result, or missing mandatory scenario fails the job. The E2E job does not use saved authentication state or production secrets; credentials and signing material are synthetic and scoped to its disposable environment.
+
+### WebAssembly boot diagnostics (RC audit R01, issue #134)
+
+`RefreshCoordinationTests` records every boot wait separately from the refresh-protocol assertions that follow it: the login form of the first tab and the first rendered UI of every additional tab. **Timeouts are unchanged** (the login form keeps the default action timeout that `FillAsync` used implicitly, and additional tabs keep the default assertion timeout), so the diagnostics cannot turn a stall into a pass. Each wait appends one line to `refresh-coordination/boot-timeline.jsonl` in the scenario's artifact directory (browser, scenario, step, tab, time to ready, `load` time, first refresh request/response time and status, framework request count), so slow but passing boots stay visible.
+
+When a boot wait fails, `boot-failure-<browser>-<scenario>-<step>.json` records a path-only timeline for every tracked tab (API requests and responses, failed requests, console messages, page errors, `load`) and a state snapshot: document readiness, whether `Blazor` started, the loader text, whether the Blazor error UI is visible, the auth-session status/pending flag, held and pending Web Lock names and a short visible-text excerpt. It never records cookies, headers, bodies, query strings, the session epoch or token values; JWT-shaped console text is redacted.
+
+The loader text `Ready` is set on the window `load` event, before the WebAssembly runtime has finished starting, so a snapshot that shows only `Ready` means the app had not rendered yet rather than that it was idle.
+
+To measure intermittency, run the manual **e2e-session-soak** workflow (Actions → e2e-session-soak → Run workflow; available once the workflow file is on `master`). It repeats the coordination suite up to 30 times for one browser, optionally with one CPU under `stress-ng` load, and writes ready-time p50/p95/max per step and the number of waits slower than 5 seconds to the job summary. It is a reproduction aid and does not change the mandatory CI gate.
