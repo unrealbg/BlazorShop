@@ -54,7 +54,7 @@ Repository governance: ruleset **26531467** is active on `refs/heads/master` onl
 | R08 | P1 | Routing, trust and service transport | **Not verified — release-installation gate.** No change. |
 | R09 | P1 | Current-target recovery | **Not verified, and wider than on 2026-11-01.** The hosted rehearsal is pinned to target `8370f81` (migration head `20260909075202_ArchiveLegacyCheckoutOrderItems`); `master` adds `20261101131138_AddRegistrationConfirmationOutbox`, which no rehearsal has applied, backed up or restored. |
 | R10 | P1/P2 | Operational, provider and content gates | **Not verified.** No change. |
-| R11 | P1 | Release provenance / governance | **Partly resolved.** Confirmed: required checks are enforced by the ruleset. Confirmed in source: `release.yml` checks out without binding `ref` to the release tag and does not compare against an approved SHA. No release or tag exists yet. |
+| R11 | P1 | Release provenance / governance | **Partly resolved.** Confirmed: required checks are enforced by the ruleset. Confirmed in source: on the manual `workflow_dispatch` path, `release.yml` checks out the default branch without `ref`, yet names and uploads the artifacts (`--clobber`) under the supplied tag; neither path compares the built commit with an approved SHA, and the workflow runs only the unit test project, not the full CI gate. On the `release: published` path the checkout is the tag's commit. No release or tag exists yet. |
 | R12 | P2 | Accepted security-policy limits | **Open — dispositions needed.** Unchanged (see security section). |
 | R13 | P2 | Performance / image pipeline | **Open.** Unchanged; see also N02 (render-blocking external resources). |
 | R14 | P2 | Pagination offset overflow | **Resolved** ([#135](https://github.com/unrealbg/BlazorShop/issues/135)). |
@@ -74,7 +74,7 @@ These must be closed or carry an explicit, evidenced owner disposition before an
 1. **R09 current-target upgrade/restore rehearsal** including the outbox migration: backup, forward migration on API startup, attach-only browser checks, restore, uploads and data-protection keys, with timings.
 2. **R08 production topology proof** on the chosen hosts: edge → Web → API attribution, Storefront → API service transport, forged-header rejection, cookie scope and SameSite on the real hostnames, rate-limit buckets.
 3. **R10 operational gates**: Stripe test mode end to end (if card payments are enabled), SMTP provider delivery and outbox recovery, upload persistence across container replacement, readiness monitoring, rollback timing; merchant identity, Privacy/Terms, currency and fulfillment decisions.
-4. **R11 provenance**: bind `release.yml` to the tag's commit and to an approved SHA before any artifact is published; create the first release from a commit whose full CI is green.
+4. **R11 provenance**: make `release.yml` build exactly the tag's commit on both paths, verify it against an approved SHA and its green required checks before upload, and refuse to overwrite existing assets; create the first release from such a commit.
 5. **R01 / N01 stability**: a dispositioned owner decision on the remaining intermittent E2E symptoms (diagnose, or accept with explicit criteria). Required checks are green on `master` today, but the symptoms have not been explained.
 
 ## Remaining security risks
