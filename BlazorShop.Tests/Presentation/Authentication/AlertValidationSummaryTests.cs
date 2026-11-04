@@ -1,11 +1,13 @@
 namespace BlazorShop.Tests.Presentation.Authentication;
 
+using System.Reflection;
 using BlazorShop.Web.Components.FormControls;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 
 public sealed class AlertValidationSummaryTests
@@ -13,7 +15,7 @@ public sealed class AlertValidationSummaryTests
     [Fact]
     public async Task AnnouncesMessagesOnWrapperWhileKeepingListSemantics()
     {
-        using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        using var services = CreateServices();
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         var model = new LoginModel();
         var editContext = new EditContext(model);
@@ -54,6 +56,28 @@ public sealed class AlertValidationSummaryTests
         });
     }
 
+    // The Web _Imports.razor injects shared services into every component; supply inert mocks.
+    private static ServiceProvider CreateServices()
+    {
+        var services = new ServiceCollection().AddLogging();
+        var injected = typeof(AlertValidationSummary)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(property => property.GetCustomAttribute<InjectAttribute>() is not null);
+        foreach (var property in injected)
+        {
+            if (property.PropertyType == typeof(NavigationManager))
+            {
+                continue;
+            }
+
+            var mock = (Mock)Activator.CreateInstance(typeof(Mock<>).MakeGenericType(property.PropertyType))!;
+            services.AddSingleton(property.PropertyType, mock.Object);
+        }
+
+        services.AddSingleton<NavigationManager>(new TestNavigationManager());
+        return services.BuildServiceProvider();
+    }
+
     private static int CountOccurrences(string value, string fragment)
     {
         var count = 0;
@@ -68,5 +92,10 @@ public sealed class AlertValidationSummaryTests
     private sealed class LoginModel
     {
         public string? Email { get; set; }
+    }
+
+    private sealed class TestNavigationManager : NavigationManager
+    {
+        public TestNavigationManager() => Initialize("https://example.test/", "https://example.test/authentication/login");
     }
 }
