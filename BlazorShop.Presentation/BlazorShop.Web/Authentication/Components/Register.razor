@@ -13,7 +13,7 @@
     }
     <EditForm Model="_user" OnValidSubmit="HandleRegister" class="v2-form" aria-busy="@_isLoading">
         <DataAnnotationsValidator />
-        <ValidationSummary role="alert" class="v2-field-full" />
+        <AlertValidationSummary class="v2-field-full" />
         <div class="v2-field-full">
             <FloatingTextInput @bind-Value="_user.FullName" Label="Full Name" autocomplete="name" aria-describedby="register-name-error" />
             <div id="register-name-error"><ValidationMessage For="@(() => _user.FullName)" /></div>
