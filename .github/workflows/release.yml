@@ -1,63 +1,214 @@
 name: release
 
-on:
-  release:
-    types:
-      - published
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing GitHub release tag to receive the artifacts
-        required: true
-        type: string
+# Release provenance (R11, docs/specs/r11-release-provenance.md).
+# A v* tag push builds exactly the tagged commit after verifying that it is in master's history and
+# passed the required checks, attests the artifacts and creates a DRAFT release. Publishing the draft
+# is a manual owner decision; nothing here deploys, edits or replaces an existing release or tag.
 
-permissions:
-  contents: write
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  publish-release-artifacts:
+  validate-build:
+    name: validate-build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      sha: ${{ steps.source.outputs.sha }}
+      prerelease: ${{ steps.source.outputs.prerelease }}
+      sums-sha256: ${{ steps.manifest.outputs.sums-sha256 }}
+      release-files: ${{ steps.manifest.outputs.release-files }}
 
     steps:
-      - name: Checkout
+      - name: Check out the tagged commit
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify tag, source commit and required checks
+        id: source
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/release/release-guard.ps1 -Command VerifySource -EvidencePath "$env:RUNNER_TEMP/required-checks.json"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
-      - name: Restore
-        run: dotnet restore BlazorShop.sln
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
-      - name: Test
-        run: dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release --no-restore --verbosity normal
+      - name: Install Web build dependencies from lockfile
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: npm ci --include=dev
 
       - name: Publish deployable applications
         run: |
-          dotnet publish BlazorShop.Presentation/BlazorShop.API/BlazorShop.API.csproj --configuration Release --no-restore --output artifacts/api
-          dotnet publish BlazorShop.Presentation/BlazorShop.Storefront/BlazorShop.Storefront.csproj --configuration Release --no-restore --output artifacts/storefront
-          dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj --configuration Release --no-restore --output artifacts/account
+          set -euo pipefail
+          dotnet publish BlazorShop.Presentation/BlazorShop.API/BlazorShop.API.csproj --configuration Release --output "$RUNNER_TEMP/publish/api"
+          dotnet publish BlazorShop.Presentation/BlazorShop.Storefront/BlazorShop.Storefront.csproj --configuration Release --output "$RUNNER_TEMP/publish/storefront"
+          dotnet publish BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj --configuration Release --output "$RUNNER_TEMP/publish/account"
 
-      - name: Package release artifacts
+      - name: Package release archives
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
         run: |
-          SAFE_TAG="$(printf '%s' "$RELEASE_TAG" | tr -c 'A-Za-z0-9._-' '-')"
-          mkdir -p release-assets
-          tar -C artifacts/api -czf "$GITHUB_WORKSPACE/release-assets/blazorshop-api-${SAFE_TAG}.tar.gz" .
-          tar -C artifacts/storefront -czf "$GITHUB_WORKSPACE/release-assets/blazorshop-storefront-${SAFE_TAG}.tar.gz" .
-          tar -C artifacts/account -czf "$GITHUB_WORKSPACE/release-assets/blazorshop-account-${SAFE_TAG}.tar.gz" .
+          set -euo pipefail
+          epoch="$(git log -1 --format=%ct)"
+          mkdir -p "$RUNNER_TEMP/dist"
+          for app in api storefront account; do
+            tar --sort=name --mtime="@${epoch}" --owner=0 --group=0 --numeric-owner \
+              -C "$RUNNER_TEMP/publish/${app}" -cf - . | gzip -n > "$RUNNER_TEMP/dist/blazorshop-${app}-${RELEASE_TAG}.tar.gz"
+          done
 
-      - name: Upload workflow artifacts
+      - name: Write provenance and checksums
+        id: manifest
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+          RELEASE_SHA: ${{ steps.source.outputs.sha }}
+          RELEASE_TAG_OBJECT_SHA: ${{ steps.source.outputs.tag-object-sha }}
+        run: ./scripts/release/release-guard.ps1 -Command WriteManifest -Tag $env:RELEASE_TAG -Sha $env:RELEASE_SHA -Directory "$env:RUNNER_TEMP/dist" -EvidencePath "$env:RUNNER_TEMP/required-checks.json"
+
+      - name: Verify artifacts before hand-off
+        shell: pwsh
+        env:
+          SUMS_SHA256: ${{ steps.manifest.outputs.sums-sha256 }}
+          RELEASE_FILES: ${{ steps.manifest.outputs.release-files }}
+        run: ./scripts/release/release-guard.ps1 -Command VerifyArtifacts -Directory "$env:RUNNER_TEMP/dist" -ExpectedSumsSha256 $env:SUMS_SHA256 -ReleaseFiles $env:RELEASE_FILES
+
+      - name: Upload release files for attestation and publishing
         uses: actions/upload-artifact@v4
         with:
-          name: blazorshop-${{ github.run_id }}
-          path: release-assets/*.tar.gz
+          name: release-files-${{ github.run_id }}
+          path: ${{ runner.temp }}/dist/
           if-no-files-found: error
+          retention-days: 7
 
-      - name: Attach artifacts to GitHub release
+  attest:
+    name: attest
+    needs: validate-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the release scripts only
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-build.outputs.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/release/
+          sparse-checkout-cone-mode: false
+
+      - name: Download release files
+        uses: actions/download-artifact@v4
+        with:
+          name: release-files-${{ github.run_id }}
+          path: ${{ runner.temp }}/dist
+
+      - name: Verify artifacts received from the build job
+        shell: pwsh
+        env:
+          SUMS_SHA256: ${{ needs.validate-build.outputs.sums-sha256 }}
+          RELEASE_FILES: ${{ needs.validate-build.outputs.release-files }}
+        run: ./scripts/release/release-guard.ps1 -Command VerifyArtifacts -Directory "$env:RUNNER_TEMP/dist" -ExpectedSumsSha256 $env:SUMS_SHA256 -ReleaseFiles $env:RELEASE_FILES
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            ${{ runner.temp }}/dist/*.tar.gz
+            ${{ runner.temp }}/dist/provenance.json
+
+      - name: Verify attestations
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: gh release upload "$RELEASE_TAG" release-assets/*.tar.gz --clobber
+          RELEASE_TAG: ${{ needs.validate-build.outputs.tag }}
+          RELEASE_SHA: ${{ needs.validate-build.outputs.sha }}
+        run: ./scripts/release/release-guard.ps1 -Command VerifyAttestations -Tag $env:RELEASE_TAG -Sha $env:RELEASE_SHA -Directory "$env:RUNNER_TEMP/dist"
+
+  publish-draft:
+    name: publish-draft
+    needs: [validate-build, attest]
+    if: github.repository == 'unrealbg/BlazorShop' && github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      attestations: read
+      contents: write
+
+    steps:
+      - name: Check out the release scripts only
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-build.outputs.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/release/
+          sparse-checkout-cone-mode: false
+
+      - name: Download release files
+        uses: actions/download-artifact@v4
+        with:
+          name: release-files-${{ github.run_id }}
+          path: ${{ runner.temp }}/dist
+
+      - name: Verify artifacts and attestations again
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUMS_SHA256: ${{ needs.validate-build.outputs.sums-sha256 }}
+          RELEASE_FILES: ${{ needs.validate-build.outputs.release-files }}
+          RELEASE_TAG: ${{ needs.validate-build.outputs.tag }}
+          RELEASE_SHA: ${{ needs.validate-build.outputs.sha }}
+        run: |
+          ./scripts/release/release-guard.ps1 -Command VerifyArtifacts -Directory "$env:RUNNER_TEMP/dist" -ExpectedSumsSha256 $env:SUMS_SHA256 -ReleaseFiles $env:RELEASE_FILES
+          ./scripts/release/release-guard.ps1 -Command VerifyAttestations -Tag $env:RELEASE_TAG -Sha $env:RELEASE_SHA -Directory "$env:RUNNER_TEMP/dist"
+
+      - name: Refuse a moved tag or an existing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.validate-build.outputs.tag }}
+          RELEASE_SHA: ${{ needs.validate-build.outputs.sha }}
+        run: |
+          ./scripts/release/release-guard.ps1 -Command AssertTagUnchanged -Tag $env:RELEASE_TAG -Sha $env:RELEASE_SHA
+          ./scripts/release/release-guard.ps1 -Command AssertNoRelease -Tag $env:RELEASE_TAG
+
+      - name: Create draft release with verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.validate-build.outputs.tag }}
+          RELEASE_SHA: ${{ needs.validate-build.outputs.sha }}
+          PRERELEASE: ${{ needs.validate-build.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          notes="Draft built from ${RELEASE_SHA} by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Verify: sha256sum -c SHA256SUMS; gh attestation verify <file> --repo ${GITHUB_REPOSITORY} --signer-workflow ${GITHUB_REPOSITORY}/.github/workflows/release.yml --source-ref refs/tags/${RELEASE_TAG} --source-digest ${RELEASE_SHA}. Publishing is a manual owner decision."
+          args=(--repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "$RELEASE_TAG" --notes "$notes")
+          if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" "${args[@]}" \
+            "$RUNNER_TEMP"/dist/blazorshop-*.tar.gz "$RUNNER_TEMP/dist/provenance.json" "$RUNNER_TEMP/dist/SHA256SUMS"
