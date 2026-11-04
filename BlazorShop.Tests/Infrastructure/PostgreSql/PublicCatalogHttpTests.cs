@@ -1,5 +1,8 @@
 namespace BlazorShop.Tests.Infrastructure.PostgreSql
 {
+    using System.Globalization;
+    using System.Net;
+
     using BlazorShop.Domain.Entities;
     using BlazorShop.Storefront.Services;
     using BlazorShop.Web.Shared.Models.Product;
@@ -79,6 +82,57 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             Assert.True(empty.IsSuccess);
             Assert.Equal(0, empty.Value!.TotalCount);
             Assert.Empty(empty.Value.Items);
+        }
+
+        [Theory]
+        [InlineData("public/catalog/products")]
+        [InlineData("product/catalog")]
+        public async Task CatalogEndpoints_RealHttpOverflowingPageWindowReturnsValidationProblem(string route)
+        {
+            await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/api/{route}?pageNumber={int.MaxValue.ToString(CultureInfo.InvariantCulture)}&pageSize=100");
+
+            using var response = await host.SendRawAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("pageNumber", body, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task PublicCatalog_RealHttpLargestRepresentablePagesReturnEmptyPages()
+        {
+            var category = new Category { Id = Guid.NewGuid(), Name = "Published", Slug = "published", IsPublished = true };
+            await using (var context = database.CreateContext())
+            {
+                context.Categories.Add(category);
+                context.Products.Add(new Product
+                {
+                    Id = Guid.NewGuid(), Name = "Only product", Slug = "only-product", Description = "Only product", Price = 1,
+                    Quantity = 1, CreatedOn = DateTime.UtcNow, PublishedOn = DateTime.UtcNow, IsPublished = true, CategoryId = category.Id,
+                });
+                await context.SaveChangesAsync();
+            }
+
+            await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
+            using var http = new HttpClient(new ApiHandler(host)) { BaseAddress = new Uri("https://localhost/api/") };
+            var api = new StorefrontApiClient(http);
+
+            var storefrontLimit = StorefrontCatalogQuery
+                .Parse(null, null, null, StorefrontCatalogQuery.MaxPageNumber.ToString(CultureInfo.InvariantCulture))
+                .ToApiQuery();
+            var apiLimit = new ProductCatalogQuery { PageNumber = (int.MaxValue / 100) + 1, PageSize = 100 };
+
+            foreach (var query in new[] { storefrontLimit, apiLimit })
+            {
+                var page = await api.GetPublishedCatalogPageAsync(query);
+                Assert.True(page.IsSuccess);
+                Assert.NotNull(page.Value);
+                Assert.Equal(1, page.Value.TotalCount);
+                Assert.Empty(page.Value.Items);
+            }
         }
 
         private sealed class ApiHandler(IdentityHttpHost host) : HttpMessageHandler
