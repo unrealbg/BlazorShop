@@ -1,0 +1,133 @@
+name: e2e-session-soak
+
+# Manual reproduction harness for RC audit R01 (intermittent secondary-tab boot in Firefox).
+# Runs the refresh-coordination browser suite repeatedly and summarizes the per-tab boot
+# timeline recorded in boot-timeline.jsonl. It never changes the mandatory CI gate.
+on:
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: Playwright browser
+        type: choice
+        options: [firefox, webkit, chromium]
+        default: firefox
+      iterations:
+        description: Number of consecutive suite runs (1-30)
+        type: number
+        default: 10
+      cpu_stress:
+        description: Run stress-ng on one CPU while the suite executes
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: BlazorShop.Presentation/BlazorShop.Web/package-lock.json
+
+      - name: Install Web build dependencies from lockfile
+        working-directory: BlazorShop.Presentation/BlazorShop.Web
+        run: npm ci --include=dev
+
+      - name: Restore and build browser E2E project
+        run: |
+          dotnet restore BlazorShop.E2E/BlazorShop.E2E.csproj
+          dotnet build BlazorShop.E2E/BlazorShop.E2E.csproj --configuration Release --no-restore -warnaserror
+
+      - name: Create development HTTPS certificate
+        run: dotnet dev-certs https
+
+      - name: Install Playwright browsers
+        run: |
+          pwsh scripts/install-playwright-chromium.ps1 -InstallerPath BlazorShop.E2E/bin/Release/net10.0/playwright.ps1
+          if [ "${{ inputs.browser }}" != "chromium" ]; then
+            pwsh BlazorShop.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps "${{ inputs.browser }}"
+          fi
+
+      - name: Start CPU stress
+        if: inputs.cpu_stress
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq stress-ng
+          nohup stress-ng --cpu 1 --cpu-load 90 --timeout 110m > /dev/null 2>&1 &
+          nproc
+
+      - name: Run refresh-coordination suite repeatedly
+        shell: pwsh
+        env:
+          SOAK_BROWSER: ${{ inputs.browser }}
+          SOAK_ITERATIONS: ${{ inputs.iterations }}
+        run: |
+          $iterations = [Math]::Min(30, [Math]::Max(1, [int]$env:SOAK_ITERATIONS))
+          $failed = 0
+          for ($i = 1; $i -le $iterations; $i++) {
+            $env:BLAZORSHOP_E2E_ARTIFACTS_DIR = "${{ github.workspace }}/artifacts/soak/run-$i"
+            & dotnet test BlazorShop.E2E/BlazorShop.E2E.csproj --configuration Release --no-build --no-restore `
+              --filter "FullyQualifiedName~RefreshCoordinationTests" `
+              --logger "trx;LogFileName=run-$i.trx" --results-directory "artifacts/soak/test-results" `
+              --verbosity minimal -- "Playwright.BrowserName=$env:SOAK_BROWSER"
+            if ($LASTEXITCODE -ne 0) { $failed++ }
+            Write-Host "Run $i of $iterations finished (failed runs so far: $failed)."
+          }
+          "SOAK_FAILED_RUNS=$failed" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SOAK_TOTAL_RUNS=$iterations" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Summarize boot timings
+        if: always()
+        shell: pwsh
+        run: |
+          $records = @(Get-ChildItem artifacts/soak -Recurse -Filter boot-timeline.jsonl -ErrorAction SilentlyContinue |
+            ForEach-Object { Get-Content $_.FullName } | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json })
+          function Percentile($values, $p) {
+            if ($values.Count -eq 0) { return 'n/a' }
+            return $values[[Math]::Min($values.Count - 1, [int][Math]::Ceiling($p * $values.Count) - 1)]
+          }
+          $summary = @(
+            "## WebAssembly boot soak (${{ inputs.browser }}, cpu_stress=${{ inputs.cpu_stress }})"
+            ""
+            "Suite runs failed: $($env:SOAK_FAILED_RUNS) of $($env:SOAK_TOTAL_RUNS). Boot waits recorded: $($records.Count)."
+            ""
+            "| Step kind | Waits | Failed | Ready ms p50 / p95 / max | Ready after 5000 ms |"
+            "| --- | --- | --- | --- | --- |"
+          )
+          foreach ($group in ($records | Group-Object { if ($_.step -like 'secondary*') { 'secondary tab' } else { $_.step } })) {
+            $ready = @($group.Group | Where-Object { $_.ready } | ForEach-Object { [double]$_.readyMs } | Sort-Object)
+            $failedWaits = @($group.Group | Where-Object { -not $_.ready }).Count
+            $max = if ($ready.Count) { $ready[-1] } else { 'n/a' }
+            $slow = @($ready | Where-Object { $_ -gt 5000 }).Count
+            $summary += "| $($group.Name) | $($group.Count) | $failedWaits | $(Percentile $ready 0.5) / $(Percentile $ready 0.95) / $max | $slow |"
+          }
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          $summary | Write-Host
+
+      - name: Upload soak reports and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-session-soak-${{ inputs.browser }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/soak
+          if-no-files-found: warn
+
+      - name: Fail when any run failed
+        if: env.SOAK_FAILED_RUNS != '0'
+        run: |
+          echo "$SOAK_FAILED_RUNS of $SOAK_TOTAL_RUNS suite runs failed."
+          exit 1

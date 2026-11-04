@@ -71,6 +71,20 @@ namespace BlazorShop.Tests.Presentation.API.Controllers
         }
 
         [Fact]
+        public async Task GetProducts_ReturnsBadRequestWithoutQueryingCatalog_WhenPageWindowOverflows()
+        {
+            var service = new Mock<IPublicCatalogService>(MockBehavior.Strict);
+            var controller = new PublicCatalogController(service.Object);
+
+            var result = await controller.GetProducts(new ProductCatalogQuery { PageNumber = int.MaxValue, PageSize = 100 });
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+            var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+            Assert.Contains(nameof(ProductCatalogQuery.PageNumber), problem.Errors.Keys);
+            service.VerifyNoOtherCalls();
+        }
+
+        [Fact]
         public async Task GetSitemap_ReturnsPublishedCatalogSitemap()
         {
             var service = new Mock<IPublicCatalogService>();

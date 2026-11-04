@@ -70,7 +70,7 @@ namespace BlazorShop.Infrastructure.Services.Admin
             var total = await logs.CountAsync();
             var items = await logs
                 .OrderByDescending(log => log.CreatedOn)
-                .Skip((pageNumber - 1) * pageSize)
+                .Skip(PageWindow.GetSkip(pageNumber, pageSize))
                 .Take(pageSize)
                 .Select(log => Map(log))
                 .ToListAsync();
