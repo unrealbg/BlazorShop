@@ -26,6 +26,28 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
     // readiness wait uses the budget; every functional assertion keeps its existing timeout.
     private static readonly TimeSpan SecondaryTabBootReadinessTimeout = TimeSpan.FromSeconds(30);
 
+    // A reload is a new cold boot of the tab and gets the same 30-second readiness budget. Ready means
+    // the startup work is actually finished, never window.load or the loader text: Blazor has replaced
+    // the loader, AuthorizeRouteView no longer shows "Authorizing", and session coordination is idle
+    // (no pending refresh flag, no authentication Web Lock held or queued). A tab that stays in
+    // "Authorizing" or keeps the lock fails here with diagnostics; whatever UI it then shows is left to
+    // the functional assertions with their unchanged timeouts.
+    private static readonly TimeSpan ReloadBootReadinessTimeout = SecondaryTabBootReadinessTimeout;
+    // Synchronous on purpose: Playwright's WaitForFunction treats a returned Promise as truthy. Web Lock
+    // activity therefore comes from the startup probe's count of this document's unsettled requests.
+    private const string SessionReadyScript = """
+        () => {
+            const probe = window.__bsStartupProbe;
+            if (!probe) return false;
+            const app = document.getElementById('app');
+            if (!app || app.querySelector('.loader_main')) return false;
+            if ((document.body?.textContent ?? '').includes('Authorizing, please wait...')) return false;
+            let state;
+            try { state = JSON.parse(localStorage.getItem('blazorshop.auth-session-state')); } catch { return false; }
+            return state?.pending !== true && probe.unsettledLocks() === 0;
+        }
+        """;
+
     // Playwright's default action timeout, which this class does not override; recorded for the login wait.
     private static readonly TimeSpan DefaultActionTimeout = TimeSpan.FromSeconds(30);
     public override BrowserNewContextOptions ContextOptions() => new() { IgnoreHTTPSErrors = true, Locale = "en-US" };
@@ -325,7 +347,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             release.TrySetResult();
             var attempted = 0;
             await other.RouteAsync(RefreshPath, async route => { Interlocked.Increment(ref attempted); await route.ContinueAsync(); });
-            await ReloadWithStartupProbeAsync(other, "secondary reload");
+            await ReloadAndWaitForSessionReadyAsync(other, "reload after uncertain refresh");
             await AssertWithDiagnosticsAsync(other, "sign-in after reload", async () =>
             {
                 await Expect(other.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
@@ -542,15 +564,23 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         await File.AppendAllTextAsync(Path.Combine(directory, "startup-timeline.jsonl"), record + Environment.NewLine);
     }
 
-    // Reloads a tab as a new measured navigation: tab metrics restart and the startup probe records the
-    // new document relative to its own navigation start, not to the creation of the tab.
-    private async Task ReloadWithStartupProbeAsync(IPage page, string description)
+    // Reloads a tab as a new measured navigation (tab metrics restart and the startup probe records the
+    // new document relative to its own navigation start) and waits for boot and session readiness.
+    private async Task ReloadAndWaitForSessionReadyAsync(IPage page, string step, [CallerMemberName] string scenario = "")
     {
         await BrowserBootDiagnostics.InstallStartupProbeAsync(page);
-        bootRecorders[page].MarkNavigation(description);
-        var called = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        await page.ReloadAsync();
-        reloadClock[page] = (called, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        bootRecorders[page].MarkNavigation(step);
+        await WaitForBootAsync(page, step, async () =>
+        {
+            var called = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            await page.ReloadAsync();
+            reloadClock[page] = (called, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            await page.WaitForFunctionAsync(SessionReadyScript, null, new()
+            {
+                Timeout = (float)ReloadBootReadinessTimeout.TotalMilliseconds,
+                PollingInterval = 100,
+            });
+        }, scenario, ReloadBootReadinessTimeout);
     }
 
     private async Task<object> WriteFailureReportAsync(string kind, IPage failedPage, string scenario, string step, long? budgetMs)

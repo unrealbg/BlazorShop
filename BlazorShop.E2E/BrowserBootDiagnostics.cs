@@ -284,6 +284,7 @@ internal sealed partial class BrowserBootDiagnostics
                 return result;
             };
 
+            let unsettledLocks = 0;
             if (typeof LockManager !== 'undefined' && LockManager.prototype.request) {
                 const request = LockManager.prototype.request;
                 LockManager.prototype.request = function (name, ...rest) {
@@ -293,13 +294,21 @@ internal sealed partial class BrowserBootDiagnostics
                     }
                     const label = `${name}:${rest[0]?.mode ?? 'exclusive'}`;
                     add('lock-request', label);
-                    const outcome = request.call(this, name, ...rest, lock => {
-                        add('lock-granted', label);
-                        const result = callback(lock);
-                        Promise.resolve(result).then(() => add('lock-released', label), () => add('lock-released', `${label} rejected`));
-                        return result;
-                    });
-                    outcome.then(() => add('lock-request-settled', label), error => add('lock-request-settled', `${label} ${error?.name ?? 'error'}`));
+                    unsettledLocks++;
+                    let outcome;
+                    try {
+                        outcome = request.call(this, name, ...rest, lock => {
+                            add('lock-granted', label);
+                            const result = callback(lock);
+                            Promise.resolve(result).then(() => add('lock-released', label), () => add('lock-released', `${label} rejected`));
+                            return result;
+                        });
+                    } catch (error) {
+                        unsettledLocks--;
+                        throw error;
+                    }
+                    outcome.then(() => add('lock-request-settled', label), error => add('lock-request-settled', `${label} ${error?.name ?? 'error'}`))
+                        .finally(() => unsettledLocks--);
                     return outcome;
                 };
             }
@@ -321,6 +330,8 @@ internal sealed partial class BrowserBootDiagnostics
 
             const resourcePattern = /blazor\.webassembly\.js$|\/dotnet[^/]*\.(js|wasm)$|authSessionSync\.js$|\/api\/authentication\/refresh-token$/;
             window.__bsStartupProbe = {
+                // Requests for this app's Web Locks made by this document that are queued or held.
+                unsettledLocks: () => unsettledLocks,
                 read: () => {
                     const navigation = performance.getEntriesByType('navigation')[0];
                     const resources = performance.getEntriesByType('resource')
@@ -332,6 +343,7 @@ internal sealed partial class BrowserBootDiagnostics
                         domContentLoaded: navigation ? Math.round(navigation.domContentLoadedEventEnd) : null,
                         load: navigation ? Math.round(navigation.loadEventEnd) : null,
                         refreshRequests: resources.filter(entry => entry.path.endsWith('/refresh-token')).length,
+                        unsettledLocks,
                         resources,
                         events: events.slice(),
                     };
