@@ -9,9 +9,10 @@ using Microsoft.Playwright;
 /// E2E-only diagnostics for a page navigation that does not reach its load state. On timeout it records,
 /// relative to the start of the navigation: every request still pending (origin, path, resource type,
 /// elapsed time), failed and slow requests, navigation milestones, document readiness, the WebAssembly
-/// bootstrap state, browser errors, an out-of-browser probe of the local Web and API servers and the
-/// runner load. It never records query strings, headers, cookies, request or response bodies, tokens or
-/// storage values; console text is truncated and JWT- and e-mail-shaped values are redacted.
+/// bootstrap state, browser errors, an out-of-browser probe of the given servers and the runner load.
+/// It never records query strings, fragments, headers, cookies, request or response bodies, tokens or
+/// storage values; recorded text is truncated, URL queries/fragments are dropped and JWT- and
+/// e-mail-shaped values are redacted. The probes run only after a timeout and are bounded in time.
 /// </summary>
 internal sealed partial class NavigationDiagnostics
 {
@@ -97,6 +98,7 @@ internal sealed partial class NavigationDiagnostics
     {
         var now = clock.ElapsedMilliseconds;
         List<object> pending, failed, slow;
+        object byOrigin;
         string[] timeline;
         lock (gate)
         {
@@ -111,6 +113,12 @@ internal sealed partial class NavigationDiagnostics
             slow = entries.Where(entry => entry.Failure is null && entry.EndMs - entry.StartMs >= SlowRequestMs)
                 .Select(entry => (object)new { entry.Origin, entry.Path, entry.ResourceType, startedMs = entry.StartMs - start, durationMs = entry.EndMs - entry.StartMs, entry.Status })
                 .ToList();
+            byOrigin = entries.GroupBy(entry => entry.Origin).ToDictionary(group => group.Key, group => new
+            {
+                total = group.Count(),
+                pending = group.Count(entry => entry.EndMs is null),
+                failed = group.Count(entry => entry.Failure is not null),
+            });
             timeline = events.ToArray();
         }
 
@@ -121,27 +129,12 @@ internal sealed partial class NavigationDiagnostics
             pendingRequests = pending,
             failedRequests = failed,
             slowRequests = slow,
-            requestsByOrigin = CountByOrigin(start),
+            requestsByOrigin = byOrigin,
             document = await ReadDocumentStateAsync(page),
             serverProbes = await ProbeAsync(probes),
             runner = ReadRunnerLoad(),
             timeline,
         };
-    }
-
-    private object CountByOrigin(long start)
-    {
-        lock (gate)
-        {
-            return requests.Values.Where(entry => entry.StartMs >= start)
-                .GroupBy(entry => entry.Origin)
-                .ToDictionary(group => group.Key, group => new
-                {
-                    total = group.Count(),
-                    pending = group.Count(entry => entry.EndMs is null),
-                    failed = group.Count(entry => entry.Failure is not null),
-                });
-        }
     }
 
     private static async Task<object> ReadDocumentStateAsync(IPage page)
@@ -173,29 +166,32 @@ internal sealed partial class NavigationDiagnostics
         }
     }
 
-    // Out-of-browser probe of the local Web/API servers and of the external stylesheet/script origins the
-    // page loads: distinguishes a server that does not answer at all from a browser that is waiting on one
-    // origin. Only status codes and timings are recorded.
+    // Out-of-browser probe, run only after a timeout: distinguishes a server that does not answer at all from
+    // a browser that is waiting on one origin. All probes run in parallel with a 5-second limit each, without
+    // cookies or credentials; only origin, path, status code and timing are recorded.
     private static async Task<object> ProbeAsync(IReadOnlyList<Uri> servers)
     {
-        using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
-        var results = new List<object>();
-        foreach (var server in servers)
+        using var handler = new HttpClientHandler
         {
+            UseCookies = false,
+            UseDefaultCredentials = false,
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+        };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+        return await Task.WhenAll(servers.Select(async server =>
+        {
+            var origin = server.GetLeftPart(UriPartial.Authority);
             var watch = Stopwatch.StartNew();
             try
             {
                 using var response = await client.GetAsync(server, HttpCompletionOption.ResponseHeadersRead);
-                results.Add(new { origin = server.GetLeftPart(UriPartial.Authority), path = server.AbsolutePath, status = (int)response.StatusCode, elapsedMs = watch.ElapsedMilliseconds });
+                return (object)new { origin, path = server.AbsolutePath, status = (int)response.StatusCode, elapsedMs = watch.ElapsedMilliseconds };
             }
             catch (Exception exception)
             {
-                results.Add(new { origin = server.GetLeftPart(UriPartial.Authority), path = server.AbsolutePath, error = exception.GetType().Name, elapsedMs = watch.ElapsedMilliseconds });
+                return new { origin, path = server.AbsolutePath, error = exception.GetType().Name, elapsedMs = watch.ElapsedMilliseconds };
             }
-        }
-
-        return results;
+        }));
     }
 
     private static object ReadRunnerLoad()
@@ -280,13 +276,19 @@ internal sealed partial class NavigationDiagnostics
         Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri.GetLeftPart(UriPartial.Authority) : "(other)";
 
     private static string PathOf(string url) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.AbsolutePath : "(non-absolute)";
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) ? Redact(uri.AbsolutePath) : "(non-absolute)";
 
+    // Drops URL queries and fragments (console messages can quote full URLs), then masks JWT- and
+    // e-mail-shaped values and truncates.
     private static string Redact(string? value)
     {
-        var redacted = EmailPattern().Replace(JwtPattern().Replace(value ?? string.Empty, "[redacted-jwt]"), "[redacted-email]");
+        var redacted = UrlQueryPattern().Replace(value ?? string.Empty, "$1");
+        redacted = EmailPattern().Replace(JwtPattern().Replace(redacted, "[redacted-jwt]"), "[redacted-email]");
         return redacted.Length <= MaxTextLength ? redacted : redacted[..MaxTextLength] + "…";
     }
+
+    [GeneratedRegex(@"([a-z][a-z0-9+.-]*://[^\s?#""'<>]*)[?#][^\s""'<>]*", RegexOptions.IgnoreCase)]
+    private static partial Regex UrlQueryPattern();
 
     [GeneratedRegex(@"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*")]
     private static partial Regex JwtPattern();
