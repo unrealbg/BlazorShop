@@ -28,6 +28,19 @@ namespace BlazorShop.Tests.Presentation.Authentication
             Assert.Contains("_user.ConfirmPassword", markup);
         }
 
+        [Theory]
+        [InlineData("BlazorShop.Presentation/BlazorShop.Web/Authentication/Components/Login.razor", 1)]
+        [InlineData("BlazorShop.Presentation/BlazorShop.Web/Authentication/Components/Register.razor", 1)]
+        [InlineData("BlazorShop.Presentation/BlazorShop.Web/Pages/Admin/Products.razor", 2)]
+        [InlineData("BlazorShop.Presentation/BlazorShop.Web/Pages/Admin/Categories.razor", 2)]
+        public void ValidationSummaries_AnnounceErrorsWithoutReplacingListRole(string path, int expectedSummaries)
+        {
+            var markup = ReadRepositoryFile(path);
+
+            Assert.DoesNotContain("<ValidationSummary role=", markup);
+            Assert.Equal(expectedSummaries, markup.Split("<AlertValidationSummary").Length - 1);
+        }
+
         [Fact]
         public void AuthControls_KeepMobileTouchTargets()
         {

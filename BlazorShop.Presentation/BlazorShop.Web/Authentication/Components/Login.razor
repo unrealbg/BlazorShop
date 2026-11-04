@@ -13,7 +13,7 @@
     }
     <EditForm Model="User" OnValidSubmit="LoginUser" class="v2-form" aria-busy="@IsSubmitting">
         <DataAnnotationsValidator />
-        <ValidationSummary role="alert" />
+        <AlertValidationSummary />
         <div>
             <FloatingTextInput @bind-Value="User.Email" Label="Email Address" Type="email" autocomplete="username" Placeholder="you@example.com" aria-describedby="login-email-error" />
             <div id="login-email-error"><ValidationMessage For="@(() => User.Email)" /></div>

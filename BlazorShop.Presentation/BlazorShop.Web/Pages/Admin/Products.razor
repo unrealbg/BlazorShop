@@ -139,7 +139,7 @@
         {
             <EditForm Model="_product" OnValidSubmit="SaveProduct">
                 <DataAnnotationsValidator />
-                <ValidationSummary role="alert" class="mb-4 text-sm text-red-700" />
+                <AlertValidationSummary class="mb-4 text-sm text-red-700" />
                 <div class="form-group mb-3">
                     <label class="block text-xs text-neutral-600 mb-1" for="admin-products-1">Product Name</label>
                     <InputText id="admin-products-1" aria-describedby="admin-products-1-error" @bind-Value="_product.Name" class="w-full border rounded px-3 py-2" />
@@ -293,7 +293,7 @@
         {
             <EditForm Model="_editProduct" OnValidSubmit="UpdateProductAsync">
                 <DataAnnotationsValidator />
-                <ValidationSummary role="alert" class="mb-4 text-sm text-red-700" />
+                <AlertValidationSummary class="mb-4 text-sm text-red-700" />
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="space-y-4">
                         <div class="form-group mb-3">
