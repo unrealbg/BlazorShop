@@ -176,6 +176,8 @@ Use `Runtime__Security__RefreshTokenCookieSameSite=Strict` for the standard same
 
 The provided [BlazorShop.Presentation/BlazorShop.Web/nginx.conf](BlazorShop.Presentation/BlazorShop.Web/nginx.conf) is intentionally HTTP-only for the internal hop and should not be treated as the public TLS endpoint.
 
+Its shared response security headers live in [nginx-security-headers.conf](BlazorShop.Presentation/BlazorShop.Web/nginx-security-headers.conf), copied into the image as `/etc/nginx/snippets/blazorshop-security-headers.conf`. nginx stops inheriting server-level `add_header` directives inside any `location` that declares its own `add_header`, so every such location must `include` the snippet again. CI checks the built Web image with `scripts/verify-web-security-headers.sh` (HTML, SPA fallback, CSS/JS and 404 responses). These headers do not replace a production CSP or edge-level TLS/HSTS policy.
+
 ## Standard Container Deployment
 
 If you want a conventional deployment path outside Aspire AppHost, use the repository Dockerfiles together with `compose.production.yml`.
