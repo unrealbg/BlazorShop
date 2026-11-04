@@ -1,5 +1,6 @@
 namespace BlazorShop.E2E;
 
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Microsoft.Playwright.Xunit;
@@ -8,6 +9,21 @@ using Microsoft.Playwright.Xunit;
 public sealed class RefreshCoordinationTests(E2EApplicationFixture application) : PageTest
 {
     private const string RefreshPath = "**/api/authentication/refresh-token";
+
+    // Boot readiness (WebAssembly start, session restoration and first rendered UI) is recorded per tab
+    // and, when a wait fails, dumped as a redacted timeline for every tab (RC audit R01, issue #134).
+    // Timeouts are deliberately unchanged: diagnostics must not turn a stall into a pass.
+    private readonly Dictionary<IPage, BrowserBootDiagnostics> bootRecorders = new();
+
+    // Cold boot of an additional tab gets the same 30-second budget that the first tab's login
+    // navigation already has through Playwright's default action timeout. Firefox CI measured the
+    // first rendered account UI at 5.24 s after opening the tab, past the 5-second assertion default,
+    // with the refresh POST done in 94 ms and no Web Lock held or pending (issue #134). Only this
+    // readiness wait uses the budget; every functional assertion keeps its existing timeout.
+    private static readonly TimeSpan SecondaryTabBootReadinessTimeout = TimeSpan.FromSeconds(30);
+
+    // Playwright's default action timeout, which this class does not override; recorded for the login wait.
+    private static readonly TimeSpan DefaultActionTimeout = TimeSpan.FromSeconds(30);
     public override BrowserNewContextOptions ContextOptions() => new() { IgnoreHTTPSErrors = true, Locale = "en-US" };
 
     [Fact]
@@ -18,9 +34,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await LoginAsync(Page, data);
-            var other = await Context.NewPageAsync();
-            await GoAsync(other, "account");
-            await Expect(other.Locator("#account-content h1")).ToBeVisibleAsync();
+            var other = await OpenSecondaryTabAsync("account", page => page.Locator("#account-content h1"));
             var reached = Signal();
             var requests = 0;
             await Context.RouteAsync(RefreshPath, async route =>
@@ -57,9 +71,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await LoginAsync(Page, data);
-            var other = await Context.NewPageAsync();
-            await GoAsync(other, "account");
-            await Expect(other.Locator("#account-content h1")).ToBeVisibleAsync();
+            var other = await OpenSecondaryTabAsync("account", page => page.Locator("#account-content h1"));
             var arrivals = 0;
             var both = Signal();
             var refreshCount = 0;
@@ -147,9 +159,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await LoginAsync(Page, data);
-            var other = await Context.NewPageAsync();
-            await GoAsync(other, "account/profile");
-            await Expect(other.GetByLabel("Full Name", new() { Exact = true })).ToBeVisibleAsync();
+            var other = await OpenSecondaryTabAsync("account/profile", page => page.GetByLabel("Full Name", new() { Exact = true }));
             await NavigateAsync(Page, "/account/profile");
             await Expect(Page.GetByLabel("Full Name", new() { Exact = true })).ToBeVisibleAsync();
             var refreshes = 0;
@@ -183,9 +193,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await LoginAsync(Page, data);
-            var other = await Context.NewPageAsync();
-            await GoAsync(other, "account");
-            await Expect(other.Locator("#account-content h1")).ToBeVisibleAsync();
+            var other = await OpenSecondaryTabAsync("account", page => page.Locator("#account-content h1"));
             var committed = Signal();
             await Page.RouteAsync(RefreshPath, async route =>
             {
@@ -225,9 +233,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await LoginAsync(Page, firstUser);
-            var other = await Context.NewPageAsync();
-            await GoAsync(other, "account");
-            await Expect(other.Locator("#account-content h1")).ToBeVisibleAsync();
+            var other = await OpenSecondaryTabAsync("account", page => page.Locator("#account-content h1"));
             await other.EvaluateAsync("sessionStorage.removeItem('token')");
             await NavigateAsync(other, "/authentication/login");
             await Expect(other.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
@@ -295,9 +301,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         try
         {
             await LoginAsync(Page, data);
-            var other = await Context.NewPageAsync();
-            await GoAsync(other, "account");
-            await Expect(other.Locator("#account-content h1")).ToBeVisibleAsync();
+            var other = await OpenSecondaryTabAsync("account", page => page.Locator("#account-content h1"));
             var committed = Signal();
             await Page.RouteAsync(RefreshPath, async route =>
             {
@@ -388,9 +392,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
     {
         await GoAsync(Page, "authentication/login");
         await Expect(Page.Locator("h1")).ToBeVisibleAsync();
-        var other = await Context.NewPageAsync();
-        await GoAsync(other, "authentication/login");
-        await Expect(other.Locator("h1")).ToBeVisibleAsync();
+        var other = await OpenSecondaryTabAsync("authentication/login", page => page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true }));
         await Page.EvaluateAsync("""
             async () => {
                 const m = await import('/js/authSessionSync.js');
@@ -435,9 +437,93 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
         Status = 401, ContentType = "application/json", Body = "{}",
         Headers = new Dictionary<string, string> { ["Access-Control-Allow-Origin"] = application.WebBaseUrl.GetLeftPart(UriPartial.Authority), ["Access-Control-Allow-Credentials"] = "true" },
     });
-    private async Task LoginAsync(IPage page, E2ETestData data)
+    private async Task<IPage> OpenSecondaryTabAsync(string path, Func<IPage, ILocator> ready, [CallerMemberName] string scenario = "")
     {
-        await GoAsync(page, "authentication/login");
+        TrackBoot(Page, "primary");
+        var other = await Context.NewPageAsync();
+        TrackBoot(other, "secondary");
+        // Readiness only: a page-specific element rendered by Blazor, never window.load or the loader text.
+        await WaitForBootAsync(other, $"secondary {path}", async () =>
+        {
+            await GoAsync(other, path);
+            await Expect(ready(other)).ToBeVisibleAsync(new() { Timeout = (float)SecondaryTabBootReadinessTimeout.TotalMilliseconds });
+        }, scenario, SecondaryTabBootReadinessTimeout);
+        return other;
+    }
+
+    private BrowserBootDiagnostics TrackBoot(IPage page, string label)
+    {
+        if (!bootRecorders.TryGetValue(page, out var recorder))
+        {
+            recorder = BrowserBootDiagnostics.Attach(page, label);
+            bootRecorders[page] = recorder;
+        }
+
+        return recorder;
+    }
+
+    private async Task WaitForBootAsync(IPage page, string step, Func<Task> wait, string scenario, TimeSpan budget)
+    {
+        var recorder = bootRecorders[page];
+        var directory = Path.Combine(application.ArtifactDirectory, "refresh-coordination");
+        var browser = Browser.BrowserType.Name;
+        try
+        {
+            await wait();
+            await AppendBootRecordAsync(directory, browser, scenario, step, recorder, budget, ready: true);
+        }
+        catch (Exception exception)
+        {
+            await AppendBootRecordAsync(directory, browser, scenario, step, recorder, budget, ready: false);
+            var pages = new List<object>();
+            foreach (var (trackedPage, tracked) in bootRecorders)
+            {
+                pages.Add(new { summary = tracked.Summary(), state = await BrowserBootDiagnostics.CaptureStateAsync(trackedPage), events = tracked.Events });
+            }
+
+            var report = new { browser, scenario, step, budgetMs = (long)budget.TotalMilliseconds, failedTab = recorder.Label, pages };
+            var fileStep = new string(step.Select(character => char.IsLetterOrDigit(character) ? character : '-').ToArray());
+            await BrowserBootDiagnostics.WriteFailureAsync(Path.Combine(directory, $"boot-failure-{browser}-{scenario}-{fileStep}.json"), report);
+
+            // Also surface the redacted report in the test result itself, so it is readable from CI logs
+            // even when artifacts are unavailable. The original failure stays the inner exception.
+            throw new BootReadinessException(
+                $"Boot wait '{step}' failed for the {recorder.Label} tab ({browser}). Redacted boot diagnostics:{Environment.NewLine}"
+                + BrowserBootDiagnostics.ToJson(report),
+                exception);
+        }
+    }
+
+    private static async Task AppendBootRecordAsync(string directory, string browser, string scenario, string step, BrowserBootDiagnostics recorder, TimeSpan budget, bool ready)
+    {
+        Directory.CreateDirectory(directory);
+        var record = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            browser,
+            scenario,
+            step,
+            tab = recorder.Label,
+            budgetMs = (long)budget.TotalMilliseconds,
+            ready,
+            readyMs = ready ? recorder.ElapsedMs : (long?)null,
+            loadMs = recorder.LoadMs,
+            firstRefreshRequestMs = recorder.FirstRefreshRequestMs,
+            firstRefreshResponseMs = recorder.FirstRefreshResponseMs,
+            firstRefreshStatus = recorder.FirstRefreshStatus,
+            frameworkRequests = recorder.FrameworkRequests,
+        });
+        await File.AppendAllTextAsync(Path.Combine(directory, "boot-timeline.jsonl"), record + Environment.NewLine);
+    }
+
+    private async Task LoginAsync(IPage page, E2ETestData data, [CallerMemberName] string scenario = "")
+    {
+        TrackBoot(page, page == Page ? "primary" : "secondary");
+        // WaitForAsync uses the same default action timeout that FillAsync applied implicitly before.
+        await WaitForBootAsync(page, "login form", async () =>
+        {
+            await GoAsync(page, "authentication/login");
+            await page.GetByLabel("Email Address", new() { Exact = true }).WaitForAsync();
+        }, scenario, DefaultActionTimeout);
         await FillLoginAsync(page, data);
         await page.GetByRole(AriaRole.Button, new() { Name = "Login", Exact = true }).ClickAsync();
         await Expect(page).ToHaveURLAsync(new Regex("/account$"));
