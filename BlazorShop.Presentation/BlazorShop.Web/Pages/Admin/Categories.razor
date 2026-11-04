@@ -80,7 +80,7 @@
     <Body>
         <EditForm Model="_category" OnValidSubmit="SaveCategory">
             <DataAnnotationsValidator />
-            <ValidationSummary role="alert" class="mb-4 text-sm text-red-700" />
+            <AlertValidationSummary class="mb-4 text-sm text-red-700" />
             <div class="p-2">
                 <FloatingTextInput id="admin-categories-2" aria-describedby="admin-categories-2-error" @bind-Value="_category.Name" Label="Category Name" class="w-full" />
                 <div id="admin-categories-2-error"><ValidationMessage For="@(() => _category.Name)" /></div>
@@ -108,7 +108,7 @@
         {
             <EditForm Model="_editCategory" OnValidSubmit="UpdateCategoryAsync">
                 <DataAnnotationsValidator />
-                <ValidationSummary role="alert" class="mb-4 text-sm text-red-700" />
+                <AlertValidationSummary class="mb-4 text-sm text-red-700" />
                 <div class="p-2">
                     <label class="block text-sm text-neutral-700 mb-1" for="admin-categories-1">Category Name</label>
                     <InputText id="admin-categories-1" aria-describedby="admin-categories-1-error" @bind-Value="_editCategory.Name" class="w-full border rounded px-3 py-2" autofocus />
