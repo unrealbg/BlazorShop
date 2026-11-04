@@ -27,12 +27,15 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
     private static readonly TimeSpan SecondaryTabBootReadinessTimeout = TimeSpan.FromSeconds(30);
 
     // A reload is a new cold boot of the tab and gets the same 30-second readiness budget. Ready means
-    // the startup work is actually finished, never window.load or the loader text: Blazor has replaced
-    // the loader, AuthorizeRouteView no longer shows "Authorizing", and session coordination is idle
-    // (no pending refresh flag, no authentication Web Lock held or queued). A tab that stays in
-    // "Authorizing" or keeps the lock fails here with diagnostics; whatever UI it then shows is left to
-    // the functional assertions with their unchanged timeouts.
+    // this document's startup work is actually finished, never window.load or the loader text: Blazor
+    // has replaced the loader, AuthorizeRouteView no longer shows "Authorizing", and none of the
+    // document's authentication Web Lock requests (session restoration) is still queued or held. A tab
+    // that stays in "Authorizing" or never settles its lock request fails here with diagnostics. The
+    // shared pending flag is not a readiness condition: it belongs to the tab that set it, and the
+    // metadata assertion checks it. Whatever UI the tab then shows is left to the functional
+    // assertions with their unchanged timeouts.
     private static readonly TimeSpan ReloadBootReadinessTimeout = SecondaryTabBootReadinessTimeout;
+
     // Synchronous on purpose: Playwright's WaitForFunction treats a returned Promise as truthy. Web Lock
     // activity therefore comes from the startup probe's count of this document's unsettled requests.
     private const string SessionReadyScript = """
@@ -42,9 +45,7 @@ public sealed class RefreshCoordinationTests(E2EApplicationFixture application) 
             const app = document.getElementById('app');
             if (!app || app.querySelector('.loader_main')) return false;
             if ((document.body?.textContent ?? '').includes('Authorizing, please wait...')) return false;
-            let state;
-            try { state = JSON.parse(localStorage.getItem('blazorshop.auth-session-state')); } catch { return false; }
-            return state?.pending !== true && probe.unsettledLocks() === 0;
+            return probe.unsettledLocks() === 0;
         }
         """;
 
