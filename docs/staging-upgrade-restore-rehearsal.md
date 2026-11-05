@@ -2,12 +2,14 @@
 
 This repository contains an isolated GitHub-hosted rehearsal for upgrading a representative historical BlazorShop database, restoring its backup, and restoring the two persistent application volumes (uploads and ASP.NET Core Data Protection keys). It is a test-only release-readiness check. It does not target, discover, or mutate any production service.
 
-## Scenarios
+## Scenarios and R09 status
 
-| Scenario | Status |
-|---|---|
-| **Historical rehearsal** (`historical` profile → current target) | Verifiable now in the hosted workflow. |
-| **VPS-specific rehearsal** (the version actually deployed → current target) | **BLOCKED.** The deployed version is unknown; it waits for read-only evidence from the VPS. |
+**R09 status (2026-11-05): PARTIALLY VERIFIED.**
+
+| Scenario | Status | Evidence |
+|---|---|---|
+| **Historical upgrade/restore** (`historical` profile `df8a5e1` → `527ee48`) | **PASS** | Hosted run [42103476333](https://github.com/unrealbg/BlazorShop/actions/runs/42103476333) on PR #147 head `80f63b3`: 72/72 assertions, browser test 1/1, database, schema, uploads and Data Protection restore verified. |
+| **VPS-specific upgrade/restore** (the version actually deployed → current target) | **BLOCKED** | The deployed baseline is unknown. It waits for read-only evidence from the VPS: see [Establishing the deployed VPS version](r09-vps-version-evidence.md). |
 
 The historical baseline is synthetic, representative evidence for the documented upgrade path. It is **not** a claim about the version that runs on any VPS.
 
