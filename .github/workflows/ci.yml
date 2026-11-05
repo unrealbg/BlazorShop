@@ -16,6 +16,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Test release provenance guards and workflow policy
+        shell: pwsh
+        run: ./scripts/release/tests/ReleaseGuard.Tests.ps1
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
