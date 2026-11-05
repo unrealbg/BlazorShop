@@ -23,7 +23,7 @@ internal sealed record RehearsalConfiguration(
     string ArtifactDirectory)
 {
     private const string ExpectedMode = "attach-upgraded-database";
-    private const string ExpectedTargetSha = "8370f817857648f475041228ea6eaf228a3b9e34";
+    private const string ExpectedTargetSha = "527ee48056ffd01821e8d3f398c2a2be3fae522e";
     private const string ExpectedMarker = "37000000-0000-0000-0000-000000000001";
 
     public static RehearsalConfiguration Load()

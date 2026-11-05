@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly BASELINE_SHA="df8a5e19d12728f0228e293404d6e2ceee743db7"
-readonly TARGET_SHA="8370f817857648f475041228ea6eaf228a3b9e34"
+# The target is pinned here, in the workflow checkout and in the attach-only browser suite.
+# The baseline comes from a reviewed profile in rehearsal/baselines/ (see profile_value below).
+readonly TARGET_SHA="527ee48056ffd01821e8d3f398c2a2be3fae522e"
+readonly TARGET_MIGRATION_COUNT="13"
+readonly TARGET_MIGRATION_HEAD="20261101131138_AddRegistrationConfirmationOutbox"
 readonly POSTGRES_IMAGE="postgres:16.13-alpine3.23"
 readonly DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0.202-noble"
 readonly DOTNET_ASPNET_IMAGE="mcr.microsoft.com/dotnet/aspnet:10.0.6-noble"
@@ -34,8 +37,50 @@ readonly RUNTIME_DIR="$(mktemp -d "${RUNNER_TEMP:-/tmp}/blazorshop-rehearsal.XXX
 readonly BACKUP_PATH="$RUNTIME_DIR/baseline.dump"
 readonly LOGIN_RESPONSE_PATH="$RUNTIME_DIR/login-response.json"
 readonly PROTECTED_RESPONSE_PATH="$RUNTIME_DIR/protected-response.json"
+# Volume archives, key-ring manifests and the protected probe payload stay in RUNTIME_DIR, which
+# is deleted on exit and never uploaded. Reports contain only counts, checksums and results.
+readonly VOLUME_WORK_DIR="$RUNTIME_DIR/volumes"
+readonly PROBE_DIR="$RUNTIME_DIR/data-protection-probe"
+readonly UPLOAD_FIXTURE_DIR="rehearsal-fixture"
+readonly UPLOAD_FIXTURES=("pixel.png" "random.png")
 
-mkdir -p "$LOG_DIR" "$REPORT_DIR" "$TEST_RESULTS_DIR"
+mkdir -p "$LOG_DIR" "$REPORT_DIR" "$TEST_RESULTS_DIR" "$VOLUME_WORK_DIR" "$PROBE_DIR"
+: > "$REPORT_DIR/assertions.txt"
+
+# A baseline profile is a reviewed file, never a guess. Only the historical fixture exists today;
+# a VPS-specific baseline stays BLOCKED until read-only evidence from the VPS has been recorded.
+readonly BASELINE_PROFILE="${REHEARSAL_BASELINE_PROFILE:-historical}"
+if [[ ! "$BASELINE_PROFILE" =~ ^[a-z0-9-]+$ ]]; then
+    echo "Invalid baseline profile name '$BASELINE_PROFILE'." >&2
+    exit 2
+fi
+readonly BASELINE_PROFILE_FILE="$TOOLING_DIR/rehearsal/baselines/$BASELINE_PROFILE.env"
+if [[ ! -f "$BASELINE_PROFILE_FILE" ]]; then
+    echo "Baseline profile '$BASELINE_PROFILE' is BLOCKED: no reviewed profile at rehearsal/baselines/$BASELINE_PROFILE.env." >&2
+    exit 2
+fi
+
+profile_value() {
+    local key="$1"
+    local pattern="$2"
+    local value
+    value="$(sed -n "s/^${key}=//p" "$BASELINE_PROFILE_FILE" | tr -d '\r')"
+    if [[ ! "$value" =~ $pattern ]]; then
+        echo "Baseline profile '$BASELINE_PROFILE' has an invalid or missing $key." >&2
+        return 1
+    fi
+    printf '%s' "$value"
+}
+
+BASELINE_SHA="$(profile_value BASELINE_SHA '^[0-9a-f]{40}$')"
+BASELINE_MIGRATION_COUNT="$(profile_value BASELINE_MIGRATION_COUNT '^[1-9][0-9]*$')"
+BASELINE_MIGRATION_HEAD="$(profile_value BASELINE_MIGRATION_HEAD '^[0-9]{14}_[A-Za-z0-9]+$')"
+BASELINE_FIXTURE="$(profile_value BASELINE_FIXTURE '^[a-z0-9-]+$')"
+readonly BASELINE_SHA BASELINE_MIGRATION_COUNT BASELINE_MIGRATION_HEAD BASELINE_FIXTURE
+if [[ "$BASELINE_FIXTURE" != "historical-5" ]]; then
+    echo "Baseline fixture '$BASELINE_FIXTURE' is not implemented; only the historical-5 seed and assertions exist." >&2
+    exit 2
+fi
 
 generate_user_password() {
     local candidate
@@ -63,6 +108,10 @@ export REHEARSAL_API_URL="http://localhost:$REHEARSAL_API_PORT"
 export REHEARSAL_STOREFRONT_URL="http://localhost:$REHEARSAL_STOREFRONT_PORT"
 export REHEARSAL_WEB_URL="http://localhost:$REHEARSAL_WEB_PORT"
 export REHEARSAL_DB_HOST="postgres"
+export REHEARSAL_UPLOADS_VOLUME="uploads-data"
+export REHEARSAL_DATA_PROTECTION_VOLUME="data-protection-keys"
+export REHEARSAL_PROBE_IMAGE="$DOTNET_ASPNET_IMAGE"
+export REHEARSAL_PROBE_DIR="$PROBE_DIR"
 
 readonly USER_EMAIL="rehearsal.user.${RUN_NUMBER}.${RUN_ATTEMPT}@example.test"
 readonly USER_PASSWORD="$(generate_user_password)"
@@ -81,9 +130,22 @@ export REHEARSAL_API_IMAGE="$BASELINE_API_IMAGE"
 export REHEARSAL_STOREFRONT_IMAGE="$BASELINE_STOREFRONT_IMAGE"
 export REHEARSAL_WEB_IMAGE="$BASELINE_WEB_IMAGE"
 
+BACKUP_DATABASE_MILLISECONDS="not-run"
+BACKUP_VOLUMES_MILLISECONDS="not-run"
 UPGRADE_MILLISECONDS="not-run"
 RESTORE_MILLISECONDS="not-run"
+RESTORE_VOLUMES_MILLISECONDS="not-run"
+MIGRATION_HEAD_BEFORE="not-read"
+MIGRATION_HEAD_AFTER="not-read"
+UPLOADS_RESULT="not-run"
+DATA_PROTECTION_RESULT="not-run"
+VOLUME_RESTORE_RESULT="not-run"
+BROWSER_RESULT="not-run"
+FAILURE_CONTEXT=""
 REHEARSAL_RESULT="failed"
+
+# Record the first failing command (unexpanded, so no generated secret is written) for the report.
+trap 'if [[ -z "$FAILURE_CONTEXT" ]]; then FAILURE_CONTEXT="line $LINENO: $BASH_COMMAND"; fi' ERR
 
 dc() {
     docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" "$@"
@@ -91,21 +153,21 @@ dc() {
 
 capture_logs() {
     local phase="$1"
-    if ! dc --profile restore logs --no-color --timestamps > "$LOG_DIR/${phase}-compose.log" 2>&1; then
+    if ! dc --profile restore --profile tools logs --no-color --timestamps > "$LOG_DIR/${phase}-compose.log" 2>&1; then
         echo "Unable to capture complete Compose logs for phase $phase." >> "$LOG_DIR/${phase}-compose.log"
     fi
-    dc --profile restore ps --all > "$LOG_DIR/${phase}-compose-ps.txt" 2>&1 || :
+    dc --profile restore --profile tools ps --all > "$LOG_DIR/${phase}-compose-ps.txt" 2>&1 || :
 }
 
 cleanup() {
     local original_exit="$?"
-    trap - EXIT
+    trap - EXIT ERR
     set +e
 
     capture_logs "final"
     local cleanup_started
     cleanup_started="$(date +%s%3N)"
-    dc --profile restore down --volumes --remove-orphans --timeout 20 > "$LOG_DIR/cleanup.log" 2>&1
+    dc --profile restore --profile tools down --volumes --remove-orphans --timeout 20 > "$LOG_DIR/cleanup.log" 2>&1
     local compose_cleanup_exit="$?"
 
     docker image rm \
@@ -132,11 +194,23 @@ cleanup() {
 
     {
         echo "result=$REHEARSAL_RESULT"
+        echo "baseline_profile=$BASELINE_PROFILE"
         echo "baseline_sha=$BASELINE_SHA"
         echo "target_sha=$TARGET_SHA"
+        echo "migration_head_before_upgrade=$MIGRATION_HEAD_BEFORE"
+        echo "migration_head_after_upgrade=$MIGRATION_HEAD_AFTER"
+        echo "backup_database_duration_milliseconds=$BACKUP_DATABASE_MILLISECONDS"
+        echo "backup_volumes_duration_milliseconds=$BACKUP_VOLUMES_MILLISECONDS"
         echo "upgrade_duration_milliseconds=$UPGRADE_MILLISECONDS"
         echo "restore_duration_milliseconds=$RESTORE_MILLISECONDS"
+        echo "restore_volumes_duration_milliseconds=$RESTORE_VOLUMES_MILLISECONDS"
         echo "cleanup_duration_milliseconds=$cleanup_milliseconds"
+        echo "uploads_fixture=$UPLOADS_RESULT"
+        echo "data_protection_probe=$DATA_PROTECTION_RESULT"
+        echo "volume_restore=$VOLUME_RESTORE_RESULT"
+        echo "browser_tests=$BROWSER_RESULT"
+        echo "failure_context=${FAILURE_CONTEXT:-none}"
+        echo "note=synthetic isolated rehearsal; durations are not VPS RPO/RTO"
     } > "$REPORT_DIR/result.txt"
 
     exit "$original_exit"
@@ -201,9 +275,54 @@ assert_equal() {
     local description="$3"
     if [[ "$actual" != "$expected" ]]; then
         echo "Assertion failed for $description. Expected '$expected', received '$actual'." >&2
+        echo "FAIL: $description: expected '$expected', received '$actual'" >> "$REPORT_DIR/assertions.txt"
         return 1
     fi
     echo "PASS: $description"
+    echo "PASS: $description" >> "$REPORT_DIR/assertions.txt"
+}
+
+scalar_stdin() {
+    local service="$1"
+    psql_service "$service" --quiet --tuples-only --no-align | tr -d '\r' | sed '/^[[:space:]]*$/d'
+}
+
+# Exact row counts for every table in the public schema, sorted with the C collation.
+table_counts() {
+    scalar_stdin "$1" <<'SQL'
+SELECT format('%s=%s', c.relname,
+    (xpath('/row/n/text()', query_to_xml(format('SELECT count(*) AS n FROM %I.%I', ns.nspname, c.relname), false, true, '')))[1]::text)
+FROM pg_class c
+JOIN pg_namespace ns ON ns.oid = c.relnamespace
+WHERE ns.nspname = 'public' AND c.relkind IN ('r', 'p')
+ORDER BY c.relname COLLATE "C";
+SQL
+}
+
+# Every pre-upgrade table keeps its exact row count (CheckoutOrderItems is renamed to the archive)
+# and every table the upgrade adds is empty. Only the migration history may grow.
+assert_upgrade_preserves_rows() {
+    local before="$1"
+    local after="$2"
+    local violations
+    violations="$(awk -F= '
+        NR == FNR {
+            if ($1 != "__EFMigrationsHistory") {
+                name = ($1 == "CheckoutOrderItems") ? "LegacyCheckoutOrderItemsArchive" : $1
+                expected[name] = $2
+            }
+            next
+        }
+        $1 == "__EFMigrationsHistory" { next }
+        ($1 in expected) {
+            seen[$1] = 1
+            if ($2 != expected[$1]) print "changed " $1 ": " expected[$1] " -> " $2
+            next
+        }
+        $2 != 0 { print "rows in new table " $1 ": " $2 }
+        END { for (name in expected) if (!(name in seen)) print "missing table " name }
+    ' "$before" "$after" | sort)"
+    assert_equal "" "$violations" "upgrade preserves every table row count and creates no rows in new tables"
 }
 
 capture_baseline_report() {
@@ -211,7 +330,9 @@ capture_baseline_report() {
     local output="$2"
     {
         echo "application_sha=$BASELINE_SHA"
-        echo "schema=historical-baseline"
+        echo "schema=$BASELINE_FIXTURE"
+        echo "table_row_counts"
+        table_counts "$service"
         echo "migration_history"
         scalar "$service" 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";'
         echo "user"
@@ -233,8 +354,8 @@ capture_baseline_report() {
 
 verify_baseline_database() {
     local service="$1"
-    assert_equal "5" "$(scalar "$service" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')" "baseline migration count"
-    assert_equal "20260424183749_AdminBackOfficeMvp" "$(scalar "$service" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')" "baseline migration head"
+    assert_equal "$BASELINE_MIGRATION_COUNT" "$(scalar "$service" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')" "baseline migration count"
+    assert_equal "$BASELINE_MIGRATION_HEAD" "$(scalar "$service" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')" "baseline migration head"
     assert_equal "Rehearsal Footwear|rehearsal-footwear|t" "$(scalar "$service" "SELECT \"Name\", \"Slug\", \"IsPublished\" FROM \"Categories\" WHERE \"Id\" = '$CATEGORY_ID';")" "baseline catalog marker"
     assert_equal "19|0|7" "$(scalar "$service" "SELECT (SELECT \"Quantity\" FROM \"Products\" WHERE \"Id\" = '$SIMPLE_PRODUCT_ID'), (SELECT \"Quantity\" FROM \"Products\" WHERE \"Id\" = '$VARIANT_PRODUCT_ID'), (SELECT \"Stock\" FROM \"ProductVariants\" WHERE \"Id\" = '$VARIANT_ID');")" "baseline inventory values"
     assert_equal "2" "$(scalar "$service" "SELECT COUNT(*) FROM \"Orders\" WHERE \"Id\"::text LIKE '37000000-0000-0000-0000-000000000%';")" "baseline order count"
@@ -245,9 +366,70 @@ verify_baseline_database() {
     assert_equal "4" "$(scalar "$service" "SELECT SUM(\"Quantity\") FROM \"CheckoutOrderItems\" WHERE \"Id\"::text LIKE '37000000-0000-0000-0000-000000000%';")" "baseline checkout-history quantities"
 }
 
+verify_registration_outbox_schema() {
+    assert_equal "yes" "$(scalar postgres "SELECT CASE WHEN to_regclass('\"RegistrationConfirmationDeliveries\"') IS NOT NULL THEN 'yes' ELSE 'no' END;")" "registration outbox table exists"
+    assert_equal \
+        "Id:uuid:-:NO,UserId:character varying:450:NO,EventId:uuid:-:NO,EmailSnapshot:character varying:256:NO,SecurityStampHash:character varying:64:NO,Generation:integer:-:NO,State:integer:-:NO,AttemptCount:integer:-:NO,CreatedOn:timestamp with time zone:-:NO,UpdatedOn:timestamp with time zone:-:NO,LastRequestedOn:timestamp with time zone:-:NO,RequestWindowStartedOn:timestamp with time zone:-:NO,RequestsInWindow:integer:-:NO,NextAttemptOn:timestamp with time zone:-:NO,LastAttemptOn:timestamp with time zone:-:YES,DeliveredOn:timestamp with time zone:-:YES,LeaseOwnerId:uuid:-:YES,LeaseExpiresOn:timestamp with time zone:-:YES,LastFailureCode:character varying:64:YES" \
+        "$(scalar_stdin postgres <<'SQL'
+SELECT string_agg(format('%s:%s:%s:%s', column_name, data_type, COALESCE(character_maximum_length::text, '-'), is_nullable), ',' ORDER BY ordinal_position)
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'RegistrationConfirmationDeliveries';
+SQL
+)" "registration outbox columns, types, lengths and nullability"
+    assert_equal \
+        "IX_RegistrationConfirmationDeliveries_State_LeaseExpiresOn|non-unique|State,LeaseExpiresOn;IX_RegistrationConfirmationDeliveries_State_NextAttemptOn|non-unique|State,NextAttemptOn;IX_RegistrationConfirmationDeliveries_UserId|unique|UserId;PK_RegistrationConfirmationDeliveries|unique|Id" \
+        "$(scalar_stdin postgres <<'SQL'
+SELECT string_agg(format('%s|%s|%s', i.relname,
+        CASE WHEN x.indisunique THEN 'unique' ELSE 'non-unique' END,
+        (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+         FROM unnest(x.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+         JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum)),
+    ';' ORDER BY i.relname COLLATE "C")
+FROM pg_index x
+JOIN pg_class i ON i.oid = x.indexrelid
+WHERE x.indrelid = '"RegistrationConfirmationDeliveries"'::regclass;
+SQL
+)" "registration outbox primary key and indexes"
+    assert_equal \
+        'FK_RegistrationConfirmationDeliveries_AspNetUsers_UserId|"AspNetUsers"|c|FOREIGN KEY ("UserId") REFERENCES "AspNetUsers"("Id") ON DELETE CASCADE' \
+        "$(scalar_stdin postgres <<'SQL'
+SELECT string_agg(format('%s|%s|%s|%s', c.conname, c.confrelid::regclass::text, c.confdeltype, pg_get_constraintdef(c.oid)), ';' ORDER BY c.conname COLLATE "C")
+FROM pg_constraint c
+WHERE c.conrelid = '"RegistrationConfirmationDeliveries"'::regclass AND c.contype = 'f';
+SQL
+)" "registration outbox foreign key to AspNetUsers with cascade delete"
+    assert_equal "CK_ConfirmationDelivery_Counts,CK_ConfirmationDelivery_State" \
+        "$(scalar postgres "SELECT string_agg(conname, ',' ORDER BY conname COLLATE \"C\") FROM pg_constraint WHERE conrelid = '\"RegistrationConfirmationDeliveries\"'::regclass AND contype = 'c';")" \
+        "registration outbox check constraints"
+    assert_equal "0" "$(scalar postgres 'SELECT COUNT(*) FROM "RegistrationConfirmationDeliveries";')" "no outbox rows invented for existing users"
+
+    # Behavioural cascade check inside a transaction that is always rolled back: a synthetic user
+    # with one outbox row is deleted and the row must go with it. Nothing is committed.
+    assert_equal "1|0" "$(scalar_stdin postgres <<'SQL' | paste -sd '|' -
+BEGIN;
+INSERT INTO "AspNetUsers" ("Id", "UserName", "NormalizedUserName", "Email", "NormalizedEmail", "EmailConfirmed", "FullName",
+    "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnabled", "AccessFailedCount", "RequirePasswordChange", "CreatedOn")
+VALUES ('rehearsal-cascade-probe', 'cascade.probe@example.test', 'CASCADE.PROBE@EXAMPLE.TEST', 'cascade.probe@example.test',
+    'CASCADE.PROBE@EXAMPLE.TEST', false, 'Cascade Probe', false, false, false, 0, false, now());
+INSERT INTO "RegistrationConfirmationDeliveries" ("Id", "UserId", "EventId", "EmailSnapshot", "SecurityStampHash", "Generation", "State",
+    "AttemptCount", "CreatedOn", "UpdatedOn", "LastRequestedOn", "RequestWindowStartedOn", "RequestsInWindow", "NextAttemptOn")
+VALUES (gen_random_uuid(), 'rehearsal-cascade-probe', gen_random_uuid(), 'cascade.probe@example.test', repeat('0', 64), 1, 0,
+    0, now(), now(), now(), now(), 1, now());
+SELECT COUNT(*) FROM "RegistrationConfirmationDeliveries" WHERE "UserId" = 'rehearsal-cascade-probe';
+DELETE FROM "AspNetUsers" WHERE "Id" = 'rehearsal-cascade-probe';
+SELECT COUNT(*) FROM "RegistrationConfirmationDeliveries" WHERE "UserId" = 'rehearsal-cascade-probe';
+ROLLBACK;
+SQL
+)" "deleting a user cascades to its outbox row (rolled back)"
+    assert_equal "0|0" "$(scalar postgres "SELECT (SELECT COUNT(*) FROM \"AspNetUsers\" WHERE \"Id\" = 'rehearsal-cascade-probe'), (SELECT COUNT(*) FROM \"RegistrationConfirmationDeliveries\");")" "cascade check left no rows behind"
+}
+
 verify_target_database() {
-    assert_equal "12" "$(scalar postgres 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')" "target migration count"
-    assert_equal "20260909075202_ArchiveLegacyCheckoutOrderItems" "$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')" "target migration head"
+    assert_equal "$TARGET_MIGRATION_COUNT" "$(scalar postgres 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')" "target migration count"
+    assert_equal "$TARGET_MIGRATION_HEAD" "$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')" "target migration head"
+    table_counts postgres > "$REPORT_DIR/table-counts-post-upgrade.txt"
+    assert_upgrade_preserves_rows "$REPORT_DIR/table-counts-pre-upgrade.txt" "$REPORT_DIR/table-counts-post-upgrade.txt"
+    verify_registration_outbox_schema
     assert_equal "yes|no" "$(scalar postgres "SELECT CASE WHEN to_regclass('\"LegacyCheckoutOrderItemsArchive\"') IS NOT NULL THEN 'yes' ELSE 'no' END, CASE WHEN to_regclass('\"CheckoutOrderItems\"') IS NOT NULL THEN 'yes' ELSE 'no' END;")" "archive rename"
     assert_equal "Operational archive of legacy checkout-history rows. Not an active order-history source." "$(scalar postgres "SELECT obj_description('\"LegacyCheckoutOrderItemsArchive\"'::regclass);")" "archive diagnostic comment"
     assert_equal "2" "$(scalar postgres "SELECT COUNT(*) FROM \"LegacyCheckoutOrderItemsArchive\" WHERE \"Id\"::text LIKE '37000000-0000-0000-0000-000000000%';")" "archived legacy row count"
@@ -278,7 +460,105 @@ capture_target_report() {
         scalar postgres "SELECT \"Id\", \"ProductId\", \"Quantity\", \"UserId\", to_char(\"CreatedOn\" AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') FROM \"LegacyCheckoutOrderItemsArchive\" WHERE \"Id\"::text LIKE '37000000-0000-0000-0000-000000000%' ORDER BY \"Id\";"
         echo "commerce_side_effect_counts"
         scalar postgres 'SELECT (SELECT COUNT(*) FROM "PaymentTransactions"), (SELECT COUNT(*) FROM "InventoryReservations"), (SELECT COUNT(*) FROM "CheckoutIdempotencyRecords");'
+        echo "registration_outbox_count"
+        scalar postgres 'SELECT COUNT(*) FROM "RegistrationConfirmationDeliveries";'
+        echo "table_row_counts"
+        cat "$REPORT_DIR/table-counts-post-upgrade.txt"
     } > "$REPORT_DIR/post-upgrade-control.txt"
+}
+
+# Schema-only dump without the per-run random \restrict key, so two dumps of one schema compare equal.
+schema_dump() {
+    dc --profile restore exec -T "$1" \
+        pg_dump --username "$REHEARSAL_DB_USER" --dbname "$REHEARSAL_DB_NAME" --schema-only --no-owner --no-acl \
+        | tr -d '\r' | grep -v -E '^\\(un)?restrict '
+}
+
+volume_exec() {
+    dc --profile tools exec -T volume-tool sh -euc "$1"
+}
+
+probe_exec() {
+    dc --profile tools exec -T data-protection-probe dotnet /probe/BlazorShop.DataProtectionProbe.dll "$@"
+}
+
+# Sorted "sha256  ./path" lines for every regular file in one volume of this Compose project.
+volume_manifest() {
+    volume_exec "cd '/volumes/$1/$2' && find . -type f | LC_ALL=C sort | while IFS= read -r file; do sha256sum \"\$file\"; done"
+}
+
+assert_volume_empty() {
+    assert_equal "0" "$(volume_exec "find '/volumes/$1/$2' -mindepth 1 | wc -l" | tr -d ' ')" "$1 $2 volume is empty before use"
+}
+
+seed_upload_fixtures() {
+    # A valid 1x1 PNG and 64 KiB of random bytes, both synthetic.
+    printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' \
+        | base64 --decode > "$VOLUME_WORK_DIR/pixel.png"
+    openssl rand 65536 > "$VOLUME_WORK_DIR/random.png"
+    volume_exec "mkdir -p '/volumes/primary/uploads/$UPLOAD_FIXTURE_DIR'"
+    local fixture
+    for fixture in "${UPLOAD_FIXTURES[@]}"; do
+        volume_exec "cat > '/volumes/primary/uploads/$UPLOAD_FIXTURE_DIR/$fixture'" < "$VOLUME_WORK_DIR/$fixture"
+        sha256sum "$VOLUME_WORK_DIR/$fixture" | awk -v name="$fixture" '{print $1 "  " name}' >> "$VOLUME_WORK_DIR/fixtures.sha256"
+    done
+    cp "$VOLUME_WORK_DIR/fixtures.sha256" "$REPORT_DIR/upload-fixtures.sha256"
+}
+
+# Reads each synthetic upload through the API's public /uploads path and compares its SHA-256.
+verify_upload_fixtures_served() {
+    local phase="$1"
+    local fixture expected actual
+    for fixture in "${UPLOAD_FIXTURES[@]}"; do
+        expected="$(awk -v name="$fixture" '$2 == name {print $1}' "$VOLUME_WORK_DIR/fixtures.sha256")"
+        actual="$(curl --fail --silent --show-error "$REHEARSAL_API_URL/uploads/$UPLOAD_FIXTURE_DIR/$fixture" | sha256sum | awk '{print $1}')"
+        assert_equal "$expected" "$actual" "$phase upload fixture $fixture is served unchanged"
+    done
+}
+
+data_protection_unprotect() {
+    local ring="$1"
+    probe_exec unprotect "/keys/$ring" < "$VOLUME_WORK_DIR/data-protection-payload.txt"
+}
+
+assert_data_protection_round_trip() {
+    local ring="$1"
+    local phase="$2"
+    local recovered
+    recovered="$(data_protection_unprotect "$ring")"
+    assert_equal "$(cat "$VOLUME_WORK_DIR/data-protection-plaintext.txt")" "$recovered" \
+        "$phase key ring unprotects the value protected before backup"
+}
+
+backup_volume() {
+    local name="$1"
+    volume_exec "tar -C '/volumes/primary/$name' -czf - ." > "$VOLUME_WORK_DIR/$name.tar.gz"
+    gzip --test "$VOLUME_WORK_DIR/$name.tar.gz"
+    assert_equal \
+        "$(wc -l < "$VOLUME_WORK_DIR/$name.pre-backup.manifest" | tr -d ' ')" \
+        "$(tar -tvzf "$VOLUME_WORK_DIR/$name.tar.gz" | awk '$1 ~ /^-/' | wc -l | tr -d ' ')" \
+        "$name archive is readable and lists every file"
+}
+
+restore_volume() {
+    local name="$1"
+    volume_exec "tar -C '/volumes/restore/$name' -xzf -" < "$VOLUME_WORK_DIR/$name.tar.gz"
+    volume_manifest restore "$name" > "$VOLUME_WORK_DIR/$name.post-restore.manifest"
+    local verdict="identical"
+    cmp --silent "$VOLUME_WORK_DIR/$name.pre-backup.manifest" "$VOLUME_WORK_DIR/$name.post-restore.manifest" || verdict="different"
+    assert_equal "identical" "$verdict" "$name restored content matches the pre-backup manifest byte for byte"
+}
+
+write_volume_report() {
+    local name
+    {
+        for name in uploads data-protection-keys; do
+            echo "${name}_files=$(wc -l < "$VOLUME_WORK_DIR/$name.pre-backup.manifest" | tr -d ' ')"
+            echo "${name}_manifest_sha256=$(sha256sum "$VOLUME_WORK_DIR/$name.pre-backup.manifest" | awk '{print $1}')"
+            echo "${name}_archive_sha256=$(sha256sum "$VOLUME_WORK_DIR/$name.tar.gz" | awk '{print $1}')"
+            echo "${name}_archive_size_bytes=$(stat --format '%s' "$VOLUME_WORK_DIR/$name.tar.gz")"
+        done
+    } > "$REPORT_DIR/volume-backup-metadata.txt"
 }
 
 register_user() {
@@ -350,6 +630,10 @@ assert_equal "$TARGET_SHA" "$target_actual" "target application source SHA"
 assert_equal "" "$(git -C "$BASELINE_DIR" status --porcelain)" "clean baseline source checkout"
 assert_equal "" "$(git -C "$TARGET_DIR" status --porcelain)" "clean target source checkout"
 
+run_logged "$LOG_DIR/build-data-protection-probe.log" dotnet publish \
+    "$TOOLING_DIR/rehearsal/data-protection-probe/BlazorShop.DataProtectionProbe.csproj" \
+    --configuration Release --output "$PROBE_DIR" -warnaserror
+
 run_logged "$LOG_DIR/pull-postgres.log" docker pull "$POSTGRES_IMAGE"
 run_logged "$LOG_DIR/pull-dotnet-sdk.log" docker pull "$DOTNET_SDK_IMAGE"
 run_logged "$LOG_DIR/pull-dotnet-aspnet.log" docker pull "$DOTNET_ASPNET_IMAGE"
@@ -387,6 +671,9 @@ build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$
 } > "$REPORT_DIR/versions-and-images.txt"
 
 dc up --detach postgres api
+dc --profile tools up --detach volume-tool data-protection-probe
+assert_volume_empty restore uploads
+assert_volume_empty restore data-protection-keys
 wait_postgres postgres
 wait_http "$REHEARSAL_API_URL/health" "initial baseline API"
 register_user
@@ -401,11 +688,28 @@ psql_service postgres --set "user_id=$USER_ID" < "$TOOLING_DIR/rehearsal/seed-ba
 dc up --detach storefront web
 verify_baseline_application "pre-upgrade"
 verify_baseline_database postgres
+MIGRATION_HEAD_BEFORE="$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
+
+# Synthetic persistent-volume data: two uploads served by the baseline API and one value protected
+# with a Data Protection key ring that lives in the API's key volume.
+UPLOADS_RESULT="failed"
+DATA_PROTECTION_RESULT="failed"
+seed_upload_fixtures
+verify_upload_fixtures_served "pre-upgrade baseline"
+openssl rand -hex 32 | tr -d '\n' > "$VOLUME_WORK_DIR/data-protection-plaintext.txt"
+probe_exec protect /keys/primary < "$VOLUME_WORK_DIR/data-protection-plaintext.txt" \
+    > "$VOLUME_WORK_DIR/data-protection-payload.txt"
+assert_equal "yes" "$([[ -s "$VOLUME_WORK_DIR/data-protection-payload.txt" ]] && echo yes || echo no)" "synthetic value protected before backup"
+assert_data_protection_round_trip primary "pre-backup"
+
 capture_baseline_report postgres "$REPORT_DIR/pre-upgrade-control.txt"
 sha256sum "$REPORT_DIR/pre-upgrade-control.txt" > "$REPORT_DIR/pre-upgrade-control.sha256"
+table_counts postgres > "$REPORT_DIR/table-counts-pre-upgrade.txt"
 capture_logs "baseline"
 stop_application_writers
+schema_dump postgres > "$REPORT_DIR/schema-pre-upgrade.sql"
 
+backup_started="$(date +%s%3N)"
 docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" exec -T postgres \
     pg_dump --username "$REHEARSAL_DB_USER" --dbname "$REHEARSAL_DB_NAME" \
     --format custom --no-owner --no-acl > "$BACKUP_PATH"
@@ -428,6 +732,18 @@ done
     echo "pg_dump_exit=0"
     echo "pg_restore_list_exit=0"
 } > "$REPORT_DIR/backup-metadata.txt"
+BACKUP_DATABASE_MILLISECONDS="$(( $(date +%s%3N) - backup_started ))"
+
+volumes_backup_started="$(date +%s%3N)"
+volume_manifest primary uploads > "$VOLUME_WORK_DIR/uploads.pre-backup.manifest"
+volume_manifest primary data-protection-keys > "$VOLUME_WORK_DIR/data-protection-keys.pre-backup.manifest"
+assert_equal "${#UPLOAD_FIXTURES[@]}" "$(wc -l < "$VOLUME_WORK_DIR/uploads.pre-backup.manifest" | tr -d ' ')" "uploads volume holds exactly the synthetic fixtures"
+assert_equal "yes" "$([[ "$(wc -l < "$VOLUME_WORK_DIR/data-protection-keys.pre-backup.manifest")" -ge 1 ]] && echo yes || echo no)" "data-protection key volume holds at least one key"
+backup_volume uploads
+backup_volume data-protection-keys
+BACKUP_VOLUMES_MILLISECONDS="$(( $(date +%s%3N) - volumes_backup_started ))"
+write_volume_report
+cp "$VOLUME_WORK_DIR/uploads.pre-backup.manifest" "$REPORT_DIR/uploads.pre-backup.manifest"
 
 export REHEARSAL_API_IMAGE="$TARGET_API_IMAGE"
 export REHEARSAL_STOREFRONT_IMAGE="$TARGET_STOREFRONT_IMAGE"
@@ -443,7 +759,21 @@ wait_http "$REHEARSAL_STOREFRONT_URL/product/rehearsal-canvas-bag" "target Store
 wait_http "$REHEARSAL_WEB_URL/authentication/login/account" "target Web"
 
 verify_target_database
+MIGRATION_HEAD_AFTER="$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
 capture_target_report
+
+# The upgrade must keep every pre-upgrade upload and key unchanged and still unprotect the value.
+verify_upload_fixtures_served "post-upgrade target"
+volume_manifest primary uploads > "$VOLUME_WORK_DIR/uploads.post-upgrade.manifest"
+uploads_verdict="identical"
+cmp --silent "$VOLUME_WORK_DIR/uploads.pre-backup.manifest" "$VOLUME_WORK_DIR/uploads.post-upgrade.manifest" || uploads_verdict="different"
+assert_equal "identical" "$uploads_verdict" "upgrade leaves the uploads volume unchanged"
+volume_manifest primary data-protection-keys > "$VOLUME_WORK_DIR/data-protection-keys.post-upgrade.manifest"
+missing_keys="$(grep --fixed-strings --line-regexp --invert-match \
+    --file "$VOLUME_WORK_DIR/data-protection-keys.post-upgrade.manifest" \
+    "$VOLUME_WORK_DIR/data-protection-keys.pre-backup.manifest" | wc -l | tr -d ' ')"
+assert_equal "0" "$missing_keys" "upgrade keeps every pre-upgrade data-protection key unchanged"
+assert_data_protection_round_trip primary "post-upgrade"
 capture_logs "target-upgraded"
 
 export BLAZORSHOP_REHEARSAL_MODE="attach-upgraded-database"
@@ -455,6 +785,7 @@ export BLAZORSHOP_REHEARSAL_USER_EMAIL="$USER_EMAIL"
 export BLAZORSHOP_REHEARSAL_USER_PASSWORD="$USER_PASSWORD"
 export BLAZORSHOP_REHEARSAL_ARTIFACTS_DIR="$TEST_RESULTS_DIR/diagnostics"
 
+BROWSER_RESULT="failed"
 run_logged "$LOG_DIR/browser-test.log" dotnet test \
     "$TOOLING_DIR/BlazorShop.StagingRehearsal/BlazorShop.StagingRehearsal.csproj" \
     --configuration Release --no-build --no-restore \
@@ -462,6 +793,7 @@ run_logged "$LOG_DIR/browser-test.log" dotnet test \
     --results-directory "$TEST_RESULTS_DIR" --verbosity normal
 pwsh "$TOOLING_DIR/scripts/verify-staging-rehearsal-results.ps1" \
     -Path "$TEST_RESULTS_DIR/staging-rehearsal.trx"
+BROWSER_RESULT="passed"
 
 capture_logs "target-after-browser"
 stop_application_writers
@@ -483,13 +815,39 @@ assert_equal \
     "$(cut --delimiter ' ' --fields 1 "$REPORT_DIR/pre-upgrade-control.sha256")" \
     "$(cut --delimiter ' ' --fields 1 "$REPORT_DIR/post-restore-control.sha256")" \
     "restored baseline control checksum"
+schema_dump restore-postgres > "$REPORT_DIR/schema-post-restore.sql"
+schema_verdict="identical"
+cmp --silent "$REPORT_DIR/schema-pre-upgrade.sql" "$REPORT_DIR/schema-post-restore.sql" || schema_verdict="different"
+assert_equal "identical" "$schema_verdict" "restored schema matches the pre-upgrade schema byte for byte"
+
+# Persistent volumes: the empty restore key ring must reject the payload (negative control) and
+# must not gain a key from that attempt; then both archives are restored into the new volumes.
+VOLUME_RESTORE_RESULT="failed"
+dp_negative="accepted"
+if ! data_protection_unprotect restore > /dev/null 2> "$LOG_DIR/data-protection-negative-control.log"; then
+    dp_negative="rejected"
+fi
+assert_equal "rejected" "$dp_negative" "empty restore key ring cannot unprotect the value (negative control)"
+assert_volume_empty restore data-protection-keys
+
+restore_volumes_started="$(date +%s%3N)"
+restore_volume uploads
+restore_volume data-protection-keys
+RESTORE_VOLUMES_MILLISECONDS="$(( $(date +%s%3N) - restore_volumes_started ))"
+assert_data_protection_round_trip restore "post-restore"
+DATA_PROTECTION_RESULT="passed"
 
 export REHEARSAL_API_IMAGE="$BASELINE_API_IMAGE"
 export REHEARSAL_STOREFRONT_IMAGE="$BASELINE_STOREFRONT_IMAGE"
 export REHEARSAL_WEB_IMAGE="$BASELINE_WEB_IMAGE"
 export REHEARSAL_DB_HOST="restore-postgres"
+export REHEARSAL_UPLOADS_VOLUME="restore-uploads-data"
+export REHEARSAL_DATA_PROTECTION_VOLUME="restore-data-protection-keys"
 dc --profile restore up --detach --force-recreate api storefront web
 verify_baseline_application "post-restore"
+verify_upload_fixtures_served "post-restore baseline"
+UPLOADS_RESULT="passed"
+VOLUME_RESTORE_RESULT="passed"
 capture_logs "restored-baseline"
 
 REHEARSAL_RESULT="passed"
