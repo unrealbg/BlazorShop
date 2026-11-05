@@ -23,6 +23,10 @@ jobs:
   upgrade-restore-rehearsal:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      # Only the historical evidence profile exists. A VPS-specific profile stays BLOCKED until
+      # read-only VPS evidence is recorded (docs/staging-upgrade-restore-rehearsal.md).
+      REHEARSAL_BASELINE_PROFILE: historical
 
     steps:
       - name: Checkout rehearsal tooling
@@ -31,17 +35,34 @@ jobs:
           path: tooling
           persist-credentials: false
 
-      - name: Checkout exact historical application baseline
+      - name: Resolve baseline from the reviewed profile
+        id: baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile_file="tooling/rehearsal/baselines/${REHEARSAL_BASELINE_PROFILE}.env"
+          if [[ ! -f "$profile_file" ]]; then
+            echo "Baseline profile '${REHEARSAL_BASELINE_PROFILE}' is BLOCKED: $profile_file does not exist." >&2
+            exit 1
+          fi
+          sha="$(sed -n 's/^BASELINE_SHA=//p' "$profile_file" | tr -d '\r')"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Baseline profile '${REHEARSAL_BASELINE_PROFILE}' has no valid BASELINE_SHA." >&2
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact baseline application version
         uses: actions/checkout@v6
         with:
-          ref: df8a5e19d12728f0228e293404d6e2ceee743db7
+          ref: ${{ steps.baseline.outputs.sha }}
           path: application-baseline
           persist-credentials: false
 
       - name: Checkout exact target application version
         uses: actions/checkout@v6
         with:
-          ref: 8370f817857648f475041228ea6eaf228a3b9e34
+          ref: 527ee48056ffd01821e8d3f398c2a2be3fae522e
           path: application-target
           persist-credentials: false
 

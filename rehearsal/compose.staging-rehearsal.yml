@@ -63,8 +63,9 @@ services:
     ports:
       - "127.0.0.1:${REHEARSAL_API_PORT:?REHEARSAL_API_PORT is required}:8080"
     volumes:
-      - uploads-data:/app/uploads
-      - data-protection-keys:/root/.aspnet/DataProtection-Keys
+      # Primary volumes by default; the restored baseline switches to the restore-* volumes.
+      - ${REHEARSAL_UPLOADS_VOLUME:-uploads-data}:/app/uploads
+      - ${REHEARSAL_DATA_PROTECTION_VOLUME:-data-protection-keys}:/root/.aspnet/DataProtection-Keys
     networks:
       - rehearsal
 
@@ -94,11 +95,37 @@ services:
     networks:
       - rehearsal
 
+  # Idle helper with no network. The runner streams fixtures, manifests and archives through
+  # `docker compose exec`, so only this run's project volumes are ever read or written.
+  volume-tool:
+    profiles: ["tools"]
+    image: ${REHEARSAL_POSTGRES_IMAGE:?REHEARSAL_POSTGRES_IMAGE is required}
+    entrypoint: ["tail", "-f", "/dev/null"]
+    network_mode: none
+    volumes:
+      - uploads-data:/volumes/primary/uploads
+      - data-protection-keys:/volumes/primary/data-protection-keys
+      - restore-uploads-data:/volumes/restore/uploads
+      - restore-data-protection-keys:/volumes/restore/data-protection-keys
+
+  # Idle ASP.NET Core runtime with no network for the Data Protection probe.
+  data-protection-probe:
+    profiles: ["tools"]
+    image: ${REHEARSAL_PROBE_IMAGE:?REHEARSAL_PROBE_IMAGE is required}
+    entrypoint: ["tail", "-f", "/dev/null"]
+    network_mode: none
+    volumes:
+      - data-protection-keys:/keys/primary
+      - restore-data-protection-keys:/keys/restore
+      - ${REHEARSAL_PROBE_DIR:?REHEARSAL_PROBE_DIR is required}:/probe:ro
+
 volumes:
   primary-postgres-data:
   restore-postgres-data:
   uploads-data:
   data-protection-keys:
+  restore-uploads-data:
+  restore-data-protection-keys:
 
 networks:
   rehearsal:
