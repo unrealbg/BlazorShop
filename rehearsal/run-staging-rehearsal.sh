@@ -769,9 +769,11 @@ uploads_verdict="identical"
 cmp --silent "$VOLUME_WORK_DIR/uploads.pre-backup.manifest" "$VOLUME_WORK_DIR/uploads.post-upgrade.manifest" || uploads_verdict="different"
 assert_equal "identical" "$uploads_verdict" "upgrade leaves the uploads volume unchanged"
 volume_manifest primary data-protection-keys > "$VOLUME_WORK_DIR/data-protection-keys.post-upgrade.manifest"
-missing_keys="$(grep --fixed-strings --line-regexp --invert-match \
-    --file "$VOLUME_WORK_DIR/data-protection-keys.post-upgrade.manifest" \
-    "$VOLUME_WORK_DIR/data-protection-keys.pre-backup.manifest" | wc -l | tr -d ' ')"
+# Pre-upgrade manifest lines absent after the upgrade. comm exits 0 when there are none; grep -v
+# would exit 1 on that success path and abort the run under pipefail.
+missing_keys="$(LC_ALL=C comm -23 \
+    <(LC_ALL=C sort "$VOLUME_WORK_DIR/data-protection-keys.pre-backup.manifest") \
+    <(LC_ALL=C sort "$VOLUME_WORK_DIR/data-protection-keys.post-upgrade.manifest") | wc -l | tr -d ' ')"
 assert_equal "0" "$missing_keys" "upgrade keeps every pre-upgrade data-protection key unchanged"
 assert_data_protection_round_trip primary "post-upgrade"
 capture_logs "target-upgraded"
