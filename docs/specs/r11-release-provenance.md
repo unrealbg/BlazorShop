@@ -1,6 +1,6 @@
 # R11 — Release provenance
 
-Status: **implemented in `.github/workflows/release.yml` and `scripts/release/`; not yet exercised by a real tag.** Source finding: R11 in the [2026-11-04 RC audit](../rc-readiness/2026-11-04/README.md). Baseline before this change: `master` at `3ef5024`.
+Status: **implemented in `.github/workflows/release.yml` and `scripts/release/` (merged in #145 as `3e5bc68`); tag rulesets and release immutability active since 2026-11-05; the real tag-triggered path has not been exercised yet.** Source finding: R11 in the [2026-11-04 RC audit](../rc-readiness/2026-11-04/README.md). Baseline before this change: `master` at `3ef5024`.
 
 ## 1. Goal
 
@@ -116,9 +116,18 @@ Archives use sorted entries, the commit time as mtime, numeric root ownership an
   - per-tag concurrency and repository gate;
   - no override of the attested source ref.
 
-## 8. Tag protection — proposal, not applied
+## 8. Tag protection — applied 2026-11-05
 
-Two rulesets, so that the bypass covers only creation. Both validate against GitHub's REST schema.
+Two rulesets, so that the bypass covers only creation. Both validate against GitHub's REST schema and were created exactly as shown below, with `master` at `3e5bc68`.
+
+| Ruleset | ID | Enforcement | Scope | Rules | Bypass |
+|---|---|---|---|---|---|
+| `release-tags-immutable` | 26626203 | active | `refs/tags/v*` | `update`, `deletion` | none, including the owner |
+| `release-tags-creation` | 26626214 | active | `refs/tags/v*` | `creation` | `User` 3398536 (`unrealbg`), `always` |
+
+GitHub accepted the individual `User` bypass, so the `RepositoryRole` fallback below was not needed. The settings were verified by reading both rulesets back through the API; the `master` ruleset 26531467 was unchanged. No tag was created to test them, so enforcement against a real push has not been observed yet.
+
+**Release immutability** was enabled for the repository on 2026-11-05 (`PUT /repos/unrealbg/BlazorShop/immutable-releases`, read back as `"enabled": true`). It applies to releases published after that date; a draft stays editable until it is published.
 
 `release-tags-immutable`: nobody can move or delete a release tag.
 
@@ -160,8 +169,8 @@ A wrong tag cannot be deleted while `release-tags-immutable` is active. That is 
 
 ## 10. Prerequisites for the first real release
 
-1. Owner approval and application of the tag rulesets (§8).
-2. Release immutability enabled in repository settings before publishing any release.
+1. ~~Owner approval and application of the tag rulesets (§8).~~ Done 2026-11-05 (rulesets 26626203 and 26626214).
+2. ~~Release immutability enabled in repository settings before publishing any release.~~ Done 2026-11-05.
 3. A first `vX.Y.Z-rc.1` tag on a fully green `master` commit, owner review of the draft, and verification with §6. The tag-triggered path itself has not run yet; the implementing pull request's dry run documents which parts were exercised against the real GitHub API.
 4. The remaining audit gates: R09, R08, R10 and R01/N01 in the 2026-11-04 audit.
 
