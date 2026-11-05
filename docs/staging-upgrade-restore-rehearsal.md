@@ -11,6 +11,8 @@ This repository contains an isolated GitHub-hosted rehearsal for upgrading a rep
 | **Historical upgrade/restore** (`historical` profile `df8a5e1` → `527ee48`) | **PASS** | Hosted run [42103476333](https://github.com/unrealbg/BlazorShop/actions/runs/42103476333) on PR #147 head `80f63b3`: 72/72 assertions, browser test 1/1, database, schema, uploads and Data Protection restore verified. |
 | **VPS-specific upgrade/restore** (the version actually deployed → current target) | **BLOCKED** | The deployed baseline is unknown. It waits for read-only evidence from the VPS: see [Establishing the deployed VPS version](r09-vps-version-evidence.md). |
 
+PR #147 was merged as `f9025f7` with a tree identical to the verified head `80f63b3`. In its post-merge `ci` run [42106323751](https://github.com/unrealbg/BlazorShop/actions/runs/42106323751), attempt 1 was cancelled when `browser-e2e` hit its 45-minute limit. That happened during the Ubuntu dependency installation for Firefox and WebKit (`playwright install --with-deps`), whose apt downloads from the runner's Ubuntu mirror stalled. Both Chromium runs had already passed 40/40. The owner approved a single rerun of that job only: attempt 2 passed with Chromium 40/40 twice and Firefox/WebKit 11/11 twice, and the install step took 26 seconds. `build-test`, `postgres16-archive` and Code Analysis were not rerun.
+
 The historical baseline is synthetic, representative evidence for the documented upgrade path. It is **not** a claim about the version that runs on any VPS.
 
 ## Pinned application boundary
