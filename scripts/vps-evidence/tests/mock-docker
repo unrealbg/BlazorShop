@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Test double for the docker CLI, driven by files in $MOCK_DOCKER_DIR:
+#   containers   id|project|service|state|oneoff|image_id|image_ref|started_at|working_dir
+#   images       image_id|created
+#   fs/<id>/...  the container file system used by `docker exec <id> sh -c ...`
+#   exec-fail    container ids whose `docker exec` fails like an unreachable container
+#   exec-bin/    commands that shadow the real ones inside `docker exec ... sh` (e.g. a failing find)
+#   psql/*       canned query results; psql-fail makes every psql call fail
+# It implements only the calls collect-version-evidence.sh makes and records each call in calls.log.
+set -euo pipefail
+
+dir="${MOCK_DOCKER_DIR:?MOCK_DOCKER_DIR is required}"
+call="$*"
+printf '%s\n' "${call//$'\n'/ }" >> "$dir/calls.log"
+
+field() {
+    local id="$1" index="$2"
+    awk -F '|' -v id="$id" -v index_="$index" '$1 == id { print $index_; found = 1 } END { exit !found }' "$dir/containers"
+}
+
+command="${1:-}"
+shift || true
+case "$command" in
+    ps)
+        all=0
+        format=""
+        filters=()
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --all) all=1 ;;
+                --quiet | --no-trunc) ;;
+                --filter) filters+=("$2"); shift ;;
+                --format) format="$2"; shift ;;
+                *) echo "mock docker ps: unsupported argument $1" >&2; exit 2 ;;
+            esac
+            shift
+        done
+        while IFS='|' read -r id project service state oneoff _ _ _ _; do
+            [[ -n "$id" ]] || continue
+            [[ $all -eq 1 || "$state" == "running" ]] || continue
+            keep=1
+            for filter in "${filters[@]}"; do
+                case "$filter" in
+                    label=com.docker.compose.project=*) [[ "$project" == "${filter#*project=}" ]] || keep=0 ;;
+                    label=com.docker.compose.service=*) [[ "$service" == "${filter#*service=}" ]] || keep=0 ;;
+                    label=com.docker.compose.oneoff=*) [[ "$oneoff" == "${filter#*oneoff=}" ]] || keep=0 ;;
+                    status=*) [[ "$state" == "${filter#status=}" ]] || keep=0 ;;
+                    *) echo "mock docker ps: unsupported filter $filter" >&2; exit 2 ;;
+                esac
+            done
+            [[ $keep -eq 1 ]] || continue
+            if [[ "$format" == '{{.Label "com.docker.compose.project"}}' ]]; then
+                echo "$project"
+            else
+                echo "$id"
+            fi
+        done < "$dir/containers"
+        ;;
+    inspect)
+        [[ "$1" == "--format" ]] || { echo "mock docker inspect: --format required" >&2; exit 2; }
+        format="$2"
+        id="$3"
+        case "$format" in
+            '{{.Image}}') field "$id" 6 ;;
+            '{{.State.Status}}') field "$id" 4 ;;
+            '{{.State.StartedAt}}') field "$id" 8 ;;
+            '{{.Config.Image}}') field "$id" 7 ;;
+            '{{index .Config.Labels "com.docker.compose.project.working_dir"}}') field "$id" 9 ;;
+            *) echo "mock docker inspect: unsupported format $format" >&2; exit 2 ;;
+        esac
+        ;;
+    image)
+        [[ "$1" == "inspect" && "$2" == "--format" && "$3" == '{{.Created}}' ]] || { echo "mock docker image: unsupported" >&2; exit 2; }
+        awk -F '|' -v id="$4" '$1 == id { print $2; found = 1 } END { exit !found }' "$dir/images"
+        ;;
+    exec)
+        if [[ "$1" == "--env" ]]; then
+            shift 2
+        fi
+        id="$1"
+        shift
+        if grep -qxF "$id" "$dir/exec-fail" 2> /dev/null; then
+            echo "Error response from daemon: container $id is not reachable" >&2
+            exit 126
+        fi
+        [[ "$(field "$id" 4)" == "running" ]] || { echo "Error response from daemon: container $id is not running" >&2; exit 1; }
+        case "$1" in
+            sh)
+                # sh -c <script> sh <absolute path>: run the real probe script against the mock file system.
+                [[ "$2" == "-c" && "$4" == "sh" ]] || { echo "mock docker exec: unsupported sh call" >&2; exit 2; }
+                PATH="$dir/exec-bin:$PATH" sh -c "$3" sh "$dir/fs/$id$5"
+                ;;
+            psql)
+                [[ ! -e "$dir/psql-fail" ]] || { echo "psql: error: connection to server failed" >&2; exit 2; }
+                query="${*: -1}"
+                case "$query" in
+                    *"SHOW server_version"*) cat "$dir/psql/version" ;;
+                    *pg_database_size*) cat "$dir/psql/size" ;;
+                    *"COUNT(*)"*) cat "$dir/psql/count" ;;
+                    *"MAX("*) cat "$dir/psql/head" ;;
+                    *'ORDER BY "MigrationId"'*) cat "$dir/psql/list" ;;
+                    *pg_stat_user_tables*) cat "$dir/psql/rows" ;;
+                    *) echo "mock psql: unexpected query" >&2; exit 2 ;;
+                esac
+                ;;
+            *) echo "mock docker exec: unsupported command $1" >&2; exit 2 ;;
+        esac
+        ;;
+    *)
+        echo "mock docker: unsupported command $command" >&2
+        exit 2
+        ;;
+esac
