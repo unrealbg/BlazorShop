@@ -20,6 +20,13 @@ jobs:
         shell: pwsh
         run: ./scripts/release/tests/ReleaseGuard.Tests.ps1
 
+      - name: Lint and test VPS version-evidence scripts
+        shell: bash
+        run: |
+          shellcheck --severity=info --shell=bash \
+            scripts/vps-evidence/*.sh scripts/vps-evidence/tests/run-tests.sh scripts/vps-evidence/tests/mock-docker
+          bash scripts/vps-evidence/tests/run-tests.sh
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
