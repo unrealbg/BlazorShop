@@ -15,6 +15,8 @@ PR #147 was merged as `f9025f7` with a tree identical to the verified head `80f6
 
 The historical baseline is synthetic, representative evidence for the documented upgrade path. It is **not** a claim about the version that runs on any VPS.
 
+The pinned target `527ee48` is not the current `master`. Between `527ee48` and `f9025f7` only rehearsal tooling and documentation changed (the workflow, runner, Compose file, browser-suite constant, baseline profile, Data Protection probe and this document). No application, migration or Dockerfile source changed. A green run therefore proves that this synthetic database and volumes upgrade to, and restore from, the application and schema of `527ee48`, which `f9025f7` shares. It proves nothing about later application commits until the target is re-pinned, and nothing about the deployed VPS version or real data. The run on PR #148 head `a23b56a` ([42117420545](https://github.com/unrealbg/BlazorShop/actions/runs/42117420545)) passed again with the same pins, showing the rehearsal is reproducible.
+
 ## Pinned application boundary
 
 The rehearsal pins both application sources:
