@@ -1,104 +1,213 @@
 #!/usr/bin/env bash
 # Read-only evidence of the BlazorShop version that is actually running on a Docker Compose host.
 #
-# Run it on the host, in the deployment checkout, by an operator with Docker access:
-#   bash scripts/vps-evidence/collect-version-evidence.sh <compose-project-name> > vps-evidence.txt
-# Without a project name it only lists the Compose projects that are running.
+# Run it from a reviewed local copy over SSH; nothing has to be installed or updated on the host:
+#   ssh <host> 'bash -s -- <compose-project> [deployment-checkout-dir]' \
+#       < scripts/vps-evidence/collect-version-evidence.sh > vps-evidence.txt
+# Without arguments it lists the running Compose projects and exits 2.
 #
-# It never changes anything: no compose up/down/pull/build, no restart, no writes to containers,
-# volumes or the database. PostgreSQL queries run in read-only transactions. It prints no
-# environment variables, connection strings, keys, file contents or row data; only commit IDs,
-# image IDs and timestamps, SHA-256 hashes of files that are copied verbatim from the repository
-# into the images, migration IDs, sizes, counts and versions.
-# Review the output before sharing it.
+# Read-only by construction: it runs only `docker ps`, `docker inspect`, `docker image inspect`,
+# and `docker exec` of sha256sum/find/du/psql in already running containers, plus `git` read
+# commands without optional locks. PostgreSQL queries run in read-only transactions and never
+# prompt for a password. It never runs `docker compose`, so the Compose environment is not rendered,
+# and it prints no environment variables, connection strings, keys, file contents or row data.
+#
+# All-or-nothing output: evidence is printed only after every item was collected and validated,
+# followed by a checksum line and `evidence_complete=true`. Any failure prints a diagnostic on
+# stderr, nothing on stdout, and exits non-zero, so a partial file cannot be mistaken for evidence.
 set -Eeuo pipefail
+shopt -s inherit_errexit
 
+readonly SCHEMA="blazorshop-vps-version-evidence/v2"
+readonly SERVICES=(postgres api storefront web)
 readonly DB_NAME="${BLAZORSHOP_EVIDENCE_DB_NAME:-blazorshop}"
 readonly DB_USER="${BLAZORSHOP_EVIDENCE_DB_USER:-blazorshop}"
+# Exit status of the in-container probe when a path provably does not exist.
+readonly ABSENT_STATUS=3
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <compose-project-name>" >&2
+fail() {
+    echo "evidence collection failed: $*" >&2
+    exit 1
+}
+# Any unexpected failure exits 1 (2 is reserved for usage), whatever the failing command returned.
+trap 'echo "evidence collection failed at line $LINENO: $BASH_COMMAND" >&2; exit 1' ERR
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: bash -s -- <compose-project> [deployment-checkout-dir] < collect-version-evidence.sh" >&2
     echo "Running Compose projects:" >&2
-    docker ps --format '{{.Label "com.docker.compose.project"}}' | sed '/^$/d' | sort -u | sed 's/^/  /' >&2
+    docker ps --filter status=running --format '{{.Label "com.docker.compose.project"}}' | sed '/^$/d' | sort -u | sed 's/^/  /' >&2
     exit 2
 fi
+if [[ $# -gt 2 ]]; then
+    fail "expected at most two arguments"
+fi
 readonly PROJECT="$1"
+readonly CHECKOUT_DIR="${2:-}"
+[[ "$PROJECT" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "invalid Compose project name '$PROJECT'"
+[[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ && "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || fail "invalid database name or user"
 
-container_for() {
-    docker ps --all --quiet \
-        --filter "label=com.docker.compose.project=$PROJECT" \
-        --filter "label=com.docker.compose.service=$1" | head -n 1
+# Every value must be non-empty, so a helper that failed inside a command substitution (and
+# therefore printed nothing) can never contribute a silently empty evidence line.
+OUTPUT=()
+emit() {
+    local key="$1"
+    local value="$2"
+    [[ "$key" =~ ^[A-Za-z0-9_.]+$ ]] || fail "internal: invalid key '$key'"
+    [[ "$value" != *$'\n'* && "$value" != *$'\r'* && -n "$value" ]] || fail "empty or multi-line value for $key"
+    OUTPUT+=("$key=$value")
 }
 
-# Prints "<sha256>" of a file inside a running container, or "missing".
+# The single running service container of this project (one-off `compose run` containers excluded).
+container_for() {
+    local service="$1"
+    local listed
+    listed="$(docker ps --quiet --no-trunc \
+        --filter "label=com.docker.compose.project=$PROJECT" \
+        --filter "label=com.docker.compose.service=$service" \
+        --filter "label=com.docker.compose.oneoff=False" \
+        --filter status=running)" || fail "docker ps failed for service '$service'"
+    local ids=()
+    [[ -z "$listed" ]] || mapfile -t ids <<< "$listed"
+    if [[ ${#ids[@]} -eq 1 ]]; then
+        printf '%s' "${ids[0]}"
+        return 0
+    fi
+    if [[ ${#ids[@]} -eq 0 ]]; then
+        local others
+        others="$(docker ps --all --quiet \
+            --filter "label=com.docker.compose.project=$PROJECT" \
+            --filter "label=com.docker.compose.service=$service" | wc -l | tr -d ' ')"
+        fail "no running '$service' container in Compose project '$PROJECT' ($others non-running)"
+    fi
+    fail "${#ids[@]} running '$service' containers in Compose project '$PROJECT'; expected exactly one"
+}
+
+inspect_field() {
+    local value
+    value="$(docker inspect --format "$2" "$1")"
+    [[ -n "$value" ]] || fail "empty docker inspect field $2"
+    printf '%s' "$value"
+}
+
+# SHA-256 of a regular file inside a running container, or "missing" only when the path provably
+# does not exist. Any other failure (docker exec, permissions, not a regular file) aborts.
 file_sha256() {
     local container="$1"
     local path="$2"
-    local hash
-    hash="$(docker exec "$container" sha256sum "$path" 2>/dev/null | awk '{print $1}' || true)"
-    printf '%s\n' "${hash:-missing}"
+    local output status=0
+    # `|| status=$?` keeps the expected "absent" exit from tripping errexit and the ERR trap.
+    output="$(docker exec "$container" sh -c '
+        if [ ! -e "$1" ] && [ ! -L "$1" ]; then exit 3; fi
+        if [ ! -f "$1" ]; then echo "not a regular file: $1" >&2; exit 4; fi
+        sha256sum "$1"' sh "$path")" || status=$?
+    if [[ $status -eq $ABSENT_STATUS ]]; then
+        printf 'missing'
+        return 0
+    fi
+    [[ $status -eq 0 ]] || fail "could not hash $path in container ${container:0:12} (exit $status)"
+    local hash="${output%% *}"
+    [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || fail "unexpected sha256sum output for $path"
+    printf '%s' "$hash"
+}
+
+# Number of regular files below a directory, or "absent" when the directory does not exist.
+file_count() {
+    local output status=0
+    output="$(docker exec "$1" sh -c 'if [ ! -e "$1" ]; then exit 3; fi; find "$1" -type f | wc -l' sh "$2")" || status=$?
+    if [[ $status -eq $ABSENT_STATUS ]]; then
+        printf 'absent'
+        return 0
+    fi
+    [[ $status -eq 0 ]] || fail "could not count files in $2 (exit $status)"
+    output="$(printf '%s' "$output" | tr -d ' ')"
+    [[ "$output" =~ ^[0-9]+$ ]] || fail "unexpected file count for $2"
+    printf '%s' "$output"
 }
 
 readonly_psql() {
     docker exec --env PGOPTIONS='-c default_transaction_read_only=on' "$1" \
-        psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align -U "$DB_USER" -d "$DB_NAME" --command "$2"
+        psql -X -w --set ON_ERROR_STOP=1 --tuples-only --no-align -U "$DB_USER" -d "$DB_NAME" --command "$2"
 }
 
-echo "schema=blazorshop-vps-version-evidence/v1"
-echo "collected_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo "compose_project=$PROJECT"
+emit schema "$SCHEMA"
+emit collected_at_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+emit compose_project "$PROJECT"
 
-echo "# checkout (the current directory; not proof of what the containers run)"
-if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    echo "checkout_head=$(git rev-parse HEAD)"
-    echo "checkout_head_commit_time=$(git log -1 --format=%cI)"
-    echo "checkout_branch=$(git rev-parse --abbrev-ref HEAD)"
-    echo "checkout_modified_files=$(git status --porcelain --untracked-files=no | wc -l | tr -d ' ')"
-    git status --porcelain --untracked-files=no | awk '{print "checkout_modified=" $2}'
+# The checkout is context only: images may have been built from another state of it.
+if [[ -n "$CHECKOUT_DIR" ]]; then
+    git -C "$CHECKOUT_DIR" rev-parse --is-inside-work-tree > /dev/null 2>&1 \
+        || fail "'$CHECKOUT_DIR' is not a git working tree"
+    export GIT_OPTIONAL_LOCKS=0
+    head="$(git -C "$CHECKOUT_DIR" rev-parse --verify HEAD)"
+    [[ "$head" =~ ^[0-9a-f]{40}$ ]] || fail "unexpected checkout HEAD"
+    emit checkout_head "$head"
+    emit checkout_head_commit_time "$(git -C "$CHECKOUT_DIR" log -1 --format=%cI HEAD)"
+    emit checkout_branch "$(git -C "$CHECKOUT_DIR" rev-parse --abbrev-ref HEAD)"
+    modified="$(git -C "$CHECKOUT_DIR" status --porcelain --untracked-files=no)"
+    emit checkout_modified_files "$(printf '%s' "$modified" | sed '/^$/d' | wc -l | tr -d ' ')"
 else
-    echo "checkout_head=not-a-git-checkout"
+    emit checkout_head not-collected
 fi
 
-echo "# containers"
-for service in postgres api storefront web; do
-    id="$(container_for "$service")"
-    if [[ -z "$id" ]]; then
-        echo "${service}_container=missing"
-        continue
-    fi
-    image_id="$(docker inspect --format '{{.Image}}' "$id")"
-    echo "${service}_state=$(docker inspect --format '{{.State.Status}}' "$id")"
-    echo "${service}_started_at=$(docker inspect --format '{{.State.StartedAt}}' "$id")"
-    echo "${service}_image_ref=$(docker inspect --format '{{.Config.Image}}' "$id")"
-    echo "${service}_image_id=$image_id"
-    echo "${service}_image_created=$(docker image inspect --format '{{.Created}}' "$image_id")"
+declare -A CONTAINER=()
+for service in "${SERVICES[@]}"; do
+    CONTAINER[$service]="$(container_for "$service")"
 done
 
-api="$(container_for api)"
-storefront="$(container_for storefront)"
-web="$(container_for web)"
-postgres="$(container_for postgres)"
+for service in "${SERVICES[@]}"; do
+    id="${CONTAINER[$service]}"
+    image_id="$(inspect_field "$id" '{{.Image}}')"
+    emit "${service}_container_id" "$id"
+    emit "${service}_state" "$(inspect_field "$id" '{{.State.Status}}')"
+    emit "${service}_started_at" "$(inspect_field "$id" '{{.State.StartedAt}}')"
+    emit "${service}_image_ref" "$(inspect_field "$id" '{{.Config.Image}}')"
+    emit "${service}_image_id" "$image_id"
+    image_created="$(docker image inspect --format '{{.Created}}' "$image_id")"
+    emit "${service}_image_created" "$image_created"
+done
+emit compose_working_dir "$(inspect_field "${CONTAINER[api]}" '{{index .Config.Labels "com.docker.compose.project.working_dir"}}')"
 
-echo "# files copied verbatim from the repository into the running images"
-[[ -n "$api" ]] && echo "sha256.api_appsettings=$(file_sha256 "$api" /app/appsettings.json)"
-[[ -n "$storefront" ]] && echo "sha256.storefront_appsettings=$(file_sha256 "$storefront" /app/appsettings.json)"
-[[ -n "$web" ]] && echo "sha256.web_nginx_template=$(file_sha256 "$web" /etc/nginx/templates/default.conf.template)"
-[[ -n "$web" ]] && echo "sha256.web_security_headers=$(file_sha256 "$web" /etc/nginx/snippets/blazorshop-security-headers.conf)"
+# Files the Dockerfiles copy verbatim from the repository. conf.d/default.conf is the verbatim
+# nginx.conf in older Web images and a runtime-rendered file in newer ones.
+emit sha256.api_appsettings "$(file_sha256 "${CONTAINER[api]}" /app/appsettings.json)"
+emit sha256.storefront_appsettings "$(file_sha256 "${CONTAINER[storefront]}" /app/appsettings.json)"
+emit sha256.web_nginx_template "$(file_sha256 "${CONTAINER[web]}" /etc/nginx/templates/default.conf.template)"
+emit sha256.web_security_headers "$(file_sha256 "${CONTAINER[web]}" /etc/nginx/snippets/blazorshop-security-headers.conf)"
+emit sha256.web_nginx_conf_d "$(file_sha256 "${CONTAINER[web]}" /etc/nginx/conf.d/default.conf)"
 
-if [[ -n "$api" ]]; then
-    echo "# persistent volumes (sizes and counts only)"
-    echo "uploads_kib=$(docker exec "$api" du -sk /app/uploads 2>/dev/null | awk '{print $1}' || true)"
-    echo "uploads_files=$(docker exec "$api" find /app/uploads -type f 2>/dev/null | wc -l | tr -d ' ')"
-    echo "data_protection_key_files=$(docker exec "$api" find /root/.aspnet/DataProtection-Keys -type f 2>/dev/null | wc -l | tr -d ' ')"
-fi
+emit uploads_files "$(file_count "${CONTAINER[api]}" /app/uploads)"
+emit data_protection_key_files "$(file_count "${CONTAINER[api]}" /root/.aspnet/DataProtection-Keys)"
 
-if [[ -n "$postgres" ]]; then
-    echo "# database (read-only transactions)"
-    echo "postgres_server_version=$(readonly_psql "$postgres" 'SHOW server_version;')"
-    echo "database_size_bytes=$(readonly_psql "$postgres" 'SELECT pg_database_size(current_database());')"
-    echo "migration_count=$(readonly_psql "$postgres" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')"
-    echo "migration_head=$(readonly_psql "$postgres" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
-    readonly_psql "$postgres" 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";' | sed 's/^/migration=/'
-    readonly_psql "$postgres" "SELECT relname || '=' || n_live_tup FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname COLLATE \"C\";" \
-        | sed 's/^/approx_rows./'
-fi
+postgres="${CONTAINER[postgres]}"
+server_version="$(readonly_psql "$postgres" 'SHOW server_version;')"
+emit postgres_server_version "$server_version"
+database_size="$(readonly_psql "$postgres" 'SELECT pg_database_size(current_database());')"
+[[ "$database_size" =~ ^[0-9]+$ ]] || fail "unexpected database size"
+emit database_size_bytes "$database_size"
+migration_count="$(readonly_psql "$postgres" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')"
+[[ "$migration_count" =~ ^[1-9][0-9]*$ ]] || fail "unexpected migration count '$migration_count'"
+migration_head="$(readonly_psql "$postgres" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
+[[ "$migration_head" =~ ^[0-9]{14}_[A-Za-z0-9]+$ ]] || fail "unexpected migration head '$migration_head'"
+migration_list="$(readonly_psql "$postgres" 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" COLLATE "C";')"
+migrations=()
+[[ -z "$migration_list" ]] || mapfile -t migrations <<< "$migration_list"
+[[ ${#migrations[@]} -eq $migration_count ]] || fail "migration list has ${#migrations[@]} entries but COUNT(*) is $migration_count"
+[[ "${migrations[-1]}" == "$migration_head" ]] || fail "migration list does not end with the reported head"
+emit migration_count "$migration_count"
+emit migration_head "$migration_head"
+for migration in "${migrations[@]}"; do
+    [[ "$migration" =~ ^[0-9]{14}_[A-Za-z0-9]+$ ]] || fail "unexpected migration id '$migration'"
+    emit migration "$migration"
+done
+row_list="$(readonly_psql "$postgres" "SELECT relname || '=' || n_live_tup FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname COLLATE \"C\";")"
+row_counts=()
+[[ -z "$row_list" ]] || mapfile -t row_counts <<< "$row_list"
+for row in "${row_counts[@]}"; do
+    [[ "$row" =~ ^[A-Za-z0-9_]+=[0-9]+$ ]] || fail "unexpected table statistics line"
+    emit "approx_rows.${row%%=*}" "${row#*=}"
+done
+
+checksum="$(printf '%s\n' "${OUTPUT[@]}" | sha256sum | awk '{print $1}')"
+printf '%s\n' "${OUTPUT[@]}"
+printf 'evidence_lines_sha256=%s\n' "$checksum"
+printf 'evidence_complete=true\n'
