@@ -53,6 +53,7 @@ check() {
 stdout_has() { grep -qxF "$1" "$WORK/out"; }
 stdout_matches() { grep -qE "$1" "$WORK/out"; }
 stderr_has() { grep -qF "$1" "$WORK/err"; }
+stderr_matches() { grep -qE "$1" "$WORK/err"; }
 stdout_empty() { [[ ! -s "$WORK/out" ]]; }
 sha() { sha256sum "$1" | awk '{print $1}'; }
 
@@ -370,7 +371,8 @@ if [[ -x "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet" ]]; then
 else
     check "collector: an unsearchable parent directory aborts" run 1 collect
     check "collector: an unsearchable directory is not reported as absent" stdout_empty
-    check "collector: an unsearchable directory is diagnosed" stderr_has "cannot tell whether /root/.aspnet/DataProtection-Keys exists"
+    # The mock runs the probe on a host directory, so the reported path carries the mock's prefix.
+    check "collector: an unsearchable directory is diagnosed" stderr_matches "^cannot tell whether .*/root/\.aspnet/DataProtection-Keys exists: .*/root/\.aspnet is not a searchable directory$"
 fi
 chmod 755 "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet"
 
