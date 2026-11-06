@@ -17,7 +17,7 @@ Prerequisites:
 
 - a local clone that is up to date and clean, with the reviewed scripts from `master`: `git fetch origin`, then `git diff --quiet origin/master -- scripts/vps-evidence` must succeed;
 - an SSH account on the VPS that can run the `docker` CLI without a password prompt (member of the `docker` group, or passwordless `sudo -n`);
-- `bash` 4.3 or later on the VPS. The images already contain `sh`, `sha256sum`, `find`, `wc` and `psql`.
+- `bash` 4.4 or later on the VPS (`bash --version`), and also on the machine that runs the matcher. Both scripts check this first and stop with an explanation on older versions or another shell, before running any command. The containers need no bash: the in-container probes are POSIX `sh`, and the images already contain `sh`, `sha256sum`, `find`, `wc` and `psql`.
 
 Nothing is copied to or installed on the VPS: the script is streamed to `bash -s`. First list the running Compose projects (exit status 2 is expected):
 
@@ -84,6 +84,7 @@ No guessed baseline is added in the meantime. RPO/RTO for the VPS must come from
 - **Containers:** running, missing, duplicate, stopped and one-off containers.
 - **Files:** provably missing files, failed `docker exec`, and non-regular files.
 - **Database:** PostgreSQL failures and inconsistent migration data.
+- **Bash version:** bash older than 4.4 and a shell that is not bash are refused before any command runs.
 - **Evidence and matching:** valid and mismatched migration sets, invalid or incomplete evidence, several candidates, one candidate, zero candidates, services from different commits, merged-branch states, shallow clones, and the read-only command set.
 
 ## Out of scope

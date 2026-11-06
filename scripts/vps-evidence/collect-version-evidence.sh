@@ -15,6 +15,15 @@
 # All-or-nothing output: evidence is printed only after every item was collected and validated,
 # followed by a checksum line and `evidence_complete=true`. Any failure prints a diagnostic on
 # stderr, nothing on stdout, and exits non-zero, so a partial file cannot be mistaken for evidence.
+# Bash 4.4 or later is required: inherit_errexit and expanding empty arrays under `set -u` are 4.4
+# features. The check runs first and uses only syntax that older bash and POSIX sh also parse.
+case "${BASH_VERSION-}" in
+    4.[4-9]* | [5-9].* | [1-9][0-9].*) ;;
+    *)
+        echo "evidence collection failed: bash 4.4 or later is required (found ${BASH_VERSION:-a shell that is not bash})" >&2
+        exit 1
+        ;;
+esac
 set -Eeuo pipefail
 shopt -s inherit_errexit
 

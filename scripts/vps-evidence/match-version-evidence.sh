@@ -15,6 +15,15 @@
 # confirm, and services built from different commits show up as an empty intersection.
 #
 # Exit status: 0 candidates found, 1 no consistent commit, 2 invalid evidence, usage or history.
+# Bash 4.4 or later is required: inherit_errexit and expanding empty arrays under `set -u` are 4.4
+# features. The check runs first and uses only syntax that older bash and POSIX sh also parse.
+case "${BASH_VERSION-}" in
+    4.[4-9]* | [5-9].* | [1-9][0-9].*) ;;
+    *)
+        echo "match-version-evidence.sh: bash 4.4 or later is required (found ${BASH_VERSION:-a shell that is not bash})" >&2
+        exit 2
+        ;;
+esac
 set -Eeuo pipefail
 shopt -s inherit_errexit
 

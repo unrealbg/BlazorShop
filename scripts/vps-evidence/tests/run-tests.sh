@@ -340,5 +340,21 @@ check "collector: lists the running Compose project" stderr_has "  blazorshop"
 mock_host
 check "collector: an invalid project name is refused" run 1 bash "$COLLECT" 'Blazor Shop'
 
+# ---- Bash version requirement -------------------------------------------------------------------
+# BASH_VERSION is an ordinary variable, so sourcing the script after overriding it exercises the
+# version check of an older bash; it must stop before any docker or git command runs.
+mock_host
+check "collector: bash older than 4.4 is refused" run 1 bash -c 'BASH_VERSION=4.3.48; . "$0" blazorshop' "$COLLECT"
+check "collector: the bash requirement is explained" stderr_has "bash 4.4 or later is required (found 4.3.48)"
+check "collector: an old bash runs no docker command" bash -c '[[ ! -s "$1" ]]' _ "$MOCK_DOCKER_DIR/calls.log"
+check "collector: bash 4.4 passes the version check" run 1 bash -c 'BASH_VERSION=4.4.0; . "$0" "Blazor Shop"' "$COLLECT"
+check "collector: bash 4.4 reaches the argument checks" stderr_has "invalid Compose project name"
+check "matcher: bash older than 4.4 is refused" run 2 bash -c 'BASH_VERSION=4.3.48; . "$0" "$1"' "$MATCH" "$E"
+check "matcher: the bash requirement is explained" stderr_has "bash 4.4 or later is required (found 4.3.48)"
+if command -v dash > /dev/null; then
+    check "collector: a shell that is not bash is refused" run 1 dash "$COLLECT" blazorshop
+    check "collector: a non-bash shell is explained" stderr_has "found a shell that is not bash"
+fi
+
 echo "passed=$passed failed=$failed"
 [[ $failed -eq 0 ]]
