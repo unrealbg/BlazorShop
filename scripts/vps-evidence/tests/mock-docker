@@ -4,6 +4,7 @@
 #   images       image_id|created
 #   fs/<id>/...  the container file system used by `docker exec <id> sh -c ...`
 #   exec-fail    container ids whose `docker exec` fails like an unreachable container
+#   exec-bin/    commands that shadow the real ones inside `docker exec ... sh` (e.g. a failing find)
 #   psql/*       canned query results; psql-fail makes every psql call fail
 # It implements only the calls collect-version-evidence.sh makes and records each call in calls.log.
 set -euo pipefail
@@ -87,7 +88,7 @@ case "$command" in
             sh)
                 # sh -c <script> sh <absolute path>: run the real probe script against the mock file system.
                 [[ "$2" == "-c" && "$4" == "sh" ]] || { echo "mock docker exec: unsupported sh call" >&2; exit 2; }
-                sh -c "$3" sh "$dir/fs/$id$5"
+                PATH="$dir/exec-bin:$PATH" sh -c "$3" sh "$dir/fs/$id$5"
                 ;;
             psql)
                 [[ ! -e "$dir/psql-fail" ]] || { echo "psql: error: connection to server failed" >&2; exit 2; }

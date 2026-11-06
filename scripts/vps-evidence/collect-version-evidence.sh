@@ -7,7 +7,7 @@
 # Without arguments it lists the running Compose projects and exits 2.
 #
 # Read-only by construction: it runs only `docker ps`, `docker inspect`, `docker image inspect`,
-# and `docker exec` of sha256sum/find/du/psql in already running containers, plus `git` read
+# and `docker exec` of sh/sha256sum/find/printf/psql in already running containers, plus `git` read
 # commands without optional locks. PostgreSQL queries run in read-only transactions and never
 # prompt for a password. It never runs `docker compose`, so the Compose environment is not rendered,
 # and it prints no environment variables, connection strings, keys, file contents or row data.
@@ -98,6 +98,21 @@ inspect_field() {
     printf '%s' "$value"
 }
 
+# POSIX sh prelude of the in-container probes (the images are not guaranteed to have bash). It exits
+# 3 only when "$1" provably does not exist: neither it nor a dangling link is there, and its nearest
+# existing ancestor is a searchable directory. A path below an unsearchable directory also fails
+# `[ -e ]`, so that case exits 5 (cannot tell) instead of being reported as absent.
+# shellcheck disable=SC2016 # the probe is sh code expanded inside the container, not here
+readonly ABSENCE_PROBE='
+    case $1 in /*) ;; *) echo "not an absolute path: $1" >&2; exit 4 ;; esac
+    if [ ! -e "$1" ] && [ ! -L "$1" ]; then
+        p=$1
+        while [ ! -e "$p" ] && [ ! -L "$p" ]; do p=${p%/*}; p=${p:-/}; done
+        if [ -d "$p" ] && [ -x "$p" ]; then exit 3; fi
+        echo "cannot tell whether $1 exists: $p is not a searchable directory" >&2
+        exit 5
+    fi'
+
 # SHA-256 of a regular file inside a running container, or "missing" only when the path provably
 # does not exist. Any other failure (docker exec, permissions, not a regular file) aborts.
 file_sha256() {
@@ -105,8 +120,7 @@ file_sha256() {
     local path="$2"
     local output status=0
     # `|| status=$?` keeps the expected "absent" exit from tripping errexit and the ERR trap.
-    output="$(docker exec "$container" sh -c '
-        if [ ! -e "$1" ] && [ ! -L "$1" ]; then exit 3; fi
+    output="$(docker exec "$container" sh -c "$ABSENCE_PROBE"'
         if [ ! -f "$1" ]; then echo "not a regular file: $1" >&2; exit 4; fi
         sha256sum "$1"' sh "$path")" || status=$?
     if [[ $status -eq $ABSENT_STATUS ]]; then
@@ -119,10 +133,17 @@ file_sha256() {
     printf '%s' "$hash"
 }
 
-# Number of regular files below a directory, or "absent" when the directory does not exist.
+# Number of regular files below a directory, or "absent" when the directory provably does not exist.
+# The probe runs under plain sh, which has no pipefail: `find | wc -l` would turn a failed or
+# partial traversal into a successful smaller count. Instead find prints one "." per file into a
+# command substitution, whose exit status is find's own, and the count is the length of that string
+# (also correct for file names that contain newlines).
 file_count() {
     local output status=0
-    output="$(docker exec "$1" sh -c 'if [ ! -e "$1" ]; then exit 3; fi; find "$1" -type f | wc -l' sh "$2")" || status=$?
+    output="$(docker exec "$1" sh -c "$ABSENCE_PROBE"'
+        if [ ! -d "$1" ]; then echo "not a directory: $1" >&2; exit 4; fi
+        marks=$(find "$1" -type f -exec printf ".%.0s" {} +) || exit 5
+        echo "${#marks}"' sh "$2")" || status=$?
     if [[ $status -eq $ABSENT_STATUS ]]; then
         printf 'absent'
         return 0

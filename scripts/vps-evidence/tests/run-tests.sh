@@ -12,7 +12,10 @@ readonly COLLECT="$TESTS_DIR/../collect-version-evidence.sh"
 readonly MATCH="$TESTS_DIR/../match-version-evidence.sh"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/vps-evidence-tests.XXXXXX")"
 readonly WORK
-trap 'rm -rf "$WORK"' EXIT
+# Permission tests remove access below $WORK; restore it so the cleanup can delete everything.
+trap 'chmod -R u+rwx "$WORK" 2> /dev/null; rm -rf "$WORK"' EXIT
+REAL_FIND="$(command -v find)"
+readonly REAL_FIND
 
 mkdir -p "$WORK/bin"
 cp "$TESTS_DIR/mock-docker" "$WORK/bin/docker"
@@ -232,6 +235,7 @@ git clone -q "file://$REPO" "$CHECKOUT"
 
 # mock_host [legacy]: four running service containers whose files reproduce commit c3 (or c1).
 mock_host() {
+    [[ ! -e "$MOCK_DOCKER_DIR" ]] || chmod -R u+rwx "$MOCK_DOCKER_DIR"
     rm -rf "$MOCK_DOCKER_DIR"
     mkdir -p "$MOCK_DOCKER_DIR/psql"
     : > "$MOCK_DOCKER_DIR/calls.log"
@@ -319,6 +323,56 @@ rm "$MOCK_DOCKER_DIR/fs/$WEB_ID/etc/nginx/conf.d/default.conf"
 mkdir "$MOCK_DOCKER_DIR/fs/$WEB_ID/etc/nginx/conf.d/default.conf"
 check "collector: a non-regular file aborts" run 1 collect
 check "collector: a non-regular file prints no evidence" stdout_empty
+
+mock_host
+check "collector: counts the files of the uploads volume" run 0 collect
+check "collector: reports the uploads file count" stdout_has "uploads_files=1"
+check "collector: reports the Data Protection key file count" stdout_has "data_protection_key_files=1"
+
+mock_host
+mkdir -p "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads/products/2026/11"
+echo upload > "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads/products/2026/11/b.png"
+echo upload > "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads/products/2026/c with spaces.png"
+mkdir -p "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads/empty-directory"
+check "collector: counts regular files in nested directories" run 0 collect
+check "collector: nested file count excludes directories" stdout_has "uploads_files=3"
+
+mock_host
+rm -r "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet"
+check "collector: an absent directory is reported" run 0 collect
+check "collector: absent means the directory provably does not exist" stdout_has "data_protection_key_files=absent"
+
+mock_host
+# find lists part of the tree and then fails, as on an unreadable subdirectory. Under plain sh,
+# `find | wc -l` would hide that failure and report the partial count as evidence.
+mkdir -p "$MOCK_DOCKER_DIR/exec-bin"
+printf '#!/bin/sh
+"%s" "$@"
+echo "find: %s: Permission denied" >&2
+exit 1
+' "$REAL_FIND" "'/app/uploads/private'" > "$MOCK_DOCKER_DIR/exec-bin/find"
+chmod +x "$MOCK_DOCKER_DIR/exec-bin/find"
+check "collector: a failing find aborts the collection" run 1 collect
+check "collector: a failing find cannot yield a partial count" stdout_empty
+check "collector: a failing find is diagnosed" stderr_has "could not count files in /app/uploads"
+
+mock_host
+rm -r "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads"
+echo not-a-directory > "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads"
+check "collector: a non-directory volume path aborts" run 1 collect
+check "collector: a non-directory volume path prints no evidence" stdout_empty
+
+mock_host
+chmod 000 "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet"
+if [[ -x "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet" ]]; then
+    # Root, or a file system without POSIX permissions (Windows): the case cannot be set up here.
+    echo "NOTE: permissions are not enforced here; the unsearchable-directory cases run in CI"
+else
+    check "collector: an unsearchable parent directory aborts" run 1 collect
+    check "collector: an unsearchable directory is not reported as absent" stdout_empty
+    check "collector: an unsearchable directory is diagnosed" stderr_has "cannot tell whether /root/.aspnet/DataProtection-Keys exists"
+fi
+chmod 755 "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet"
 
 mock_host
 touch "$MOCK_DOCKER_DIR/psql-fail"

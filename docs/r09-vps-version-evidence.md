@@ -17,7 +17,7 @@ Prerequisites:
 
 - a local clone that is up to date and clean, with the reviewed scripts from `master`: `git fetch origin`, then `git diff --quiet origin/master -- scripts/vps-evidence` must succeed;
 - an SSH account on the VPS that can run the `docker` CLI without a password prompt (member of the `docker` group, or passwordless `sudo -n`);
-- `bash` 4.4 or later on the VPS (`bash --version`), and also on the machine that runs the matcher. Both scripts check this first and stop with an explanation on older versions or another shell, before running any command. The containers need no bash: the in-container probes are POSIX `sh`, and the images already contain `sh`, `sha256sum`, `find`, `wc` and `psql`.
+- `bash` 4.4 or later on the VPS (`bash --version`), and also on the machine that runs the matcher. Both scripts check this first and stop with an explanation on older versions or another shell, before running any command. The containers need no bash: the in-container probes are POSIX `sh`, and the images already contain `sh`, `sha256sum`, `find`, `printf` and `psql`.
 
 Nothing is copied to or installed on the VPS: the script is streamed to `bash -s`. First list the running Compose projects (exit status 2 is expected):
 
@@ -33,12 +33,13 @@ ssh <user>@<vps> 'bash -s -- <compose-project> <deployment-checkout-dir>' < scri
 
 What the script does and does not do:
 
-- **Docker commands:** it runs only `docker ps`, `docker inspect` with fixed format fields, `docker image inspect`, and `docker exec` of `sh`/`sha256sum`/`find`/`wc`/`psql` in containers that are already running.
+- **Docker commands:** it runs only `docker ps`, `docker inspect` with fixed format fields, `docker image inspect`, and `docker exec` of `sh`/`sha256sum`/`find`/`printf`/`psql` in containers that are already running.
 - **Git commands:** it runs read-only `git` commands with `GIT_OPTIONAL_LOCKS=0`, so even `git status` does not rewrite the index.
 - **Never:** it never runs `docker compose`, so the Compose environment and its secrets are not rendered. It never starts, stops, pulls, builds, or writes anything.
 - **Database:** PostgreSQL queries run with `default_transaction_read_only=on` and `psql -w`, so psql never prompts for a password.
 - **Container choice:** for each of `postgres`, `api`, `storefront` and `web` it uses exactly one *running* service container of the project, ignoring stopped and one-off (`compose run`) containers. Zero or several matches abort with a diagnostic.
-- **Missing files:** `missing` means the path provably does not exist in the image. Any `docker exec`, permission or file-type error aborts instead.
+- **Missing files:** `missing` (or `absent` for a directory) means the path provably does not exist: neither it nor a dangling link is there, and its nearest existing parent is a searchable directory. A path below an unsearchable directory, a `docker exec` failure or a wrong file type aborts instead.
+- **File counts:** `uploads_files` and `data_protection_key_files` count regular files without a `find | wc -l` pipeline, which plain `sh` (no `pipefail`) would let report a partial count when `find` fails. Any `find` error aborts the collection.
 - **All or nothing:** the evidence is printed only after everything was collected and validated, followed by a checksum line and `evidence_complete=true`. On any failure it prints a diagnostic on stderr, nothing on stdout, and exits 1. A failed run therefore leaves an empty file, never a partial one.
 - **What it prints:** commit and image IDs, timestamps, hashes, migration IDs, sizes, file counts, the PostgreSQL version and approximate per-table row counts. It prints no environment variables, connection strings, keys, file contents or row data. The row counts reveal data volume, so review the file before sharing it.
 
@@ -82,7 +83,7 @@ No guessed baseline is added in the meantime. RPO/RTO for the VPS must come from
 `bash scripts/vps-evidence/tests/run-tests.sh` runs in the `build-test` CI job together with ShellCheck. It uses a mock `docker` CLI and synthetic git histories and covers:
 
 - **Containers:** running, missing, duplicate, stopped and one-off containers.
-- **Files:** provably missing files, failed `docker exec`, and non-regular files.
+- **Files:** provably missing files and directories, failed `docker exec`, non-regular files, nested file counts, a `find` that fails after a partial listing, a volume path that is not a directory, and an unsearchable parent directory (enforced only where file permissions apply, as in CI on Linux; skipped with a note on Windows or as root).
 - **Database:** PostgreSQL failures and inconsistent migration data.
 - **Bash version:** bash older than 4.4 and a shell that is not bash are refused before any command runs.
 - **Evidence and matching:** valid and mismatched migration sets, invalid or incomplete evidence, several candidates, one candidate, zero candidates, services from different commits, merged-branch states, shallow clones, and the read-only command set.
