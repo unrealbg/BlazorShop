@@ -127,6 +127,11 @@ export REHEARSAL_API_PORT="$((21000 + PORT_OFFSET))"
 export REHEARSAL_STOREFRONT_PORT="$((REHEARSAL_API_PORT + 1))"
 export REHEARSAL_WEB_PORT="$((REHEARSAL_API_PORT + 2))"
 export REHEARSAL_MAIL_PORT="$((REHEARSAL_API_PORT + 3))"
+export REHEARSAL_EDGE_PORT="$((REHEARSAL_API_PORT + 4))"
+export REHEARSAL_EDGE_DIR="$RUNTIME_DIR/edge"
+export REHEARSAL_EDGE_IMAGE="$NGINX_IMAGE"
+unset REHEARSAL_DB_LOGIN_USER REHEARSAL_STRIPE_WEBHOOK_SECRET
+unset REHEARSAL_EDGE_IP REHEARSAL_FORCE_HTTPS REHEARSAL_FORWARD_HEADERS
 export REHEARSAL_API_URL="http://localhost:$REHEARSAL_API_PORT"
 export REHEARSAL_STOREFRONT_URL="http://localhost:$REHEARSAL_STOREFRONT_PORT"
 export REHEARSAL_WEB_URL="http://localhost:$REHEARSAL_WEB_PORT"
@@ -176,17 +181,17 @@ CAPTURE_API_LOGS=true
 trap 'if [[ -z "$FAILURE_CONTEXT" ]]; then FAILURE_CONTEXT="line $LINENO: $BASH_COMMAND"; fi' ERR
 
 dc() {
-    docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" "$@"
+    docker compose --project-name "$PROJECT_NAME" --file "${RECOVERED_COMPOSE_FILE:-$COMPOSE_FILE}" "$@"
 }
 
 capture_logs() {
     local phase="$1"
-    local services=(postgres restore-postgres storefront web)
+    local services=(postgres restore-postgres storefront web edge)
     if [[ "$CAPTURE_API_LOGS" == true ]]; then services+=(api); fi
-    if ! dc --profile restore --profile tools --profile mail logs --no-color --timestamps "${services[@]}" > "$LOG_DIR/${phase}-compose.log" 2>&1; then
+    if ! dc --profile restore --profile tools --profile mail --profile edge logs --no-color --timestamps "${services[@]}" > "$LOG_DIR/${phase}-compose.log" 2>&1; then
         echo "Unable to capture complete Compose logs for phase $phase." >> "$LOG_DIR/${phase}-compose.log"
     fi
-    dc --profile restore --profile tools --profile mail ps --all > "$LOG_DIR/${phase}-compose-ps.txt" 2>&1 || :
+    dc --profile restore --profile tools --profile mail --profile edge ps --all > "$LOG_DIR/${phase}-compose-ps.txt" 2>&1 || :
 }
 
 cleanup() {
@@ -197,7 +202,7 @@ cleanup() {
     capture_logs "final"
     local cleanup_started
     cleanup_started="$(date +%s%3N)"
-    dc --profile restore --profile tools --profile mail down --volumes --remove-orphans --timeout 20 > "$LOG_DIR/cleanup.log" 2>&1
+    dc --profile restore --profile tools --profile mail --profile edge down --volumes --remove-orphans --timeout 20 > "$LOG_DIR/cleanup.log" 2>&1
     local compose_cleanup_exit="$?"
 
     docker image rm \
@@ -628,6 +633,8 @@ register_user() {
 
 # shellcheck source=rehearsal/rehearsal-application-checks.sh
 source "$TOOLING_DIR/rehearsal/rehearsal-application-checks.sh"
+source "$TOOLING_DIR/rehearsal/recovery-qualification.sh"
+qualification_init
 
 verify_baseline_application() {
     local phase="$1"
@@ -810,7 +817,10 @@ capture_baseline_report postgres "$REPORT_DIR/pre-upgrade-control.txt"
 sha256sum "$REPORT_DIR/pre-upgrade-control.txt" > "$REPORT_DIR/pre-upgrade-control.sha256"
 table_counts postgres > "$REPORT_DIR/table-counts-pre-upgrade.txt"
 capture_logs "baseline"
+qualification_aggregate postgres baseline 5
+qualification_maintenance
 stop_application_writers
+qualification_drain
 schema_dump postgres > "$REPORT_DIR/schema-pre-upgrade.sql"
 table_fingerprints postgres > "$REPORT_DIR/rows-pre-upgrade.txt"
 
@@ -848,6 +858,8 @@ backup_volume uploads
 backup_volume data-protection-keys
 BACKUP_VOLUMES_MILLISECONDS="$(( $(date +%s%3N) - volumes_backup_started ))"
 write_volume_report
+qualification_checkpoint
+qualification_before_migration
 cp "$VOLUME_WORK_DIR/uploads.pre-backup.manifest" "$REPORT_DIR/uploads.pre-backup.manifest"
 
 export REHEARSAL_API_IMAGE="$TARGET_API_IMAGE"
@@ -855,6 +867,8 @@ export REHEARSAL_STOREFRONT_IMAGE="$TARGET_STOREFRONT_IMAGE"
 export REHEARSAL_WEB_IMAGE="$TARGET_WEB_IMAGE"
 export REHEARSAL_DB_HOST="postgres"
 
+qualification_failed_startup
+export REHEARSAL_STRIPE_WEBHOOK_SECRET="whsec_rehearsal_$(openssl rand -hex 32)"
 upgrade_started="$(date +%s%3N)"
 dc up --detach --force-recreate --pull never api
 wait_http "$REHEARSAL_API_URL/health" "target API after migration"
@@ -869,6 +883,7 @@ wait_http "$REHEARSAL_STOREFRONT_URL/product/rehearsal-canvas-bag" "target Store
 wait_http "$REHEARSAL_WEB_URL/authentication/login/account" "target Web"
 
 verify_target_database
+qualification_aggregate postgres upgraded 13
 assert_equal "$PRE_UPGRADE_IDENTITY" "$(identity_fingerprint postgres)" "upgrade preserves user IDs, roles, confirmation and password hashes"
 verify_baseline_application "post-upgrade"
 check_upgraded_sessions "$(session_cookie "$RUNTIME_DIR/baseline-survivor")"
@@ -897,8 +912,12 @@ BROWSER_RESULT="passed"
 
 capture_logs "target-after-browser"
 check_upgraded_checkout
+check_upgraded_stripe_webhook
 check_upgraded_outbox
+qualification_forwarding
 stop_application_writers
+qualification_drain
+qualification_restore_images
 
 dc --profile restore up --detach restore-postgres
 wait_postgres restore-postgres
@@ -910,6 +929,7 @@ dc --profile restore exec -T restore-postgres \
 RESTORE_MILLISECONDS="$(( $(date +%s%3N) - restore_started ))"
 
 verify_baseline_database restore-postgres
+qualification_aggregate restore-postgres restored 5
 capture_baseline_report restore-postgres "$REPORT_DIR/post-restore-control.txt"
 cmp --silent "$REPORT_DIR/pre-upgrade-control.txt" "$REPORT_DIR/post-restore-control.txt"
 sha256sum "$REPORT_DIR/post-restore-control.txt" > "$REPORT_DIR/post-restore-control.sha256"
@@ -951,12 +971,14 @@ export REHEARSAL_DB_HOST="restore-postgres"
 export REHEARSAL_UPLOADS_VOLUME="restore-uploads-data"
 export REHEARSAL_DATA_PROTECTION_VOLUME="restore-data-protection-keys"
 export REHEARSAL_REQUIRE_CONFIRMED_EMAIL=false REHEARSAL_EMAIL_ENABLED=false
+unset REHEARSAL_STRIPE_WEBHOOK_SECRET
 dc --profile restore up --detach --force-recreate api storefront web
 CAPTURE_API_LOGS=true
 verify_baseline_application "post-restore"
 assert_rotation "$(session_cookie "$RUNTIME_DIR/baseline-survivor")" "$RUNTIME_DIR/restored-session" \
     "restored baseline accepts the original pre-backup refresh cookie"
 verify_upload_fixtures_served "post-restore baseline"
+qualification_reconcile
 UPLOADS_RESULT="passed"
 VOLUME_RESTORE_RESULT="passed"
 capture_logs "restored-baseline"
