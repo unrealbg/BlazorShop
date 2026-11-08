@@ -164,6 +164,7 @@ UPLOADS_RESULT="not-run"
 DATA_PROTECTION_RESULT="not-run"
 VOLUME_RESTORE_RESULT="not-run"
 BROWSER_RESULT="not-run"
+BASELINE_BROWSER_RESULT="not-run"
 FAILURE_CONTEXT=""
 REHEARSAL_RESULT="failed"
 CAPTURE_API_LOGS=true
@@ -236,6 +237,7 @@ cleanup() {
         echo "data_protection_probe=$DATA_PROTECTION_RESULT"
         echo "volume_restore=$VOLUME_RESTORE_RESULT"
         echo "browser_tests=$BROWSER_RESULT"
+        echo "baseline_browser_tests=$BASELINE_BROWSER_RESULT"
         echo "assertions_passed=$(grep -c '^PASS:' "$REPORT_DIR/assertions.txt" || :)"
         echo "assertions_failed=$(grep -c '^FAIL:' "$REPORT_DIR/assertions.txt" || :)"
         echo "failure_context=${FAILURE_CONTEXT:-none}"
@@ -249,13 +251,13 @@ trap cleanup EXIT
 run_logged() {
     local log_path="$1"
     shift
-    set +e
-    "$@" 2>&1 | tee "$log_path"
-    local command_exit="${PIPESTATUS[0]}"
-    set -e
-    if [[ "$command_exit" -ne 0 ]]; then
-        echo "Command failed with exit code $command_exit; see $log_path." >&2
-        return "$command_exit"
+    if "$@" 2>&1 | tee "$log_path"; then
+        return 0
+    else
+        local exit_code=$?
+        FAILURE_CONTEXT="${FAILURE_CONTEXT:-logged operation failed; see $(basename "$log_path")}"
+        echo "Logged operation failed; see $log_path." >&2
+        return "$exit_code"
     fi
 }
 
@@ -762,7 +764,9 @@ psql_service postgres --set "user_id=$USER_ID" < "$TOOLING_DIR/rehearsal/seed-ba
 dc up --detach storefront web
 verify_baseline_application "pre-upgrade"
 verify_baseline_database postgres
+BASELINE_BROWSER_RESULT="failed"
 run_browser_scenario baseline BaselineBrowserTests -Baseline
+BASELINE_BROWSER_RESULT="passed"
 check_pre_upgrade_sessions
 PRE_UPGRADE_IDENTITY="$(identity_fingerprint postgres)"
 readonly PRE_UPGRADE_IDENTITY

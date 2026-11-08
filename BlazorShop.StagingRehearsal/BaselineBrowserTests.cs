@@ -19,8 +19,9 @@ public sealed class BaselineBrowserTests : PageTest
         await Expect(variants).ToHaveValueAsync(configuration.VariantId.ToString("D"));
 
         await Page.GotoAsync(new Uri(configuration.WebBaseUrl, "authentication/login/account/orders").ToString());
-        await Page.GetByLabel("Email Address", new() { Exact = true }).FillAsync(configuration.UserEmail);
-        await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(configuration.UserPassword);
+        // The pinned baseline renders sibling labels without a label/input association.
+        await Page.GetByPlaceholder("my@email.com", new() { Exact = true }).FillAsync(configuration.UserEmail);
+        await Page.GetByPlaceholder("Password", new() { Exact = true }).FillAsync(configuration.UserPassword);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Login", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Order history", Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "REHEARSAL-LEGACY-001", Exact = true })).ToBeVisibleAsync();
