@@ -53,12 +53,14 @@ This change is not compatible with a rolling mix of old and new application bina
 
 Cutover procedure:
 
-1. Take and verify a database backup.
-2. Stop or drain every old API instance and wait for in-flight checkout/history writes to finish.
+1. Put the edge in maintenance. Drain every old API instance, background writer, and in-flight checkout/history write.
+2. Take and verify a consistent checkpoint of the database, uploads, and Data Protection keys.
 3. Apply the migration, which atomically renames the table.
 4. Deploy only binaries containing the #95 runtime cleanup.
 5. Verify migration history, archive row count and representative field values; then verify authoritative checkout and customer/admin order routes.
 
-For rollback, first stop the new binaries, run the migration `Down` to rename the archive back with its data intact, and deploy the matching old binaries. Do not run old and new writers concurrently. Any operator changes made directly to the archive after cutover are outside the automated rollback guarantee.
+The archive migration's tested `Down` operation applies to a downgrade between the two schemas immediately adjacent to the rename. Stop writers before that operation and use binaries that match the resulting schema. Direct changes to the archive after cutover are outside the automated rollback guarantee.
 
-The concurrency coverage applies only to writers already in flight when the rename requests its lock; it does not authorize old binaries after cutover. A tested schema downgrade is not a restore of external Stripe state, application activity that happened after the migration, or a database backup. A [hosted historical upgrade/restore rehearsal](staging-upgrade-restore-rehearsal.md) exists for its explicitly pinned application versions. It does not establish recovery of the current release target, uploads, data-protection material or external provider activity. A separately verified current-target staging/recovery rehearsal remains necessary before production deployment; see the [RC audit](rc-readiness/2026-11-01/README.md).
+For an upgrade spanning multiple migrations, stop target writers and choose between recovering forward and restoring the verified pre-cutover checkpoint. Verify the restored migration history and start the matching baseline images with the restored uploads and keys. The registration confirmation outbox migration refuses to downgrade a nonempty outbox. Preserve upgraded data for reconciliation of writes, provider events, and mail delivery after the checkpoint.
+
+The [hosted historical and reconstructed candidate rehearsals](staging-upgrade-restore-rehearsal.md) exercise database, uploads, and key-ring recovery with synthetic fixtures and pinned application versions. Production approval still requires exact rollback artifacts, a timed recovery with representative topology and data volume, and a procedure for reconciling external effects.

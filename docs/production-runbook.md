@@ -151,7 +151,7 @@ If you deploy with an appsettings override file instead of environment variables
 - Confirmation emails and password-reset style links depend on `ClientApp:BaseUrl` because they link back into the authenticated Web client, not the SSR storefront.
 - Stripe success and cancel URLs also depend on `ClientApp:BaseUrl`; do not point that value at the public storefront domain unless the authenticated client is actually hosted there.
 - Refresh-token cookies remain `HttpOnly` and `Secure`. `SameSite=Strict` is correct for the standard `shop.example.com` / `account.shop.example.com` / `api.shop.example.com` model because those subdomains are cross-origin but still same-site.
-- SMTP delivery failures are now logged with the full exception and bubble back to callers. In strict confirmation mode, that keeps registration fail-closed instead of creating users who never receive a usable confirmation link.
+- With email confirmation required, registration commits the user and the confirmation outbox entry together. A background worker attempts SMTP delivery and records retries and dead letters. An unconfirmed user cannot sign in. Check the outbox and SMTP diagnostics when registration succeeds and the confirmation email is delayed.
 
 ## Web Runtime Config
 
@@ -273,7 +273,7 @@ Notes:
 
 - API startup/runtime logs go to console and to `BlazorShop.Presentation/BlazorShop.API/log/log*.txt` by default.
 - Storefront runtime signals for discovery, redirect, and public catalog failures are emitted as structured log event names such as `public.discovery.sitemap_failure`, `public.redirect.invalid_target_blocked`, and `public.product.service_unavailable`.
-- SMTP failures are logged with the exception details and no longer fail silently in confirmation-required auth paths.
+- Review registration confirmation outbox age, retries, and dead letters alongside SMTP diagnostics. Review the delivery state before retrying a message.
 - If storefront handoff routes start returning `503`, check `ClientApp:BaseUrl` on the storefront host first. That is the explicit failure mode when neither standalone config nor service discovery can resolve the authenticated client origin.
 
 ## Deployment Smoke Checks
@@ -302,16 +302,21 @@ The production Dockerfiles and compose file pin exact image tags so base-image u
 
 - Review the pinned .NET, nginx, and PostgreSQL tags at least monthly.
 - Review them immediately after vendor security advisories or when CI/container scanning flags a base-image issue.
-- Update the pinned tags in `compose.production.yml`, `BlazorShop.Presentation/BlazorShop.API/Dockerfile`, and `BlazorShop.Presentation/BlazorShop.Web/Dockerfile` in the same change.
+- Review the pins in `compose.production.yml` and the API, Storefront, and Web Dockerfiles when changing a base image.
 - Re-run the full release verification after every image bump, even when the application code is unchanged.
+- Record the application image digests and their source commit, verify the packaged runtime versions, and scan the exact images that will be deployed. A dependency audit covers a different scope from the container scan.
 
 Current pinned images in this repository:
 
 - PostgreSQL: `postgres:16.13-alpine3.23`
 - API build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
 - API runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.6-noble`
+- Storefront build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
+- Storefront runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.6-noble`
 - Web build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
 - Web runtime image: `nginx:1.27.5-alpine3.21`
+
+The API and Storefront runtime pins fall in the affected range for CVE-2026-88092. Use a supported patched runtime and repeat release verification before approving an image set. [Microsoft security advisory](https://github.com/dotnet/aspnetcore/security/advisories/GHSA-rv87-ccxw-8ggf)
 
 ## Storefront SEO Runtime Signals
 
@@ -460,7 +465,7 @@ Run this checklist before promoting a release candidate.
 4. Run `dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"` against the actual running storefront environment with `BLAZORSHOP_SEO_SMOKE_BASE_URL` and any required route overrides set.
 5. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
 6. Run `docker compose -f compose.production.yml build api web`.
-7. Apply database migrations before opening traffic. In the standard runtime path this repository applies migrations on API startup, but if your deployment process separates migration execution from app startup, run that migration step explicitly and verify it completed successfully.
+7. Rehearse the migration and restore with isolated staging data. The API applies migrations on startup by default. Verify the full migration history before opening traffic.
 8. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
 
 Suggested smoke-test focus:
@@ -473,6 +478,8 @@ Suggested smoke-test focus:
 The GitHub Actions workflow `ci` runs the full PostgreSQL 17 regression suite, npm audit gates, Release build, production Compose rendering, and API/Storefront/Web image builds. Its focused `postgres16-archive` job runs the archive safety suite on the production Compose database version. The checklist above intentionally retains backup rehearsal and post-deploy smoke-test steps that CI cannot prove on its own.
 
 ## Deployment Checklist
+
+For an upgrade that changes the schema, keep the edge in maintenance from the writer drain through backup, migration, and private smoke. Drain old writers and verify a consistent database, uploads, and Data Protection checkpoint before the first target API startup. Test recovery with the exact rollback images in an isolated environment before the maintenance window.
 
 1. Put all secrets in the platform secret store or injected environment variables.
 2. Apply `docs/production.appsettings.example.json` as a deployment-only override file or convert it to environment variables.
@@ -487,7 +494,7 @@ The GitHub Actions workflow `ci` runs the full PostgreSQL 17 regression suite, n
 11. Upload a test image and confirm it still exists after an API container restart.
 12. If Stripe is enabled, register `https://<api-host>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`; store its signing secret in `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`.
 13. If Stripe is enabled, complete a Stripe test checkout and verify that the pending order becomes `Paid` only after the signed webhook is received.
-14. For the #95 checkout-history cleanup, follow the non-rolling [legacy archive cutover and rollback procedure](legacy-checkout-archive.md): back up the database, drain old writers, migrate, deploy matching binaries, and verify the archive before restoring traffic.
+14. For the #95 checkout-history cleanup, follow the non-rolling [legacy archive cutover and rollback procedure](legacy-checkout-archive.md). For an upgrade that spans multiple migrations, use the verified recovery checkpoint and reconcile writes and provider effects that occurred after it.
 
 ## GitHub Branch Protection
 
