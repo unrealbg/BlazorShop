@@ -485,14 +485,14 @@ For an upgrade that changes the schema, keep the edge in maintenance from the wr
 3. Remove any extra `AllowedOrigins` entries you do not actually serve in production.
 4. Leave forwarded headers disabled unless a reverse proxy or ingress is really in front of the API.
 5. If forwarded headers are enabled, trust only the exact proxy IPs or CIDR blocks that should be allowed to set `X-Forwarded-*` headers.
-6. Deploy the API and verify that startup logs show the expected allowed origins and forwarded-header mode.
+6. Start the target API with the edge in maintenance. Verify the exact expected migration history, database readiness, allowed origins, and forwarded-header mode. If startup fails, stop target writers and establish the last committed migration before retrying or restoring.
 7. Confirm the production email sender settings are populated with real values and that startup did not fail email-options validation.
-8. If production health endpoints are enabled, verify that `/health` and `/alive` both return `200` and a minimal healthy payload.
+8. If production health endpoints are enabled, verify them through a private probe. `/health` includes database connectivity and `/alive` checks liveness. Verify the migration history separately.
 9. Verify that a browser preflight request from the public web origin succeeds against a public API endpoint.
 10. Verify that public traffic is throttled as expected while authenticated flows still work.
 11. Upload a test image and confirm it still exists after an API container restart.
 12. If Stripe is enabled, register `https://<api-host>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`; store its signing secret in `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`.
-13. If Stripe is enabled, complete a Stripe test checkout and verify that the pending order becomes `Paid` only after the signed webhook is received.
+13. If Stripe is enabled, rehearse checkout and webhook delivery against the Stripe sandbox on an isolated, representative topology. Verify that a pending order becomes `Paid` after a valid signed webhook. Review retry behavior during maintenance and document how to reconcile external effects after the checkpoint.
 14. For the #95 checkout-history cleanup, follow the non-rolling [legacy archive cutover and rollback procedure](legacy-checkout-archive.md). For an upgrade that spans multiple migrations, use the verified recovery checkpoint and reconcile writes and provider effects that occurred after it.
 
 ## GitHub Branch Protection
