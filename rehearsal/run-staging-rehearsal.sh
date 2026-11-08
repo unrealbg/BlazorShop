@@ -6,6 +6,23 @@ set -Eeuo pipefail
 readonly TARGET_SHA="527ee48056ffd01821e8d3f398c2a2be3fae522e"
 readonly TARGET_MIGRATION_COUNT="13"
 readonly TARGET_MIGRATION_HEAD="20261101131138_AddRegistrationConfirmationOutbox"
+readonly BASELINE_MIGRATIONS=(
+    20260412183234_InitialCreate
+    20260412211723_AlignIdentityKeyLengths
+    20260414195649_ProductionHardeningPass
+    20260418101205_SeoFoundation
+    20260424183749_AdminBackOfficeMvp
+)
+readonly UPGRADE_MIGRATIONS=(
+    20260820134400_PreserveCheckoutProductVariants
+    20260820145506_AddOrderLinePurchaseSnapshots
+    20260820152625_AddInventoryReservations
+    20260820204600_AddCheckoutIdempotency
+    20260821084312_AddPaymentReconciliation
+    20260908215523_SeparateOrderPaymentAndFulfillmentStatuses
+    20260909075202_ArchiveLegacyCheckoutOrderItems
+    20261101131138_AddRegistrationConfirmationOutbox
+)
 readonly POSTGRES_IMAGE="postgres:16.13-alpine3.23"
 readonly DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0.202-noble"
 readonly DOTNET_ASPNET_IMAGE="mcr.microsoft.com/dotnet/aspnet:10.0.6-noble"
@@ -19,6 +36,10 @@ if [[ $# -ne 3 ]]; then
     echo "Usage: $0 <tooling-directory> <baseline-source-directory> <target-source-directory>" >&2
     exit 2
 fi
+if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted || "${RUNNER_OS:-}" != Linux ]]; then
+    echo "This rehearsal requires a GitHub-hosted Linux runner." >&2
+    exit 2
+fi
 
 readonly TOOLING_DIR="$(realpath "$1")"
 readonly BASELINE_DIR="$(realpath "$2")"
@@ -30,12 +51,10 @@ readonly REPORT_DIR="$ARTIFACT_DIR/reports"
 readonly TEST_RESULTS_DIR="$ARTIFACT_DIR/browser-results"
 readonly RUN_NUMBER="${GITHUB_RUN_ID:-local}"
 readonly RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
-readonly PROJECT_NAME="bsrehearsal${RUN_NUMBER//[^0-9]/0}a${RUN_ATTEMPT//[^0-9]/0}"
 readonly PORT_SEED="$(printf '%s' "${GITHUB_RUN_ID:-0}" | tr -cd '0-9' | tail -c 4)"
 readonly PORT_OFFSET="$((10#${PORT_SEED:-0} % 15000))"
 readonly RUNTIME_DIR="$(mktemp -d "${RUNNER_TEMP:-/tmp}/blazorshop-rehearsal.XXXXXX")"
 readonly BACKUP_PATH="$RUNTIME_DIR/baseline.dump"
-readonly LOGIN_RESPONSE_PATH="$RUNTIME_DIR/login-response.json"
 readonly PROTECTED_RESPONSE_PATH="$RUNTIME_DIR/protected-response.json"
 # Volume archives, key-ring manifests and the protected probe payload stay in RUNTIME_DIR, which
 # is deleted on exit and never uploaded. Reports contain only counts, checksums and results.
@@ -47,13 +66,13 @@ readonly UPLOAD_FIXTURES=("pixel.png" "random.png")
 mkdir -p "$LOG_DIR" "$REPORT_DIR" "$TEST_RESULTS_DIR" "$VOLUME_WORK_DIR" "$PROBE_DIR"
 : > "$REPORT_DIR/assertions.txt"
 
-# A baseline profile is a reviewed file, never a guess. Only the historical fixture exists today;
-# a VPS-specific baseline stays BLOCKED until read-only evidence from the VPS has been recorded.
+# Both reviewed profiles use the same five-migration synthetic fixture.
 readonly BASELINE_PROFILE="${REHEARSAL_BASELINE_PROFILE:-historical}"
 if [[ ! "$BASELINE_PROFILE" =~ ^[a-z0-9-]+$ ]]; then
     echo "Invalid baseline profile name '$BASELINE_PROFILE'." >&2
     exit 2
 fi
+readonly PROJECT_NAME="bsrehearsal${RUN_NUMBER//[^0-9]/0}a${RUN_ATTEMPT//[^0-9]/0}-${BASELINE_PROFILE}"
 readonly BASELINE_PROFILE_FILE="$TOOLING_DIR/rehearsal/baselines/$BASELINE_PROFILE.env"
 if [[ ! -f "$BASELINE_PROFILE_FILE" ]]; then
     echo "Baseline profile '$BASELINE_PROFILE' is BLOCKED: no reviewed profile at rehearsal/baselines/$BASELINE_PROFILE.env." >&2
@@ -101,9 +120,11 @@ export REHEARSAL_DB_NAME="blazorshop_rehearsal"
 export REHEARSAL_DB_USER="rehearsal"
 export REHEARSAL_DB_PASSWORD="$(openssl rand -hex 32)"
 export REHEARSAL_JWT_KEY="$(openssl rand -base64 48 | tr -d '\n')"
+export REHEARSAL_SMTP_PASSWORD="$(openssl rand -hex 32)"
 export REHEARSAL_API_PORT="$((21000 + PORT_OFFSET))"
 export REHEARSAL_STOREFRONT_PORT="$((REHEARSAL_API_PORT + 1))"
 export REHEARSAL_WEB_PORT="$((REHEARSAL_API_PORT + 2))"
+export REHEARSAL_MAIL_PORT="$((REHEARSAL_API_PORT + 3))"
 export REHEARSAL_API_URL="http://localhost:$REHEARSAL_API_PORT"
 export REHEARSAL_STOREFRONT_URL="http://localhost:$REHEARSAL_STOREFRONT_PORT"
 export REHEARSAL_WEB_URL="http://localhost:$REHEARSAL_WEB_PORT"
@@ -115,6 +136,8 @@ export REHEARSAL_PROBE_DIR="$PROBE_DIR"
 
 readonly USER_EMAIL="rehearsal.user.${RUN_NUMBER}.${RUN_ATTEMPT}@example.test"
 readonly USER_PASSWORD="$(generate_user_password)"
+readonly ADMIN_EMAIL="rehearsal.admin.${RUN_NUMBER}.${RUN_ATTEMPT}@example.test"
+readonly ADMIN_PASSWORD="$(generate_user_password)"
 readonly BASELINE_IMAGE_PREFIX="$PROJECT_NAME-baseline"
 readonly TARGET_IMAGE_PREFIX="$PROJECT_NAME-target"
 readonly BASELINE_API_IMAGE="$BASELINE_IMAGE_PREFIX-api:local"
@@ -141,8 +164,10 @@ UPLOADS_RESULT="not-run"
 DATA_PROTECTION_RESULT="not-run"
 VOLUME_RESTORE_RESULT="not-run"
 BROWSER_RESULT="not-run"
+BASELINE_BROWSER_RESULT="not-run"
 FAILURE_CONTEXT=""
 REHEARSAL_RESULT="failed"
+CAPTURE_API_LOGS=true
 
 # Record the first failing command (unexpanded, so no generated secret is written) for the report.
 trap 'if [[ -z "$FAILURE_CONTEXT" ]]; then FAILURE_CONTEXT="line $LINENO: $BASH_COMMAND"; fi' ERR
@@ -153,10 +178,12 @@ dc() {
 
 capture_logs() {
     local phase="$1"
-    if ! dc --profile restore --profile tools logs --no-color --timestamps > "$LOG_DIR/${phase}-compose.log" 2>&1; then
+    local services=(postgres restore-postgres storefront web)
+    if [[ "$CAPTURE_API_LOGS" == true ]]; then services+=(api); fi
+    if ! dc --profile restore --profile tools --profile mail logs --no-color --timestamps "${services[@]}" > "$LOG_DIR/${phase}-compose.log" 2>&1; then
         echo "Unable to capture complete Compose logs for phase $phase." >> "$LOG_DIR/${phase}-compose.log"
     fi
-    dc --profile restore --profile tools ps --all > "$LOG_DIR/${phase}-compose-ps.txt" 2>&1 || :
+    dc --profile restore --profile tools --profile mail ps --all > "$LOG_DIR/${phase}-compose-ps.txt" 2>&1 || :
 }
 
 cleanup() {
@@ -167,7 +194,7 @@ cleanup() {
     capture_logs "final"
     local cleanup_started
     cleanup_started="$(date +%s%3N)"
-    dc --profile restore --profile tools down --volumes --remove-orphans --timeout 20 > "$LOG_DIR/cleanup.log" 2>&1
+    dc --profile restore --profile tools --profile mail down --volumes --remove-orphans --timeout 20 > "$LOG_DIR/cleanup.log" 2>&1
     local compose_cleanup_exit="$?"
 
     docker image rm \
@@ -190,6 +217,7 @@ cleanup() {
 
     if [[ "$compose_cleanup_exit" -ne 0 || "$image_cleanup_exit" -ne 0 || "$runtime_cleanup_exit" -ne 0 ]]; then
         original_exit=1
+        REHEARSAL_RESULT=failed
     fi
 
     {
@@ -209,6 +237,9 @@ cleanup() {
         echo "data_protection_probe=$DATA_PROTECTION_RESULT"
         echo "volume_restore=$VOLUME_RESTORE_RESULT"
         echo "browser_tests=$BROWSER_RESULT"
+        echo "baseline_browser_tests=$BASELINE_BROWSER_RESULT"
+        echo "assertions_passed=$(grep -c '^PASS:' "$REPORT_DIR/assertions.txt" || :)"
+        echo "assertions_failed=$(grep -c '^FAIL:' "$REPORT_DIR/assertions.txt" || :)"
         echo "failure_context=${FAILURE_CONTEXT:-none}"
         echo "note=synthetic isolated rehearsal; durations are not VPS RPO/RTO"
     } > "$REPORT_DIR/result.txt"
@@ -220,13 +251,13 @@ trap cleanup EXIT
 run_logged() {
     local log_path="$1"
     shift
-    set +e
-    "$@" 2>&1 | tee "$log_path"
-    local command_exit="${PIPESTATUS[0]}"
-    set -e
-    if [[ "$command_exit" -ne 0 ]]; then
-        echo "Command failed with exit code $command_exit; see $log_path." >&2
-        return "$command_exit"
+    if "$@" 2>&1 | tee "$log_path"; then
+        return 0
+    else
+        local exit_code=$?
+        FAILURE_CONTEXT="${FAILURE_CONTEXT:-logged operation failed; see $(basename "$log_path")}"
+        echo "Logged operation failed; see $log_path." >&2
+        return "$exit_code"
     fi
 }
 
@@ -285,6 +316,21 @@ assert_equal() {
 scalar_stdin() {
     local service="$1"
     psql_service "$service" --quiet --tuples-only --no-align | tr -d '\r' | sed '/^[[:space:]]*$/d'
+}
+
+table_fingerprints() {
+    local service="$1"
+    scalar_stdin "$service" <<'SQL'
+SELECT format(
+    'SELECT %L, count(*), encode(sha256(convert_to(coalesce(string_agg(row_text, chr(10) ORDER BY row_text COLLATE "C"), ''''), ''UTF8'')), ''hex'') FROM (SELECT to_jsonb(t)::text AS row_text FROM %I.%I t) snapshot',
+    tablename, schemaname, tablename)
+FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename COLLATE "C"
+\gexec
+SQL
+}
+
+migration_ids() {
+    scalar "$1" 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" COLLATE "C";'
 }
 
 # Exact row counts for every table in the public schema, sorted with the C collation.
@@ -354,6 +400,7 @@ capture_baseline_report() {
 
 verify_baseline_database() {
     local service="$1"
+    assert_equal "$(printf '%s\n' "${BASELINE_MIGRATIONS[@]}")" "$(migration_ids "$service")" "exact five baseline migration IDs ($service)"
     assert_equal "$BASELINE_MIGRATION_COUNT" "$(scalar "$service" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')" "baseline migration count"
     assert_equal "$BASELINE_MIGRATION_HEAD" "$(scalar "$service" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')" "baseline migration head"
     assert_equal "Rehearsal Footwear|rehearsal-footwear|t" "$(scalar "$service" "SELECT \"Name\", \"Slug\", \"IsPublished\" FROM \"Categories\" WHERE \"Id\" = '$CATEGORY_ID';")" "baseline catalog marker"
@@ -425,6 +472,7 @@ SQL
 }
 
 verify_target_database() {
+    assert_equal "$(printf '%s\n' "${BASELINE_MIGRATIONS[@]}" "${UPGRADE_MIGRATIONS[@]}")" "$(migration_ids postgres)" "exact eight forward migrations appended"
     assert_equal "$TARGET_MIGRATION_COUNT" "$(scalar postgres 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')" "target migration count"
     assert_equal "$TARGET_MIGRATION_HEAD" "$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')" "target migration head"
     table_counts postgres > "$REPORT_DIR/table-counts-post-upgrade.txt"
@@ -562,18 +610,21 @@ write_volume_report() {
 }
 
 register_user() {
-    local payload
+    local email="$1" password="$2" payload
     payload="$(jq --compact-output --null-input \
-        --arg email "$USER_EMAIL" \
-        --arg password "$USER_PASSWORD" \
+        --arg email "$email" \
+        --arg password "$password" \
         '{fullName:"Rehearsal Customer",email:$email,password:$password,confirmPassword:$password}')"
     local status
     status="$(curl --silent --show-error --output "$RUNTIME_DIR/register-response.json" --write-out '%{http_code}' \
         --header 'Content-Type: application/json' --request POST --data "$payload" \
         "$REHEARSAL_API_URL/api/authentication/create")"
-    assert_equal "200" "$status" "historical user registration"
-    assert_equal "true" "$(jq --raw-output '.success' "$RUNTIME_DIR/register-response.json")" "historical user registration result"
+    assert_equal "200" "$status" "synthetic user registration ($email)"
+    assert_equal "true" "$(jq --raw-output '.success' "$RUNTIME_DIR/register-response.json")" "synthetic registration succeeds ($email)"
 }
+
+# shellcheck source=rehearsal/rehearsal-application-checks.sh
+source "$TOOLING_DIR/rehearsal/rehearsal-application-checks.sh"
 
 verify_baseline_application() {
     local phase="$1"
@@ -587,20 +638,19 @@ verify_baseline_application() {
     grep --fixed-strings --quiet "Rehearsal Canvas Bag" "$product_page"
     rm -f "$product_page"
 
-    local login_payload
-    login_payload="$(jq --compact-output --null-input --arg email "$USER_EMAIL" --arg password "$USER_PASSWORD" \
-        '{email:$email,password:$password}')"
-    curl --fail --silent --show-error --header 'Content-Type: application/json' \
-        --request POST --data "$login_payload" "$REHEARSAL_API_URL/api/authentication/login" \
-        --output "$LOGIN_RESPONSE_PATH"
+    login_user "$USER_EMAIL" "$USER_PASSWORD" "$RUNTIME_DIR/customer-$phase" "$REHEARSAL_WEB_URL"
     local access_token
-    access_token="$(jq --exit-status --raw-output '.token' "$LOGIN_RESPONSE_PATH")"
-    curl --fail --silent --show-error --header "Authorization: Bearer $access_token" \
-        "$REHEARSAL_API_URL/api/cart/user/orders" --output "$PROTECTED_RESPONSE_PATH"
-    jq --exit-status 'map(select(.reference == "REHEARSAL-LEGACY-001")) | length == 1' \
-        "$PROTECTED_RESPONSE_PATH" > /dev/null
-    rm -f "$LOGIN_RESPONSE_PATH" "$PROTECTED_RESPONSE_PATH"
-    echo "PASS: $phase baseline catalog, login, and protected order-history operation"
+    access_token="$(jq --exit-status --raw-output '.token' "$RUNTIME_DIR/customer-$phase.json")"
+    curl --fail --silent --show-error --max-time 15 --header "Authorization: Bearer $access_token" \
+        "$REHEARSAL_WEB_URL/api/cart/user/orders" --output "$PROTECTED_RESPONSE_PATH"
+    assert_equal true "$(jq -r 'map(select(.reference == "REHEARSAL-LEGACY-001")) | length == 1' "$PROTECTED_RESPONSE_PATH")" \
+        "$phase protected order history through Web proxy"
+    assert_equal 403 "$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $access_token" "$REHEARSAL_API_URL/api/cart/orders")" \
+        "$phase customer cannot read all orders"
+    login_user "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$RUNTIME_DIR/first-user-$phase"
+    access_token="$(jq -er '.token' "$RUNTIME_DIR/first-user-$phase.json")"
+    assert_equal "$FIRST_USER_ADMIN_HTTP" "$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $access_token" "$REHEARSAL_API_URL/api/cart/orders")" \
+        "$phase first user's effective admin access"
 }
 
 stop_application_writers() {
@@ -621,6 +671,26 @@ build_image() {
     local log_name="$4"
     run_logged "$LOG_DIR/$log_name" timeout 1200 docker build --pull \
         --tag "$image" --file "$source_dir/$dockerfile" "$source_dir"
+}
+
+run_browser_scenario() {
+    local phase="$1" test_class="$2"
+    shift 2
+    export BLAZORSHOP_REHEARSAL_MODE="attach-$phase-database"
+    export BLAZORSHOP_REHEARSAL_TARGET_SHA="$TARGET_SHA"
+    export BLAZORSHOP_REHEARSAL_BASELINE_SHA="$BASELINE_SHA"
+    export BLAZORSHOP_REHEARSAL_MARKER="$CATEGORY_ID"
+    export BLAZORSHOP_REHEARSAL_STOREFRONT_URL="$REHEARSAL_STOREFRONT_URL"
+    export BLAZORSHOP_REHEARSAL_WEB_URL="$REHEARSAL_WEB_URL"
+    export BLAZORSHOP_REHEARSAL_USER_EMAIL="$USER_EMAIL"
+    export BLAZORSHOP_REHEARSAL_USER_PASSWORD="$USER_PASSWORD"
+    export BLAZORSHOP_REHEARSAL_ARTIFACTS_DIR="$TEST_RESULTS_DIR/$phase-diagnostics"
+    run_logged "$LOG_DIR/$phase-browser-test.log" dotnet test \
+        "$TOOLING_DIR/BlazorShop.StagingRehearsal/BlazorShop.StagingRehearsal.csproj" \
+        --configuration Release --no-build --no-restore --filter "FullyQualifiedName~$test_class" \
+        --logger "trx;LogFileName=$phase-rehearsal.trx" --results-directory "$TEST_RESULTS_DIR" --verbosity normal
+    pwsh "$TOOLING_DIR/scripts/verify-staging-rehearsal-results.ps1" -Path "$TEST_RESULTS_DIR/$phase-rehearsal.trx" "$@"
+    assert_equal passed passed "$phase browser smoke"
 }
 
 baseline_actual="$(git -C "$BASELINE_DIR" rev-parse HEAD)"
@@ -676,7 +746,13 @@ assert_volume_empty restore uploads
 assert_volume_empty restore data-protection-keys
 wait_postgres postgres
 wait_http "$REHEARSAL_API_URL/health" "initial baseline API"
-register_user
+readonly FIRST_USER_ROLE="$([[ "$BASELINE_PROFILE" == candidate-f40b870 ]] && echo Admin || echo User)"
+readonly FIRST_USER_ADMIN_HTTP="$([[ "$FIRST_USER_ROLE" == Admin ]] && echo 200 || echo 403)"
+assert_equal 0 "$(scalar postgres 'SELECT COUNT(*) FROM "AspNetUsers";')" "baseline begins with no Identity users"
+register_user "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
+verify_role "$ADMIN_EMAIL" "$FIRST_USER_ROLE"
+register_user "$USER_EMAIL" "$USER_PASSWORD"
+verify_role "$USER_EMAIL" User
 readonly USER_ID="$(scalar postgres "SELECT \"Id\" FROM \"AspNetUsers\" WHERE \"Email\" = '$USER_EMAIL';")"
 if [[ -z "$USER_ID" ]]; then
     echo "Historical user ID was not persisted." >&2
@@ -688,6 +764,12 @@ psql_service postgres --set "user_id=$USER_ID" < "$TOOLING_DIR/rehearsal/seed-ba
 dc up --detach storefront web
 verify_baseline_application "pre-upgrade"
 verify_baseline_database postgres
+BASELINE_BROWSER_RESULT="failed"
+run_browser_scenario baseline BaselineBrowserTests -Baseline
+BASELINE_BROWSER_RESULT="passed"
+check_pre_upgrade_sessions
+PRE_UPGRADE_IDENTITY="$(identity_fingerprint postgres)"
+readonly PRE_UPGRADE_IDENTITY
 MIGRATION_HEAD_BEFORE="$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
 
 # Synthetic persistent-volume data: two uploads served by the baseline API and one value protected
@@ -708,6 +790,7 @@ table_counts postgres > "$REPORT_DIR/table-counts-pre-upgrade.txt"
 capture_logs "baseline"
 stop_application_writers
 schema_dump postgres > "$REPORT_DIR/schema-pre-upgrade.sql"
+table_fingerprints postgres > "$REPORT_DIR/rows-pre-upgrade.txt"
 
 backup_started="$(date +%s%3N)"
 docker compose --project-name "$PROJECT_NAME" --file "$COMPOSE_FILE" exec -T postgres \
@@ -759,6 +842,9 @@ wait_http "$REHEARSAL_STOREFRONT_URL/product/rehearsal-canvas-bag" "target Store
 wait_http "$REHEARSAL_WEB_URL/authentication/login/account" "target Web"
 
 verify_target_database
+assert_equal "$PRE_UPGRADE_IDENTITY" "$(identity_fingerprint postgres)" "upgrade preserves user IDs, roles, confirmation and password hashes"
+verify_baseline_application "post-upgrade"
+check_upgraded_sessions "$(session_cookie "$RUNTIME_DIR/baseline-survivor")"
 MIGRATION_HEAD_AFTER="$(scalar postgres 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
 capture_target_report
 
@@ -778,26 +864,13 @@ assert_equal "0" "$missing_keys" "upgrade keeps every pre-upgrade data-protectio
 assert_data_protection_round_trip primary "post-upgrade"
 capture_logs "target-upgraded"
 
-export BLAZORSHOP_REHEARSAL_MODE="attach-upgraded-database"
-export BLAZORSHOP_REHEARSAL_TARGET_SHA="$TARGET_SHA"
-export BLAZORSHOP_REHEARSAL_MARKER="$CATEGORY_ID"
-export BLAZORSHOP_REHEARSAL_STOREFRONT_URL="$REHEARSAL_STOREFRONT_URL"
-export BLAZORSHOP_REHEARSAL_WEB_URL="$REHEARSAL_WEB_URL"
-export BLAZORSHOP_REHEARSAL_USER_EMAIL="$USER_EMAIL"
-export BLAZORSHOP_REHEARSAL_USER_PASSWORD="$USER_PASSWORD"
-export BLAZORSHOP_REHEARSAL_ARTIFACTS_DIR="$TEST_RESULTS_DIR/diagnostics"
-
 BROWSER_RESULT="failed"
-run_logged "$LOG_DIR/browser-test.log" dotnet test \
-    "$TOOLING_DIR/BlazorShop.StagingRehearsal/BlazorShop.StagingRehearsal.csproj" \
-    --configuration Release --no-build --no-restore \
-    --logger "trx;LogFileName=staging-rehearsal.trx" \
-    --results-directory "$TEST_RESULTS_DIR" --verbosity normal
-pwsh "$TOOLING_DIR/scripts/verify-staging-rehearsal-results.ps1" \
-    -Path "$TEST_RESULTS_DIR/staging-rehearsal.trx"
+run_browser_scenario upgraded UpgradedDatabaseBrowserTests
 BROWSER_RESULT="passed"
 
 capture_logs "target-after-browser"
+check_upgraded_checkout
+check_upgraded_outbox
 stop_application_writers
 
 dc --profile restore up --detach restore-postgres
@@ -821,6 +894,11 @@ schema_dump restore-postgres > "$REPORT_DIR/schema-post-restore.sql"
 schema_verdict="identical"
 cmp --silent "$REPORT_DIR/schema-pre-upgrade.sql" "$REPORT_DIR/schema-post-restore.sql" || schema_verdict="different"
 assert_equal "identical" "$schema_verdict" "restored schema matches the pre-upgrade schema byte for byte"
+table_fingerprints restore-postgres > "$REPORT_DIR/rows-post-restore.txt"
+rows_verdict="identical"
+cmp --silent "$REPORT_DIR/rows-pre-upgrade.txt" "$REPORT_DIR/rows-post-restore.txt" || rows_verdict="different"
+assert_equal "identical" "$rows_verdict" "restored rows match per-table fingerprints"
+assert_equal "$PRE_UPGRADE_IDENTITY" "$(identity_fingerprint restore-postgres)" "restored Identity roles and password hashes"
 
 # Persistent volumes: the empty restore key ring must reject the payload (negative control) and
 # must not gain a key from that attempt; then both archives are restored into the new volumes.
@@ -845,8 +923,12 @@ export REHEARSAL_WEB_IMAGE="$BASELINE_WEB_IMAGE"
 export REHEARSAL_DB_HOST="restore-postgres"
 export REHEARSAL_UPLOADS_VOLUME="restore-uploads-data"
 export REHEARSAL_DATA_PROTECTION_VOLUME="restore-data-protection-keys"
+export REHEARSAL_REQUIRE_CONFIRMED_EMAIL=false REHEARSAL_EMAIL_ENABLED=false
 dc --profile restore up --detach --force-recreate api storefront web
+CAPTURE_API_LOGS=true
 verify_baseline_application "post-restore"
+assert_rotation "$(session_cookie "$RUNTIME_DIR/baseline-survivor")" "$RUNTIME_DIR/restored-session" \
+    "restored baseline accepts the original pre-backup refresh cookie"
 verify_upload_fixtures_served "post-restore baseline"
 UPLOADS_RESULT="passed"
 VOLUME_RESTORE_RESULT="passed"
