@@ -148,6 +148,7 @@ readonly BASELINE_WEB_IMAGE="$BASELINE_IMAGE_PREFIX-web:local"
 readonly TARGET_API_IMAGE="$TARGET_IMAGE_PREFIX-api:local"
 readonly TARGET_STOREFRONT_IMAGE="$TARGET_IMAGE_PREFIX-storefront:local"
 readonly TARGET_WEB_IMAGE="$TARGET_IMAGE_PREFIX-web:local"
+declare -A TARGET_ENGINE_IMAGE_IDS=()
 
 # Compose evaluates required image variables even during best-effort diagnostics
 # and teardown. Start with the baseline images so an early failure remains cleanable.
@@ -676,14 +677,18 @@ build_image() {
 }
 
 import_target_image() {
-    local service="$1" image="$2" archive record
+    local service="$1" image="$2" archive record config_hash
     archive="$TARGET_ARCHIVES_DIR/$service.oci.tar"
     record="$REPORT_DIR/target-$service-oci.json"
     python3 "$TOOLING_DIR/rehearsal/inspect-target-image.py" "$archive" "$TARGET_SHA" > "$record"
     cmp "$record" "$TARGET_ARCHIVES_DIR/$service.json"
     run_logged "$LOG_DIR/import-target-$service.log" skopeo copy "oci-archive:$archive" "docker-daemon:$image"
-    assert_equal "$(jq -er .config_digest "$record")" "$(docker image inspect "$image" --format '{{.Id}}')" \
+    # Docker image IDs differ between the classic and containerd image stores.
+    # Hash the imported config bytes before recording the engine's own ID for the running check.
+    config_hash="$(skopeo inspect --raw --config "docker-daemon:$image" | sha256sum | cut -d ' ' -f 1)"
+    assert_equal "$(jq -er .config_digest "$record")" "sha256:$config_hash" \
         "target $service import matches the OCI config digest"
+    TARGET_ENGINE_IMAGE_IDS[$service]="$(docker image inspect "$image" --format '{{.Id}}')"
     bash "$TOOLING_DIR/scripts/verify-aspnet-runtime.sh" "$image" > "$REPORT_DIR/target-$service-runtimes.txt"
 }
 
@@ -856,9 +861,9 @@ wait_http "$REHEARSAL_API_URL/health" "target API after migration"
 UPGRADE_MILLISECONDS="$(( $(date +%s%3N) - upgrade_started ))"
 dc up --detach --force-recreate --pull never storefront web
 for service in api storefront; do
-    assert_equal "$(jq -er .config_digest "$REPORT_DIR/target-$service-oci.json")" \
+    assert_equal "${TARGET_ENGINE_IMAGE_IDS[$service]}" \
         "$(docker inspect "$(dc ps -q "$service")" --format '{{.Image}}')" \
-        "running target $service matches the OCI config digest"
+        "running target $service matches the verified OCI import"
 done
 wait_http "$REHEARSAL_STOREFRONT_URL/product/rehearsal-canvas-bag" "target Storefront"
 wait_http "$REHEARSAL_WEB_URL/authentication/login/account" "target Web"
