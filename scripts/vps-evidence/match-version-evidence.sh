@@ -125,15 +125,28 @@ blob_at() {
     git rev-parse --quiet --verify "$1:$2" 2> /dev/null || true
 }
 
-# SHA-256 of a path at a commit, or "missing" when the commit does not have it.
-content_sha256() {
-    local blob
+# Model checkout of an LF text blob as CRLF. Read to EOF without stripping the last newline.
+# A NUL delimiter or an existing CR rules out this conversion, including mixed line endings.
+crlf_checkout() {
+    local data
+    if IFS= read -r -d '' data || [[ "$data" == *$'\r'* ]]; then
+        return 1
+    fi
+    printf '%s' "${data//$'\n'/$'\r\n'}"
+}
+
+content_matches() {
+    local actual="$3" blob expected
     blob="$(blob_at "$1" "$2")"
     if [[ -z "$blob" ]]; then
-        printf 'missing'
-        return 0
+        [[ "$actual" == "missing" ]]
+        return
     fi
-    git cat-file blob "$blob" | sha256sum | awk '{print $1}'
+    [[ "$actual" != "missing" ]] || return 1
+    expected="$(git cat-file blob "$blob" | sha256sum | awk '{print $1}')" || return 1
+    [[ "$actual" != "$expected" ]] || return 0
+    expected="$(git cat-file blob "$blob" | crlf_checkout | sha256sum | awk '{print $1}')" || return 1
+    [[ "$actual" == "$expected" ]]
 }
 
 # "dest<TAB>source" lines for plain `COPY <source> <dest>` instructions of the Web Dockerfile.
@@ -144,40 +157,36 @@ web_copies() {
     git cat-file blob "$blob" | tr -d '\r' | awk '$1 == "COPY" && NF == 3 && $2 !~ /^--/ { print $3 "\t" $2 }'
 }
 
-# Expected value for a Web container path at a commit; "any" when the file is not copied there
-# but may be created at runtime (the nginx entrypoint renders conf.d/default.conf from templates).
-web_expected() {
-    local commit="$1" container_path="$2" when_not_copied="$3" copies source
-    copies="$(web_copies "$commit")" || { printf 'no-dockerfile'; return 0; }
+# Match a Web container path against the source this Dockerfile copies there. An uncopied
+# conf.d/default.conf may be rendered at runtime and its hash is intentionally unconstrained.
+web_path_matches() {
+    local commit="$1" copies="$2" container_path="$3" when_not_copied="$4" actual="$5" source
     source="$(printf '%s\n' "$copies" | awk -F '\t' -v dest="$container_path" '$1 == dest { print $2; exit }')"
     if [[ -z "$source" ]]; then
-        printf '%s' "$when_not_copied"
-        return 0
+        [[ "$when_not_copied" == "any" || "$actual" == "$when_not_copied" ]]
+        return
     fi
-    content_sha256 "$commit" "$source"
-}
-
-matches() {
-    [[ "$1" == "any" || "$1" == "$2" ]]
+    content_matches "$commit" "$source" "$actual"
 }
 
 api_matches() {
     local commit="$1" migrations
-    matches "$(content_sha256 "$commit" "$API_APPSETTINGS")" "${VALUE[sha256.api_appsettings]}" || return 1
+    content_matches "$commit" "$API_APPSETTINGS" "${VALUE[sha256.api_appsettings]}" || return 1
     migrations="$(git ls-tree --name-only "$commit" "$MIGRATIONS_DIR/" \
         | sed -n -E 's|^.*/([0-9]{14}_[A-Za-z0-9]+)\.cs$|\1|p' | LC_ALL=C sort)"
     [[ "$migrations" == "$EVIDENCE_MIGRATIONS" ]]
 }
 
 storefront_matches() {
-    matches "$(content_sha256 "$1" "$STOREFRONT_APPSETTINGS")" "${VALUE[sha256.storefront_appsettings]}"
+    content_matches "$1" "$STOREFRONT_APPSETTINGS" "${VALUE[sha256.storefront_appsettings]}"
 }
 
 web_matches() {
-    local commit="$1"
-    matches "$(web_expected "$commit" /etc/nginx/templates/default.conf.template missing)" "${VALUE[sha256.web_nginx_template]}" || return 1
-    matches "$(web_expected "$commit" /etc/nginx/snippets/blazorshop-security-headers.conf missing)" "${VALUE[sha256.web_security_headers]}" || return 1
-    matches "$(web_expected "$commit" /etc/nginx/conf.d/default.conf any)" "${VALUE[sha256.web_nginx_conf_d]}"
+    local commit="$1" copies
+    copies="$(web_copies "$commit")" || return 1
+    web_path_matches "$commit" "$copies" /etc/nginx/templates/default.conf.template missing "${VALUE[sha256.web_nginx_template]}" || return 1
+    web_path_matches "$commit" "$copies" /etc/nginx/snippets/blazorshop-security-headers.conf missing "${VALUE[sha256.web_security_headers]}" || return 1
+    web_path_matches "$commit" "$copies" /etc/nginx/conf.d/default.conf any "${VALUE[sha256.web_nginx_conf_d]}"
 }
 
 # ---- Scan. ------------------------------------------------------------------------------------

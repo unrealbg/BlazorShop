@@ -83,10 +83,10 @@ add_migration() {
 }
 commit() { git add -A && git commit -q -m "$1" && git rev-parse HEAD; }
 
-printf 'server { listen 80; }\n' > "$WEB/nginx.conf"
+printf 'server {\n    listen 80;\n}\n' > "$WEB/nginx.conf"
 printf 'FROM nginx\nCOPY %s/nginx.conf /etc/nginx/conf.d/default.conf\nCOPY --from=build /app/publish/wwwroot /usr/share/nginx/html\n' "$WEB" > "$WEB/Dockerfile"
-printf '{ "api": 1 }\n' > "$API/appsettings.json"
-printf '{ "storefront": 1 }\n' > "$SF/appsettings.json"
+printf '{\n    "api": 1\n}\n' > "$API/appsettings.json"
+printf '{\n    "storefront": 1\n}' > "$SF/appsettings.json"
 add_migration "$M1"
 add_migration "$M2"
 C1="$(commit c1)"
@@ -165,6 +165,45 @@ check "matcher: valid migration head and count are echoed" stdout_has "evidence_
 evidence "$E" "$H_A1" "$H_SF" missing missing "$H_NGINX" "$M1" "$M2"
 check "matcher: legacy conf.d Web image maps by that commit's Dockerfile" run 0 bash "$MATCH" "$E" master
 check "matcher: legacy image matches only c1, not the templated c2" bash -c '[[ "$(grep -c "^candidate=" "$1")" -eq 1 ]] && grep -q "^candidate=$2 " "$1" && ! grep -q "^candidate=$3 " "$1"' _ "$WORK/out" "$C1" "$C2"
+
+H_A1_CRLF="$(printf '{\r\n    "api": 1\r\n}\r\n' | sha256sum | awk '{print $1}')"
+H_SF_CRLF="$(printf '{\r\n    "storefront": 1\r\n}' | sha256sum | awk '{print $1}')"
+H_NGINX_CRLF="$(printf 'server {\r\n    listen 80;\r\n}\r\n' | sha256sum | awk '{print $1}')"
+H_HEADERS_CRLF="$(printf 'add_header X-Content-Type-Options nosniff;\r\n' | sha256sum | awk '{print $1}')"
+
+evidence "$E" "$H_A1_CRLF" "$H_SF_CRLF" "$H_NGINX_CRLF" "$H_HEADERS_CRLF" "$H_RENDERED" "$M1" "$M2" "$M3"
+check "matcher: CRLF checkout matches all services, preserving an unterminated last line" run 0 bash "$MATCH" "$E" master
+check "matcher: CRLF gives the same two common candidates as LF" stdout_has "candidate_count=2"
+
+evidence "$E" "$H_A1" "$H_SF_CRLF" missing missing "$H_NGINX_CRLF" "$M1" "$M2"
+check "matcher: legacy conf.d accepts CRLF alongside LF in another service" run 0 bash "$MATCH" "$E" master
+check "matcher: CRLF legacy conf.d resolves to c1" stdout_matches "^candidate=$C1 "
+check "matcher: CRLF legacy conf.d still excludes the templated image" stdout_has "candidate_count.web=1"
+
+H_MIXED="$(printf '{\r\n    "api": 1\n}\r\n' | sha256sum | awk '{print $1}')"
+evidence "$E" "$H_MIXED" "$H_SF_CRLF" "$H_NGINX_CRLF" "$H_HEADERS_CRLF" "$H_RENDERED" "$M1" "$M2" "$M3"
+check "matcher: a mixed-ending modification to an LF blob is rejected" run 1 bash "$MATCH" "$E" master
+check "matcher: a mixed-ending API file excludes API candidates" stdout_has "candidate_count.api=0"
+
+H_EDITED="$(printf '{\r\n    "api": 1 \r\n}\r\n' | sha256sum | awk '{print $1}')"
+evidence "$E" "$H_EDITED" "$H_SF_CRLF" "$H_NGINX_CRLF" "$H_HEADERS_CRLF" "$H_RENDERED" "$M1" "$M2" "$M3"
+check "matcher: a content change in CRLF is rejected even when JSON semantics are unchanged" run 1 bash "$MATCH" "$E" master
+check "matcher: a content change excludes only API candidates" stdout_has "candidate_count.api=0"
+check "matcher: Storefront still has independent candidates" stdout_matches '^candidate_count.storefront=[1-9]'
+check "matcher: Web still has independent candidates" stdout_matches '^candidate_count.web=[1-9]'
+
+git switch -q --detach "$C3"
+printf '{\r\n    "api": 9\n}\r\n' > "$API/appsettings.json"
+git -c core.autocrlf=false add "$API/appsettings.json"
+git commit -qm mixed
+C_MIXED="$(git rev-parse HEAD)"
+H_MIXED_BLOB="$(git cat-file blob "$C_MIXED:$API/appsettings.json" | sha256sum | awk '{print $1}')"
+git switch -q master
+evidence "$E" "$H_MIXED_BLOB" "$H_SF" "$H_NGINX" "$H_HEADERS" "$H_RENDERED" "$M1" "$M2" "$M3"
+check "matcher: a committed mixed-ending blob can match its exact bytes" run 0 bash "$MATCH" "$E" "$C_MIXED"
+H_MIXED_REWRITTEN="$(printf '{\r\n    "api": 9\r\n}\r\n' | sha256sum | awk '{print $1}')"
+evidence "$E" "$H_MIXED_REWRITTEN" "$H_SF" "$H_NGINX" "$H_HEADERS" "$H_RENDERED" "$M1" "$M2" "$M3"
+check "matcher: a committed mixed-ending blob is not converted to uniform CRLF" run 1 bash "$MATCH" "$E" "$C_MIXED"
 
 evidence "$E" "$H_A1" "$H_SF" "$H_NGINX" "$H_HEADERS" "$H_RENDERED" "$M1" "$M3"
 check "matcher: same head but a missing migration matches nothing" run 1 bash "$MATCH" "$E" master

@@ -65,7 +65,7 @@ Run it in a full clone; shallow clones are refused. The matcher behaves as follo
 - **Services can be built from different commits.** Per-service candidates exist then, but the intersection is empty. That is a finding to resolve with the owner, not something to guess away.
 - **The migration list records the newest API that migrated the database.** If an older API image was redeployed after a newer one had migrated, the API files and the migrations disagree, and the intersection is empty.
 - **History coverage.** By default the matcher scans the first-parent history of `origin/master` (merge results, 119 of 586 commits today). `--all-ancestors` also scans commits of merged branches. A deployment from an unmerged branch or a modified checkout matches nothing.
-- **Line endings.** Hashes assume the Linux checkout produced LF files, as `.gitattributes` (`text=auto`) does by default. A checkout with `core.autocrlf=true` or local edits will not match, which fails closed.
+- **Line endings.** For each tracked configuration file, the matcher compares the evidence hash with the exact Git blob and, for an LF text blob, with the exact bytes produced by expanding each LF to CRLF. This covers build contexts packaged from a checkout that uses CRLF, such as a Windows checkout with `core.autocrlf=true`. The conversion preserves every other byte and an unterminated last line. A blob containing CR (including mixed endings) or NUL is eligible for an exact match only. An arbitrary mixture of line endings or any other content edit is outside this rule. The collector hashes the deployed bytes and the matcher validates the original evidence checksum.
 - **The checksum detects truncation and accidental edits.** It is not a signature. Trust in the evidence rests on the owner running the reviewed script over SSH and handling the file carefully.
 
 ## Step 3: decide and record the baseline (owner)
@@ -87,6 +87,7 @@ No guessed baseline is added in the meantime. RPO/RTO for the VPS must come from
 - **Database:** PostgreSQL failures and inconsistent migration data.
 - **Bash version:** bash older than 4.4 and a shell that is not bash are refused before any command runs.
 - **Evidence and matching:** valid and mismatched migration sets, invalid or incomplete evidence, several candidates, one candidate, zero candidates, services from different commits, merged-branch states, shallow clones, and the read-only command set.
+- **Configuration bytes:** exact LF and checkout CRLF, preservation of an unterminated last line, rejection of content edits and uncommitted mixed endings, exact matching of a mixed-ending Git blob, and the legacy nginx `conf.d/default.conf` copy path.
 
 ## Out of scope
 
