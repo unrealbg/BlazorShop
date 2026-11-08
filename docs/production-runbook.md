@@ -10,7 +10,7 @@ BlazorShop now has three deployable surfaces with different configuration owners
 - Storefront: the SSR public shopping site, public canonical/discovery origin, and storefront-to-account handoff URLs
 - Web: the authenticated account/admin Blazor WebAssembly client
 
-Use [docs/production.appsettings.example.json](docs/production.appsettings.example.json) as the API example and [docs/storefront.production.appsettings.example.json](docs/storefront.production.appsettings.example.json) as the standalone storefront example.
+Use [docs/production.appsettings.example.json](production.appsettings.example.json) as the API example and [docs/storefront.production.appsettings.example.json](storefront.production.appsettings.example.json) as the standalone storefront example.
 
 ## Replace the placeholders
 
@@ -174,9 +174,9 @@ The repository's standard container stack is designed around a public HTTPS edge
 
 Use `Runtime__Security__RefreshTokenCookieSameSite=Strict` for the standard same-site deployment model shown in this repository, including `shop.example.com` and `api.shop.example.com`. Only relax it to `None` if the browser frontend truly lives on a different site and must send the refresh cookie cross-site; if you do that, keep HTTPS and browser credentials enabled end to end.
 
-The provided [BlazorShop.Presentation/BlazorShop.Web/nginx.conf](BlazorShop.Presentation/BlazorShop.Web/nginx.conf) is intentionally HTTP-only for the internal hop and should not be treated as the public TLS endpoint.
+The provided [BlazorShop.Presentation/BlazorShop.Web/nginx.conf](../BlazorShop.Presentation/BlazorShop.Web/nginx.conf) is intentionally HTTP-only for the internal hop and should not be treated as the public TLS endpoint.
 
-Its shared response security headers live in [nginx-security-headers.conf](BlazorShop.Presentation/BlazorShop.Web/nginx-security-headers.conf), copied into the image as `/etc/nginx/snippets/blazorshop-security-headers.conf`. nginx stops inheriting server-level `add_header` directives inside any `location` that declares its own `add_header`, so every such location must `include` the snippet again. CI checks the built Web image with `scripts/verify-web-security-headers.sh` (HTML, SPA fallback, CSS/JS and 404 responses). These headers do not replace a production CSP or edge-level TLS/HSTS policy.
+Its shared response security headers live in [nginx-security-headers.conf](../BlazorShop.Presentation/BlazorShop.Web/nginx-security-headers.conf), copied into the image as `/etc/nginx/snippets/blazorshop-security-headers.conf`. nginx stops inheriting server-level `add_header` directives inside any `location` that declares its own `add_header`, so every such location must `include` the snippet again. CI checks the built Web image with `scripts/verify-web-security-headers.sh` (HTML, SPA fallback, CSS/JS and 404 responses). These headers do not replace a production CSP or edge-level TLS/HSTS policy.
 
 ## Standard Container Deployment
 
@@ -309,14 +309,13 @@ The production Dockerfiles and compose file pin exact image tags so base-image u
 Current pinned images in this repository:
 
 - PostgreSQL: `postgres:16.13-alpine3.23`
-- API build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
-- API runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.6-noble`
-- Storefront build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
-- Storefront runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.6-noble`
-- Web build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
+- API, Storefront, and Web build image: `mcr.microsoft.com/dotnet/sdk:10.0.403-noble`
+- API and Storefront runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.14-noble`
 - Web runtime image: `nginx:1.27.5-alpine3.21`
 
-The API and Storefront runtime pins fall in the affected range for CVE-2026-88092. Use a supported patched runtime and repeat release verification before approving an image set. [Microsoft security advisory](https://github.com/dotnet/aspnetcore/security/advisories/GHSA-rv87-ccxw-8ggf)
+The .NET Dockerfile defaults also pin the Microsoft image index digests. The API and Storefront require a patched runtime for [CVE-2026-88092](https://github.com/dotnet/aspnetcore/security/advisories/GHSA-rv87-ccxw-8ggf). CI reads the installed frameworks inside both final images. The [hosted rehearsal](staging-upgrade-restore-rehearsal.md) records the exact OCI digests and scan results separately from production sign-off.
+
+The pinned Noble runtime base needs the APT security update for [CVE-2026-109518](https://ubuntu.com/security/CVE-2026-109518). Review the targeted package upgrade when changing the base digest.
 
 ## Storefront SEO Runtime Signals
 
@@ -464,7 +463,7 @@ Run this checklist before promoting a release candidate.
 3. Run `npm ci --include=dev`, the full-tree high/critical npm audit gate, and the separate runtime-only audit described in `docs/dependency-security.md`.
 4. Run `dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"` against the actual running storefront environment with `BLAZORSHOP_SEO_SMOKE_BASE_URL` and any required route overrides set.
 5. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
-6. Run `docker compose -f compose.production.yml build api web`.
+6. Run `docker compose -f compose.production.yml build api storefront web` in an isolated build environment. Record the verified image digests before promotion.
 7. Rehearse the migration and restore with isolated staging data. The API applies migrations on startup by default. Verify the full migration history before opening traffic.
 8. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
 
@@ -479,7 +478,7 @@ The GitHub Actions workflow `ci` runs the full PostgreSQL 17 regression suite, n
 
 ## Deployment Checklist
 
-For an upgrade that changes the schema, keep the edge in maintenance from the writer drain through backup, migration, and private smoke. Drain old writers and verify a consistent database, uploads, and Data Protection checkpoint before the first target API startup. Test recovery with the exact rollback images in an isolated environment before the maintenance window.
+For an upgrade that changes the schema, keep the edge in maintenance from the writer drain through backup, migration, and private smoke. Drain all application and background writers and verify a consistent database, uploads, and Data Protection checkpoint before the first target API startup. Keep a protected off-host copy. Test recovery with the exact rollback images in an isolated environment before the maintenance window.
 
 1. Put all secrets in the platform secret store or injected environment variables.
 2. Apply `docs/production.appsettings.example.json` as a deployment-only override file or convert it to environment variables.

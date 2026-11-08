@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# The target is pinned here, in the workflow checkout and in the attach-only browser suite.
+# The workflow pins the target to the exact event SHA and builds its OCI archives once.
 # The baseline comes from a reviewed profile in rehearsal/baselines/ (see profile_value below).
-readonly TARGET_SHA="527ee48056ffd01821e8d3f398c2a2be3fae522e"
+readonly TARGET_SHA="${REHEARSAL_TARGET_SHA:?Missing target commit SHA}"
 readonly TARGET_MIGRATION_COUNT="13"
 readonly TARGET_MIGRATION_HEAD="20261101131138_AddRegistrationConfirmationOutbox"
 readonly BASELINE_MIGRATIONS=(
@@ -24,16 +24,17 @@ readonly UPGRADE_MIGRATIONS=(
     20261101131138_AddRegistrationConfirmationOutbox
 )
 readonly POSTGRES_IMAGE="postgres:16.13-alpine3.23"
-readonly DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0.202-noble"
-readonly DOTNET_ASPNET_IMAGE="mcr.microsoft.com/dotnet/aspnet:10.0.6-noble"
+readonly BASELINE_DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0.202-noble"
+readonly BASELINE_DOTNET_ASPNET_IMAGE="mcr.microsoft.com/dotnet/aspnet:10.0.6-noble"
+readonly PROBE_IMAGE="mcr.microsoft.com/dotnet/aspnet:10.0.14-noble@sha256:1a48394b6f29d3a32c79d9edecd4abda0ecbe8776d567dbfc4590ed6979c740c"
 readonly NGINX_IMAGE="nginx:1.27.5-alpine3.21"
 readonly CATEGORY_ID="37000000-0000-0000-0000-000000000001"
 readonly SIMPLE_PRODUCT_ID="37000000-0000-0000-0000-000000000010"
 readonly VARIANT_PRODUCT_ID="37000000-0000-0000-0000-000000000020"
 readonly VARIANT_ID="37000000-0000-0000-0000-000000000021"
 
-if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <tooling-directory> <baseline-source-directory> <target-source-directory>" >&2
+if [[ $# -ne 4 || ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Usage: REHEARSAL_TARGET_SHA=<commit> $0 <tooling> <baseline-source> <target-source> <target-archives>" >&2
     exit 2
 fi
 if [[ "${GITHUB_ACTIONS:-}" != true || "${RUNNER_ENVIRONMENT:-}" != github-hosted || "${RUNNER_OS:-}" != Linux ]]; then
@@ -44,6 +45,7 @@ fi
 readonly TOOLING_DIR="$(realpath "$1")"
 readonly BASELINE_DIR="$(realpath "$2")"
 readonly TARGET_DIR="$(realpath "$3")"
+readonly TARGET_ARCHIVES_DIR="$(realpath "$4")"
 readonly COMPOSE_FILE="$TOOLING_DIR/rehearsal/compose.staging-rehearsal.yml"
 readonly ARTIFACT_DIR="$TOOLING_DIR/artifacts/staging-rehearsal"
 readonly LOG_DIR="$ARTIFACT_DIR/logs"
@@ -131,7 +133,7 @@ export REHEARSAL_WEB_URL="http://localhost:$REHEARSAL_WEB_PORT"
 export REHEARSAL_DB_HOST="postgres"
 export REHEARSAL_UPLOADS_VOLUME="uploads-data"
 export REHEARSAL_DATA_PROTECTION_VOLUME="data-protection-keys"
-export REHEARSAL_PROBE_IMAGE="$DOTNET_ASPNET_IMAGE"
+export REHEARSAL_PROBE_IMAGE="$PROBE_IMAGE"
 export REHEARSAL_PROBE_DIR="$PROBE_DIR"
 
 readonly USER_EMAIL="rehearsal.user.${RUN_NUMBER}.${RUN_ATTEMPT}@example.test"
@@ -146,6 +148,7 @@ readonly BASELINE_WEB_IMAGE="$BASELINE_IMAGE_PREFIX-web:local"
 readonly TARGET_API_IMAGE="$TARGET_IMAGE_PREFIX-api:local"
 readonly TARGET_STOREFRONT_IMAGE="$TARGET_IMAGE_PREFIX-storefront:local"
 readonly TARGET_WEB_IMAGE="$TARGET_IMAGE_PREFIX-web:local"
+declare -A TARGET_ENGINE_IMAGE_IDS=()
 
 # Compose evaluates required image variables even during best-effort diagnostics
 # and teardown. Start with the baseline images so an early failure remains cleanable.
@@ -673,6 +676,22 @@ build_image() {
         --tag "$image" --file "$source_dir/$dockerfile" "$source_dir"
 }
 
+import_target_image() {
+    local service="$1" image="$2" archive record config_hash
+    archive="$TARGET_ARCHIVES_DIR/$service.oci.tar"
+    record="$REPORT_DIR/target-$service-oci.json"
+    python3 "$TOOLING_DIR/rehearsal/inspect-target-image.py" "$archive" "$TARGET_SHA" > "$record"
+    cmp "$record" "$TARGET_ARCHIVES_DIR/$service.json"
+    run_logged "$LOG_DIR/import-target-$service.log" skopeo copy "oci-archive:$archive" "docker-daemon:$image"
+    # Docker image IDs differ between the classic and containerd image stores.
+    # Hash the imported config bytes before recording the engine's own ID for the running check.
+    config_hash="$(skopeo inspect --raw --config "docker-daemon:$image" | sha256sum | cut -d ' ' -f 1)"
+    assert_equal "$(jq -er .config_digest "$record")" "sha256:$config_hash" \
+        "target $service import matches the OCI config digest"
+    TARGET_ENGINE_IMAGE_IDS[$service]="$(docker image inspect "$image" --format '{{.Id}}')"
+    bash "$TOOLING_DIR/scripts/verify-aspnet-runtime.sh" "$image" > "$REPORT_DIR/target-$service-runtimes.txt"
+}
+
 run_browser_scenario() {
     local phase="$1" test_class="$2"
     shift 2
@@ -705,15 +724,16 @@ run_logged "$LOG_DIR/build-data-protection-probe.log" dotnet publish \
     --configuration Release --output "$PROBE_DIR" -warnaserror
 
 run_logged "$LOG_DIR/pull-postgres.log" docker pull "$POSTGRES_IMAGE"
-run_logged "$LOG_DIR/pull-dotnet-sdk.log" docker pull "$DOTNET_SDK_IMAGE"
-run_logged "$LOG_DIR/pull-dotnet-aspnet.log" docker pull "$DOTNET_ASPNET_IMAGE"
+run_logged "$LOG_DIR/pull-baseline-dotnet-sdk.log" docker pull "$BASELINE_DOTNET_SDK_IMAGE"
+run_logged "$LOG_DIR/pull-baseline-dotnet-aspnet.log" docker pull "$BASELINE_DOTNET_ASPNET_IMAGE"
+run_logged "$LOG_DIR/pull-probe-aspnet.log" docker pull "$PROBE_IMAGE"
 run_logged "$LOG_DIR/pull-nginx.log" docker pull "$NGINX_IMAGE"
 
 build_image "$BASELINE_DIR" "BlazorShop.Presentation/BlazorShop.API/Dockerfile" "$BASELINE_API_IMAGE" "build-baseline-api.log"
 build_image "$BASELINE_DIR" "BlazorShop.Presentation/BlazorShop.Storefront/Dockerfile" "$BASELINE_STOREFRONT_IMAGE" "build-baseline-storefront.log"
 build_image "$BASELINE_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$BASELINE_WEB_IMAGE" "build-baseline-web.log"
-build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.API/Dockerfile" "$TARGET_API_IMAGE" "build-target-api.log"
-build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.Storefront/Dockerfile" "$TARGET_STOREFRONT_IMAGE" "build-target-storefront.log"
+import_target_image api "$TARGET_API_IMAGE"
+import_target_image storefront "$TARGET_STOREFRONT_IMAGE"
 build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$TARGET_WEB_IMAGE" "build-target-web.log"
 
 {
@@ -722,11 +742,12 @@ build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$
     echo "target_sha=$target_actual"
     echo "postgres_image=$POSTGRES_IMAGE"
     echo "postgres_local_image_id=$(docker image inspect "$POSTGRES_IMAGE" --format '{{.Id}}')"
-    echo "dotnet_sdk_base=$DOTNET_SDK_IMAGE"
-    echo "dotnet_aspnet_base=$DOTNET_ASPNET_IMAGE"
+    echo "baseline_dotnet_sdk_base=$BASELINE_DOTNET_SDK_IMAGE"
+    echo "baseline_dotnet_aspnet_base=$BASELINE_DOTNET_ASPNET_IMAGE"
+    echo "probe_aspnet_base=$PROBE_IMAGE"
     echo "nginx_base=$NGINX_IMAGE"
-    echo "dotnet_sdk_local_image_id=$(docker image inspect "$DOTNET_SDK_IMAGE" --format '{{.Id}}')"
-    echo "dotnet_aspnet_local_image_id=$(docker image inspect "$DOTNET_ASPNET_IMAGE" --format '{{.Id}}')"
+    echo "baseline_dotnet_sdk_local_image_id=$(docker image inspect "$BASELINE_DOTNET_SDK_IMAGE" --format '{{.Id}}')"
+    echo "baseline_dotnet_aspnet_local_image_id=$(docker image inspect "$BASELINE_DOTNET_ASPNET_IMAGE" --format '{{.Id}}')"
     echo "nginx_local_image_id=$(docker image inspect "$NGINX_IMAGE" --format '{{.Id}}')"
     for image in \
         "$BASELINE_API_IMAGE" "$BASELINE_STOREFRONT_IMAGE" "$BASELINE_WEB_IMAGE" \
@@ -735,7 +756,8 @@ build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$
     done
     echo "postgres_version=$(docker run --rm "$POSTGRES_IMAGE" postgres --version)"
     echo "baseline_api_runtimes=$(docker run --rm --entrypoint dotnet "$BASELINE_API_IMAGE" --list-runtimes | paste -sd ';' -)"
-    echo "target_api_runtimes=$(docker run --rm --entrypoint dotnet "$TARGET_API_IMAGE" --list-runtimes | paste -sd ';' -)"
+    echo "target_api_runtimes=$(paste -sd ';' "$REPORT_DIR/target-api-runtimes.txt")"
+    echo "target_storefront_runtimes=$(paste -sd ';' "$REPORT_DIR/target-storefront-runtimes.txt")"
     echo "nginx_version=$(docker run --rm --entrypoint nginx "$TARGET_WEB_IMAGE" -v 2>&1)"
     echo "playwright_package=1.61.0"
 } > "$REPORT_DIR/versions-and-images.txt"
@@ -834,10 +856,15 @@ export REHEARSAL_WEB_IMAGE="$TARGET_WEB_IMAGE"
 export REHEARSAL_DB_HOST="postgres"
 
 upgrade_started="$(date +%s%3N)"
-dc up --detach --force-recreate api
+dc up --detach --force-recreate --pull never api
 wait_http "$REHEARSAL_API_URL/health" "target API after migration"
 UPGRADE_MILLISECONDS="$(( $(date +%s%3N) - upgrade_started ))"
-dc up --detach --force-recreate storefront web
+dc up --detach --force-recreate --pull never storefront web
+for service in api storefront; do
+    assert_equal "${TARGET_ENGINE_IMAGE_IDS[$service]}" \
+        "$(docker inspect "$(dc ps -q "$service")" --format '{{.Image}}')" \
+        "running target $service matches the verified OCI import"
+done
 wait_http "$REHEARSAL_STOREFRONT_URL/product/rehearsal-canvas-bag" "target Storefront"
 wait_http "$REHEARSAL_WEB_URL/authentication/login/account" "target Web"
 
