@@ -148,6 +148,11 @@ jobs:
       - name: Build Storefront container image
         run: docker build -f BlazorShop.Presentation/BlazorShop.Storefront/Dockerfile -t blazorshop-storefront:ci .
 
+      - name: Verify the final API and Storefront runtimes
+        run: |
+          bash scripts/verify-aspnet-runtime.sh blazorshop-api:ci
+          bash scripts/verify-aspnet-runtime.sh blazorshop-storefront:ci
+
       - name: Verify published Storefront static assets
         run: |
           docker run --detach --name storefront-assets --publish 127.0.0.1:18080:8080 \

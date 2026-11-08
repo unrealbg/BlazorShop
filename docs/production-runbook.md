@@ -308,10 +308,13 @@ The production Dockerfiles and compose file pin exact image tags so base-image u
 Current pinned images in this repository:
 
 - PostgreSQL: `postgres:16.13-alpine3.23`
-- API build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
-- API runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.6-noble`
-- Web build image: `mcr.microsoft.com/dotnet/sdk:10.0.202-noble`
+- API, Storefront, and Web build image: `mcr.microsoft.com/dotnet/sdk:10.0.403-noble`
+- API and Storefront runtime image: `mcr.microsoft.com/dotnet/aspnet:10.0.14-noble`
 - Web runtime image: `nginx:1.27.5-alpine3.21`
+
+The .NET Dockerfile defaults also pin the Microsoft image index digests. The API and Storefront require a patched runtime for [CVE-2026-88092](https://github.com/dotnet/aspnetcore/security/advisories/GHSA-rv87-ccxw-8ggf). CI reads the installed frameworks inside both final images. The [hosted rehearsal](staging-upgrade-restore-rehearsal.md) records the exact OCI digests and scan results separately from production sign-off.
+
+The pinned Noble runtime base needs the APT security update for [CVE-2026-109518](https://ubuntu.com/security/CVE-2026-109518). Review the targeted package upgrade when changing the base digest.
 
 ## Storefront SEO Runtime Signals
 

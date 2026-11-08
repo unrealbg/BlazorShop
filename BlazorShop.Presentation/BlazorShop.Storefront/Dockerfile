@@ -1,11 +1,11 @@
-ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.202-noble
-ARG DOTNET_ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.6-noble
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e
+ARG DOTNET_ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.14-noble@sha256:1a48394b6f29d3a32c79d9edecd4abda0ecbe8776d567dbfc4590ed6979c740c
 
 FROM ${DOTNET_SDK_IMAGE} AS build
 WORKDIR /src
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nodejs npm \
+    && apt-get -o Acquire::Retries=0 install -y --no-install-recommends nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 COPY BlazorShop.Presentation/BlazorShop.Storefront/BlazorShop.Storefront.csproj BlazorShop.Presentation/BlazorShop.Storefront/
@@ -41,6 +41,11 @@ RUN dotnet publish BlazorShop.Presentation/BlazorShop.Storefront/BlazorShop.Stor
 
 FROM ${DOTNET_ASPNET_IMAGE} AS final
 WORKDIR /app
+
+# Service the Noble APT packages for CVE-2026-109518.
+RUN apt-get update \
+    && apt-get -o Acquire::Retries=0 install -y --only-upgrade --no-install-recommends apt libapt-pkg6.0t64 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
 

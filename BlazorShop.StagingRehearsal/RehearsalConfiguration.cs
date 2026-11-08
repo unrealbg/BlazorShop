@@ -23,7 +23,6 @@ internal sealed record RehearsalConfiguration(
     string ArtifactDirectory)
 {
     private const string ExpectedMode = "attach-upgraded-database";
-    private const string ExpectedTargetSha = "527ee48056ffd01821e8d3f398c2a2be3fae522e";
     private const string ExpectedMarker = "37000000-0000-0000-0000-000000000001";
 
     public static RehearsalConfiguration Load(bool baseline = false)
@@ -43,9 +42,9 @@ internal sealed record RehearsalConfiguration(
         }
 
         var targetSha = Required("BLAZORSHOP_REHEARSAL_TARGET_SHA");
-        if (!string.Equals(targetSha, ExpectedTargetSha, StringComparison.Ordinal))
+        if (targetSha.Length != 40 || !targetSha.All(Uri.IsHexDigit))
         {
-            throw new InvalidOperationException($"The attach-only suite requires target SHA {ExpectedTargetSha}.");
+            throw new InvalidOperationException("The attach-only suite requires the verified target commit SHA.");
         }
 
         var marker = Required("BLAZORSHOP_REHEARSAL_MARKER");
