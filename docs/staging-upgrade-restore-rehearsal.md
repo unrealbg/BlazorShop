@@ -4,28 +4,28 @@ This repository contains an isolated GitHub-hosted rehearsal for upgrading a rep
 
 ## Scenarios and R09 status
 
-**R09 status (2026-11-05): PARTIALLY VERIFIED.**
+**R09 remains PARTIALLY VERIFIED. RELEASE / DEPLOYMENT remains NO-GO pending production sign-off.**
 
 | Scenario | Status | Evidence |
 |---|---|---|
 | **Historical upgrade/restore** (`historical` profile `df8a5e1` → `527ee48`) | **PASS** | Hosted run [42103476333](https://github.com/unrealbg/BlazorShop/actions/runs/42103476333) on PR #147 head `80f63b3`: 72/72 assertions, browser test 1/1, database, schema, uploads and Data Protection restore verified. |
-| **Reconstructed candidate** (`candidate-f40b870` profile `f40b870` → `527ee48`) | See hosted matrix result | Same synthetic five-migration fixture, separate application builds and restore volumes. |
+| **Reconstructed candidate** (`candidate-f40b870` profile `f40b870` → `527ee48`) | **PASS** | [Hosted run 42467399535](https://github.com/unrealbg/BlazorShop/actions/runs/42467399535) recorded 148 assertions and 2 Playwright tests in each profile, and 139 PostgreSQL 16 regressions on that earlier target. |
 | **VPS-specific upgrade/restore** (the version actually deployed → current target) | **BLOCKED** | The deployed baseline is unknown. It waits for read-only evidence from the VPS: see [Establishing the deployed VPS version](r09-vps-version-evidence.md). |
 
 PR #147 was merged as `f9025f7` with a tree identical to the verified head `80f63b3`. In its post-merge `ci` run [42106323751](https://github.com/unrealbg/BlazorShop/actions/runs/42106323751), attempt 1 was cancelled when `browser-e2e` hit its 45-minute limit. That happened during the Ubuntu dependency installation for Firefox and WebKit (`playwright install --with-deps`), whose apt downloads from the runner's Ubuntu mirror stalled. Both Chromium runs had already passed 40/40. The owner approved a single rerun of that job only: attempt 2 passed with Chromium 40/40 twice and Firefox/WebKit 11/11 twice, and the install step took 26 seconds. `build-test`, `postgres16-archive` and Code Analysis were not rerun.
 
 The historical baseline is synthetic, representative evidence for the documented upgrade path. It is **not** a claim about the version that runs on any VPS.
 
-The pinned target `527ee48` is not the current `master`. Between `527ee48` and `f9025f7` only rehearsal tooling and documentation changed (the workflow, runner, Compose file, browser-suite constant, baseline profile, Data Protection probe and this document). No application, migration or Dockerfile source changed. A green run therefore proves that this synthetic database and volumes upgrade to, and restore from, the application and schema of `527ee48`, which `f9025f7` shares. It proves nothing about later application commits until the target is re-pinned, and nothing about the deployed VPS version or real data. The run on PR #148 head `a23b56a` ([42117420545](https://github.com/unrealbg/BlazorShop/actions/runs/42117420545)) passed again with the same pins, showing the rehearsal is reproducible.
+The results above apply to the earlier target `527ee48`. For the ASP.NET Core security remediation, use the results from the exact target commit and OCI digests recorded in its hosted run.
 
 ## Pinned application boundary
 
 The rehearsal pins both application sources:
 
-- baseline: from the reviewed profile [`rehearsal/baselines/historical.env`](../rehearsal/baselines/historical.env), currently `df8a5e19d12728f0228e293404d6e2ceee743db7`;
-- upgrade target: `527ee48056ffd01821e8d3f398c2a2be3fae522e`.
+- baselines come from the reviewed [historical](../rehearsal/baselines/historical.env) and [candidate-f40b870](../rehearsal/baselines/candidate-f40b870.env) profiles;
+- the workflow uses the full PR head SHA or, for a manual dispatch, the full commit SHA of the dispatched ref.
 
-The target SHA appears in three places that must change together: the target checkout in `.github/workflows/staging-rehearsal.yml`, `TARGET_SHA` in `rehearsal/run-staging-rehearsal.sh`, and `ExpectedTargetSha` in `BlazorShop.StagingRehearsal/RehearsalConfiguration.cs`. The runner rejects a checkout whose `HEAD` differs, and the browser suite refuses any other SHA.
+The workflow builds the Linux/amd64 API and Storefront OCI archives once and labels them with that SHA. Each scenario independently verifies its source checkouts, verifies the archives and their source labels, imports the same images and checks the container image IDs against the OCI config digests. The runtime probe reads `dotnet --list-runtimes` inside both final images. The scan job reads the same OCI artifacts and uploads the CycloneDX SBOMs and full vulnerability reports. The artifacts record the source SHA, OCI manifest digest, and config digest for each image.
 
 The historical commit is the merge of PR #97 and is the last application version before the checkout migration series began. Its migration head is `20260424183749_AdminBackOfficeMvp` (5 migrations). The target has 13 migrations with head `20261101131138_AddRegistrationConfirmationOutbox`. It applies these eight migrations to the historical database, in order:
 
@@ -38,7 +38,7 @@ The historical commit is the merge of PR #97 and is the last application version
 7. `ArchiveLegacyCheckoutOrderItems`
 8. `AddRegistrationConfirmationOutbox`
 
-Changing either pinned version is a deliberate reviewable change. The application checkouts are clean, detached sources; the rehearsal does not edit historical code, migrations, or the baseline seed.
+The clean application checkouts are detached. Changing a reviewed baseline or the expected migration history requires an explicit source change. Historical code, migrations, and the baseline seed remain intact.
 
 ### Baseline profiles and the blocked VPS scenario
 

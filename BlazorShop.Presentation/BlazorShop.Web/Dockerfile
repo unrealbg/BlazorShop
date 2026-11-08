@@ -1,11 +1,11 @@
-ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.202-noble
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e
 ARG NGINX_IMAGE=nginx:1.27.5-alpine3.21
 
 FROM ${DOTNET_SDK_IMAGE} AS build
 WORKDIR /src
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nodejs npm \
+    && apt-get -o Acquire::Retries=0 install -y --no-install-recommends nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 COPY BlazorShop.Presentation/BlazorShop.Web/BlazorShop.Web.csproj BlazorShop.Presentation/BlazorShop.Web/
