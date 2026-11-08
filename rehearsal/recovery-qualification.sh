@@ -119,6 +119,18 @@ qualification_failed_startup() {
 
 qualification_forwarding() {
     local cid status edge="https://localhost:$REHEARSAL_EDGE_PORT"
+    rm "$REHEARSAL_EDGE_DIR/maintenance"
+    for _ in {1..15}; do
+        status="$(edge_request --output /dev/null --write-out '%{http_code}' "$edge/product/rehearsal-canvas-bag" 2>/dev/null || :)"
+        [[ "$status" == 200 ]] && break
+        sleep 1
+    done
+    assert_equal 200 "$status" "target Storefront is reachable through TLS"
+    assert_equal 200 "$(edge_request --output /dev/null --write-out '%{http_code}' "$edge/authentication/login/account")" "target Web is reachable through TLS"
+    touch "$REHEARSAL_EDGE_DIR/maintenance"
+
+    # Enable API redirects only for the forwarding probe. Storefront calls the API over the
+    # internal HTTP hop in the representative topology.
     cid="$(dc --profile edge ps --quiet edge)"
     REHEARSAL_EDGE_IP="$(docker inspect "$cid" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')"
     [[ "$REHEARSAL_EDGE_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
@@ -134,8 +146,6 @@ qualification_forwarding() {
     assert_equal 307 "$(curl -sS --max-time 10 --header 'X-Forwarded-Proto: https' \
         --output /dev/null --write-out '%{http_code}' "$REHEARSAL_API_URL/health")" "untrusted direct request cannot spoof HTTPS forwarding"
     assert_equal 200 "$(edge_request --output /dev/null --write-out '%{http_code}' "$edge/alive")" "target liveness succeeds through the TLS edge"
-    assert_equal 200 "$(edge_request --output /dev/null --write-out '%{http_code}' "$edge/product/rehearsal-canvas-bag")" "target Storefront is reachable through TLS"
-    assert_equal 200 "$(edge_request --output /dev/null --write-out '%{http_code}' "$edge/authentication/login/account")" "target Web is reachable through TLS"
     touch "$REHEARSAL_EDGE_DIR/maintenance"
     unset REHEARSAL_EDGE_IP REHEARSAL_FORCE_HTTPS REHEARSAL_FORWARD_HEADERS
 }
