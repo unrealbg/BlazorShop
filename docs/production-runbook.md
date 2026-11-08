@@ -10,7 +10,7 @@ BlazorShop now has three deployable surfaces with different configuration owners
 - Storefront: the SSR public shopping site, public canonical/discovery origin, and storefront-to-account handoff URLs
 - Web: the authenticated account/admin Blazor WebAssembly client
 
-Use [docs/production.appsettings.example.json](docs/production.appsettings.example.json) as the API example and [docs/storefront.production.appsettings.example.json](docs/storefront.production.appsettings.example.json) as the standalone storefront example.
+Use [docs/production.appsettings.example.json](production.appsettings.example.json) as the API example and [docs/storefront.production.appsettings.example.json](storefront.production.appsettings.example.json) as the standalone storefront example.
 
 ## Replace the placeholders
 
@@ -151,7 +151,7 @@ If you deploy with an appsettings override file instead of environment variables
 - Confirmation emails and password-reset style links depend on `ClientApp:BaseUrl` because they link back into the authenticated Web client, not the SSR storefront.
 - Stripe success and cancel URLs also depend on `ClientApp:BaseUrl`; do not point that value at the public storefront domain unless the authenticated client is actually hosted there.
 - Refresh-token cookies remain `HttpOnly` and `Secure`. `SameSite=Strict` is correct for the standard `shop.example.com` / `account.shop.example.com` / `api.shop.example.com` model because those subdomains are cross-origin but still same-site.
-- SMTP delivery failures are now logged with the full exception and bubble back to callers. In strict confirmation mode, that keeps registration fail-closed instead of creating users who never receive a usable confirmation link.
+- With email confirmation required, registration commits the user and the confirmation outbox entry together. A background worker attempts SMTP delivery and records retries and dead letters. An unconfirmed user cannot sign in. Check the outbox and SMTP diagnostics when registration succeeds and the confirmation email is delayed.
 
 ## Web Runtime Config
 
@@ -174,9 +174,9 @@ The repository's standard container stack is designed around a public HTTPS edge
 
 Use `Runtime__Security__RefreshTokenCookieSameSite=Strict` for the standard same-site deployment model shown in this repository, including `shop.example.com` and `api.shop.example.com`. Only relax it to `None` if the browser frontend truly lives on a different site and must send the refresh cookie cross-site; if you do that, keep HTTPS and browser credentials enabled end to end.
 
-The provided [BlazorShop.Presentation/BlazorShop.Web/nginx.conf](BlazorShop.Presentation/BlazorShop.Web/nginx.conf) is intentionally HTTP-only for the internal hop and should not be treated as the public TLS endpoint.
+The provided [BlazorShop.Presentation/BlazorShop.Web/nginx.conf](../BlazorShop.Presentation/BlazorShop.Web/nginx.conf) is intentionally HTTP-only for the internal hop and should not be treated as the public TLS endpoint.
 
-Its shared response security headers live in [nginx-security-headers.conf](BlazorShop.Presentation/BlazorShop.Web/nginx-security-headers.conf), copied into the image as `/etc/nginx/snippets/blazorshop-security-headers.conf`. nginx stops inheriting server-level `add_header` directives inside any `location` that declares its own `add_header`, so every such location must `include` the snippet again. CI checks the built Web image with `scripts/verify-web-security-headers.sh` (HTML, SPA fallback, CSS/JS and 404 responses). These headers do not replace a production CSP or edge-level TLS/HSTS policy.
+Its shared response security headers live in [nginx-security-headers.conf](../BlazorShop.Presentation/BlazorShop.Web/nginx-security-headers.conf), copied into the image as `/etc/nginx/snippets/blazorshop-security-headers.conf`. nginx stops inheriting server-level `add_header` directives inside any `location` that declares its own `add_header`, so every such location must `include` the snippet again. CI checks the built Web image with `scripts/verify-web-security-headers.sh` (HTML, SPA fallback, CSS/JS and 404 responses). These headers do not replace a production CSP or edge-level TLS/HSTS policy.
 
 ## Standard Container Deployment
 
@@ -273,7 +273,7 @@ Notes:
 
 - API startup/runtime logs go to console and to `BlazorShop.Presentation/BlazorShop.API/log/log*.txt` by default.
 - Storefront runtime signals for discovery, redirect, and public catalog failures are emitted as structured log event names such as `public.discovery.sitemap_failure`, `public.redirect.invalid_target_blocked`, and `public.product.service_unavailable`.
-- SMTP failures are logged with the exception details and no longer fail silently in confirmation-required auth paths.
+- Review registration confirmation outbox age, retries, and dead letters alongside SMTP diagnostics. Review the delivery state before retrying a message.
 - If storefront handoff routes start returning `503`, check `ClientApp:BaseUrl` on the storefront host first. That is the explicit failure mode when neither standalone config nor service discovery can resolve the authenticated client origin.
 
 ## Deployment Smoke Checks
@@ -302,8 +302,9 @@ The production Dockerfiles and compose file pin exact image tags so base-image u
 
 - Review the pinned .NET, nginx, and PostgreSQL tags at least monthly.
 - Review them immediately after vendor security advisories or when CI/container scanning flags a base-image issue.
-- Update the pinned tags in `compose.production.yml`, `BlazorShop.Presentation/BlazorShop.API/Dockerfile`, and `BlazorShop.Presentation/BlazorShop.Web/Dockerfile` in the same change.
+- Review the pins in `compose.production.yml` and the API, Storefront, and Web Dockerfiles when changing a base image.
 - Re-run the full release verification after every image bump, even when the application code is unchanged.
+- Record the application image digests and their source commit, verify the packaged runtime versions, and scan the exact images that will be deployed. A dependency audit covers a different scope from the container scan.
 
 Current pinned images in this repository:
 
@@ -462,8 +463,8 @@ Run this checklist before promoting a release candidate.
 3. Run `npm ci --include=dev`, the full-tree high/critical npm audit gate, and the separate runtime-only audit described in `docs/dependency-security.md`.
 4. Run `dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj -c Release --filter "Category=SeoSmoke"` against the actual running storefront environment with `BLAZORSHOP_SEO_SMOKE_BASE_URL` and any required route overrides set.
 5. Run `docker compose -f compose.production.yml config` with the production-required environment variables available.
-6. Run `docker compose -f compose.production.yml build api web`.
-7. Apply database migrations before opening traffic. In the standard runtime path this repository applies migrations on API startup, but if your deployment process separates migration execution from app startup, run that migration step explicitly and verify it completed successfully.
+6. Run `docker compose -f compose.production.yml build api storefront web` in an isolated build environment. Record the verified image digests before promotion.
+7. Rehearse the migration and restore with isolated staging data. The API applies migrations on startup by default. Verify the full migration history before opening traffic.
 8. Smoke test login, refresh, logout, and upload persistence against the deployed environment.
 
 Suggested smoke-test focus:
@@ -477,20 +478,22 @@ The GitHub Actions workflow `ci` runs the full PostgreSQL 17 regression suite, n
 
 ## Deployment Checklist
 
+For an upgrade that changes the schema, keep the edge in maintenance from the writer drain through backup, migration, and private smoke. Drain all application and background writers and verify a consistent database, uploads, and Data Protection checkpoint before the first target API startup. Keep a protected off-host copy. Test recovery with the exact rollback images in an isolated environment before the maintenance window.
+
 1. Put all secrets in the platform secret store or injected environment variables.
 2. Apply `docs/production.appsettings.example.json` as a deployment-only override file or convert it to environment variables.
 3. Remove any extra `AllowedOrigins` entries you do not actually serve in production.
 4. Leave forwarded headers disabled unless a reverse proxy or ingress is really in front of the API.
 5. If forwarded headers are enabled, trust only the exact proxy IPs or CIDR blocks that should be allowed to set `X-Forwarded-*` headers.
-6. Deploy the API and verify that startup logs show the expected allowed origins and forwarded-header mode.
+6. Start the target API with the edge in maintenance. Verify the exact expected migration history, database readiness, allowed origins, and forwarded-header mode. If startup fails, stop target writers and establish the last committed migration before retrying or restoring.
 7. Confirm the production email sender settings are populated with real values and that startup did not fail email-options validation.
-8. If production health endpoints are enabled, verify that `/health` and `/alive` both return `200` and a minimal healthy payload.
+8. If production health endpoints are enabled, verify them through a private probe. `/health` includes database connectivity and `/alive` checks liveness. Verify the migration history separately.
 9. Verify that a browser preflight request from the public web origin succeeds against a public API endpoint.
 10. Verify that public traffic is throttled as expected while authenticated flows still work.
 11. Upload a test image and confirm it still exists after an API container restart.
 12. If Stripe is enabled, register `https://<api-host>/api/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`; store its signing secret in `BLAZORSHOP_STRIPE_WEBHOOK_SECRET`.
-13. If Stripe is enabled, complete a Stripe test checkout and verify that the pending order becomes `Paid` only after the signed webhook is received.
-14. For the #95 checkout-history cleanup, follow the non-rolling [legacy archive cutover and rollback procedure](legacy-checkout-archive.md): back up the database, drain old writers, migrate, deploy matching binaries, and verify the archive before restoring traffic.
+13. If Stripe is enabled, rehearse checkout and webhook delivery against the Stripe sandbox on an isolated, representative topology. Verify that a pending order becomes `Paid` after a valid signed webhook. Review retry behavior during maintenance and document how to reconcile external effects after the checkpoint.
+14. For the #95 checkout-history cleanup, follow the non-rolling [legacy archive cutover and rollback procedure](legacy-checkout-archive.md). For an upgrade that spans multiple migrations, use the verified recovery checkpoint and reconcile writes and provider effects that occurred after it.
 
 ## GitHub Branch Protection
 
