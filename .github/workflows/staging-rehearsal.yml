@@ -21,17 +21,21 @@ concurrency:
 
 jobs:
   upgrade-restore-rehearsal:
+    name: Upgrade and restore (${{ matrix.baseline }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        baseline: [historical, candidate-f40b870]
     env:
-      # Only the historical evidence profile exists. A VPS-specific profile stays BLOCKED until
-      # read-only VPS evidence is recorded (docs/staging-upgrade-restore-rehearsal.md).
-      REHEARSAL_BASELINE_PROFILE: historical
+      REHEARSAL_BASELINE_PROFILE: ${{ matrix.baseline }}
 
     steps:
       - name: Checkout rehearsal tooling
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: tooling
           persist-credentials: false
 
@@ -124,7 +128,54 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: staging-upgrade-restore-${{ github.run_id }}-${{ github.run_attempt }}
+          name: staging-upgrade-restore-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: tooling/artifacts/staging-rehearsal
+          if-no-files-found: error
+          retention-days: 14
+
+  target-postgres-regressions:
+    name: Pinned target PostgreSQL regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BLAZORSHOP_TEST_POSTGRES_IMAGE: postgres:16.13-alpine3.23
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 527ee48056ffd01821e8d3f398c2a2be3fae522e
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Run refresh, inventory, checkout, reconciliation and SMTP regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 527ee48056ffd01821e8d3f398c2a2be3fae522e
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/rehearsal-regressions
+          git rev-parse HEAD > artifacts/rehearsal-regressions/target-sha.txt
+          dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release \
+            --filter 'FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~InventoryReservationPostgreSqlTests|FullyQualifiedName~CheckoutIdempotencyPostgreSqlTests|FullyQualifiedName~StripeReconciliationPostgreSqlTests|FullyQualifiedName~RegistrationConfirmationHttpTests|FullyQualifiedName~RegistrationConfirmationMigrationTests' \
+            --logger 'trx;LogFileName=target-postgres.trx' --results-directory artifacts/rehearsal-regressions
+      - name: Require passing tests in every regression group
+        shell: pwsh
+        run: |
+          [xml] $report = Get-Content -Raw artifacts/rehearsal-regressions/target-postgres.trx
+          $results = @($report.TestRun.Results.UnitTestResult)
+          $groups = @('RefreshRotationHttpTests','InventoryReservationPostgreSqlTests','CheckoutIdempotencyPostgreSqlTests','StripeReconciliationPostgreSqlTests','RegistrationConfirmationHttpTests','RegistrationConfirmationMigrationTests')
+          foreach ($group in $groups) {
+            $matchesForGroup = @($results | Where-Object testName -Like "*.$group.*")
+            if (!$matchesForGroup.Count -or @($matchesForGroup | Where-Object outcome -NE Passed).Count) {
+              throw "Missing or non-passing test results for $group."
+            }
+            "$group passed=$($matchesForGroup.Count)"
+          }
+      - name: Upload pinned target regression results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-rehearsal-target-regressions-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/rehearsal-regressions
           if-no-files-found: error
           retention-days: 14

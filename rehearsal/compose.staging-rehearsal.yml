@@ -43,12 +43,20 @@ services:
       Jwt__Audience: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
       ClientApp__BaseUrl: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
       Identity__RequireConfirmedAccount: "false"
-      Identity__RequireConfirmedEmail: "false"
+      Identity__RequireConfirmedEmail: ${REHEARSAL_REQUIRE_CONFIRMED_EMAIL:-false}
       Stripe__Enabled: "false"
       Stripe__SecretKey: ""
       Stripe__WebhookSecret: ""
       Demo__Enabled: "false"
-      EmailSettings__Enabled: "false"
+      EmailSettings__Enabled: ${REHEARSAL_EMAIL_ENABLED:-false}
+      EmailSettings__From: rehearsal@example.test
+      EmailSettings__DisplayName: Rehearsal
+      EmailSettings__SmtpServer: mailpit
+      EmailSettings__Port: "1025"
+      EmailSettings__UseSsl: "false"
+      EmailSettings__Username: rehearsal
+      EmailSettings__Password: ${REHEARSAL_SMTP_PASSWORD:?REHEARSAL_SMTP_PASSWORD is required}
+      RegistrationConfirmation__PollSeconds: "1"
       Runtime__Cors__AllowedOrigins__0: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
       Runtime__ForwardedHeaders__Enabled: "false"
       Runtime__Health__ExposeInProduction: "true"
@@ -92,6 +100,18 @@ services:
       - api
     ports:
       - "127.0.0.1:${REHEARSAL_WEB_PORT:?REHEARSAL_WEB_PORT is required}:80"
+    networks:
+      - rehearsal
+
+  mailpit:
+    profiles: ["mail"]
+    image: axllent/mailpit:v1.27.4
+    environment:
+      MP_DISABLE_VERSION_CHECK: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:${REHEARSAL_MAIL_PORT:?REHEARSAL_MAIL_PORT is required}:8025"
     networks:
       - rehearsal
 

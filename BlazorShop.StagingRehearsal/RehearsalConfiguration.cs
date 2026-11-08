@@ -26,13 +26,20 @@ internal sealed record RehearsalConfiguration(
     private const string ExpectedTargetSha = "527ee48056ffd01821e8d3f398c2a2be3fae522e";
     private const string ExpectedMarker = "37000000-0000-0000-0000-000000000001";
 
-    public static RehearsalConfiguration Load()
+    public static RehearsalConfiguration Load(bool baseline = false)
     {
+        var expectedMode = baseline ? "attach-baseline-database" : ExpectedMode;
         var mode = Required("BLAZORSHOP_REHEARSAL_MODE");
-        if (!string.Equals(mode, ExpectedMode, StringComparison.Ordinal))
+        if (!string.Equals(mode, expectedMode, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"BLAZORSHOP_REHEARSAL_MODE must be exactly '{ExpectedMode}'; the attach-only suite never starts a disposable stack.");
+                $"BLAZORSHOP_REHEARSAL_MODE must be exactly '{expectedMode}'; the attach-only suite never starts a disposable stack.");
+        }
+
+        if (baseline && Required("BLAZORSHOP_REHEARSAL_BASELINE_SHA") is not
+            ("df8a5e19d12728f0228e293404d6e2ceee743db7" or "f40b8703c84bc565eac7ea569ee0bbe09040817e"))
+        {
+            throw new InvalidOperationException("The baseline browser smoke requires a reviewed baseline SHA.");
         }
 
         var targetSha = Required("BLAZORSHOP_REHEARSAL_TARGET_SHA");

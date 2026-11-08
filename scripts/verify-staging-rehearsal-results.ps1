@@ -1,10 +1,15 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string] $Path
+    [string] $Path,
+    [switch] $Baseline
 )
 
 $ErrorActionPreference = "Stop"
-$expectedTest = "BlazorShop.StagingRehearsal.UpgradedDatabaseBrowserTests.UpgradedHistoricalDatabase_CheckoutStartBrowserFlow"
+$expectedTest = if ($Baseline) {
+    "BlazorShop.StagingRehearsal.BaselineBrowserTests.BaselineCatalogVariantAndProtectedOrderHistory"
+} else {
+    "BlazorShop.StagingRehearsal.UpgradedDatabaseBrowserTests.UpgradedHistoricalDatabase_CheckoutStartBrowserFlow"
+}
 
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
     throw "Staging rehearsal TRX report was not created: $Path"
@@ -25,7 +30,7 @@ if ($failed.Count -gt 0) {
 
 $executedTests = @($results | ForEach-Object { [string] $_.testName } | Sort-Object -Unique)
 if ($results.Count -ne 1 -or $executedTests.Count -ne 1 -or $executedTests[0] -ne $expectedTest) {
-    throw "The mandatory upgraded-database browser scenario was not the exact executed test."
+    throw "The mandatory browser scenario was not the exact executed test: $expectedTest"
 }
 
-Write-Host "Verified the mandatory upgraded-database browser scenario in $Path."
+Write-Host "Verified $expectedTest in $Path."

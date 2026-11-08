@@ -9,6 +9,7 @@ This repository contains an isolated GitHub-hosted rehearsal for upgrading a rep
 | Scenario | Status | Evidence |
 |---|---|---|
 | **Historical upgrade/restore** (`historical` profile `df8a5e1` → `527ee48`) | **PASS** | Hosted run [42103476333](https://github.com/unrealbg/BlazorShop/actions/runs/42103476333) on PR #147 head `80f63b3`: 72/72 assertions, browser test 1/1, database, schema, uploads and Data Protection restore verified. |
+| **Reconstructed candidate** (`candidate-f40b870` profile `f40b870` → `527ee48`) | See hosted matrix result | Same synthetic five-migration fixture, separate application builds and restore volumes. |
 | **VPS-specific upgrade/restore** (the version actually deployed → current target) | **BLOCKED** | The deployed baseline is unknown. It waits for read-only evidence from the VPS: see [Establishing the deployed VPS version](r09-vps-version-evidence.md). |
 
 PR #147 was merged as `f9025f7` with a tree identical to the verified head `80f63b3`. In its post-merge `ci` run [42106323751](https://github.com/unrealbg/BlazorShop/actions/runs/42106323751), attempt 1 was cancelled when `browser-e2e` hit its 45-minute limit. That happened during the Ubuntu dependency installation for Firefox and WebKit (`playwright install --with-deps`), whose apt downloads from the runner's Ubuntu mirror stalled. Both Chromium runs had already passed 40/40. The owner approved a single rerun of that job only: attempt 2 passed with Chromium 40/40 twice and Firefox/WebKit 11/11 twice, and the install step took 26 seconds. `build-test`, `postgres16-archive` and Code Analysis were not rerun.
@@ -41,7 +42,9 @@ Changing either pinned version is a deliberate reviewable change. The applicatio
 
 ### Baseline profiles and the blocked VPS scenario
 
-A baseline profile is a reviewed file in `rehearsal/baselines/` with `BASELINE_SHA`, `BASELINE_MIGRATION_COUNT`, `BASELINE_MIGRATION_HEAD` and `BASELINE_FIXTURE`. The workflow selects it with `REHEARSAL_BASELINE_PROFILE` (fixed to `historical`), checks out its SHA, and the runner validates every field. A missing profile fails with a `BLOCKED` message, and only the `historical-5` fixture (seed and assertions for the 5-migration schema) is implemented.
+A baseline profile is a reviewed file in `rehearsal/baselines/` with `BASELINE_SHA`, `BASELINE_MIGRATION_COUNT`, `BASELINE_MIGRATION_HEAD` and `BASELINE_FIXTURE`. The hosted matrix selects `historical` and [`candidate-f40b870`](../rehearsal/baselines/candidate-f40b870.env) independently. The runner validates the profile, checkout and full migration list. The two baselines have identical EF migration files and use the same `historical-5` seed.
+
+`f40b870` and `91f6fa2` share the same Git tree. The diff from `94fa210` to `f40b870` changes only Storefront and Web presentation files and the README. The API Dockerfile, `.dockerignore`, and all API Dockerfile COPY directories (API, Infrastructure, Application, Domain, ServiceDefaults) are identical. There is one reconstructed application scenario for those API/UI inputs. This identifies equivalent tracked API build inputs at the two commits. It leaves the actual production build context and binary provenance open.
 
 To enable the VPS-specific scenario later:
 
@@ -51,11 +54,11 @@ To enable the VPS-specific scenario later:
 
 ## Isolation and data provenance
 
-The workflow runs on `ubuntu-24.04` with a unique Compose project name. PostgreSQL instances, named volumes, network, application containers, credentials, JWT key, user password, and loopback ports are generated per run. Published ports bind only to `127.0.0.1`; the two helper containers have no network at all. Cleanup addresses only that run's Compose project, its volumes, the temporary runtime directory, and locally built application images.
+The workflow runs on GitHub-hosted `ubuntu-24.04`. Each matrix job has its own runner, Compose project name, database instances, volumes, network and generated credentials. Published ports bind only to `127.0.0.1`. The volume and key-ring helpers have no network. Cleanup addresses that job's Compose project, volumes, runtime directory and locally built application images.
 
-The environment uses test URLs and credentials. Stripe, email sending, demo mode, HTTPS redirection, forwarded headers, and rate limiting are disabled explicitly. It does not load repository or production secrets and has no connection to any real database. `GITHUB_TOKEN` has only `contents: read`, and checkout does not persist credentials.
+The environment uses synthetic URLs and credentials. Stripe, demo mode, HTTPS redirection, forwarded headers and rate limiting are disabled. Confirmation mail is enabled for a final target probe and sent exclusively to the project-local Mailpit sink. That phase's API logs and all message bodies stay out of artifacts. The hosted workflow uses a read-only repository token and ephemeral PostgreSQL databases.
 
-The historical API creates the ordinary test user through the real registration surface, with confirmation requirements disabled in the isolated configuration. The remaining deterministic fixture is inserted directly into the already migrated historical database by [`seed-baseline.sql`](../rehearsal/seed-baseline.sql). There are no public reset endpoints, authentication bypasses, external email calls, or payment calls.
+The baseline API creates two accounts through real registration, with confirmation requirements disabled for initial seeding. The candidate must give the first account Admin and the second User. The historical control must give both accounts User. Subsequent checks verify actual login, admin authorization, unchanged Identity data, rotation of a pre-upgrade refresh cookie on the target, replay and logout rejection, and acceptance of the original cookie after restore. The SQL seed supplies the deterministic catalog and legacy orders. [Baseline seed](../rehearsal/seed-baseline.sql)
 
 The synthetic fixture includes:
 
@@ -91,18 +94,20 @@ The separate `Staging Upgrade and Restore Rehearsal` workflow performs the follo
 
 The browser scenario covers home-to-category-to-product navigation with content assertions, a product-only cart line, exact variant selection, displayed prices, quantity change and reload persistence, anonymous checkout redirect, UI login, and both preserved cart lines at checkout start. It performs no checkout submission, payment, webhook, email, or stock mutation. Its selectors match the current storefront and checkout UI, which the green `StorefrontCheckoutTests` in `BlazorShop.E2E` exercise with the same texts and roles.
 
-The Data Protection probe (`rehearsal/data-protection-probe`) uses a fixed application name and purpose, persists keys to the mounted key directory, and disables automatic key generation when unprotecting. It proves that the backed-up key ring itself survives; it does not reproduce the API's own discriminator.
+Before upgrade, a second Playwright scenario selects a Storefront variant, signs in through Web and opens the protected order history. On the upgraded database, the HTTP checks submit offline Cash on Delivery checkout through Web, verify the variant snapshot, retry with the same key and a conflicting intent, and race two requests for the last unit. The final Mailpit check waits for outbox delivery, verifies a single captured email and exercises the actual Identity confirmation endpoint with invalid and valid tokens. A separate job builds and runs the exact target's PostgreSQL regression suites, including fake-provider reconciliation and SMTP failure/retry tests, on disposable PostgreSQL 16.13. These regressions use their own database.
+
+The Data Protection probe uses its own application name and purpose and verifies the backed-up key ring with positive and empty-ring negative controls. In the pinned applications, the exercised refresh cookie carries an opaque database-backed credential, and email confirmation uses Identity's email token provider. Their positive and negative API checks exercise those mechanisms independently of the Data Protection probe.
 
 ## Running and diagnosing
 
 The supported execution environment is the GitHub-hosted workflow. Run it from **Actions → Staging Upgrade and Restore Rehearsal → Run workflow**, or change a path covered by its pull-request trigger. Local Docker availability is not treated as a prerequisite or as equivalent staging evidence.
 
-Every run uploads a `staging-upgrade-restore-<run-id>-<attempt>` artifact for 14 days. It contains:
+Each matrix job uploads a `staging-upgrade-restore-<profile>-<run-id>-<attempt>` artifact for 14 days. It contains:
 
 - exact source SHAs, runner/.NET/package/browser/PostgreSQL versions, and local image IDs;
 - `result.txt` with the baseline profile and SHAs, migration heads before and after the upgrade, backup, upgrade and restore durations for the database and the volumes, the uploads, Data Protection, volume-restore and browser results, and the first failing command when a run fails;
 - `assertions.txt` with every PASS/FAIL assertion and, for a failure, the expected and received values;
-- pre-upgrade, post-upgrade, backup metadata/content-list, and post-restore control reports, per-table row counts, and pre-upgrade and post-restore schema dumps;
+- pre-upgrade, post-upgrade, backup metadata/content-list, and post-restore controls, per-table counts and restore fingerprints, and pre-upgrade and post-restore schema dumps;
 - volume archive checksums, sizes and file counts, the upload fixture checksums, and the uploads manifest;
 - the mandatory browser TRX plus a failure screenshot and pre-authentication trace when that test fails;
 - Docker build, application, Compose state, seed, restore, and runner logs.
