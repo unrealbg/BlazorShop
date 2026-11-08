@@ -21,7 +21,7 @@ Obtain separate written approval for the exact host, services, role, command lis
 
 ## Aggregate SQL and stop criteria
 
-The query starts a read-only transaction with bounded statement and lock timeouts. It checks the five- and thirteen-migration schema shapes and emits counts, not individual users, orders or values. Missing historical currency or provider fields are reported explicitly. Review authoritative currency and provider evidence separately.
+The query starts a repeatable-read, read-only transaction with bounded statement and lock timeouts. It checks the five- and thirteen-migration schema shapes and emits counts, not individual users, orders or values. Missing historical currency or provider fields are reported explicitly. Review authoritative currency and provider evidence separately.
 
 | Signal | Before a production cutover |
 |---|---|

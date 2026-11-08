@@ -915,6 +915,7 @@ check_upgraded_checkout
 check_upgraded_stripe_webhook
 check_upgraded_outbox
 qualification_forwarding
+recovery_started="$(date +%s%3N)"
 stop_application_writers
 qualification_drain
 qualification_restore_images
@@ -972,13 +973,15 @@ export REHEARSAL_UPLOADS_VOLUME="restore-uploads-data"
 export REHEARSAL_DATA_PROTECTION_VOLUME="restore-data-protection-keys"
 export REHEARSAL_REQUIRE_CONFIRMED_EMAIL=false REHEARSAL_EMAIL_ENABLED=false
 unset REHEARSAL_STRIPE_WEBHOOK_SECRET
-dc --profile restore up --detach --force-recreate api storefront web
+dc --profile restore up --detach --force-recreate --pull never api storefront web
 CAPTURE_API_LOGS=true
 verify_baseline_application "post-restore"
 assert_rotation "$(session_cookie "$RUNTIME_DIR/baseline-survivor")" "$RUNTIME_DIR/restored-session" \
     "restored baseline accepts the original pre-backup refresh cookie"
 verify_upload_fixtures_served "post-restore baseline"
 qualification_reconcile
+printf 'recovery_elapsed_to_private_smoke_ms=%s\n' "$(( $(date +%s%3N) - recovery_started ))" \
+    >> "$REPORT_DIR/recovery-qualification.txt"
 UPLOADS_RESULT="passed"
 VOLUME_RESTORE_RESULT="passed"
 capture_logs "restored-baseline"

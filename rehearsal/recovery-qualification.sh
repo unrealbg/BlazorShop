@@ -85,6 +85,7 @@ qualification_checkpoint() {
     done > "$RUNTIME_DIR/baseline-ids.txt"
     {
         printf 'checkpoint_config_and_image_export_ms=%s\n' "$(( $(date +%s%3N) - started ))"
+        printf 'checkpoint_elapsed_ms=%s\n' "$(( $(date +%s%3N) - backup_started ))"
         printf 'docker_archive_bytes=%s\n' "$(stat -c %s "$RUNTIME_DIR/rollback-images.tar")"
         printf 'database_archive_bytes=%s\n' "$(stat -c %s "$BACKUP_PATH")"
         cat "$RUNTIME_DIR/baseline-ids.txt"
@@ -108,6 +109,7 @@ qualification_failed_startup() {
     [[ "$code" =~ ^[1-9][0-9]*$ ]]
     docker logs "$cid" > "$LOG_DIR/synthetic-startup-failure.log" 2>&1
     grep -Eq '28P01|password authentication failed' "$LOG_DIR/synthetic-startup-failure.log"
+    printf 'synthetic_startup_exit=%s\n' "$code" >> "$REPORT_DIR/recovery-qualification.txt"
     assert_equal 5 "$(scalar postgres 'SELECT count(*) FROM "__EFMigrationsHistory";')" "failed startup leaves five baseline migrations"
     assert_equal 503 "$(edge_request --output /dev/null --write-out '%{http_code}' \
         "https://localhost:$REHEARSAL_EDGE_PORT/health")" "maintenance stays closed during failed startup"

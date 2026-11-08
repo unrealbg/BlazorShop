@@ -1,8 +1,8 @@
 \set ON_ERROR_STOP on
-BEGIN READ ONLY;
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 SET LOCAL statement_timeout = '15s';
 SET LOCAL lock_timeout = '2s';
-SET LOCAL search_path = public, pg_catalog;
+SET LOCAL search_path = pg_catalog, public;
 
 -- Aggregate-only output. The operator must retain even these results in the approved environment.
 SELECT 'transaction_read_only', current_setting('transaction_read_only');
@@ -34,8 +34,10 @@ UNION ALL SELECT 'money.negative_variant_prices', (SELECT count(*) FROM "Product
 UNION ALL SELECT 'orders.count', count(*)::text FROM "Orders"
 UNION ALL SELECT 'orders.negative_totals', count(*)::text FROM "Orders" WHERE "TotalAmount" < 0
 UNION ALL SELECT 'orders.nonfinite_totals', count(*)::text FROM "Orders" WHERE "TotalAmount"::text IN ('NaN', 'Infinity', '-Infinity')
+UNION ALL SELECT 'orders.totals_outside_decimal_range', count(*)::text FROM "Orders" WHERE abs("TotalAmount") > 79228162514264337593543950335
 UNION ALL SELECT 'lines.count', count(*)::text FROM "OrderLines"
 UNION ALL SELECT 'lines.invalid_quantity_or_price', count(*)::text FROM "OrderLines" WHERE "Quantity" <= 0 OR "UnitPrice" < 0 OR "UnitPrice"::text IN ('NaN', 'Infinity', '-Infinity')
+UNION ALL SELECT 'lines.extended_price_outside_decimal_range', count(*)::text FROM "OrderLines" WHERE abs("UnitPrice") > 79228162514264337593543950335 / greatest(1, "Quantity")
 UNION ALL SELECT 'lines.catalog_fallback', count(*)::text FROM "OrderLines" l LEFT JOIN "Products" p ON p."Id" = l."ProductId" WHERE p."Id" IS NULL OR p."Name" IS NULL
 UNION ALL SELECT 'payment.methods', count(*)::text FROM "PaymentMethods";
 
