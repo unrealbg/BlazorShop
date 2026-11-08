@@ -173,7 +173,7 @@ SQL
     timestamp="$(date +%s)"
     # Stripe.net 50.0.0 expects the 2025-11-17.clover API version.
     payload="$(jq -cn --argjson time "$timestamp" --arg order "$order_id" --arg transaction "$transaction_id" '{
-        id: "evt_r09_rehearsal", object: "event", api_version: "2025-11-17.clover",
+        id: "evt_r09_rehearsal", object: "event", api_version: "2025-11-17.clover", request: null,
         created: $time, type: "checkout.session.completed", data: { object: {
             id: "cs_rehearsal", object: "checkout.session", amount_total: 2500, currency: "eur",
             client_reference_id: $order, payment_intent: "pi_rehearsal", payment_status: "paid", status: "complete",
