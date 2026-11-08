@@ -46,7 +46,7 @@ services:
       Identity__RequireConfirmedEmail: ${REHEARSAL_REQUIRE_CONFIRMED_EMAIL:-false}
       Stripe__Enabled: "false"
       Stripe__SecretKey: ""
-      Stripe__WebhookSecret: ""
+      Stripe__WebhookSecret: ${REHEARSAL_STRIPE_WEBHOOK_SECRET:-}
       Demo__Enabled: "false"
       EmailSettings__Enabled: ${REHEARSAL_EMAIL_ENABLED:-false}
       EmailSettings__From: rehearsal@example.test

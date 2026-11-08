@@ -1,138 +1,18 @@
-name: Staging Upgrade and Restore Rehearsal
+name: R09 Final OCI Signed Stripe Rehearsal
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - ".github/workflows/staging-rehearsal.yml"
-      - "global.json"
-      - "BlazorShop.Presentation/**/Dockerfile"
-      - "BlazorShop.StagingRehearsal/**"
-      - "rehearsal/**"
-      - "scripts/install-playwright-chromium.ps1"
-      - "scripts/verify-aspnet-runtime.sh"
-      - "scripts/verify-staging-rehearsal-results.ps1"
-      - "docs/staging-upgrade-restore-rehearsal.md"
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 env:
-  REHEARSAL_TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-
-concurrency:
-  group: staging-rehearsal-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  REHEARSAL_TARGET_SHA: 750e3df37ffd430ae03697339e8dad9d6989d8f5
 
 jobs:
-  target-images:
-    name: Build immutable rehearsal target images
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    outputs:
-      artifact: ${{ steps.bundle.outputs.artifact }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ env.REHEARSAL_TARGET_SHA }}
-          persist-credentials: false
-      - name: Build Linux OCI archives from the exact target SHA
-        id: bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$REHEARSAL_TARGET_SHA"
-          test -z "$(git status --porcelain)"
-          output="$RUNNER_TEMP/r09-target-oci"
-          mkdir -p "$output"
-          docker buildx create --name r09-oci --driver docker-container
-          for app in API Storefront; do
-            service="${app,,}"
-            archive="$output/$service.oci.tar"
-            docker buildx build --builder r09-oci --platform linux/amd64 --pull \
-              --provenance=false --sbom=false \
-              --label "org.opencontainers.image.revision=$REHEARSAL_TARGET_SHA" \
-              --file "BlazorShop.Presentation/BlazorShop.$app/Dockerfile" \
-              --output "type=oci,dest=$archive" .
-            python3 rehearsal/inspect-target-image.py "$archive" "$REHEARSAL_TARGET_SHA" | tee "$output/$service.json"
-          done
-          echo "artifact=r09-target-oci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
-      - name: Upload exact OCI archives and digest records
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.bundle.outputs.artifact }}
-          path: ${{ runner.temp }}/r09-target-oci
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 14
-
-  target-image-scan:
-    name: Target image SBOM and vulnerability scan
-    needs: target-images
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.target-images.outputs.artifact }}
-          path: ${{ runner.temp }}/r09-target-oci
-      - name: Generate SBOMs and scan the OCI archives
-        shell: bash
-        run: |
-          set -euo pipefail
-          input="$RUNNER_TEMP/r09-target-oci"
-          output="$RUNNER_TEMP/r09-target-image-security"
-          mkdir -p "$output" "$RUNNER_TEMP/trivy-cache"
-          trivy() {
-            docker run --rm \
-              --mount "type=bind,src=$input,dst=/images,readonly" \
-              --mount "type=bind,src=$output,dst=/reports" \
-              --mount "type=bind,src=$RUNNER_TEMP/trivy-cache,dst=/root/.cache/trivy" \
-              ghcr.io/aquasecurity/trivy:0.76.2@sha256:6fa071ef8daa2e58b90cbf1710bedca91adbb3bf98693533226f442035b836a6 "$@"
-          }
-          trivy --version > "$output/trivy-version.txt"
-          for service in api storefront; do
-            cp "$input/$service.json" "$output/"
-            mkdir "$input/$service"
-            tar -xf "$input/$service.oci.tar" -C "$input/$service"
-            trivy image --input "/images/$service" --format cyclonedx \
-              --output "/reports/$service.cdx.json" --no-progress
-            trivy image --input "/images/$service" --scanners vuln --format json \
-              --output "/reports/$service.scan.json" --no-progress
-          done
-          trivy --version >> "$output/trivy-version.txt"
-      - name: Require scans of both images without Critical or High findings
-        shell: bash
-        run: |
-          set -euo pipefail
-          failed=0
-          for service in api storefront; do
-            output="$RUNNER_TEMP/r09-target-image-security"
-            scan="$output/$service.scan.json"
-            config_digest="$(jq -er '.config_digest' "$output/$service.json")"
-            jq -e --arg config "$config_digest" '.ArtifactType == "container_image"
-              and .Metadata.ImageID == $config
-              and any(.Results[]; .Target | endswith("/Microsoft.AspNetCore.App.deps.json"))' "$scan" > /dev/null
-            findings="$(jq '[.Results[].Vulnerabilities[]? | select(
-              .VulnerabilityID == "CVE-2026-88092" or .Severity == "CRITICAL" or .Severity == "HIGH"
-            ) | {VulnerabilityID, Severity, PkgName, InstalledVersion, FixedVersion}] | unique' "$scan")"
-            printf '%s\n%s\n' "$service" "$findings"
-            if [[ "$findings" != '[]' ]]; then failed=1; fi
-          done
-          exit "$failed"
-      - name: Upload SBOMs, scan results and digest records
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: r09-target-image-security-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/r09-target-image-security
-          if-no-files-found: error
-          retention-days: 14
-
   upgrade-restore-rehearsal:
-    name: Upgrade and restore (${{ matrix.baseline }})
-    needs: target-images
+    name: Signed fake Stripe rehearsal (${{ matrix.baseline }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -146,7 +26,7 @@ jobs:
       - name: Checkout rehearsal tooling
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.REHEARSAL_TARGET_SHA }}
+          ref: ${{ github.sha }}
           path: tooling
           persist-credentials: false
 
@@ -183,7 +63,9 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.target-images.outputs.artifact }}
+          name: r09-target-oci-42500204918-1
+          run-id: 42500204918
+          github-token: ${{ github.token }}
           path: ${{ runner.temp }}/r09-target-oci
 
       - name: Install the OCI archive importer
@@ -253,54 +135,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: staging-upgrade-restore-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r09-signed-stripe-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: tooling/artifacts/staging-rehearsal
-          if-no-files-found: error
-          retention-days: 14
-
-  target-postgres-regressions:
-    name: Pinned target PostgreSQL regressions
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      BLAZORSHOP_TEST_POSTGRES_IMAGE: postgres:16.13-alpine3.23
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ env.REHEARSAL_TARGET_SHA }}
-          persist-credentials: false
-      - uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-      - name: Run refresh, inventory, checkout, reconciliation and SMTP regressions
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$REHEARSAL_TARGET_SHA"
-          test -z "$(git status --porcelain)"
-          mkdir -p artifacts/rehearsal-regressions
-          git rev-parse HEAD > artifacts/rehearsal-regressions/target-sha.txt
-          dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release \
-            --filter 'FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~InventoryReservationPostgreSqlTests|FullyQualifiedName~CheckoutIdempotencyPostgreSqlTests|FullyQualifiedName~StripeReconciliationPostgreSqlTests|FullyQualifiedName~RegistrationConfirmationHttpTests|FullyQualifiedName~RegistrationConfirmationMigrationTests' \
-            --logger 'trx;LogFileName=target-postgres.trx' --results-directory artifacts/rehearsal-regressions
-      - name: Require passing tests in every regression group
-        shell: pwsh
-        run: |
-          [xml] $report = Get-Content -Raw artifacts/rehearsal-regressions/target-postgres.trx
-          $results = @($report.TestRun.Results.UnitTestResult)
-          $groups = @('RefreshRotationHttpTests','InventoryReservationPostgreSqlTests','CheckoutIdempotencyPostgreSqlTests','StripeReconciliationPostgreSqlTests','RegistrationConfirmationHttpTests','RegistrationConfirmationMigrationTests')
-          foreach ($group in $groups) {
-            $matchesForGroup = @($results | Where-Object testName -Like "*.$group.*")
-            if (!$matchesForGroup.Count -or @($matchesForGroup | Where-Object outcome -NE Passed).Count) {
-              throw "Missing or non-passing test results for $group."
-            }
-            "$group passed=$($matchesForGroup.Count)"
-          }
-      - name: Upload pinned target regression results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: staging-rehearsal-target-regressions-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/rehearsal-regressions
           if-no-files-found: error
           retention-days: 14

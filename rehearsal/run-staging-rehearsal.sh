@@ -134,6 +134,7 @@ export REHEARSAL_DB_HOST="postgres"
 export REHEARSAL_UPLOADS_VOLUME="uploads-data"
 export REHEARSAL_DATA_PROTECTION_VOLUME="data-protection-keys"
 export REHEARSAL_PROBE_IMAGE="$PROBE_IMAGE"
+unset REHEARSAL_STRIPE_WEBHOOK_SECRET
 export REHEARSAL_PROBE_DIR="$PROBE_DIR"
 
 readonly USER_EMAIL="rehearsal.user.${RUN_NUMBER}.${RUN_ATTEMPT}@example.test"
@@ -855,6 +856,7 @@ export REHEARSAL_STOREFRONT_IMAGE="$TARGET_STOREFRONT_IMAGE"
 export REHEARSAL_WEB_IMAGE="$TARGET_WEB_IMAGE"
 export REHEARSAL_DB_HOST="postgres"
 
+export REHEARSAL_STRIPE_WEBHOOK_SECRET="whsec_rehearsal_$(openssl rand -hex 32)"
 upgrade_started="$(date +%s%3N)"
 dc up --detach --force-recreate --pull never api
 wait_http "$REHEARSAL_API_URL/health" "target API after migration"
@@ -897,6 +899,7 @@ BROWSER_RESULT="passed"
 
 capture_logs "target-after-browser"
 check_upgraded_checkout
+check_upgraded_stripe_webhook
 check_upgraded_outbox
 stop_application_writers
 
@@ -951,6 +954,7 @@ export REHEARSAL_DB_HOST="restore-postgres"
 export REHEARSAL_UPLOADS_VOLUME="restore-uploads-data"
 export REHEARSAL_DATA_PROTECTION_VOLUME="restore-data-protection-keys"
 export REHEARSAL_REQUIRE_CONFIRMED_EMAIL=false REHEARSAL_EMAIL_ENABLED=false
+unset REHEARSAL_STRIPE_WEBHOOK_SECRET
 dc --profile restore up --detach --force-recreate api storefront web
 CAPTURE_API_LOGS=true
 verify_baseline_application "post-restore"

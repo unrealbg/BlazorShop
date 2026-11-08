@@ -134,6 +134,62 @@ check_upgraded_checkout() {
         "overselling check leaves exactly two new orders and reservations and zero stock"
 }
 
+send_synthetic_stripe_event() {
+    local payload="$1" signature="$2"
+    curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' \
+        --header 'Content-Type: application/json' --header "Stripe-Signature: $signature" \
+        --data-binary "$payload" "$REHEARSAL_API_URL/api/stripe/webhook"
+}
+
+check_upgraded_stripe_webhook() {
+    local order_id="37000000-0000-0000-0000-000000000100"
+    local transaction_id="37000000-0000-0000-0000-000000000130"
+    local reservation_id="37000000-0000-0000-0000-000000000131"
+    local timestamp payload signature stock_before state_sql
+
+    # Extend the isolated upgraded fixture after the original assertions. Outbound Stripe stays disabled.
+    psql_service postgres --quiet \
+        --set "order_id=$order_id" --set "transaction_id=$transaction_id" \
+        --set "reservation_id=$reservation_id" --set "product_id=$SIMPLE_PRODUCT_ID" <<'SQL'
+BEGIN;
+UPDATE "Orders" SET "OrderStatus" = 'Pending', "PaymentMethod" = 'Stripe', "FulfillmentStatus" = 'NotStarted'
+WHERE "Id" = :'order_id';
+INSERT INTO "PaymentTransactions" ("Id", "OrderId", "Provider", "ProviderSessionId",
+    "ProviderPaymentIntentId", "ExpectedAmountMinor", "Currency", "Status")
+VALUES (:'transaction_id', :'order_id', 'Stripe', 'cs_rehearsal', 'pi_rehearsal', 2500, 'EUR', 'Pending');
+INSERT INTO "InventoryReservations" ("Id", "OrderId", "ProductId", "Quantity", "Status")
+VALUES (:'reservation_id', :'order_id', :'product_id', 2, 'Reserved');
+COMMIT;
+SQL
+    stock_before="$(scalar postgres "SELECT \"Quantity\" FROM \"Products\" WHERE \"Id\" = '$SIMPLE_PRODUCT_ID';")"
+    state_sql="SELECT o.\"PaymentStatus\", p.\"Status\", r.\"Status\",
+       (SELECT count(*) FROM \"PaymentProviderEvents\" WHERE \"ProviderEventId\" = 'evt_r09_rehearsal'),
+       (SELECT \"Quantity\" FROM \"Products\" WHERE \"Id\" = '$SIMPLE_PRODUCT_ID')
+       FROM \"Orders\" o JOIN \"PaymentTransactions\" p ON p.\"OrderId\" = o.\"Id\"
+       JOIN \"InventoryReservations\" r ON r.\"OrderId\" = o.\"Id\"
+       WHERE o.\"Id\" = '$order_id' AND p.\"Id\" = '$transaction_id' AND r.\"Id\" = '$reservation_id';"
+    assert_equal "Pending|Pending|Reserved|0|$stock_before" "$(scalar postgres "$state_sql")" "synthetic Stripe fixture starts pending"
+
+    timestamp="$(date +%s)"
+    # Stripe.net 50.0.0 expects the 2025-11-17.clover API version.
+    payload="$(jq -cn --argjson time "$timestamp" --arg order "$order_id" --arg transaction "$transaction_id" '{
+        id: "evt_r09_rehearsal", object: "event", api_version: "2025-11-17.clover",
+        created: $time, type: "checkout.session.completed", data: { object: {
+            id: "cs_rehearsal", object: "checkout.session", amount_total: 2500, currency: "eur",
+            client_reference_id: $order, payment_intent: "pi_rehearsal", payment_status: "paid", status: "complete",
+            metadata: { order_id: $order, payment_transaction_id: $transaction }
+        }}
+    }')"
+    signature="$(printf '%s.%s' "$timestamp" "$payload" \
+        | openssl dgst -sha256 -hmac "$REHEARSAL_STRIPE_WEBHOOK_SECRET" | awk '{print $NF}')"
+    assert_equal 400 "$(send_synthetic_stripe_event "$payload" "t=$timestamp,v1=invalid")" "invalid fake Stripe signature is rejected"
+    assert_equal "Pending|Pending|Reserved|0|$stock_before" "$(scalar postgres "$state_sql")" "invalid signature leaves ledger, payment and stock unchanged"
+    assert_equal 200 "$(send_synthetic_stripe_event "$payload" "t=$timestamp,v1=$signature")" "signed fake Stripe event accepted by verified OCI API"
+    assert_equal "Paid|Paid|Consumed|1|$((stock_before - 2))" "$(scalar postgres "$state_sql")" "Stripe reconciliation consumes reserved stock exactly once"
+    assert_equal 200 "$(send_synthetic_stripe_event "$payload" "t=$timestamp,v1=$signature")" "fake Stripe retry is acknowledged"
+    assert_equal "Paid|Paid|Consumed|1|$((stock_before - 2))" "$(scalar postgres "$state_sql")" "fake Stripe retry leaves stock and ledger unchanged"
+}
+
 check_upgraded_outbox() {
     local email="rehearsal.outbox.${RUN_NUMBER}.${RUN_ATTEMPT}@example.test"
     local password user_id mail_id state token status
