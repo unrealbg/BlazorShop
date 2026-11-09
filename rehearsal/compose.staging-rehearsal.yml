@@ -37,7 +37,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=${REHEARSAL_DB_HOST:-postgres};Port=5432;Database=${REHEARSAL_DB_NAME};Username=${REHEARSAL_DB_USER};Password=${REHEARSAL_DB_PASSWORD}
+      ConnectionStrings__DefaultConnection: Host=${REHEARSAL_DB_HOST:-postgres};Port=5432;Database=${REHEARSAL_DB_NAME};Username=${REHEARSAL_DB_LOGIN_USER:-${REHEARSAL_DB_USER}};Password=${REHEARSAL_DB_PASSWORD}
       Jwt__Key: ${REHEARSAL_JWT_KEY:?REHEARSAL_JWT_KEY is required}
       Jwt__Issuer: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
       Jwt__Audience: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
@@ -46,7 +46,7 @@ services:
       Identity__RequireConfirmedEmail: ${REHEARSAL_REQUIRE_CONFIRMED_EMAIL:-false}
       Stripe__Enabled: "false"
       Stripe__SecretKey: ""
-      Stripe__WebhookSecret: ""
+      Stripe__WebhookSecret: ${REHEARSAL_STRIPE_WEBHOOK_SECRET:-}
       Demo__Enabled: "false"
       EmailSettings__Enabled: ${REHEARSAL_EMAIL_ENABLED:-false}
       EmailSettings__From: rehearsal@example.test
@@ -58,10 +58,12 @@ services:
       EmailSettings__Password: ${REHEARSAL_SMTP_PASSWORD:?REHEARSAL_SMTP_PASSWORD is required}
       RegistrationConfirmation__PollSeconds: "1"
       Runtime__Cors__AllowedOrigins__0: ${REHEARSAL_WEB_URL:?REHEARSAL_WEB_URL is required}
-      Runtime__ForwardedHeaders__Enabled: "false"
+      Runtime__ForwardedHeaders__Enabled: ${REHEARSAL_FORWARD_HEADERS:-false}
+      Runtime__ForwardedHeaders__KnownProxies__0: ${REHEARSAL_EDGE_IP:-127.0.0.1}
+      ASPNETCORE_HTTPS_PORT: ${REHEARSAL_EDGE_PORT:-443}
       Runtime__Health__ExposeInProduction: "true"
       Runtime__Security__EnableHsts: "false"
-      Runtime__Security__EnableHttpsRedirection: "false"
+      Runtime__Security__EnableHttpsRedirection: ${REHEARSAL_FORCE_HTTPS:-false}
       Runtime__Security__RefreshTokenCookieName: blazorshop-rehearsal-refresh
       Runtime__Security__RefreshTokenCookieSameSite: Lax
       Runtime__RateLimiting__Enabled: "false"
@@ -112,6 +114,17 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
     ports:
       - "127.0.0.1:${REHEARSAL_MAIL_PORT:?REHEARSAL_MAIL_PORT is required}:8025"
+    networks:
+      - rehearsal
+
+  edge:
+    profiles: ["edge"]
+    image: ${REHEARSAL_EDGE_IMAGE:?REHEARSAL_EDGE_IMAGE is required}
+    ports:
+      - "127.0.0.1:${REHEARSAL_EDGE_PORT:?REHEARSAL_EDGE_PORT is required}:443"
+    volumes:
+      - ${REHEARSAL_EDGE_DIR:?REHEARSAL_EDGE_DIR is required}:/edge:ro
+      - ${REHEARSAL_EDGE_DIR}/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - rehearsal
 
