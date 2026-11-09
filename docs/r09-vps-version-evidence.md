@@ -13,6 +13,12 @@ R09 is **PARTIALLY VERIFIED**: the historical upgrade/restore rehearsal passes, 
 
 ## Step 1: collect evidence over SSH (owner, read-only)
 
+For a minimal production inventory, obtain separate approval for the exact host, port, SSH account, Compose project, database role, command list and protected evidence destination. Use the collector's `--inventory-only <project> <db-name> <read-only-db-user>` mode for that scope. This mode keeps the same matcher format and omits checkout inspection, volume traversal, database size and approximate row counts.
+
+The inventory mode inspects fixed container and image fields, the three expected named volume destinations, and the OCI revision label when it contains a hexadecimal revision. It refuses other mount layouts before file probes. It hashes only the fixed matching inputs and refuses symlinked inputs. It reads the EF history in one repeatable-read, read-only transaction with 5-second statement and 1-second lock timeouts. The PostgreSQL connection uses the existing local socket at port 5432 and an explicitly supplied read-only role, without inherited PostgreSQL environment or password files. A failed connection stops collection. It also checks that the same four containers are still running with the same start times before sealing the output. Checkpoint and off-host recovery evidence require separate, owner-approved artifact references.
+
+The wider version-discovery procedure below has a different scope.
+
 Prerequisites:
 
 - a local clone that is up to date and clean, with the reviewed scripts from `master`: `git fetch origin`, then `git diff --quiet origin/master -- scripts/vps-evidence` must succeed;

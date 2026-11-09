@@ -279,16 +279,21 @@ mock_host() {
     rm -rf "$MOCK_DOCKER_DIR"
     mkdir -p "$MOCK_DOCKER_DIR/psql"
     : > "$MOCK_DOCKER_DIR/calls.log"
-    local service id
+    local service id image_id
     for service in postgres api storefront web; do
-        id="${service}0000000000000000000000000000000000000000000000000000000000"
-        id="${id:0:64}"
-        echo "$id|blazorshop|$service|running|False|sha256:img-$service|blazorshop-$service|2026-11-01T10:00:00Z|/srv/blazorshop" >> "$MOCK_DOCKER_DIR/containers"
-        echo "sha256:img-$service|2026-11-01T09:00:00Z" >> "$MOCK_DOCKER_DIR/images"
+        id="$(container_id "$service")"
+        image_id="sha256:$(container_id "image-$service")"
+        echo "$id|blazorshop|$service|running|False|$image_id|blazorshop-$service|2026-11-01T10:00:00Z|/srv/blazorshop" >> "$MOCK_DOCKER_DIR/containers"
+        echo "$image_id|2026-11-01T09:00:00Z|linux/amd64|$C3|example.test/blazorshop/$service@$image_id" >> "$MOCK_DOCKER_DIR/images"
         mkdir -p "$MOCK_DOCKER_DIR/fs/$id"
     done
     API_ID="$(container_id api)"
     WEB_ID="$(container_id web)"
+    {
+        printf '%s|volume|pg-data|/var/lib/postgresql/data\n' "$(container_id postgres)"
+        printf '%s|volume|uploads-data|/app/uploads\n' "$API_ID"
+        printf '%s|volume|dp-keys|/root/.aspnet/DataProtection-Keys\n' "$API_ID"
+    } > "$MOCK_DOCKER_DIR/mounts"
     mkdir -p "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads/products" "$MOCK_DOCKER_DIR/fs/$API_ID/root/.aspnet/DataProtection-Keys"
     git -C "$REPO" show "$C3:$API/appsettings.json" > "$MOCK_DOCKER_DIR/fs/$API_ID/app/appsettings.json"
     echo upload > "$MOCK_DOCKER_DIR/fs/$API_ID/app/uploads/products/a.png"
@@ -306,8 +311,9 @@ mock_host() {
     printf '%s\n' "$M1" "$M2" "$M3" > "$MOCK_DOCKER_DIR/psql/list"
     printf '%s\n' "AspNetUsers=2" "Orders=5" > "$MOCK_DOCKER_DIR/psql/rows"
 }
-container_id() { local id="${1}0000000000000000000000000000000000000000000000000000000000"; printf '%s' "${id:0:64}"; }
+container_id() { printf '%s' "$1" | sha256sum | awk '{print $1}'; }
 collect() { bash "$COLLECT" blazorshop "$CHECKOUT"; }
+inventory() { bash "$COLLECT" --inventory-only blazorshop blazorshop evidence_reader; }
 
 mock_host
 check "collector: one running container per service succeeds" run 0 collect
@@ -322,6 +328,33 @@ check "collector: queries PostgreSQL read-only without password prompts" bash -c
 check "collector: prints no file contents" bash -c '! grep -qE "rendered.example.test|\"api\"|^key$" "$1"' _ "$WORK/out"
 cp "$WORK/out" "$WORK/collected.txt"
 check "collector + matcher: collected evidence matches c3 and c4" bash -c 'cd "$1" && bash "$2" "$3" master > "$4" 2>&1 && [[ "$(grep -c "^candidate=" "$4")" -eq 2 ]]' _ "$REPO" "$MATCH" "$WORK/collected.txt" "$WORK/match.txt"
+
+mock_host
+sed -i '/\/web@/s/|linux\/amd64|[^|]*/|linux\/amd64|DO_NOT_PRINT_TEST_VALUE/' "$MOCK_DOCKER_DIR/images"
+check "inventory: bounded mode collects matching metadata" run 0 inventory
+check "inventory: API image platform" stdout_has "api_image_platform=linux/amd64"
+check "inventory: API OCI revision" stdout_has "api_image_revision=$C3"
+check "inventory: arbitrary revision values are omitted" stdout_has "web_image_revision=unrecognized"
+check "inventory: no raw label or volume contents" bash -c '! grep -qE "DO_NOT_PRINT_TEST_VALUE|uploads_files=|data_protection_key_files=|approx_rows\.|database_size_bytes=|compose_working_dir=" "$1"' _ "$WORK/out"
+check "inventory: API mount metadata" stdout_has "api_volume.1.destination=/app/uploads"
+check "inventory: repo digests are indexed" stdout_has "api_repo_digest.1=example.test/blazorshop/api@sha256:$(container_id image-api)"
+check "inventory: matcher-compatible migration count" stdout_has "migration_count=3"
+check "inventory: no volume traversal or wide inspect" bash -c '! grep -qE "find |\.Config\.Env|\.Mounts.*\.Source|pg_stat_user_tables|pg_database_size" "$1"' _ "$MOCK_DOCKER_DIR/calls.log"
+check "inventory: one bounded repeatable-read PostgreSQL transaction" bash -c '[[ $(grep -c "psql " "$1") == 1 ]] && grep "psql " "$1" | grep -qE "env -i .* -X -w .*evidence_reader.*REPEATABLE READ READ ONLY.*statement_timeout = 5000.*lock_timeout = 1000.*ROLLBACK"' _ "$MOCK_DOCKER_DIR/calls.log"
+cp "$WORK/out" "$WORK/inventory.txt"
+check "inventory + matcher: v2 evidence still matches both candidates" bash -c 'cd "$1" && bash "$2" "$3" master > "$4" 2>&1 && [[ "$(grep -c "^candidate=" "$4")" -eq 2 ]]' _ "$REPO" "$MATCH" "$WORK/inventory.txt" "$WORK/match.txt"
+
+mock_host
+printf '%s|bind||/app/appsettings.json\n' "$API_ID" >> "$MOCK_DOCKER_DIR/mounts"
+check "inventory: an unapproved bind mount stops collection" run 1 inventory
+check "inventory: unapproved mount produces no evidence" stdout_empty
+check "inventory: an unapproved mount stops before docker exec" bash -c '! grep -q "^exec " "$1"' _ "$MOCK_DOCKER_DIR/calls.log"
+
+mock_host
+mv "$MOCK_DOCKER_DIR/fs/$API_ID/app/appsettings.json" "$MOCK_DOCKER_DIR/fs/$API_ID/app/original.json"
+ln -s original.json "$MOCK_DOCKER_DIR/fs/$API_ID/app/appsettings.json"
+check "inventory: symlinked config stops collection" run 1 inventory
+check "inventory: symlinked config produces no evidence" stdout_empty
 
 mock_host
 sed -i '/|api|/d' "$MOCK_DOCKER_DIR/containers"
