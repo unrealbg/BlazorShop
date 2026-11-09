@@ -5,6 +5,8 @@
 #   ssh <host> 'bash -s -- <compose-project> [deployment-checkout-dir]' \
 #       < scripts/vps-evidence/collect-version-evidence.sh > vps-evidence.txt
 # Without arguments it lists the running Compose projects and exits 2.
+# --inventory-only <project> <db-name> <read-only-db-user> skips checkout inspection,
+# volume traversal and database size/table statistics.
 #
 # Read-only by construction: it runs only `docker ps`, `docker inspect`, `docker image inspect`,
 # and `docker exec` of sh/sha256sum/find/printf/psql in already running containers, plus `git` read
@@ -29,8 +31,6 @@ shopt -s inherit_errexit
 
 readonly SCHEMA="blazorshop-vps-version-evidence/v2"
 readonly SERVICES=(postgres api storefront web)
-readonly DB_NAME="${BLAZORSHOP_EVIDENCE_DB_NAME:-blazorshop}"
-readonly DB_USER="${BLAZORSHOP_EVIDENCE_DB_USER:-blazorshop}"
 # Exit status of the in-container probe when a path provably does not exist.
 readonly ABSENT_STATUS=3
 
@@ -47,11 +47,15 @@ if [[ $# -lt 1 ]]; then
     docker ps --filter status=running --format '{{.Label "com.docker.compose.project"}}' | sed '/^$/d' | sort -u | sed 's/^/  /' >&2
     exit 2
 fi
-if [[ $# -gt 2 ]]; then
-    fail "expected at most two arguments"
+if [[ "$1" == --inventory-only ]]; then
+    [[ $# -eq 4 ]] || fail "expected --inventory-only <project> <db-name> <read-only-db-user>"
+    readonly INVENTORY_ONLY=true PROJECT="$2" DB_NAME="$3" DB_USER="$4" CHECKOUT_DIR=""
+else
+    [[ $# -le 2 ]] || fail "expected at most two arguments"
+    readonly INVENTORY_ONLY=false PROJECT="$1" CHECKOUT_DIR="${2:-}"
+    readonly DB_NAME="${BLAZORSHOP_EVIDENCE_DB_NAME:-blazorshop}"
+    readonly DB_USER="${BLAZORSHOP_EVIDENCE_DB_USER:-blazorshop}"
 fi
-readonly PROJECT="$1"
-readonly CHECKOUT_DIR="${2:-}"
 [[ "$PROJECT" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "invalid Compose project name '$PROJECT'"
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ && "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || fail "invalid database name or user"
 
@@ -118,9 +122,16 @@ readonly ABSENCE_PROBE='
 file_sha256() {
     local container="$1"
     local path="$2"
-    local output status=0
+    local output status=0 restriction=""
+    if "$INVENTORY_ONLY"; then
+        # Reject symlinks in the fixed path or its parents.
+        # shellcheck disable=SC2016
+        restriction='
+        canonical=$(readlink -f "$1") || exit 5
+        [ "$canonical" = "$1" ] || exit 5'
+    fi
     # `|| status=$?` keeps the expected "absent" exit from tripping errexit and the ERR trap.
-    output="$(docker exec "$container" sh -c "$ABSENCE_PROBE"'
+    output="$(docker exec "$container" sh -c "$ABSENCE_PROBE$restriction"'
         if [ ! -f "$1" ]; then echo "not a regular file: $1" >&2; exit 4; fi
         sha256sum "$1"' sh "$path")" || status=$?
     if [[ $status -eq $ABSENT_STATUS ]]; then
@@ -159,6 +170,62 @@ readonly_psql() {
         psql -X -w --set ON_ERROR_STOP=1 --tuples-only --no-align -U "$DB_USER" -d "$DB_NAME" --command "$2"
 }
 
+inventory_metadata() {
+    local service="$1" id="$2" image_id="$3" platform revision digests digest mounts type name destination
+    local digest_count=0 mount_count=0
+    local -A seen_destinations=()
+    platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image_id")"
+    [[ "$platform" =~ ^[a-z0-9_]+/[a-z0-9_]+$ ]] || fail "invalid image platform for $service"
+    emit "${service}_image_platform" "$platform"
+    revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image_id")"
+    if [[ -z "$revision" || "$revision" == '<no value>' ]]; then
+        revision=absent
+    elif [[ ! "$revision" =~ ^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$ ]]; then
+        revision=unrecognized
+    fi
+    emit "${service}_image_revision" "$revision"
+    digests="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id")"
+    while IFS= read -r digest; do
+        [[ -n "$digest" ]] || continue
+        [[ "$digest" =~ ^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$ ]] || fail "invalid RepoDigest for $service"
+        digest_count=$((digest_count + 1))
+        emit "${service}_repo_digest.$digest_count" "$digest"
+    done <<< "$digests"
+    emit "${service}_repo_digest_count" "$digest_count"
+
+    mounts="$(docker inspect --format '{{range .Mounts}}{{printf "%s|%s|%s\n" .Type .Name .Destination}}{{end}}' "$id")"
+    while IFS='|' read -r type name destination; do
+        [[ -n "$type" ]] || continue
+        [[ "$type" == volume && "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || fail "unexpected mount type or volume name for $service"
+        case "$service:$destination" in
+            postgres:/var/lib/postgresql/data | api:/app/uploads | api:/root/.aspnet/DataProtection-Keys) ;;
+            *) fail "unexpected persistent mount destination for $service" ;;
+        esac
+        [[ -z "${seen_destinations[$destination]+set}" ]] || fail "duplicate mount destination for $service"
+        seen_destinations[$destination]=1
+        mount_count=$((mount_count + 1))
+        emit "${service}_volume.$mount_count.name" "$name"
+        emit "${service}_volume.$mount_count.destination" "$destination"
+    done <<< "$mounts"
+    case "$service:$mount_count" in
+        postgres:1 | api:2 | storefront:0 | web:0) ;;
+        *) fail "missing expected persistent mount for $service" ;;
+    esac
+    emit "${service}_volume_count" "$mount_count"
+}
+
+inventory_history() {
+    docker exec "$1" env -i PATH=/usr/local/bin:/usr/bin:/bin PGPASSFILE=/dev/null/r09 PGCONNECT_TIMEOUT=3 \
+        psql -X -w --quiet --set ON_ERROR_STOP=1 --tuples-only --no-align \
+        --host=/var/run/postgresql --port=5432 -U "$DB_USER" -d "$DB_NAME" --command '
+            BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+            SET LOCAL statement_timeout = 5000;
+            SET LOCAL lock_timeout = 1000;
+            SELECT current_setting('\''server_version_num'\'');
+            SELECT "MigrationId" FROM public."__EFMigrationsHistory" ORDER BY "MigrationId" COLLATE "C";
+            ROLLBACK;' 2>/dev/null
+}
+
 emit schema "$SCHEMA"
 emit collected_at_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 emit compose_project "$PROJECT"
@@ -179,7 +246,7 @@ else
     emit checkout_head not-collected
 fi
 
-declare -A CONTAINER=()
+declare -A CONTAINER=() STARTED_AT=()
 for service in "${SERVICES[@]}"; do
     CONTAINER[$service]="$(container_for "$service")"
 done
@@ -187,15 +254,28 @@ done
 for service in "${SERVICES[@]}"; do
     id="${CONTAINER[$service]}"
     image_id="$(inspect_field "$id" '{{.Image}}')"
+    STARTED_AT[$service]="$(inspect_field "$id" '{{.State.StartedAt}}')"
+    state="$(inspect_field "$id" '{{.State.Status}}')"
+    if "$INVENTORY_ONLY"; then
+        [[ "$state" == running && "$id" =~ ^[0-9a-f]{64}$ && "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] \
+            || fail "invalid running container or image ID for $service"
+    fi
     emit "${service}_container_id" "$id"
-    emit "${service}_state" "$(inspect_field "$id" '{{.State.Status}}')"
-    emit "${service}_started_at" "$(inspect_field "$id" '{{.State.StartedAt}}')"
-    emit "${service}_image_ref" "$(inspect_field "$id" '{{.Config.Image}}')"
+    emit "${service}_state" "$state"
+    emit "${service}_started_at" "${STARTED_AT[$service]}"
+    if ! "$INVENTORY_ONLY"; then
+        emit "${service}_image_ref" "$(inspect_field "$id" '{{.Config.Image}}')"
+    fi
     emit "${service}_image_id" "$image_id"
     image_created="$(docker image inspect --format '{{.Created}}' "$image_id")"
     emit "${service}_image_created" "$image_created"
+    if "$INVENTORY_ONLY"; then
+        inventory_metadata "$service" "$id" "$image_id"
+    fi
 done
-emit compose_working_dir "$(inspect_field "${CONTAINER[api]}" '{{index .Config.Labels "com.docker.compose.project.working_dir"}}')"
+if ! "$INVENTORY_ONLY"; then
+    emit compose_working_dir "$(inspect_field "${CONTAINER[api]}" '{{index .Config.Labels "com.docker.compose.project.working_dir"}}')"
+fi
 
 # Files the Dockerfiles copy verbatim from the repository. conf.d/default.conf is the verbatim
 # nginx.conf in older Web images and a runtime-rendered file in newer ones.
@@ -205,37 +285,55 @@ emit sha256.web_nginx_template "$(file_sha256 "${CONTAINER[web]}" /etc/nginx/tem
 emit sha256.web_security_headers "$(file_sha256 "${CONTAINER[web]}" /etc/nginx/snippets/blazorshop-security-headers.conf)"
 emit sha256.web_nginx_conf_d "$(file_sha256 "${CONTAINER[web]}" /etc/nginx/conf.d/default.conf)"
 
-emit uploads_files "$(file_count "${CONTAINER[api]}" /app/uploads)"
-emit data_protection_key_files "$(file_count "${CONTAINER[api]}" /root/.aspnet/DataProtection-Keys)"
-
 postgres="${CONTAINER[postgres]}"
-server_version="$(readonly_psql "$postgres" 'SHOW server_version;')"
-emit postgres_server_version "$server_version"
-database_size="$(readonly_psql "$postgres" 'SELECT pg_database_size(current_database());')"
-[[ "$database_size" =~ ^[0-9]+$ ]] || fail "unexpected database size"
-emit database_size_bytes "$database_size"
-migration_count="$(readonly_psql "$postgres" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')"
-[[ "$migration_count" =~ ^[1-9][0-9]*$ ]] || fail "unexpected migration count '$migration_count'"
-migration_head="$(readonly_psql "$postgres" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
-[[ "$migration_head" =~ ^[0-9]{14}_[A-Za-z0-9]+$ ]] || fail "unexpected migration head '$migration_head'"
-migration_list="$(readonly_psql "$postgres" 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" COLLATE "C";')"
 migrations=()
-[[ -z "$migration_list" ]] || mapfile -t migrations <<< "$migration_list"
+if "$INVENTORY_ONLY"; then
+    history="$(inventory_history "$postgres")" || fail "bounded migration query failed"
+    mapfile -t history_lines <<< "$history"
+    server_version="${history_lines[0]}"
+    [[ "$server_version" =~ ^[1-9][0-9]{5,7}$ ]] || fail "unexpected PostgreSQL version number"
+    emit postgres_server_version_num "$server_version"
+    migrations=("${history_lines[@]:1}")
+    migration_count="${#migrations[@]}"
+    [[ "$migration_count" -gt 0 ]] || fail "no migration IDs returned"
+    migration_head="${migrations[-1]}"
+else
+    emit uploads_files "$(file_count "${CONTAINER[api]}" /app/uploads)"
+    emit data_protection_key_files "$(file_count "${CONTAINER[api]}" /root/.aspnet/DataProtection-Keys)"
+    emit postgres_server_version "$(readonly_psql "$postgres" 'SHOW server_version;')"
+    database_size="$(readonly_psql "$postgres" 'SELECT pg_database_size(current_database());')"
+    [[ "$database_size" =~ ^[0-9]+$ ]] || fail "unexpected database size"
+    emit database_size_bytes "$database_size"
+    migration_count="$(readonly_psql "$postgres" 'SELECT COUNT(*) FROM "__EFMigrationsHistory";')"
+    migration_head="$(readonly_psql "$postgres" 'SELECT MAX("MigrationId") FROM "__EFMigrationsHistory";')"
+    migration_list="$(readonly_psql "$postgres" 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" COLLATE "C";')"
+    [[ -z "$migration_list" ]] || mapfile -t migrations <<< "$migration_list"
+fi
+[[ "$migration_count" =~ ^[1-9][0-9]*$ ]] || fail "unexpected migration count '$migration_count'"
+[[ "$migration_head" =~ ^[0-9]{14}_[A-Za-z0-9]+$ ]] || fail "unexpected migration head"
 [[ ${#migrations[@]} -eq $migration_count ]] || fail "migration list has ${#migrations[@]} entries but COUNT(*) is $migration_count"
 [[ "${migrations[-1]}" == "$migration_head" ]] || fail "migration list does not end with the reported head"
 emit migration_count "$migration_count"
 emit migration_head "$migration_head"
 for migration in "${migrations[@]}"; do
-    [[ "$migration" =~ ^[0-9]{14}_[A-Za-z0-9]+$ ]] || fail "unexpected migration id '$migration'"
+    [[ "$migration" =~ ^[0-9]{14}_[A-Za-z0-9]+$ ]] || fail "unexpected migration id"
     emit migration "$migration"
 done
-row_list="$(readonly_psql "$postgres" "SELECT relname || '=' || n_live_tup FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname COLLATE \"C\";")"
-row_counts=()
-[[ -z "$row_list" ]] || mapfile -t row_counts <<< "$row_list"
-for row in "${row_counts[@]}"; do
-    [[ "$row" =~ ^[A-Za-z0-9_]+=[0-9]+$ ]] || fail "unexpected table statistics line"
-    emit "approx_rows.${row%%=*}" "${row#*=}"
-done
+if "$INVENTORY_ONLY"; then
+    for service in "${SERVICES[@]}"; do
+        id="${CONTAINER[$service]}"
+        [[ "$(container_for "$service")" == "$id" && "$(inspect_field "$id" '{{.State.StartedAt}}')" == "${STARTED_AT[$service]}" ]] \
+            || fail "$service changed during collection"
+    done
+else
+    row_list="$(readonly_psql "$postgres" "SELECT relname || '=' || n_live_tup FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname COLLATE \"C\";")"
+    row_counts=()
+    [[ -z "$row_list" ]] || mapfile -t row_counts <<< "$row_list"
+    for row in "${row_counts[@]}"; do
+        [[ "$row" =~ ^[A-Za-z0-9_]+=[0-9]+$ ]] || fail "unexpected table statistics line"
+        emit "approx_rows.${row%%=*}" "${row#*=}"
+    done
+fi
 
 checksum="$(printf '%s\n' "${OUTPUT[@]}" | sha256sum | awk '{print $1}')"
 printf '%s\n' "${OUTPUT[@]}"

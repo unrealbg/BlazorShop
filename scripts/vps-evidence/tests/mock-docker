@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test double for the docker CLI, driven by files in $MOCK_DOCKER_DIR:
 #   containers   id|project|service|state|oneoff|image_id|image_ref|started_at|working_dir
-#   images       image_id|created
+#   images       image_id|created|platform|revision|repo_digest
+#   mounts       container_id|type|name|destination
 #   fs/<id>/...  the container file system used by `docker exec <id> sh -c ...`
 #   exec-fail    container ids whose `docker exec` fails like an unreachable container
 #   exec-bin/    commands that shadow the real ones inside `docker exec ... sh` (e.g. a failing find)
@@ -66,12 +67,21 @@ case "$command" in
             '{{.State.StartedAt}}') field "$id" 8 ;;
             '{{.Config.Image}}') field "$id" 7 ;;
             '{{index .Config.Labels "com.docker.compose.project.working_dir"}}') field "$id" 9 ;;
+            '{{range .Mounts}}{{printf "%s|%s|%s\n" .Type .Name .Destination}}{{end}}')
+                awk -F '|' -v id="$id" '$1 == id { print $2 "|" $3 "|" $4 }' "$dir/mounts" ;;
             *) echo "mock docker inspect: unsupported format $format" >&2; exit 2 ;;
         esac
         ;;
     image)
-        [[ "$1" == "inspect" && "$2" == "--format" && "$3" == '{{.Created}}' ]] || { echo "mock docker image: unsupported" >&2; exit 2; }
-        awk -F '|' -v id="$4" '$1 == id { print $2; found = 1 } END { exit !found }' "$dir/images"
+        [[ "$1" == "inspect" && "$2" == "--format" ]] || exit 2
+        case "$3" in
+            '{{.Created}}') index_=2 ;;
+            '{{.Os}}/{{.Architecture}}') index_=3 ;;
+            '{{index .Config.Labels "org.opencontainers.image.revision"}}') index_=4 ;;
+            '{{range .RepoDigests}}{{println .}}{{end}}') index_=5 ;;
+            *) exit 2 ;;
+        esac
+        awk -F '|' -v id="$4" -v index_="$index_" '$1 == id { print $index_; found = 1 } END { exit !found }' "$dir/images"
         ;;
     exec)
         if [[ "$1" == "--env" ]]; then
@@ -85,6 +95,12 @@ case "$command" in
         fi
         [[ "$(field "$id" 4)" == "running" ]] || { echo "Error response from daemon: container $id is not running" >&2; exit 1; }
         case "$1" in
+            env)
+                [[ "$2" == -i && "$3" == 'PATH=/usr/local/bin:/usr/bin:/bin' && "$4" == 'PGPASSFILE=/dev/null/r09' && "$5" == 'PGCONNECT_TIMEOUT=3' && "$6" == psql ]] || exit 2
+                [[ ! -e "$dir/psql-fail" ]] || exit 2
+                printf '160013\n'
+                cat "$dir/psql/list"
+                ;;
             sh)
                 # sh -c <script> sh <absolute path>: run the real probe script against the mock file system.
                 [[ "$2" == "-c" && "$4" == "sh" ]] || { echo "mock docker exec: unsupported sh call" >&2; exit 2; }
