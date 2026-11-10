@@ -242,6 +242,12 @@
                 }
 
                 var claims = await _userManager.GetUserClaimsAsync(user.Email);
+                if (!claims.Any(claim => claim.Type == ClaimTypes.Role))
+                {
+                    await RevokeLockedChainAsync(token, ipAddress, cancellationToken);
+                    return null;
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
                 var rawReplacement = GetReFreshToken();
                 var replacement = CreateRefreshToken(user.Id, rawReplacement, ipAddress, userAgent);

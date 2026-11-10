@@ -4,6 +4,8 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
     using System.Net.Http.Headers;
     using System.Net.Http.Json;
     using System.Data.Common;
+    using System.IdentityModel.Tokens.Jwt;
+    using System.Security.Claims;
     using System.Security.Cryptography;
     using System.Threading.RateLimiting;
 
@@ -144,17 +146,25 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
         }
 
         [Theory]
-        [InlineData("User", HttpStatusCode.Forbidden)]
-        [InlineData("Admin", HttpStatusCode.OK)]
-        public async Task NormalLoginAndRefresh_PreserveRolesAndLogout(string role, HttpStatusCode adminStatus)
+        [InlineData("User", null, HttpStatusCode.Forbidden)]
+        [InlineData("Admin", null, HttpStatusCode.OK)]
+        [InlineData("User", "Admin", HttpStatusCode.OK)]
+        public async Task NormalLoginAndRefresh_PreserveRolesAndLogout(string role, string? additionalRole, HttpStatusCode adminStatus)
         {
             await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
-            var user = await host.CreateUserAsync(role);
-            var session = await host.RotateAsync(await host.LoginAsync(user));
+            string[] assignedRoles = additionalRole is null ? [role] : [role, additionalRole];
+            var user = await host.CreateUserAsync(role, additionalRoles: assignedRoles[1..]);
+            var login = await host.LoginAsync(user);
+            var session = await host.RotateAsync(login);
+            Assert.False(login.Cookie == session.Cookie);
+            foreach (var issued in new[] { login, session })
+            {
+                AssertRoleClaims(issued, assignedRoles);
+                using var adminResponse = await host.SendAsync(HttpMethod.Get, "/api/admin/users/roles", issued);
+                Assert.Equal(adminStatus, adminResponse.StatusCode);
+            }
             using var customerResponse = await host.SendAsync(HttpMethod.Get, "/test/customer", session);
             Assert.Equal(HttpStatusCode.NoContent, customerResponse.StatusCode);
-            using var adminResponse = await host.SendAsync(HttpMethod.Get, "/api/admin/users/roles", session);
-            Assert.Equal(adminStatus, adminResponse.StatusCode);
             using var logout = await host.SendAsync(HttpMethod.Post, "/api/authentication/logout", session, useCookie: true);
             Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
             using var repeatedLogout = await host.SendAsync(HttpMethod.Post, "/api/authentication/logout", session, useCookie: true);
@@ -162,6 +172,66 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
             using var stale = await host.RefreshAsync(session);
             Assert.Equal(HttpStatusCode.BadRequest, stale.StatusCode);
             await AssertRejectedAsync(stale);
+        }
+
+        [Fact]
+        public async Task RefreshUsesCurrentRoles_WhenAdminIsRemoved()
+        {
+            await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
+            var user = await host.CreateUserAsync("User", additionalRoles: ["Admin"]);
+            var admin = await host.LoginAsync(await host.CreateUserAsync("Admin"));
+            var login = await host.LoginAsync(user);
+            AssertRoleClaims(login, ["User", "Admin"]);
+
+            using var changed = await host.SendAsync(HttpMethod.Put, $"/api/admin/users/{user.Id}/roles", admin,
+                new UpdateUserRolesDto { Roles = ["User"] });
+            Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+            var refreshed = await host.RotateAsync(login);
+            AssertRoleClaims(refreshed, ["User"]);
+            using var forbidden = await host.SendAsync(HttpMethod.Get, "/api/admin/users/roles", refreshed);
+            Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        }
+
+        [Fact]
+        public async Task NoAssignedRoles_DeniesLoginAndRefresh()
+        {
+            await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
+            var user = await host.CreateUserAsync("User");
+            var login = await host.LoginAsync(user);
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+                var stored = await users.FindByIdAsync(user.Id);
+                Assert.NotNull(stored);
+                Assert.True((await users.RemoveFromRoleAsync(stored, "User")).Succeeded);
+            }
+
+            await host.AssertLoginDeniedAsync(user);
+            using var refresh = await host.RefreshAsync(login);
+            Assert.Equal(HttpStatusCode.BadRequest, refresh.StatusCode);
+            await AssertRejectedAsync(refresh);
+            Assert.Equal(1, await host.TokenCountAsync(user));
+            await host.AssertAllRevokedAsync(user);
+        }
+
+        [Fact]
+        public async Task ModifiedRoleClaims_AreRejectedByBearerSignatureValidation()
+        {
+            await using var host = await IdentityHttpHost.CreateAsync(database.ConnectionString);
+            var login = await host.LoginAsync(await host.CreateUserAsync("User"));
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(login.AccessToken);
+            jwt.Payload[ClaimTypes.Role] = new[] { "User", "Admin" };
+            var tampered = login with { AccessToken = $"{jwt.RawHeader}.{jwt.EncodedPayload}.{jwt.RawSignature}" };
+
+            using var denied = await host.SendAsync(HttpMethod.Get, "/api/admin/users/roles", tampered);
+            Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
+        }
+
+        private static void AssertRoleClaims(Session session, string[] roles)
+        {
+            var actual = new JwtSecurityTokenHandler().ReadJwtToken(session.AccessToken).Claims
+                .Where(claim => claim.Type == ClaimTypes.Role).Select(claim => claim.Value);
+            Assert.Equal(roles.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
         }
 
         [Fact]
@@ -397,20 +467,24 @@ namespace BlazorShop.Tests.Infrastructure.PostgreSql
                 return new IdentityHttpHost(app, client);
             }
 
-            public async Task<TestUser> CreateUserAsync(string role, bool confirmed = true)
+            public async Task<TestUser> CreateUserAsync(string role, bool confirmed = true, params string[] additionalRoles)
             {
                 await using var scope = app.Services.CreateAsyncScope();
                 var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-                if (!await roles.RoleExistsAsync(role))
+                string[] assignedRoles = [role, ..additionalRoles];
+                foreach (var assignedRole in assignedRoles)
                 {
-                    Assert.True((await roles.CreateAsync(new IdentityRole(role))).Succeeded);
+                    if (!await roles.RoleExistsAsync(assignedRole))
+                    {
+                        Assert.True((await roles.CreateAsync(new IdentityRole(assignedRole))).Succeeded);
+                    }
                 }
 
                 var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
                 var email = $"identity-{Guid.NewGuid():N}@example.test";
                 var user = new AppUser { UserName = email, Email = email, EmailConfirmed = confirmed, FullName = "Isolated User" };
                 Assert.True((await users.CreateAsync(user, Password)).Succeeded);
-                Assert.True((await users.AddToRoleAsync(user, role)).Succeeded);
+                Assert.True((await users.AddToRolesAsync(user, assignedRoles)).Succeeded);
                 return new TestUser(user.Id, email);
             }
 

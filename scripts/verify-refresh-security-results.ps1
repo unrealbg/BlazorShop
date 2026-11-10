@@ -11,7 +11,7 @@ $required = @{
     'BankTransferConfigurationHttpTests' = 19
     'PublicCatalogHttpTests' = 9
     'RefreshRotationHttpTests' = 15
-    'RefreshEligibilityHttpTests' = 17
+    'RefreshEligibilityHttpTests' = 21
     'SessionObservationHttpTests' = 18
 }
 foreach ($group in $required.Keys) {

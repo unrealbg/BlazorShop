@@ -25,7 +25,7 @@ The rehearsal pins both application sources:
 - baselines come from the reviewed [historical](../rehearsal/baselines/historical.env) and [candidate-f40b870](../rehearsal/baselines/candidate-f40b870.env) profiles;
 - the workflow uses the full PR head SHA or, for a manual dispatch, the full commit SHA of the dispatched ref.
 
-The workflow builds the Linux/amd64 API and Storefront OCI archives once and labels them with that SHA. Each scenario independently verifies its source checkouts and archive source labels, hashes the imported image configs, and checks that the running containers use those verified imports. The runtime probe reads `dotnet --list-runtimes` inside both final images. The scan job reads the same OCI artifacts and uploads the CycloneDX SBOMs and full vulnerability reports. The artifacts record the source SHA, OCI manifest digest, and config digest for each image.
+The workflow builds the Linux/amd64 API, Storefront and Web OCI archives once from that SHA. Each scenario verifies the archive and layer checksums, the source revision, the imported image config digest and the running container image ID for all three services. It records the .NET runtimes inside API and Storefront and the NGINX version inside Web. The scan job verifies the same archives and uploads their CycloneDX SBOMs and vulnerability reports. Each image record contains the source SHA, archive SHA-256, OCI manifest digest and config digest.
 
 The historical commit is the merge of PR #97 and is the last application version before the checkout migration series began. Its migration head is `20260424183749_AdminBackOfficeMvp` (5 migrations). The target has 13 migrations with head `20261101131138_AddRegistrationConfirmationOutbox`. It applies these eight migrations to the historical database, in order:
 
@@ -77,7 +77,7 @@ The old `OrderLines` schema has no variant identifier. The representative legacy
 The separate `Staging Upgrade and Restore Rehearsal` workflow performs the following operations:
 
 1. Resolves the baseline profile, then checks out the workflow tooling plus the exact baseline and target application SHAs into separate directories.
-2. Builds baseline and target API, Storefront, and Web images from those unmodified sources, and the rehearsal-only Data Protection probe. PostgreSQL is pinned to `postgres:16.13-alpine3.23`.
+2. Builds API, Storefront and Web from the unchanged baseline source, imports the three verified target OCI archives, and builds the rehearsal-only Data Protection probe. PostgreSQL is pinned to `postgres:16.13-alpine3.23`.
 3. Starts the baseline API against an empty primary PostgreSQL volume. The baseline API applies only its own historical EF migrations. The restore volumes are asserted empty.
 4. Creates and verifies the synthetic fixture, starts the baseline UI, and proves catalog access, UI-independent login, and an authenticated order-history request.
 5. Writes the two upload fixtures, reads them back through the API's `/uploads` path, and protects a random value with the probe against the API's key volume.

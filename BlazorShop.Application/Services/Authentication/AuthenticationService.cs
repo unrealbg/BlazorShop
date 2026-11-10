@@ -1,5 +1,7 @@
 ﻿namespace BlazorShop.Application.Services.Authentication
 {
+    using System.Security.Claims;
+
     using AutoMapper;
 
     using BlazorShop.Application.DTOs;
@@ -165,6 +167,11 @@
             }
 
             var claims = await _userManager.GetUserClaimsAsync(confirmedEmail);
+            if (!claims.Any(claim => claim.Type == ClaimTypes.Role))
+            {
+                return new LoginResponse { Message = "Invalid credentials." };
+            }
+
 
             var accessToken = _tokenManager.GenerateAccessToken(claims);
             var refreshToken = _tokenManager.GetReFreshToken();

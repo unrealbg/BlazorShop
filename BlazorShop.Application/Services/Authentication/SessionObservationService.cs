@@ -15,9 +15,10 @@ namespace BlazorShop.Application.Services.Authentication
             var user = await users.GetUserByIdAsync(token.UserId);
             if (user is null || string.IsNullOrWhiteSpace(user.Email) || !await users.CanRefreshSignInAsync(user))
                 return SessionObservation.Anonymous;
-            var role = await roles.GetUserRoleAsync(user.Email);
-            if (role is not ("User" or "Admin")) return SessionObservation.Anonymous;
-            return new SessionObservation(true, role == "Admin", user.FullName, user.Email);
+            var assignedRoles = await roles.GetUserRolesAsync(user);
+            var isAdmin = assignedRoles.Contains("Admin");
+            if (!isAdmin && !assignedRoles.Contains("User")) return SessionObservation.Anonymous;
+            return new SessionObservation(true, isAdmin, user.FullName, user.Email);
         }
     }
 }
