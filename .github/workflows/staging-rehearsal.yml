@@ -47,7 +47,7 @@ jobs:
           output="$RUNNER_TEMP/r09-target-oci"
           mkdir -p "$output"
           docker buildx create --name r09-oci --driver docker-container
-          for app in API Storefront; do
+          for app in API Storefront Web; do
             service="${app,,}"
             archive="$output/$service.oci.tar"
             docker buildx build --builder r09-oci --platform linux/amd64 --pull \
@@ -73,6 +73,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.REHEARSAL_TARGET_SHA }}
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: ${{ needs.target-images.outputs.artifact }}
@@ -92,28 +96,35 @@ jobs:
               ghcr.io/aquasecurity/trivy:0.76.2@sha256:6fa071ef8daa2e58b90cbf1710bedca91adbb3bf98693533226f442035b836a6 "$@"
           }
           trivy --version > "$output/trivy-version.txt"
-          for service in api storefront; do
-            cp "$input/$service.json" "$output/"
+          for service in api storefront web; do
+            python3 rehearsal/inspect-target-image.py "$input/$service.oci.tar" "$REHEARSAL_TARGET_SHA" > "$output/$service.json"
+            cmp "$output/$service.json" "$input/$service.json"
             mkdir "$input/$service"
             tar -xf "$input/$service.oci.tar" -C "$input/$service"
             trivy image --input "/images/$service" --format cyclonedx \
               --output "/reports/$service.cdx.json" --no-progress
-            trivy image --input "/images/$service" --scanners vuln --format json \
+            trivy image --input "/images/$service" --scanners vuln --format json --list-all-pkgs \
               --output "/reports/$service.scan.json" --no-progress
           done
           trivy --version >> "$output/trivy-version.txt"
-      - name: Require scans of both images without Critical or High findings
+      - name: Require scans of all three images without Critical or High findings
         shell: bash
         run: |
           set -euo pipefail
           failed=0
-          for service in api storefront; do
+          for service in api storefront web; do
             output="$RUNNER_TEMP/r09-target-image-security"
             scan="$output/$service.scan.json"
             config_digest="$(jq -er '.config_digest' "$output/$service.json")"
-            jq -e --arg config "$config_digest" '.ArtifactType == "container_image"
-              and .Metadata.ImageID == $config
-              and any(.Results[]; .Target | endswith("/Microsoft.AspNetCore.App.deps.json"))' "$scan" > /dev/null
+            jq -e --arg config "$config_digest" --arg service "$service" '
+              .ArtifactType == "container_image" and .Metadata.ImageID == $config
+              and (if $service == "web" then
+                any(.Results[]; .Class == "os-pkgs" and .Type == "alpine"
+                  and any(.Packages[]?; .Name == "nginx"))
+              else
+                any(.Results[]; .Target | endswith("/Microsoft.AspNetCore.App.deps.json"))
+              end)' "$scan" > /dev/null
+            jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' "$output/$service.cdx.json" > /dev/null
             findings="$(jq '[.Results[].Vulnerabilities[]? | select(
               .VulnerabilityID == "CVE-2026-88092" or .Severity == "CRITICAL" or .Severity == "HIGH"
             ) | {VulnerabilityID, Severity, PkgName, InstalledVersion, FixedVersion}] | unique' "$scan")"
@@ -281,14 +292,14 @@ jobs:
           mkdir -p artifacts/rehearsal-regressions
           git rev-parse HEAD > artifacts/rehearsal-regressions/target-sha.txt
           dotnet test BlazorShop.Tests/BlazorShop.Tests.csproj --configuration Release \
-            --filter 'FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~InventoryReservationPostgreSqlTests|FullyQualifiedName~CheckoutIdempotencyPostgreSqlTests|FullyQualifiedName~StripeReconciliationPostgreSqlTests|FullyQualifiedName~RegistrationConfirmationHttpTests|FullyQualifiedName~RegistrationConfirmationMigrationTests' \
+            --filter 'FullyQualifiedName~RefreshEligibilityHttpTests|FullyQualifiedName~RefreshRotationHttpTests|FullyQualifiedName~InventoryReservationPostgreSqlTests|FullyQualifiedName~CheckoutIdempotencyPostgreSqlTests|FullyQualifiedName~StripeReconciliationPostgreSqlTests|FullyQualifiedName~RegistrationConfirmationHttpTests|FullyQualifiedName~RegistrationConfirmationMigrationTests' \
             --logger 'trx;LogFileName=target-postgres.trx' --results-directory artifacts/rehearsal-regressions
       - name: Require passing tests in every regression group
         shell: pwsh
         run: |
           [xml] $report = Get-Content -Raw artifacts/rehearsal-regressions/target-postgres.trx
           $results = @($report.TestRun.Results.UnitTestResult)
-          $groups = @('RefreshRotationHttpTests','InventoryReservationPostgreSqlTests','CheckoutIdempotencyPostgreSqlTests','StripeReconciliationPostgreSqlTests','RegistrationConfirmationHttpTests','RegistrationConfirmationMigrationTests')
+          $groups = @('RefreshEligibilityHttpTests','RefreshRotationHttpTests','InventoryReservationPostgreSqlTests','CheckoutIdempotencyPostgreSqlTests','StripeReconciliationPostgreSqlTests','RegistrationConfirmationHttpTests','RegistrationConfirmationMigrationTests')
           foreach ($group in $groups) {
             $matchesForGroup = @($results | Where-Object testName -Like "*.$group.*")
             if (!$matchesForGroup.Count -or @($matchesForGroup | Where-Object outcome -NE Passed).Count) {

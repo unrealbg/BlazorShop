@@ -696,7 +696,9 @@ import_target_image() {
     assert_equal "$(jq -er .config_digest "$record")" "sha256:$config_hash" \
         "target $service import matches the OCI config digest"
     TARGET_ENGINE_IMAGE_IDS[$service]="$(docker image inspect "$image" --format '{{.Id}}')"
-    bash "$TOOLING_DIR/scripts/verify-aspnet-runtime.sh" "$image" > "$REPORT_DIR/target-$service-runtimes.txt"
+    if [[ "$service" != web ]]; then
+        bash "$TOOLING_DIR/scripts/verify-aspnet-runtime.sh" "$image" > "$REPORT_DIR/target-$service-runtimes.txt"
+    fi
 }
 
 run_browser_scenario() {
@@ -741,7 +743,7 @@ build_image "$BASELINE_DIR" "BlazorShop.Presentation/BlazorShop.Storefront/Docke
 build_image "$BASELINE_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$BASELINE_WEB_IMAGE" "build-baseline-web.log"
 import_target_image api "$TARGET_API_IMAGE"
 import_target_image storefront "$TARGET_STOREFRONT_IMAGE"
-build_image "$TARGET_DIR" "BlazorShop.Presentation/BlazorShop.Web/Dockerfile" "$TARGET_WEB_IMAGE" "build-target-web.log"
+import_target_image web "$TARGET_WEB_IMAGE"
 
 {
     echo "tooling_sha=$(git -C "$TOOLING_DIR" rev-parse HEAD)"
@@ -874,7 +876,7 @@ dc up --detach --force-recreate --pull never api
 wait_http "$REHEARSAL_API_URL/health" "target API after migration"
 UPGRADE_MILLISECONDS="$(( $(date +%s%3N) - upgrade_started ))"
 dc up --detach --force-recreate --pull never storefront web
-for service in api storefront; do
+for service in api storefront web; do
     assert_equal "${TARGET_ENGINE_IMAGE_IDS[$service]}" \
         "$(docker inspect "$(dc ps -q "$service")" --format '{{.Image}}')" \
         "running target $service matches the verified OCI import"

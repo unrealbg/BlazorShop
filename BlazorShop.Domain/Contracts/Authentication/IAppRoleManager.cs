@@ -4,7 +4,7 @@
 
     public interface IAppRoleManager
     {
-        Task<string?> GetUserRoleAsync(string userEmail);
+        Task<IList<string>> GetUserRolesAsync(AppUser user);
 
         Task<bool> AddUserToRoleAsync(AppUser user, string roleName);
     }

@@ -55,9 +55,7 @@
                 return new UserLoginResult(false);
             }
 
-            string? roleName = await _roleManager.GetUserRoleAsync(user.Email!);
-
-            if (string.IsNullOrEmpty(roleName))
+            if ((await _roleManager.GetUserRolesAsync(currentUser)).Count == 0)
             {
                 return new UserLoginResult(false);
             }
@@ -99,17 +97,16 @@
 
         public async Task<List<Claim>> GetUserClaimsAsync(string email)
         {
-            var user = await GetUserByEmailAsync(email);
-
-            string? roleName = await _roleManager.GetUserRoleAsync(user!.Email!);
+            var user = (await GetUserByEmailAsync(email))!;
+            var roles = await _roleManager.GetUserRolesAsync(user);
 
             List<Claim> claims =
                 [
-                    new Claim("FullName", user!.FullName!),
-                    new Claim(ClaimTypes.Email, user!.Email!),
-                    new Claim(ClaimTypes.NameIdentifier, user!.Id),
-                    new Claim(ClaimTypes.Role, roleName!)
+                    new Claim("FullName", user.FullName!),
+                    new Claim(ClaimTypes.Email, user.Email!),
+                    new Claim(ClaimTypes.NameIdentifier, user.Id)
                 ];
+            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
             if (_demoRequestContext.IsDemo && !string.IsNullOrWhiteSpace(_demoRequestContext.SessionId))
             {

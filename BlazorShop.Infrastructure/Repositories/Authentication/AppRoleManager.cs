@@ -14,17 +14,9 @@
             _userManager = userManager;
         }
 
-        public async Task<string?> GetUserRoleAsync(string userEmail)
+        public Task<IList<string>> GetUserRolesAsync(AppUser user)
         {
-            var user = await _userManager.FindByEmailAsync(userEmail);
-
-            if (user == null)
-            {
-                return null;
-            }
-
-            var roles = await _userManager.GetRolesAsync(user);
-            return roles.FirstOrDefault();
+            return _userManager.GetRolesAsync(user);
         }
 
         public async Task<bool> AddUserToRoleAsync(AppUser user, string roleName)

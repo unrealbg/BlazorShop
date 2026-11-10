@@ -332,7 +332,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 PasswordHash = loginUser.Password,
                 EmailConfirmed = true
             };
-            var claims = new List<Claim> { new Claim(ClaimTypes.Name, "Test User") };
+            var claims = new List<Claim> { new(ClaimTypes.Name, "Test User"), new(ClaimTypes.Role, "User") };
             var accessToken = "accessToken";
             var refreshToken = "refreshToken";
             var storedRefreshToken = new RefreshToken { UserId = appUser.Id, TokenHash = "hashed-token" };
@@ -515,7 +515,7 @@ namespace BlazorShop.Tests.Application.Services.Authentication
                 PasswordHash = loginUser.Password,
                 EmailConfirmed = false,
             };
-            var claims = new List<Claim> { new Claim(ClaimTypes.Name, "Test User") };
+            var claims = new List<Claim> { new(ClaimTypes.Name, "Test User"), new(ClaimTypes.Role, "User") };
             var accessToken = "accessToken";
             var refreshToken = "refreshToken";
             var storedRefreshToken = new RefreshToken { UserId = appUser.Id, TokenHash = "hashed-token" };
